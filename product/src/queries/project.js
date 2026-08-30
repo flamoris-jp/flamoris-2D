@@ -2,19 +2,43 @@ import { cloneProject } from "../model/project.js";
 import { validationResult } from "../model/validation.js";
 import { worldTransformMatrix } from "../core/transforms.js";
 
-function treeNode(project, nodeId, includeHidden) {
+function treeNode(
+  project,
+  nodeId,
+  includeHidden,
+  parentEffectiveVisibility = true,
+) {
   const node = project.scene.nodes[nodeId];
-  if (!node || (!includeHidden && !node.visible)) return null;
+  if (!node) return null;
+  const effectiveVisible = parentEffectiveVisibility && node.visible;
+  if (!includeHidden && !effectiveVisible) return null;
   return {
     id: node.id,
     kind: node.kind,
     displayName: node.displayName,
     visible: node.visible,
+    effectiveVisible,
     locked: node.locked,
     children: node.children
-      .map((id) => treeNode(project, id, includeHidden))
+      .map((id) =>
+        treeNode(project, id, includeHidden, effectiveVisible))
       .filter(Boolean),
   };
+}
+
+export function isEffectivelyVisible(project, nodeId) {
+  let current = project.scene.nodes[nodeId];
+  if (!current) throw new Error("Unknown node " + nodeId + ".");
+  const visited = new Set();
+  while (current) {
+    if (visited.has(current.id)) return false;
+    visited.add(current.id);
+    if (!current.visible) return false;
+    current = current.parentId
+      ? project.scene.nodes[current.parentId]
+      : null;
+  }
+  return true;
 }
 
 export const projectQueries = {
@@ -40,6 +64,7 @@ export const projectQueries = {
     if (!node) throw new Error("Unknown node " + input.nodeId + ".");
     return {
       ...cloneProject(node),
+      effectiveVisible: isEffectivelyVisible(project, input.nodeId),
       worldTransform: worldTransformMatrix(project, input.nodeId),
     };
   },
@@ -47,13 +72,17 @@ export const projectQueries = {
     const needle = String(input.text || "").toLocaleLowerCase();
     return Object.values(project.scene.nodes)
       .filter((node) =>
-        (input.includeHidden !== false || node.visible) &&
+        (
+          input.includeHidden !== false ||
+          isEffectivelyVisible(project, node.id)
+        ) &&
         node.displayName.toLocaleLowerCase().includes(needle))
       .map((node) => ({
         id: node.id,
         displayName: node.displayName,
         kind: node.kind,
         visible: node.visible,
+        effectiveVisible: isEffectivelyVisible(project, node.id),
         locked: node.locked,
       }));
   },

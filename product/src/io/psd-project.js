@@ -4,10 +4,14 @@ import {
   createSceneNode,
 } from "../model/project.js";
 
-function layerSourceKey(node, path, occurrence) {
+function identitySegment(displayName, occurrence) {
+  return encodeURIComponent(displayName) + "[" + occurrence + "]";
+}
+
+function layerSourceKey(node, identityPath) {
   const nativeId = node.id ?? node.layerId;
   return nativeId == null
-    ? "path:" + path.join("/") + "#" + occurrence
+    ? "path:" + identityPath.join("/")
     : "layer:" + nativeId;
 }
 
@@ -43,6 +47,7 @@ export function createProjectFromPsd(
     children,
     parentId,
     parentPath,
+    parentIdentityPath,
   ) {
     const occurrences = new Map();
     for (const layer of children || []) {
@@ -50,6 +55,10 @@ export function createProjectFromPsd(
       const occurrence = (occurrences.get(displayName) || 0) + 1;
       occurrences.set(displayName, occurrence);
       const path = [...parentPath, displayName];
+      const identityPath = [
+        ...parentIdentityPath,
+        identitySegment(displayName, occurrence),
+      ];
       const id = idFactory("node");
       const hasChildren = Array.isArray(layer.children);
       const left = Number(layer.left ?? 0);
@@ -70,8 +79,9 @@ export function createProjectFromPsd(
         blendMode: layer.blendMode || "normal",
         sourceRef: {
           sourceAssetId,
-          sourceKey: layerSourceKey(layer, path, occurrence),
+          sourceKey: layerSourceKey(layer, identityPath),
           path: path.join("/"),
+          identityPath: identityPath.join("/"),
         },
         bounds: hasChildren
           ? null
@@ -80,60 +90,78 @@ export function createProjectFromPsd(
       project.scene.nodes[id] = node;
       project.scene.nodes[parentId].children.push(id);
       if (hasChildren) {
-        walk(layer.children, id, path);
+        walk(layer.children, id, path, identityPath);
       }
     }
   }
 
-  walk(psd.children || [], project.scene.rootId, []);
+  walk(psd.children || [], project.scene.rootId, [], []);
   return project;
 }
 
 export function reconcilePsdProject(project, psd, options = {}) {
   const imported = createProjectFromPsd(psd, options);
-  const currentBySource = new Map();
-  for (const node of Object.values(project.scene.nodes)) {
-    if (node.sourceRef?.sourceKey) {
-      currentBySource.set(node.sourceRef.sourceKey, node);
+  const indexBySource = (sourceProject) => {
+    const index = new Map();
+    for (const node of Object.values(sourceProject.scene.nodes)) {
+      const sourceKey = node.sourceRef?.sourceKey;
+      if (!sourceKey) continue;
+      if (!index.has(sourceKey)) index.set(sourceKey, []);
+      index.get(sourceKey).push(node);
     }
-  }
+    return index;
+  };
+  const currentBySource = indexBySource(project);
+  const importedBySource = indexBySource(imported);
   const matched = [];
   const added = [];
-  for (const node of Object.values(imported.scene.nodes)) {
-    const current = node.sourceRef &&
-      currentBySource.get(node.sourceRef.sourceKey);
-    if (!current) {
-      if (node.id !== imported.scene.rootId) {
-        added.push({
-          sourceKey: node.sourceRef?.sourceKey,
-          displayName: node.displayName,
-        });
-      }
+  const removed = [];
+  const ambiguous = [];
+  const sourceKeys = new Set([
+    ...currentBySource.keys(),
+    ...importedBySource.keys(),
+  ]);
+  for (const sourceKey of sourceKeys) {
+    const current = currentBySource.get(sourceKey) || [];
+    const next = importedBySource.get(sourceKey) || [];
+    if (current.length > 1 || next.length > 1) {
+      ambiguous.push({
+        sourceKey,
+        currentNodeIds: current.map((node) => node.id),
+        importedNodeIds: next.map((node) => node.id),
+      });
       continue;
     }
-    matched.push({
-      sourceKey: node.sourceRef.sourceKey,
-      nodeId: current.id,
-      importedNodeId: node.id,
-    });
+    if (current.length === 1 && next.length === 1) {
+      matched.push({
+        sourceKey,
+        nodeId: current[0].id,
+        importedNodeId: next[0].id,
+      });
+    } else if (next.length === 1) {
+      added.push({
+        sourceKey,
+        importedNodeId: next[0].id,
+        displayName: next[0].displayName,
+      });
+    } else if (current.length === 1) {
+      removed.push({
+        sourceKey,
+        nodeId: current[0].id,
+        displayName: current[0].displayName,
+      });
+    }
   }
-  const matchedKeys = new Set(
-    matched.map((entry) => entry.sourceKey),
-  );
-  const removed = [...currentBySource.entries()]
-    .filter(([sourceKey]) => !matchedKeys.has(sourceKey))
-    .map(([sourceKey, node]) => ({
-      sourceKey,
-      nodeId: node.id,
-      displayName: node.displayName,
-    }));
   return {
     importedProject: imported,
     review: {
       matched,
       added,
       removed,
-      canApplyAutomatically: removed.length === 0,
+      ambiguous,
+      canApplyAutomatically:
+        removed.length === 0 &&
+        ambiguous.length === 0,
     },
   };
 }

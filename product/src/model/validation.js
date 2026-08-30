@@ -30,7 +30,27 @@ export function validateProject(project) {
     issues.push(issue("scene.missing_nodes", "scene.nodes", "Scene node map is required."));
     return issues;
   }
-  if (!nodes[rootId]) issues.push(issue("scene.missing_root", "scene.rootId", "Scene root does not exist.", rootId));
+  const root = nodes[rootId];
+  if (!root) {
+    issues.push(issue("scene.missing_root", "scene.rootId", "Scene root does not exist.", rootId));
+  } else {
+    if (root.parentId !== null) {
+      issues.push(issue(
+        "scene.root_parent_not_null",
+        "scene.nodes." + rootId + ".parentId",
+        "Scene root parentId must be null.",
+        rootId,
+      ));
+    }
+    if (root.kind !== "group") {
+      issues.push(issue(
+        "scene.root_not_group",
+        "scene.nodes." + rootId + ".kind",
+        "Scene root kind must be group.",
+        rootId,
+      ));
+    }
+  }
 
   const allIds = new Map();
   const register = (id, path) => {

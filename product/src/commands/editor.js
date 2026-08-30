@@ -1,10 +1,10 @@
 import {
   cloneProject,
   createSceneNode,
-  identityTransform,
 } from "../model/project.js";
 import { validateProject } from "../model/validation.js";
 import { queryProject } from "../queries/project.js";
+import { validateCommand } from "./schemas.js";
 
 export class CommandError extends Error {
   constructor(message, code = "command.invalid", details = null) {
@@ -36,16 +36,6 @@ function nodeFor(project, nodeId) {
   return node;
 }
 
-function normalizedTransform(value) {
-  const base = identityTransform();
-  return {
-    position: { ...base.position, ...value?.position },
-    rotation: value?.rotation ?? base.rotation,
-    scale: { ...base.scale, ...value?.scale },
-    pivot: { ...base.pivot, ...value?.pivot },
-  };
-}
-
 const handlers = {
   "scene.rename_node": (project, payload) => {
     const node = nodeFor(project, payload.nodeId);
@@ -68,9 +58,13 @@ const handlers = {
     const node = nodeFor(project, payload.nodeId);
     const inverse = {
       type: "scene.set_transform",
-      payload: { nodeId: node.id, transform: cloneProject(node.transform) },
+      payload: {
+        nodeId: node.id,
+        coordinateSpace: "node-local",
+        transform: cloneProject(node.transform),
+      },
     };
-    node.transform = normalizedTransform(payload.transform);
+    node.transform = cloneProject(payload.transform);
     return { inverse, affectedIds: [node.id] };
   },
 
@@ -80,7 +74,7 @@ const handlers = {
       type: "scene.set_visibility",
       payload: { nodeId: node.id, visible: node.visible },
     };
-    node.visible = Boolean(payload.visible);
+    node.visible = payload.visible;
     return { inverse, affectedIds: [node.id] };
   },
 
@@ -90,7 +84,7 @@ const handlers = {
       type: "scene.set_locked",
       payload: { nodeId: node.id, locked: node.locked },
     };
-    node.locked = Boolean(payload.locked);
+    node.locked = payload.locked;
     return { inverse, affectedIds: [node.id] };
   },
 
@@ -214,17 +208,18 @@ const handlers = {
   },
 };
 
-function applyToDraft(project, command) {
-  if (
-    !command ||
-    typeof command.type !== "string" ||
-    !handlers[command.type]
-  ) {
+function assertCommand(command, { allowInternal = false } = {}) {
+  const issues = validateCommand(command, { allowInternal });
+  if (issues.length) {
     throw new CommandError(
-      "Unknown command " + (command?.type || "(missing)") + ".",
-      "command.unknown",
+      "Malformed command payload.",
+      "command.payload_invalid",
+      { issues },
     );
   }
+}
+
+function applyToDraft(project, command) {
   return handlers[command.type](project, command.payload || {});
 }
 
@@ -259,6 +254,7 @@ export class EditorSession {
         "transaction.empty",
       );
     }
+    commands.forEach((command) => assertCommand(command));
     const draft = cloneProject(this.project);
     const inverses = [];
     const affected = new Set();
@@ -298,7 +294,10 @@ export class EditorSession {
     const entry = this.undoStack.pop();
     if (!entry) return null;
     const draft = cloneProject(this.project);
-    entry.inverses.forEach((command) => applyToDraft(draft, command));
+    entry.inverses.forEach((command) => {
+      assertCommand(command, { allowInternal: true });
+      applyToDraft(draft, command);
+    });
     const issues = validationErrors(draft);
     if (issues.length) throw new TransactionError(issues);
     this.project = draft;
@@ -316,7 +315,10 @@ export class EditorSession {
     const entry = this.redoStack.pop();
     if (!entry) return null;
     const draft = cloneProject(this.project);
-    entry.commands.forEach((command) => applyToDraft(draft, command));
+    entry.commands.forEach((command) => {
+      assertCommand(command);
+      applyToDraft(draft, command);
+    });
     const issues = validationErrors(draft);
     if (issues.length) throw new TransactionError(issues);
     this.project = draft;

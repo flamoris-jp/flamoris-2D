@@ -82,3 +82,62 @@ test("PSD reconciliation reports compatible IDs and removed layers", () => {
   );
   assert.equal(result.review.canApplyAutomatically, false);
 });
+
+test("fallback source identity includes occurrence at every hierarchy level", () => {
+  const sameNamePsd = {
+    width: 100,
+    height: 100,
+    children: [
+      {
+        name: "顔",
+        children: [{ name: "目", left: 0, top: 0, right: 10, bottom: 10 }],
+      },
+      {
+        name: "顔",
+        children: [{ name: "目", left: 20, top: 0, right: 30, bottom: 10 }],
+      },
+    ],
+  };
+  const project = createProjectFromPsd(sameNamePsd, {
+    idFactory: createIdFactory("fallback"),
+  });
+  const sourceKeys = Object.values(project.scene.nodes)
+    .map((node) => node.sourceRef?.sourceKey)
+    .filter(Boolean);
+  assert.equal(new Set(sourceKeys).size, sourceKeys.length);
+  assert.ok(sourceKeys.includes(
+    "path:%E9%A1%94[1]/%E7%9B%AE[1]",
+  ));
+  assert.ok(sourceKeys.includes(
+    "path:%E9%A1%94[2]/%E7%9B%AE[1]",
+  ));
+
+  const reconciliation = reconcilePsdProject(
+    project,
+    sameNamePsd,
+    { idFactory: createIdFactory("fallback-next") },
+  );
+  assert.deepEqual(reconciliation.review.ambiguous, []);
+  assert.equal(reconciliation.review.canApplyAutomatically, true);
+});
+
+test("duplicate source identity blocks automatic reconciliation", () => {
+  const project = createProjectFromPsd(psd, {
+    idFactory: createIdFactory("unique"),
+  });
+  const duplicateIdPsd = structuredClone(psd);
+  duplicateIdPsd.children[0].children.push({
+    id: 11,
+    name: "重複した左目",
+    left: 120,
+    top: 20,
+    right: 220,
+    bottom: 80,
+  });
+  const result = reconcilePsdProject(project, duplicateIdPsd, {
+    idFactory: createIdFactory("duplicate"),
+  });
+  assert.equal(result.review.ambiguous.length, 1);
+  assert.equal(result.review.ambiguous[0].sourceKey, "layer:11");
+  assert.equal(result.review.canApplyAutomatically, false);
+});

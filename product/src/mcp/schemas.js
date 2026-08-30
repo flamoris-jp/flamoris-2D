@@ -1,4 +1,4 @@
-const nodeId = { type: "string", minLength: 1 };
+export { commandSchemas } from "../commands/schemas.js";
 
 export const MCP_SCHEMA_VERSION = 1;
 
@@ -31,56 +31,3 @@ export const querySchemas = {
     additionalProperties: false,
   },
 };
-
-export const commandSchemas = {
-  "scene.rename_node": {
-    required: ["nodeId", "displayName"],
-    properties: {
-      nodeId,
-      displayName: { type: "string", minLength: 1 },
-    },
-  },
-  "scene.set_transform": {
-    required: ["nodeId", "transform"],
-    properties: {
-      nodeId,
-      transform: { type: "object" },
-    },
-  },
-  "scene.set_visibility": {
-    required: ["nodeId", "visible"],
-    properties: {
-      nodeId,
-      visible: { type: "boolean" },
-    },
-  },
-  "scene.set_locked": {
-    required: ["nodeId", "locked"],
-    properties: {
-      nodeId,
-      locked: { type: "boolean" },
-    },
-  },
-  "scene.create_group": {
-    required: ["id", "parentId", "displayName"],
-    properties: {
-      id: nodeId,
-      parentId: nodeId,
-      displayName: { type: "string", minLength: 1 },
-      index: { type: "integer", minimum: 0 },
-    },
-  },
-  "scene.reparent_node": {
-    required: ["nodeId", "parentId"],
-    properties: {
-      nodeId,
-      parentId: nodeId,
-      index: { type: "integer", minimum: 0 },
-    },
-  },
-};
-
-for (const schema of Object.values(commandSchemas)) {
-  schema.type = "object";
-  schema.additionalProperties = false;
-}

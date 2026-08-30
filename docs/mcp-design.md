@@ -91,6 +91,13 @@ MCP should generally use document/node/mesh coordinates rather than viewport pix
 
 This prevents commands from changing meaning when the user zooms or pans.
 
+`scene.set_transform` is a complete replacement command. Its payload must
+declare `coordinateSpace: "node-local"` and provide every transform field:
+`position`, `rotation`, `scale`, and `pivot`. Partial transform payloads
+are rejected before mutation. If partial editing is needed later, it will use a
+separate command such as `scene.patch_transform` rather than changing the
+meaning of `scene.set_transform`.
+
 ## 5. Query vs mutation separation
 
 Read tools should be clearly separate from editing tools.
