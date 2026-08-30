@@ -7,3 +7,11 @@ src/mesh.js
 src/psd.js
 src/renderer.js
 src/styles.css
+src/model/project.js
+src/model/validation.js
+src/core/transforms.js
+src/queries/project.js
+src/commands/editor.js
+src/io/project-json.js
+src/io/psd-project.js
+src/mcp/schemas.js
