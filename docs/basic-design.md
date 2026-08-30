@@ -1,76 +1,117 @@
-# FLAMORIS 2D Basic Design v0
+# FLAMORIS 2D Basic Design v1 Draft
 
 Status: draft for review
 
 ## 1. Product purpose
 
-FLAMORIS 2D is a lightweight 2D rigging and animation editor for producing short character animation clips for music-video production.
+FLAMORIS 2D is a PSD-native 2D rigging and animation editor for producing short character animation clips for music-video production.
 
-Primary workflow:
+The defining workflow is not limited to deforming one illustration. A shot may use multiple authored Key Arts, especially a start drawing and an end drawing:
 
 ```text
-Photoshop PSD
-  -> FLAMORIS 2D Rig
+PSD Key Art A
+  -> Rig / Mesh / Mapping
+  -> Editable Transition
+  -> PSD Key Art B
+  -> optional B -> C -> D transitions
   -> Short Animation Clip
   -> PNG/WebM/Video or Bridge
   -> After Effects / Blender / Editing Pipeline
 ```
 
-FLAMORIS 2D is not intended to reproduce every feature of Live2D Cubism or become a full real-time VTuber tracking suite.
+FLAMORIS 2D is not intended to reproduce every Live2D Cubism feature or become a full real-time VTuber tracking suite.
 
-The editor should nevertheless provide the rigging foundations required for production-quality short clips. "Lightweight" means focused workflow, not fragile data structures.
+The product identity is:
+
+> A PSD-native, key-art-transition and clip-first 2D rigging editor optimized for expressive short MV shots.
 
 ## 2. Design principles
 
-1. **PSD is a first-class source format.**
-   Preserve source hierarchy, layer order, coordinates, names, opacity, and supported masks/blend information.
-2. **Non-destructive editing.**
-   Source artwork, base mesh, rig state, and animation state remain logically separate.
-3. **Stable IDs, editable names.**
-   Internal IDs never depend on Japanese/English display names.
-4. **Scene hierarchy is real data.**
-   Groups are not UI-only folders; they can own transforms and animation.
-5. **Rig and animation are separate layers.**
-   A rig defines how things can move. Animation defines when/how those controls move.
-6. **Clip-first authoring for MV work.**
-   Reusable actions such as Blink, HairSway, Breath, HeadTilt, LookLeft, and RaiseArm are first-class animation clips.
-7. **Semantic parameters are optional drivers.**
-   Parameter-style control can be added where useful without making the whole editor parameter-centric.
-8. **All mutations go through commands.**
-   UI, Undo/Redo, scripting, and future MCP call the same deterministic command layer.
-9. **Open, versioned project data.**
-   Projects must be recoverable, testable, migratable, and suitable for version control.
-10. **Production changes must survive source-art updates.**
-    PSD re-import should update textures/positions without discarding rig and animation work whenever matching is possible.
+1. **PSD is a first-class source format.** Preserve hierarchy, layer order, coordinates, names, opacity, and supported masks/blend information.
+2. **Multiple Key Arts are first-class.** Start/end drawings are project data, not flattened reference images.
+3. **Non-destructive editing.** Source artwork, base mesh topology, per-Key-Art mesh keyforms, rig state, and animation state remain logically separate.
+4. **Stable IDs, editable names.** Permanent identity never depends on Japanese/English display names.
+5. **Semantic identity can span drawings.** A logical part such as `eye.left.iris` may map to different PSD layers in different Key Arts.
+6. **Scene hierarchy is real data.** Groups own transforms and may be animated.
+7. **Rig and animation are separate layers.** Rig defines how content can move; animation defines when controls move.
+8. **Clip-first authoring.** Reusable actions such as Blink, HairSway, Breath, HeadTilt, LookLeft, RaiseArm are first-class clips.
+9. **AI/MCP readiness starts at the core.** UI, tests, scripts, and MCP use one headless command/query model.
+10. **AI proposes; deterministic commands commit.** No opaque AI-only project state.
+11. **Open, versioned project data.** Projects are recoverable, migratable, testable, and version-control friendly.
+12. **Source-art updates must preserve authored work where possible.** PSD re-import and Key-Art updates should not destroy meshes/rig/animation silently.
 
-## 3. Core domain model
+## 3. High-level architecture
+
+```text
+Human UI ───────┐
+                │
+AI / MCP ───────┼──> Query / Command API
+                │         ↓
+Tests/Scripts ──┘    Project Model
+                         ↓
+                    Evaluation Core
+                         ↓
+                      Renderer
+```
+
+Core domain/model/commands must not depend on DOM pointer events.
+
+Suggested module boundaries:
+
+```text
+model       versioned schema + validation
+core        scene, geometry, rig, transition, animation evaluation
+commands    deterministic mutations + undo/redo + transactions
+io          PSD/project import/export
+renderer    WebGL rendering
+ui          browser editor shell
+mcp         typed adapter over queries/commands
+```
+
+These may begin as folders/modules in one package and split later only if useful.
+
+## 4. Core domain model
 
 ```text
 Project
 ├── schemaVersion
 ├── Canvas
 ├── SourceAsset[]
+├── SemanticSlot[]
+├── KeyArt[]
+│   ├── sourceAssetId
+│   └── SceneState / PartAppearance[]
 ├── Scene
 │   └── SceneNode tree
 ├── Rig
 │   ├── Deformer[]
 │   ├── Bone[]
 │   └── Constraint[]
+├── Transition[]
+│   ├── fromKeyArtId
+│   ├── toKeyArtId
+│   └── PartTransition[]
 ├── Animation
 │   ├── Clip[]
 │   ├── Track[]
 │   └── Keyframe[]
+├── Sequence
 └── RenderSettings
 ```
 
-### 3.1 SceneNode
+Detailed Key-Art behavior is defined in `docs/key-art-transition.md`.
+Detailed AI/MCP behavior is defined in `docs/mcp-design.md`.
+
+## 5. Stable identity and semantic mapping
+
+### 5.1 SceneNode identity
 
 Common properties:
 
 ```text
 id              stable internal ID
 sourceRef       PSD source mapping if any
-displayName     user-editable, Unicode/Japanese allowed
+displayName     user-editable Unicode/Japanese name
 parentId
 children[]
 visible
@@ -80,7 +121,7 @@ blendMode
 transform
 ```
 
-Node kinds:
+Node kinds include:
 
 ```text
 GroupNode
@@ -89,43 +130,35 @@ DeformerNode
 BoneNode
 ```
 
-A GroupNode has meaningful transform inheritance and can be animated.
+Layer names are never permanent IDs.
 
-### 3.2 PartNode
+### 5.2 SemanticSlot
+
+A SemanticSlot identifies meaning across different drawings.
+
+Examples:
 
 ```text
-PartNode
-├── TextureReference
-├── SourceBounds
-├── Transform
-├── Mesh
-├── Mask/Clipping relationships
-├── Deformation state
-└── Render properties
+eye.left.white
+eye.left.iris
+hair.front.center
+body.arm.left.upper
 ```
 
-A part keeps a source-space reference to the PSD so source updates can be reconciled later.
+Each Key Art maps concrete nodes/layers to semantic slots.
 
-### 3.3 IDs and names
+This allows:
 
-Never use layer names as permanent identity.
-
-Recommended shape:
-
-```json
-{
-  "id": "part_01...",
-  "source": {
-    "documentId": "source_01...",
-    "path": "03_face/eye_left/eye_left_iris"
-  },
-  "displayName": "左目・虹彩"
-}
+```text
+Key Art A: eye_left_iris
+Key Art B: 左目_虹彩
+      ↓
+semanticSlotId: eye.left.iris
 ```
 
-`source.path` is useful for re-import matching but is not the primary identity.
+The mapping may be manual, rule-assisted, or AI-suggested, but the saved result is deterministic project data.
 
-## 4. Transform model
+## 6. Transform and hierarchy model
 
 Every transform-capable node has:
 
@@ -136,9 +169,9 @@ scale x/y
 pivot x/y
 ```
 
-World transform is inherited through the scene tree.
+World transforms inherit through the scene tree.
 
-Typical hierarchy:
+Example:
 
 ```text
 Akino
@@ -152,143 +185,205 @@ Akino
     └── FrontHair
 ```
 
-Moving `LeftEye` moves all eye children. Moving `Head` moves the complete head hierarchy.
+Moving `LeftEye` moves all eye children; moving `Head` moves the whole head hierarchy.
 
-## 5. Geometry and deformation model
+GroupNode is therefore a real rig primitive, not a UI-only folder.
 
-### 5.1 Immutable base mesh
+## 7. Geometry model
+
+### 7.1 Shared topology
+
+A compatible logical part can share mesh topology across Key Arts:
 
 ```text
-Mesh
-├── baseVertices
-├── uvs
-└── indices
+MeshTopology
+├── stableVertexIds[]
+└── indices[]
 ```
 
-The base mesh is not destructively overwritten by animation.
-
-### 5.2 Evaluated deformation pipeline
-
-Conceptual evaluation order:
+Each Key Art stores its own mesh keyform:
 
 ```text
-Base Mesh
+MeshKeyform
+├── keyArtId
+├── positions[]
+└── uvs[]
+```
+
+The start drawing can define the initial topology. The same stable vertices are then positioned over the end drawing.
+
+### 7.2 Immutable base data
+
+Topology and source keyforms should not be destructively overwritten by animation playback.
+
+Direct edits create ordinary keyform/deformation changes through commands.
+
+### 7.3 Evaluation pipeline
+
+Conceptually:
+
+```text
+Selected Key Art / Transition base geometry
+  -> Key-Art geometry interpolation
   -> Rig deformation
        bone skinning
        warp/lattice deformation
-       optional path/deformer effects
+       optional path effects
   -> Animation/form corrections
-       keyformed vertex offsets / shape states
   -> Node/world transform
   -> Render Mesh
 ```
 
-The exact mathematical order must be covered by tests because changing it later can invalidate authored rigs.
+The mathematical order must be tested because changing it later can invalidate authored work.
 
-### 5.3 Direct mesh editing
+## 8. Key Art transition model
 
-Direct vertex editing remains supported.
+A Transition connects two authored states:
 
-Editor tools should include over time:
+```text
+A -> Transition AB -> B
+```
 
-- point selection
-- multi-selection
+For a compatible part:
+
+```text
+position_i(t) = lerp(positionA_i, positionB_i, curve(t))
+```
+
+When the artwork itself differs, the renderer can morph using two textures and two UV sets on the interpolated triangles:
+
+```text
+Texture A / UV A ----┐
+                     ├-> interpolated geometry -> blended color
+Texture B / UV B ----┘
+```
+
+Minimum transition modes:
+
+```text
+Morph
+Hold
+Crossfade/Replace
+Appear
+Disappear
+Occlusion
+Swap
+```
+
+Presence is not binary. Distinguish:
+
+```text
+present
+occluded
+absent
+```
+
+This matters for turns where an eye/arm/hair section still exists logically but is hidden.
+
+Major viewpoint changes should be represented as several Key Arts when needed:
+
+```text
+Front -> 3/4 -> Side -> Back
+```
+
+Do not pretend that unseen art can always be reconstructed from one source drawing.
+
+## 9. Mesh editing
+
+Required production tools over time:
+
+- point/multi-select
 - box/lasso/brush selection
 - vertex move
 - add/remove/connect
 - reset selected/all
+- configurable mesh density
 - proportional editing
-- optional connected-only proportional editing
+- connected-only proportional editing
 - mirror editing
+- topology diagnostics
 
-Proportional Editing is an editor operation. It writes ordinary vertex changes using a falloff and does not require a special runtime deformation type.
+Initial proportional falloffs:
 
-Initial falloffs:
+```text
+Smooth
+Linear
+Sharp
+```
 
-- Smooth
-- Linear
-- Sharp
+Proportional Editing is an editor operation that writes ordinary vertex changes. It does not require a special runtime deformation type.
 
-## 6. Deformers and grouping
+## 10. Correspondence assistance
 
-### 6.1 Group transform
+The target mesh on Key Art B may initially be authored manually.
+
+A useful deterministic helper is sparse correspondence anchors:
+
+```text
+A shoulder -> B shoulder
+A elbow    -> B elbow
+A wrist    -> B wrist
+```
+
+The system then solves remaining vertices smoothly, followed by manual correction.
+
+Algorithms to evaluate:
+
+- piecewise affine / triangle propagation
+- barycentric propagation
+- thin-plate spline
+- ARAP-style deformation
+
+AI can later suggest anchors or dense correspondence using visual/semantic matching, but the persistent result remains ordinary target vertex positions and mappings.
+
+## 11. Deformers and grouping
+
+### Group transform
 
 Lowest-cost way to move related content together.
 
-Use cases:
+### Warp/Lattice Deformer
 
-- complete left eye
-- head
-- hand and attached accessory
-- mouth contents
+Sparse control grid affecting one or more child nodes.
 
-### 6.2 Warp/Lattice Deformer
+Useful for:
 
-A sparse control grid deforms one or more child parts.
-
-Use cases:
-
-- head tilt correction
+- face/head corrections
 - hair block sway
 - cloth
-- face-wide deformation
+- grouped deformation
 
-A deformer is different from the part's own render mesh. Its purpose is to provide a low-resolution control surface for multiple children.
+### Bone rig
 
-### 6.3 Bone rig
-
-Bones form a parent-child skeletal hierarchy.
-
-Minimum properties:
-
-```text
-id
-parentBoneId
-origin
-length/direction
-rotation
-scale
-```
+Bones form a parent-child hierarchy.
 
 Production target:
 
 - per-vertex bone weights
-- multiple bone influence per vertex
-- weight normalization
-- weight editing/painting
+- multiple influences
+- normalization
+- weight visualization/editing
+- later 2-bone IK and limits
 
-Development can start with rigid part attachment for proof, but weighted mesh skinning is the intended design.
-
-Bone workflow:
+Typical workflow:
 
 ```text
-move/rotate bones for large pose
-  -> evaluate skinning
-  -> apply mesh/form correction for silhouette and clothing quality
+bone pose for large motion
+  -> skinning
+  -> mesh/form correction
 ```
 
-Later constraints:
+## 12. Mask and clipping model
 
-- rotation limits
-- simple 2-bone IK
-- optional target controls
+Keep source masks and clipping relationships separate.
 
-## 7. Mask and clipping model
+### Source mask
 
-Keep two concepts separate.
+Changes the alpha/content of the part itself, including imported PSD masks where supported.
 
-### 7.1 Source mask
+### Clipping
 
-Modifies the alpha/content of the part itself.
-
-Examples:
-
-- imported PSD layer mask
-- explicit user-authored mask asset
-
-### 7.2 Clipping relationship
-
-Restricts a rendered part to the visible region of another mask source.
+Restricts one part to the visible region of another.
 
 Example:
 
@@ -299,174 +394,149 @@ highlights
   Clip To -> eye_white / eye_area
 ```
 
-Expected capabilities:
+Clipping must remain correct while both source and target deform and while transitioning between Key Arts.
 
-- one clipping source can affect multiple targets
-- support inversion later if needed
-- clipping remains valid while both source and target deform
+## 13. PSD import and re-import
 
-Eye clipping is a P0 production requirement because it is needed immediately for gaze animation.
+PSD is core workflow.
 
-## 8. PSD import and re-import
+Import should preserve as much as practical:
 
-PSD is now part of the core workflow rather than a future optional import path.
-
-Initial import already proves that FLAMORIS 2D can recover:
-
-- document dimensions
+- dimensions
 - hierarchy
-- layer names
+- names
 - document-space bounds
 - layer order
 - image data
+- opacity
+- supported masks/blending metadata
 
-Re-import design:
+Re-import flow:
 
 ```text
-Existing Project + Updated PSD
-  -> parse source
-  -> match existing nodes
+Existing Key Art + Updated PSD
+  -> parse
+  -> match existing source nodes
   -> report added/removed/renamed/changed layers
-  -> update source textures/bounds
-  -> preserve stable IDs, meshes, rig, clips where compatible
+  -> update textures/bounds
+  -> preserve stable IDs, semantic mapping, meshes, rig, transitions, clips where compatible
 ```
 
-Matching strategy, in order:
+Ambiguous matches require explicit review rather than silent data loss.
 
-1. stored source identity/path
-2. source metadata/fingerprint where available
-3. name + hierarchy + geometry heuristic
-4. explicit user mapping when ambiguous
+## 14. Editor UI architecture
 
-Re-import must show a review result instead of silently discarding rig data.
-
-## 9. Editor UI architecture
-
-Recommended production layout:
+Recommended layout:
 
 ```text
 +-----------+----------------------+-------------+
-| Scene     |                      | Inspector   |
-| Tree      |      Viewport        |             |
-|           |                      |             |
+| Scene /   |                      | Inspector   |
+| Key Art   |      Viewport        |             |
+| Tree      |                      |             |
 +-----------+----------------------+-------------+
-|               Timeline                         |
+| Key Art Strip + Timeline                       |
 +------------------------------------------------+
 ```
 
-### 9.1 Scene Tree
-
-Replaces the prototype select box.
-
-Features:
+### Scene Tree
 
 - PSD hierarchy
 - expand/collapse
 - selection
-- drag-to-reparent where valid
-- visibility
-- lock
+- visibility/lock
 - rename/display name
 - search/filter
-- type icons for Group, Part, Warp, Bone
-- optional Solo
+- type icons
+- drag reparent with validation
+- optional solo
 
-### 9.2 Viewport
+### Key Art controls
 
-Current zoom/pan becomes foundation.
+- A/B/C thumbnails or strip
+- active Key Art
+- overlay/ghost compare
+- correspondence status
+- transition mode per selected semantic part
+- jump to Start / End keyform
 
-Future tools:
+### Viewport
 
+- zoom/pan
 - canvas picking
 - transform gizmo
-- pivot editing
-- mesh edit mode
-- proportional editing radius/falloff
-- bone edit/pose mode
+- pivot edit
+- mesh edit
+- target-Key-Art mesh edit
+- proportional radius/falloff
+- bone edit/pose
 - clipping visualization
 - weight visualization
+- optional A/B onion/ghost overlay
 
-### 9.3 Inspector
+### Inspector
 
-Contextual properties for selected node/tool.
+Contextual properties for selected node, mesh, Key Art, transition, bone, clip, or tool.
 
-Do not place all future controls permanently in the left sidebar.
+### Timeline
 
-### 9.4 Timeline
+Tracks may target:
 
-Tracks can target:
-
-- node transform
-- bone transform
-- deformer control points
-- mesh/form offsets
-- visibility/opacity where useful
+- node/group transforms
+- bones
+- deformers
+- mesh/form states
+- visibility/opacity
 - clip instances
+- Key Art transitions
+- transition curves
+- draw-order step events where needed
 
-## 10. Animation model
+## 15. Animation model
 
-### 10.1 Clip-first model
+### Clip-first
 
-```text
-Clip: Blink
-  LeftEye track
-  RightEye track
-
-Clip: HairSway
-  FrontHair warp track
-  SideHair warp track
-```
-
-Clips have:
+Reusable clips:
 
 ```text
-id
-displayName
-duration
-loopMode
-tracks[]
-```
-
-A clip can be reused multiple times in a shot timeline.
-
-### 10.2 Keyframes
-
-Keyframes should eventually support:
-
-- Linear
-- Ease In/Out
-- Bezier/custom curve
-- Hold/step where useful
-
-### 10.3 Pose / Form / Shape state
-
-Reusable deformation states are useful for:
-
-- EyesClosed
-- Smile
-- LookLeft
-- HandPose
-
-These states can be blended or referenced by animation clips later.
-
-### 10.4 Optional semantic drivers
-
-Semantic controls such as:
-
-```text
-EyeOpenLeft
-EyeOpenRight
-LookX
-LookY
-HeadAngle
+Blink
 Breath
+HairSway
+HeadTilt
+LookLeft
+RaiseArm
 ```
 
-may be layered on top later for reusable rigs and MCP. They are not required to be the primary timeline authoring UI.
+Clips are reusable instances on a shot timeline.
 
-## 11. Command and Undo architecture
+### Pose/Form/Shape state
 
-All model changes must eventually be commands.
+Reusable states such as:
+
+```text
+EyesClosed
+Smile
+LookLeft
+HandPose
+```
+
+may be blended or referenced by clips.
+
+### Key Art sequence
+
+Animation and Key-Art transitions coexist:
+
+```text
+rig animation on A
+  -> Transition A/B
+  -> rig animation on B
+  -> Transition B/C
+```
+
+The sequence model should generalize from two Key Arts to multiple without redesigning the project format.
+
+## 16. Command, transactions, Undo/Redo
+
+Every persistent mutation is a command.
 
 Examples:
 
@@ -476,38 +546,69 @@ ReparentNode
 SetTransform
 MoveVertices
 GenerateMesh
+SetMeshKeyform
+MapSemanticSlot
+CreateKeyArt
+CreateTransition
+SetPartTransitionMode
 SetClippingSource
 AddBone
 SetBoneWeights
 AddKeyframe
-MoveKeyframe
 ```
 
-Command contract:
+Commands support:
+
+- apply
+- undo
+- validation
+- grouping/transaction
+- structured change summary
+
+Multi-step AI edits should be atomic or rollback on failure.
+
+High-impact automatic operations should support dry-run/preview before commit.
+
+## 17. MCP-first requirements
+
+MCP uses stable IDs and domain coordinates, not display names or viewport pixels as primary addressing.
+
+Separate query and mutation capabilities.
+
+Example queries:
 
 ```text
-apply(project)
-undo(project)
-serialize? (where useful)
+scene.get_tree
+keyart.list
+keyart.compare
+transition.get
+mesh.get_summary
+project.validate
 ```
 
-Benefits:
+Example mutations:
 
-- Undo/Redo
-- action history
-- deterministic tests
-- macro operations
-- future MCP
-- safer automation
+```text
+scene.set_transform
+mesh.set_keyform
+keyart.map_semantic_slot
+transition.create
+transition.set_correspondence
+animation.create_clip
+```
 
-## 12. Persistence
+Semantic AI operations such as `blink`, `tilt_head`, or `connect_key_arts` compile to the same low-level commands the UI uses.
+
+The deterministic editor must work offline without AI.
+
+## 18. Persistence
 
 Suggested development representation:
 
 ```text
 project/
 ├── project.json
-└── optional cached/generated assets
+└── optional generated/cache assets
 ```
 
 Later packaged form:
@@ -516,76 +617,77 @@ Later packaged form:
 *.flamoris2d
 ```
 
-which may be a ZIP container.
-
-Project data must contain:
+Project data includes:
 
 - schema version
-- source PSD reference metadata
+- source asset metadata
 - stable IDs
-- scene tree
-- meshes
-- rig/deformer definitions
-- clipping relationships
-- animation clips/timeline
+- semantic slots
+- Key Arts
+- scene hierarchy
+- mesh topology and per-Key-Art keyforms
+- rig/deformers/bones
+- clipping
+- transitions
+- clips/timeline/sequence
 - render settings
 
-Transient editor state such as current panel width or hover should not pollute core project data unless explicitly desired as workspace preferences.
+Transient panel sizes/hover state should remain workspace/editor preferences, not core project state.
 
-## 13. Rendering
+## 19. Rendering
 
 Continue using indexed GPU meshes.
 
-Render pipeline must support over time:
+Renderer must grow to support:
 
-- scene hierarchy transform evaluation
+- hierarchy transforms
+- multiple deformed parts
 - stable draw order
-- alpha blending
 - clipping masks
-- selected-part overlay/gizmos
-- multiple deformed parts in one frame
+- dual-texture transition sampling
+- per-Key-Art UVs
+- selected-part overlays/gizmos
+- transition preview/scrub
 
-Advanced blend modes are optional after core alpha/clipping correctness.
+Advanced blend modes come after alpha/clipping/transition correctness.
 
-## 14. Reliability requirements
+## 20. Reliability requirements
 
-Production-facing editor requirements:
+Production-facing requirements:
 
 - Undo/Redo
+- transactions
 - autosave/recovery
-- project schema validation
-- safe load failure with useful diagnostics
-- no silent source re-import data loss
+- schema validation
+- safe load failures
+- no silent re-import loss
+- no silent correspondence loss
 - deterministic serialization where practical
-- tests for geometry evaluation and hierarchy cycles
-- tests for project migration/version loading
+- hierarchy-cycle tests
+- geometry/keyform compatibility tests
+- project migration tests
+- transition render tests
 
-## 15. Non-goals for the first production beta
-
-Keep these out until the editor can reliably make and export a short MV shot:
+## 21. Non-goals for first production beta
 
 - real-time face tracking
 - full VTuber runtime
-- audio-driven lip sync
-- complex rigid-body simulation
-- full Live2D compatibility
-- arbitrary plugin ecosystem
-- automatic AI segmentation as a dependency
+- audio-driven lip-sync
+- complete Live2D compatibility
+- advanced rigid-body simulation
+- arbitrary plugin marketplace
+- mandatory AI/cloud service
+- magical reconstruction of truly unseen artwork from one image
 
-## 16. Long-term integration
+## 22. Long-term integrations
 
-Once the command/model layers are stable:
+Once model/commands are stable:
 
-- MCP exposes the same commands as the UI.
-- semantic MCP operations compile into deterministic commands/clips.
-- After Effects bridge can reconstruct layers/transforms or consume baked output.
-- Blender importer can reconstruct planes/meshes/shape data where useful.
-- automated rig helpers can infer groups, clipping, pivots, bones, or common clips without changing the underlying project format.
+- full MCP server over existing query/command API
+- AI correspondence and rig suggestions
+- After Effects bridge
+- Blender importer/bridge
+- optional generative intermediate-frame suggestions as reference/assist layers
+- optional semantic parameter/driver layer
 
-## 17. Product identity
-
-FLAMORIS 2D should aim to be:
-
-> A PSD-native, clip-first 2D rigging editor optimized for quickly creating expressive short character animation shots for music-video production.
-
-That focus allows the tool to use proven rigging foundations without inheriting the complete complexity of a real-time avatar suite.
+The core project must remain editable even when all AI helpers are unavailable.
