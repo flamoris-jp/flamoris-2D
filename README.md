@@ -1,276 +1,152 @@
-# flamoris-2D
+# FLAMORIS 2D
 
-FLAMORIS向けの軽量2Dキャラクターアニメーションエンジン。
-Photoshopなどで事前に分離した透明PNGパーツを読み込み、
-各パーツにMeshを生成して変形・キーフレームアニメーションを行います。
-フル機能のLive2D代替を目指すのではなく、
-MV制作で使う短い2Dアニメーションカットを素早く作ることを目的とします。
+FLAMORIS 2D is a PSD-native 2D rigging and animation editor for producing short expressive character shots for music-video work.
 
-## Concept
-
-基本ワークフロー:
+The current design is not limited to deforming a single illustration. The core workflow treats authored Key Arts, especially a start image and an end image, as first-class states that can be connected by editable mesh/texture transitions.
 
 ```text
-Photoshop
-→ PNG Parts
-→ Mesh
-→ Deformation
-→ Keyframes
-→ Short Silent Clip
-→ After Effects / Blender
+PSD Key Art A
+  -> Rig / Mesh Layout / Semantic Mapping
+  -> Editable A→B Transition
+  -> PSD Key Art B
+  -> optional B→C→D transitions
+  -> Short MV Clip
+  -> PNG/WebM/Bridge
+  -> After Effects / Blender / Editing Pipeline
 ```
 
-主な用途:
+Product identity:
 
-- 髪の揺れ
-- 顔や頭の軽い動き
-- 衣装やアクセサリの変形
-- 瞬き
-- 短いループアニメーション
-- MV用の数秒程度のカット制作
+> A PSD-native, Key-Art-transition and clip-first 2D rigging editor optimized for short MV shots.
 
-## Scope
+## Current status
 
-### In Scope
-
-- 透明PNGパーツの読み込み
-- パーツ単位のMesh生成
-- Mesh頂点編集
-- Mesh Deformation
-- Keyframe Animation
-- Layer Order
-- Project Save / Load
-- Short Clip Preview
-- PNG Sequence Export
-
-### Out of Scope for MVP
-
-- Audio
-- Lip Sync
-- Lyrics Sync
-- Full-body realtime animation
-- Physics simulation
-- Motion tracking
-- Full Live2D-compatible parameter system
-
-## Mesh Architecture
-
-各パーツは独立したMeshを持ちます。
+The latest preserved runnable prototype is `v0.3` on:
 
 ```text
-Part
-├── Texture
-├── Transform
-├── Mesh
-│   ├── baseVertices
-│   ├── uvs
-│   └── indices
-└── Deformation
-    └── vertexOffsets
+prototype/psd-import-zoom-pan-v0.3
 ```
 
-基本変形:
+It includes:
+
+- direct PSD import via `ag-psd`
+- PSD hierarchy/position reconstruction
+- per-part Grid Mesh editing
+- A/B deformation keyframes and preview
+- viewport zoom/pan and selected-part fit
+- deterministic Node tests
+
+That prototype is a preserved implementation snapshot, not the final repository architecture.
+
+The current proposed architecture/design is reviewed in Draft PR #2 on:
 
 ```text
-deformedPosition = basePosition + vertexOffset
+docs/basic-design-v0
 ```
 
-描画では、三角形ごとに画像を分割して合成するのではなく、
+## Core design principles
+
+- PSD is a first-class source format.
+- Multiple Key Arts are first-class project data.
+- Mesh topology, per-Key-Art layout/keyforms, rig state, and animation deformation are non-destructive separate layers.
+- Mesh Layout (位置決め) and Deform (変形) are separate editing modes.
+- Stable IDs are independent from user-editable Japanese/Unicode display names.
+- Groups are real transform/animation hierarchy nodes.
+- UI, scripts, tests, AI, and MCP share one headless Command/Transaction model.
+- AI proposes; deterministic commands commit.
+- The editor must remain usable without cloud/AI services.
+
+## Repository boundaries
+
+FLAMORIS 2D adopts explicit repository responsibility boundaries inspired by the successful reconstruction discipline used by FLAMORIS George:
 
 ```text
-Texture
-+ Shared Vertex Buffer
-+ UV Buffer
-+ Index Buffer
+product/   current production-capable editor/runtime source
+staging/   manual/visual acceptance setup and non-production fixtures
+test/      integration/system/staging checks outside Product runtime
+history/   superseded prototypes and historical material
+docs/      current design/research/ADRs
 ```
 
-を使用してIndexed Meshとして描画します。
+Rules:
 
-これにより、三角形境界のシームを避けることを目指します。
+- Product runtime must not depend on Staging, integration-test helpers, History, or handoff-only assets.
+- Staging may depend on Product; Product must never depend on Staging.
+- Production artifacts must use an explicit allowlist or equally explicit build-input boundary.
+- Historical/prototype material does not become current execution authority automatically.
+- CI is added at meaningful milestones to protect stable behavior/boundaries, not as a growing development orchestration framework.
+- Expensive visual/browser/release checks remain explicit until automation has a clear reason.
 
-## MVP Mesh Generation
+See:
 
-最初のMesh生成方式はGrid Meshとします。
+- [`AGENTS.md`](AGENTS.md)
+- [`docs/repository-boundaries.md`](docs/repository-boundaries.md)
+
+## Mesh authoring modes
+
+### Mesh Layout / 位置決め
+
+Defines topology and where stable vertices belong on the active Key Art artwork.
 
 ```text
-PNG Alpha
-→ Non-transparent Bounds
-→ Grid
-→ Triangulation
-→ UV Generation
+Key Art A: layoutPositions A
+Key Art B: alignment + layoutPositions B
 ```
 
-将来的にはAlpha Contourを使ったContour Meshも追加予定です。
+Topology editing such as split/subdivide belongs here.
 
-## Editor Architecture
+### Deform / 変形
 
-編集用Meshと描画用Meshを分離します。
+Poses or animates an already-authored mesh without changing its topology or Key Art correspondence.
 
 ```text
-EditableMesh
-MeshVertex
-├── position
-└── connections[]
-
-↓ compile
-
-RenderMesh
-vertices
-uvs
-indices
+Key Art layout/keyform
+  -> rig
+  -> deformation/form/keyframe
+  -> render
 ```
 
-最初に必要な編集操作:
+See ADR:
 
-- Select Vertex
-- Multi Select
-- Move Vertex
-- Add Vertex
-- Remove Vertex
-- Connect Vertex
-- Reset Vertex
+- [`docs/decisions/0003-mesh-layout-vs-deform-mode.md`](docs/decisions/0003-mesh-layout-vs-deform-mode.md)
 
-## Animation
+## Documentation
 
-MVPでは複雑なParameterシステムを作らず、
-Mesh deformationを直接Keyframeとして保存します。
+Start with [`docs/README.md`](docs/README.md).
 
-Example:
+Current design set includes:
+
+- `docs/basic-design.md`
+- `docs/key-art-transition.md`
+- `docs/mcp-design.md`
+- `docs/feature-matrix.md`
+- `docs/roadmap.md`
+- `docs/repository-boundaries.md`
+- `docs/decisions/*`
+
+## GitHub workflow
+
+GitHub is the durable project memory.
 
 ```text
-0s   Neutral
-2s   Hair Left
-4s   Neutral
-6s   Hair Right
-8s   Neutral
+main          reviewed stable state
+feature/*     implementation work
+docs/*        design/research/ADR work
+prototype/*   preserved runnable snapshots, not current Product authority
 ```
 
-各Keyframe間のvertexOffsetsを補間します。
+For meaningful changes:
 
-最初はLinear Interpolationから開始し、
-将来的にEase / Bezierへ拡張します。
+1. define requirement/acceptance criteria,
+2. update design or ADR when architecture/persistent semantics change,
+3. implement the smallest understandable Product change,
+4. run the smallest relevant deterministic tests,
+5. review via PR,
+6. merge only after required acceptance/checks pass,
+7. tag meaningful milestones where useful.
 
-## Project Structure
+Do not leave the latest working implementation only in chat attachments, Downloads, or local ZIPs.
 
-```text
-Project
-├── Canvas
-├── Parts[]
-│   ├── Texture
-│   ├── Transform
-│   ├── Mesh
-│   └── Deformation
-├── Timeline
-└── RenderSettings
-```
+## First production goal
 
-ProjectデータはJSONベースの非破壊形式を予定しています。
-
-各PartやObjectにはstable IDを持たせ、
-将来的なMCP / After Effects / Blender連携で利用します。
-
-## MCP
-
-将来的にはEditor操作をMCPから制御できるようにします。
-
-Low-level commands:
-
-```text
-load_project
-select_part
-move_vertex
-set_keyframe
-render_preview
-export_frames
-```
-
-将来的にはSemantic commandも追加予定です。
-
-```text
-blink
-tilt_head
-bend_hair
-sway_cloth
-breathe
-```
-
-UI操作、Undo / Redo、MCP操作は
-同じCommand Layerを利用する設計を目指します。
-
-Example:
-
-```text
-MoveVertices
-AddVertex
-RemoveVertex
-SetKeyframe
-SetLayerOrder
-```
-
-## External Integration
-
-### After Effects
-
-想定方式:
-
-```text
-Project JSON
-+ Assets
-+ JSX
-```
-
-TransformやLayer構造、Keyframeを生成します。
-
-Mesh deformationそのものは必要に応じて
-PNG / EXR SequenceとしてBakeします。
-
-### Blender
-
-想定方式:
-
-```text
-Project JSON
-→ Blender Python Importer
-```
-
-Mesh、Material、Shape Key、Keyframe、
-Orthographic Cameraなどを生成します。
-
-## References
-
-主な設計参考:
-
-- Inochi2D / inochi2d
-- Inochi2D / inochi-creator
-- zhangzhensong / arap
-
-特にInochi2Dの
-
-- MeshData
-- DeformedMesh
-- Deformation
-- MeshDeformer
-- LatticeDeformer
-
-およびInochi Creatorの
-
-- Grid AutoMesh
-- Editable Mesh
-- Mesh Point Tool
-- Deformation Editing
-
-を参考にしています。
-
-ARAPは将来研究対象とし、
-MVPでは必須としません。
-
-## First Goal
-
-最初の成功条件は非常に小さく設定します。
-
-透明な前髪PNGを読み込み、
-Grid Meshを生成し、
-頂点をドラッグすると、
-三角形の境界線を出さずリアルタイムに変形できる。
-
-これがflamoris-2Dの最初の一歩です。
+A user should be able to import two or more layered character Key Arts, map corresponding parts, author/edit a shared mesh from coarse to fine, connect the drawings with deterministic editable transitions, animate rig controls/clips, save/reopen safely, and export a transparent short shot for downstream MV production.
