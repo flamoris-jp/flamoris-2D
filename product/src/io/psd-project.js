@@ -4,12 +4,19 @@ import {
   createSceneNode,
 } from "../model/project.js";
 
-function identitySegment(displayName, occurrence) {
-  return encodeURIComponent(displayName) + "[" + occurrence + "]";
+function nativeLayerId(node) {
+  return node.id ?? node.layerId;
+}
+
+function identitySegment(node, displayName, occurrence) {
+  const nativeId = nativeLayerId(node);
+  return nativeId == null
+    ? "name:" + encodeURIComponent(displayName) + "[" + occurrence + "]"
+    : "id:" + encodeURIComponent(String(nativeId));
 }
 
 function layerSourceKey(node, identityPath) {
-  const nativeId = node.id ?? node.layerId;
+  const nativeId = nativeLayerId(node);
   return nativeId == null
     ? "path:" + identityPath.join("/")
     : "layer:" + nativeId;
@@ -48,8 +55,17 @@ export function createProjectFromPsd(
     parentId,
     parentPath,
     parentIdentityPath,
+    parentOrderDependent = false,
   ) {
     const occurrences = new Map();
+    const siblingNameCounts = new Map();
+    for (const layer of children || []) {
+      const name = layer.name || "(unnamed)";
+      siblingNameCounts.set(
+        name,
+        (siblingNameCounts.get(name) || 0) + 1,
+      );
+    }
     for (const layer of children || []) {
       const displayName = layer.name || "(unnamed)";
       const occurrence = (occurrences.get(displayName) || 0) + 1;
@@ -57,8 +73,15 @@ export function createProjectFromPsd(
       const path = [...parentPath, displayName];
       const identityPath = [
         ...parentIdentityPath,
-        identitySegment(displayName, occurrence),
+        identitySegment(layer, displayName, occurrence),
       ];
+      const hasNativeIdentity = nativeLayerId(layer) != null;
+      const orderDependent =
+        !hasNativeIdentity &&
+        (
+          parentOrderDependent ||
+          siblingNameCounts.get(displayName) > 1
+        );
       const id = idFactory("node");
       const hasChildren = Array.isArray(layer.children);
       const left = Number(layer.left ?? 0);
@@ -82,6 +105,8 @@ export function createProjectFromPsd(
           sourceKey: layerSourceKey(layer, identityPath),
           path: path.join("/"),
           identityPath: identityPath.join("/"),
+          identityKind: hasNativeIdentity ? "native" : "fallback",
+          orderDependent,
         },
         bounds: hasChildren
           ? null
@@ -90,7 +115,13 @@ export function createProjectFromPsd(
       project.scene.nodes[id] = node;
       project.scene.nodes[parentId].children.push(id);
       if (hasChildren) {
-        walk(layer.children, id, path, identityPath);
+        walk(
+          layer.children,
+          id,
+          path,
+          identityPath,
+          orderDependent,
+        );
       }
     }
   }
@@ -124,9 +155,21 @@ export function reconcilePsdProject(project, psd, options = {}) {
   for (const sourceKey of sourceKeys) {
     const current = currentBySource.get(sourceKey) || [];
     const next = importedBySource.get(sourceKey) || [];
+    const reasons = [];
     if (current.length > 1 || next.length > 1) {
+      reasons.push("duplicate-source-key");
+    }
+    if (
+      [...current, ...next].some(
+        (node) => node.sourceRef?.orderDependent,
+      )
+    ) {
+      reasons.push("order-dependent-fallback");
+    }
+    if (reasons.length) {
       ambiguous.push({
         sourceKey,
+        reasons,
         currentNodeIds: current.map((node) => node.id),
         importedNodeIds: next.map((node) => node.id),
       });

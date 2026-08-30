@@ -83,7 +83,7 @@ test("PSD reconciliation reports compatible IDs and removed layers", () => {
   assert.equal(result.review.canApplyAutomatically, false);
 });
 
-test("fallback source identity includes occurrence at every hierarchy level", () => {
+test("fallback source identity is unique but order-dependent siblings are ambiguous", () => {
   const sameNamePsd = {
     width: 100,
     height: 100,
@@ -106,10 +106,10 @@ test("fallback source identity includes occurrence at every hierarchy level", ()
     .filter(Boolean);
   assert.equal(new Set(sourceKeys).size, sourceKeys.length);
   assert.ok(sourceKeys.includes(
-    "path:%E9%A1%94[1]/%E7%9B%AE[1]",
+    "path:name:%E9%A1%94[1]/name:%E7%9B%AE[1]",
   ));
   assert.ok(sourceKeys.includes(
-    "path:%E9%A1%94[2]/%E7%9B%AE[1]",
+    "path:name:%E9%A1%94[2]/name:%E7%9B%AE[1]",
   ));
 
   const reconciliation = reconcilePsdProject(
@@ -117,8 +117,40 @@ test("fallback source identity includes occurrence at every hierarchy level", ()
     sameNamePsd,
     { idFactory: createIdFactory("fallback-next") },
   );
-  assert.deepEqual(reconciliation.review.ambiguous, []);
-  assert.equal(reconciliation.review.canApplyAutomatically, true);
+  assert.ok(
+    reconciliation.review.ambiguous.some(
+      (entry) =>
+        entry.reasons.includes("order-dependent-fallback"),
+    ),
+  );
+  assert.equal(reconciliation.review.canApplyAutomatically, false);
+});
+
+test("reordered same-name siblings never auto-reconcile fallback identity", () => {
+  const sameNameLayers = {
+    width: 100,
+    height: 100,
+    children: [
+      { name: "影", left: 0, top: 0, right: 10, bottom: 10 },
+      { name: "影", left: 20, top: 0, right: 30, bottom: 10 },
+    ],
+  };
+  const project = createProjectFromPsd(sameNameLayers, {
+    idFactory: createIdFactory("ordered"),
+  });
+  const reordered = structuredClone(sameNameLayers);
+  reordered.children.reverse();
+
+  const result = reconcilePsdProject(project, reordered, {
+    idFactory: createIdFactory("reordered"),
+  });
+  assert.equal(result.review.canApplyAutomatically, false);
+  assert.equal(result.review.matched.length, 0);
+  assert.equal(result.review.ambiguous.length, 2);
+  assert.ok(result.review.ambiguous.every(
+    (entry) =>
+      entry.reasons.includes("order-dependent-fallback"),
+  ));
 });
 
 test("duplicate source identity blocks automatic reconciliation", () => {

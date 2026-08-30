@@ -2,6 +2,11 @@ export { commandSchemas } from "../commands/schemas.js";
 
 export const MCP_SCHEMA_VERSION = 1;
 
+const nodeId = {
+  type: "string",
+  minLength: 1,
+};
+
 export const querySchemas = {
   "project.get_summary": {
     type: "object",
