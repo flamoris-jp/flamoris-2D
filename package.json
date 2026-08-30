@@ -1,0 +1,13 @@
+{
+  "name": "flamoris-2d",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "ag-psd": "^31.0.2"
+  }
+}
