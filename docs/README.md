@@ -7,20 +7,26 @@
 - [`roadmap.md`](roadmap.md) — dependency-driven implementation phases and acceptance criteria
 - [`key-art-transition.md`](key-art-transition.md) — multi-Key-Art A→B→C transition model
 - [`mcp-design.md`](mcp-design.md) — MCP-ready command/transaction architecture
+- [`repository-boundaries.md`](repository-boundaries.md) — Product / Staging / Test / History separation, testing and CI boundary
 - [`research/rigging-tools.md`](research/rigging-tools.md) — reference research from Inochi2D/Inochi Creator, Live2D Cubism, Stretchy Studio, Iki, Godot, and Synfig
 - [`research/key-art-transition-research.md`](research/key-art-transition-research.md) — correspondence/morphing research notes
+
+Repository-wide AI/automation rules live at [`../AGENTS.md`](../AGENTS.md).
 
 ## Architecture decisions
 
 - [`decisions/0001-key-art-and-mcp-foundations.md`](decisions/0001-key-art-and-mcp-foundations.md) — Key Art transitions and MCP-ready core as product foundations
 - [`decisions/0002-coarse-to-fine-key-art-mesh.md`](decisions/0002-coarse-to-fine-key-art-mesh.md) — start with a coarse shared mesh, align it over each Key Art, then refine topology without breaking existing keyforms
+- [`decisions/0003-mesh-layout-vs-deform-mode.md`](decisions/0003-mesh-layout-vs-deform-mode.md) — separate Mesh Layout (位置決め) from Deform (変形), including topology/Key-Art/MCP implications
 
 ## Earlier draft
 
 - [`design.md`](design.md) — original prototype-era design draft
 
-The original draft remains useful as project history, but it predates the successful direct PSD import prototype and the expanded rigging/editor requirements. When the documents disagree, the current design set above should be reviewed first.
+The original draft remains useful as project history, but it predates the successful direct PSD import prototype and the expanded rigging/editor requirements. When documents disagree, review status and the current design/accepted ADRs rather than assuming the oldest file is authoritative.
 
 ## Documentation workflow
 
 Design decisions should be recorded in GitHub before or together with implementation changes. Large architectural choices are captured as ADRs under `docs/decisions/`.
+
+Current proposals remain draft until reviewed/merged. Prototype branches are runnable snapshots and do not automatically override current design authority.
