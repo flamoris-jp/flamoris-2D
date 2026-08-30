@@ -424,6 +424,12 @@ Existing Key Art + Updated PSD
 
 Ambiguous matches require explicit review rather than silent data loss.
 
+Fallback source identities may use occurrence-qualified hierarchy paths when a
+PSD layer has no native ID. This can make keys unique, but not necessarily safe
+for automatic identity matching. If same-name siblings make a fallback path
+order-dependent, re-import must report the match as ambiguous and must not
+automatically transfer existing mesh, rig, transition, or animation state.
+
 ## 14. Editor UI architecture
 
 Recommended layout:
