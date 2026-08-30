@@ -1,276 +1,63 @@
-# flamoris-2D
+# FLAMORIS 2D
 
-FLAMORIS向けの軽量2Dキャラクターアニメーションエンジン。
-Photoshopなどで事前に分離した透明PNGパーツを読み込み、
-各パーツにMeshを生成して変形・キーフレームアニメーションを行います。
-フル機能のLive2D代替を目指すのではなく、
-MV制作で使う短い2Dアニメーションカットを素早く作ることを目的とします。
+透明PNGのグリッドメッシュ編集に加え、PSDを直接読み込んでパーツ構造・座標・重なり順を復元する実験版です。
+Milestone 2の単一PNG編集機能を維持したまま、PSD Importの入口を追加しています。
 
-## Concept
+## セットアップ
 
-基本ワークフロー:
-
-```text
-Photoshop
-→ PNG Parts
-→ Mesh
-→ Deformation
-→ Keyframes
-→ Short Silent Clip
-→ After Effects / Blender
+```bash
+npm install
+npm start
 ```
 
-主な用途:
+ブラウザで `http://127.0.0.1:4173` を開きます。
 
-- 髪の揺れ
-- 顔や頭の軽い動き
-- 衣装やアクセサリの変形
-- 瞬き
-- 短いループアニメーション
-- MV用の数秒程度のカット制作
+## PSD Import
 
-## Scope
+1. 「PNG / PSDを開く」からPSDを選ぶ、またはViewportへPSDをドロップ
+2. PSD内の表示中レイヤーを元座標・元レイヤー順で復元
+3. 「PSDパーツ」で編集したいパーツを選択
+4. 選択パーツだけ既存のGrid Mesh編集へ接続
+5. 選択パーツより下と上のレイヤーを別Canvasに描くため、元の重なり順を維持したまま変形を確認可能
 
-### In Scope
+Akino検証PSDでは 5000×8000 / 70パーツの直接読込を想定しています。
 
-- 透明PNGパーツの読み込み
-- パーツ単位のMesh生成
-- Mesh頂点編集
-- Mesh Deformation
-- Keyframe Animation
-- Layer Order
-- Project Save / Load
-- Short Clip Preview
-- PNG Sequence Export
+## 既存機能
 
-### Out of Scope for MVP
+- 透明PNGの読み込み
+- Alpha領域の検出
+- X/Yグリッドメッシュ生成
+- WebGL 2によるindexed textured mesh描画
+- 単一・複数頂点の選択とドラッグ
+- base verticesを変更しないoffset変形
+- 変形リセット
+- キーフレームA/Bの記録
+- 線形補間によるA→B→Aループ
+- タイムスライダーと無音プレビュー
 
-- Audio
-- Lip Sync
-- Lyrics Sync
-- Full-body realtime animation
-- Physics simulation
-- Motion tracking
-- Full Live2D-compatible parameter system
+## PSD Import 現在の範囲
 
-## Mesh Architecture
+- ag-psdによるブラウザ内PSD解析
+- Layer hierarchy / left / top / right / bottom の利用
+- 表示レイヤーのCanvas画像読込
+- opacity / 基本Blend Modeの描画
+- PSDの重なり順を保った全体表示
+- 選択した1パーツをMesh Editorへ接続
 
-各パーツは独立したMeshを持ちます。
+Photoshop固有の複雑なLayer Effect、Clipping、特殊Mask表現は今後の検証対象です。
 
-```text
-Part
-├── Texture
-├── Transform
-├── Mesh
-│   ├── baseVertices
-│   ├── uvs
-│   └── indices
-└── Deformation
-    └── vertexOffsets
+## テスト
+
+```bash
+npm test
 ```
 
-基本変形:
+## Viewport navigation
 
-```text
-deformedPosition = basePosition + vertexOffset
-```
+PSDパーツ編集時は選択したパーツへ自動ズームします。
 
-描画では、三角形ごとに画像を分割して合成するのではなく、
-
-```text
-Texture
-+ Shared Vertex Buffer
-+ UV Buffer
-+ Index Buffer
-```
-
-を使用してIndexed Meshとして描画します。
-
-これにより、三角形境界のシームを避けることを目指します。
-
-## MVP Mesh Generation
-
-最初のMesh生成方式はGrid Meshとします。
-
-```text
-PNG Alpha
-→ Non-transparent Bounds
-→ Grid
-→ Triangulation
-→ UV Generation
-```
-
-将来的にはAlpha Contourを使ったContour Meshも追加予定です。
-
-## Editor Architecture
-
-編集用Meshと描画用Meshを分離します。
-
-```text
-EditableMesh
-MeshVertex
-├── position
-└── connections[]
-
-↓ compile
-
-RenderMesh
-vertices
-uvs
-indices
-```
-
-最初に必要な編集操作:
-
-- Select Vertex
-- Multi Select
-- Move Vertex
-- Add Vertex
-- Remove Vertex
-- Connect Vertex
-- Reset Vertex
-
-## Animation
-
-MVPでは複雑なParameterシステムを作らず、
-Mesh deformationを直接Keyframeとして保存します。
-
-Example:
-
-```text
-0s   Neutral
-2s   Hair Left
-4s   Neutral
-6s   Hair Right
-8s   Neutral
-```
-
-各Keyframe間のvertexOffsetsを補間します。
-
-最初はLinear Interpolationから開始し、
-将来的にEase / Bezierへ拡張します。
-
-## Project Structure
-
-```text
-Project
-├── Canvas
-├── Parts[]
-│   ├── Texture
-│   ├── Transform
-│   ├── Mesh
-│   └── Deformation
-├── Timeline
-└── RenderSettings
-```
-
-ProjectデータはJSONベースの非破壊形式を予定しています。
-
-各PartやObjectにはstable IDを持たせ、
-将来的なMCP / After Effects / Blender連携で利用します。
-
-## MCP
-
-将来的にはEditor操作をMCPから制御できるようにします。
-
-Low-level commands:
-
-```text
-load_project
-select_part
-move_vertex
-set_keyframe
-render_preview
-export_frames
-```
-
-将来的にはSemantic commandも追加予定です。
-
-```text
-blink
-tilt_head
-bend_hair
-sway_cloth
-breathe
-```
-
-UI操作、Undo / Redo、MCP操作は
-同じCommand Layerを利用する設計を目指します。
-
-Example:
-
-```text
-MoveVertices
-AddVertex
-RemoveVertex
-SetKeyframe
-SetLayerOrder
-```
-
-## External Integration
-
-### After Effects
-
-想定方式:
-
-```text
-Project JSON
-+ Assets
-+ JSX
-```
-
-TransformやLayer構造、Keyframeを生成します。
-
-Mesh deformationそのものは必要に応じて
-PNG / EXR SequenceとしてBakeします。
-
-### Blender
-
-想定方式:
-
-```text
-Project JSON
-→ Blender Python Importer
-```
-
-Mesh、Material、Shape Key、Keyframe、
-Orthographic Cameraなどを生成します。
-
-## References
-
-主な設計参考:
-
-- Inochi2D / inochi2d
-- Inochi2D / inochi-creator
-- zhangzhensong / arap
-
-特にInochi2Dの
-
-- MeshData
-- DeformedMesh
-- Deformation
-- MeshDeformer
-- LatticeDeformer
-
-およびInochi Creatorの
-
-- Grid AutoMesh
-- Editable Mesh
-- Mesh Point Tool
-- Deformation Editing
-
-を参考にしています。
-
-ARAPは将来研究対象とし、
-MVPでは必須としません。
-
-## First Goal
-
-最初の成功条件は非常に小さく設定します。
-
-透明な前髪PNGを読み込み、
-Grid Meshを生成し、
-頂点をドラッグすると、
-三角形の境界線を出さずリアルタイムに変形できる。
-
-これがflamoris-2Dの最初の一歩です。
+- マウスホイール: ズーム
+- Space + 左ドラッグ: パン
+- 中ボタンドラッグ: パン
+- `全体`: ドキュメント全体へフィット
+- `パーツ`: 選択パーツへフィット
