@@ -1,13 +1,10 @@
 {
-  "name": "flamoris-2d",
+  "name": "flamoris-2d-repository",
   "version": "0.3.0",
   "private": true,
-  "type": "module",
+  "workspaces": ["product"],
   "scripts": {
-    "start": "node scripts/serve.mjs",
-    "test": "node --test"
-  },
-  "dependencies": {
-    "ag-psd": "^31.0.2"
+    "start": "npm --workspace flamoris-2d start",
+    "test": "npm --workspace flamoris-2d test"
   }
 }
