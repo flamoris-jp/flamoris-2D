@@ -4,6 +4,20 @@ Status: draft
 
 This roadmap is dependency-driven rather than date-driven. A phase is complete when its acceptance criteria pass.
 
+The defining workflow is now:
+
+```text
+PSD Key Art A
+  -> Rig / Mesh / Semantic Mapping
+  -> Editable Transition
+  -> PSD Key Art B
+  -> optional Transition
+  -> Key Art C ...
+  -> Short MV Clip
+```
+
+MCP/AI readiness is an architectural constraint from the beginning, not a late integration task.
+
 ## Phase 0 — Repository and design baseline
 
 Goal: make GitHub the source of truth before the prototype grows further.
@@ -11,161 +25,198 @@ Goal: make GitHub the source of truth before the prototype grows further.
 Work:
 
 - Commit the current Milestone 2 + PSD import + zoom/pan prototype source to GitHub.
-- Preserve the current passing tests.
-- Add `basic-design.md`, `feature-matrix.md`, `roadmap.md`, and research notes.
-- Decide package/project naming and version convention.
-- Add a minimal changelog/release note convention.
-- Use feature branches + PRs for future implementation changes.
+- Preserve current passing tests.
+- Keep design, research, feature matrix, and roadmap in GitHub.
+- Adopt feature branches + PR review for implementation changes.
+- Establish minimal version/changelog conventions.
 
 Acceptance criteria:
 
 - A fresh clone can `npm install`, `npm test`, and `npm start` successfully.
-- The Akino PSD import prototype can be reproduced from the GitHub revision.
-- No implementation exists only inside a chat attachment or local ZIP.
+- Akino PSD import can be reproduced from GitHub.
+- No implementation exists only in chat attachments/local ZIPs.
 
-## Phase 1 — Editor foundation
+## Phase 1 — Editor Core + MCP-ready architecture
 
-Goal: turn the prototype into a safe editable project rather than a demo page.
+Goal: turn the prototype into a safe, headless-capable editor core shared by UI and future AI/MCP.
 
 Work:
 
-- Introduce versioned `Project` model and stable IDs.
-- Separate core project state from transient editor UI state.
-- Introduce Command Layer.
+- Versioned Project model.
+- Stable IDs for nodes, meshes, vertices, clips, Key Arts, transitions.
+- Separate persistent project state from transient UI state.
+- Headless command/query core independent of DOM.
+- Command Layer for every mutation.
+- Transactions / grouped commands.
+- Validation API with machine-readable errors.
 - Undo/Redo and action history.
 - Project save/load.
 - Autosave/recovery.
-- Hierarchical Scene Tree using PSD hierarchy.
-- Japanese/Unicode display names independent from source/internal identity.
+- Hierarchical Scene Tree from PSD hierarchy.
+- Unicode/Japanese display names independent from source identity.
 - Visibility, lock, search/filter.
-- Canvas click picking synchronized with tree selection.
+- Canvas picking synchronized with tree.
 - Inspector panel.
 - GroupNode with transform inheritance.
-- Transform and pivot model.
-- Transform gizmo.
-- Implement PSD re-import matching/review at a minimal usable level.
-
-Why this comes before bones:
-
-Bones, masks, deformers, and timeline tracks all need stable node identity, hierarchy, undo, persistence, and selection. Building them first would force repeated rewrites.
+- Transform/pivot model and gizmo.
+- Minimal PSD re-import reconciliation/review.
+- Define typed MCP-facing query/command schemas.
+- Optional minimal development MCP smoke adapter to prove headless editing works without DOM events.
 
 Acceptance criteria:
 
-- Import Akino PSD and see the full hierarchy in a tree.
-- Rename a part to Japanese without losing source mapping.
-- Group eye components and move the group.
-- Undo/redo hierarchy and transform edits.
-- Save, reload, and reproduce the same scene.
-- Modify a known PSD layer, re-import it, and preserve existing project identity/rig data where compatible.
+- Import Akino PSD and inspect the hierarchy through UI and headless query API.
+- Rename/group/transform nodes and undo the edit.
+- Save/reload deterministically.
+- Re-import a known PSD change while preserving compatible project identity.
+- Execute a basic edit using the same command API without browser pointer events.
+- Validate project state after a transaction.
 
-## Phase 2 — Production mesh editing
+Why this comes first:
 
-Goal: make direct deformation comfortable enough for real artwork.
+Every later feature, including Key Art transitions, bones, masks, animation, and AI assistance, depends on stable identities, transactions, persistence, and deterministic commands.
+
+## Phase 2 — Multi-Key-Art Transition foundation
+
+Goal: establish the core two-image workflow that differentiates FLAMORIS 2D.
+
+Work:
+
+- `KeyArt` domain object.
+- Multiple PSD source assets in one project.
+- `SemanticSlot` mapping across different drawings/layer names.
+- `Transition` domain object connecting Key Art A -> B.
+- Reuse stable mesh topology from A on B.
+- Per-Key-Art mesh keyforms with stable vertex IDs.
+- Edit target mesh positions while viewing End Key Art B.
+- Interpolate mesh geometry between A and B.
+- Per-Key-Art UV sets.
+- Dual-texture morph renderer for compatible parts.
+- Transition modes: Morph, Hold, Crossfade/Replace, Appear, Disappear.
+- Presence model: present / occluded / absent.
+- Basic per-Key-Art draw order and transition visibility/opacity.
+- Save/load/undo/redo of mappings and transition data.
+
+Acceptance criteria:
+
+- Import two layered Akino PSDs.
+- Map corresponding parts even when display/source names differ.
+- Create a mesh on A and use the same topology on B.
+- Position B's mesh over B artwork.
+- Scrub a deterministic A-to-B geometry transition.
+- Blend A and B textures using their own UV mappings.
+- Explicitly handle one A-only or B-only part.
+- Save/reload with pixel/geometry-equivalent result.
+
+## Phase 3 — Production mesh editing and correspondence tools
+
+Goal: make target-keyform authoring and ordinary deformation fast enough for real production.
 
 Work:
 
 - Per-part mesh density controls.
-- Proportional Editing with Smooth/Linear/Sharp falloff.
-- Wheel-adjustable influence radius.
+- Proportional Editing: Smooth / Linear / Sharp.
+- Wheel-adjustable radius.
 - Connected-only mode.
 - Box/lasso selection.
 - Add/remove/connect vertices.
-- Partial/full deformation reset.
+- Partial/full reset.
 - Mirror editing.
 - Mesh topology validation.
-- Evaluate contour automesh as optional alternative to grid automesh.
+- Contour automesh evaluation.
+- Correspondence anchors/pins between Key Arts.
+- Smooth target-mesh solve from sparse anchors.
+- Evaluate piecewise affine, barycentric propagation, TPS, and ARAP-style helpers.
 
 Acceptance criteria:
 
-- A front-hair part can be shaped naturally without dragging dozens of vertices individually.
-- Eye/mouth meshes can be edited precisely at useful zoom levels.
-- Invalid topology is reported rather than silently corrupting rendering.
+- Front hair can be edited naturally without point-by-point drudgery.
+- A target mesh keyform can be created from a few pinned correspondences and then manually refined.
+- Invalid/incompatible topology is reported rather than silently corrupted.
 
-## Phase 3 — Clipping and deformers
+## Phase 4 — Clipping and group deformers
 
-Goal: support facial rigging and grouped organic deformation.
+Goal: support facial rigging, occlusion control, and grouped organic deformation.
 
 Work:
 
-- Source mask model.
-- Part-to-part clipping relationships.
+- Source mask preservation/model.
+- Part-to-part clipping.
 - Eye clipping workflow.
 - Clipping-aware WebGL render pass.
-- Clipping visualization in editor.
-- Warp/Lattice Deformer node.
-- Child attachment to a deformer.
-- Deformer control-point editing.
-- Deformer hierarchy validation.
+- Clipping visualization.
+- Warp/Lattice Deformer.
+- Deformer children and hierarchy validation.
+- Deformer control point editing.
+- Key-Art-specific clipping/visibility states where required.
 
 Acceptance criteria:
 
-- Iris/pupil can move without rendering outside the eye region.
-- A low-resolution face/hair deformer can move multiple child parts together.
-- Deformer state survives save/load and undo/redo.
+- Iris/pupil remain inside the eye region during gaze/deformation.
+- A sparse deformer moves multiple child parts.
+- Mask/clipping state works through an A-to-B transition.
 
-## Phase 4 — Bones and skinning
+## Phase 5 — Bones and skinning
 
-Goal: make limbs and larger poses practical.
+Goal: make limbs and large pose changes practical.
 
-Work in slices:
-
-### 4A — Bone controls / FK proof
+### 5A — FK proof
 
 - Bone hierarchy.
-- Bone edit mode vs pose mode.
-- Pivot/origin and parent-child transforms.
-- Rigid part attachment for initial workflow validation.
+- Edit vs pose mode.
+- Origin/pivot and parent-child transforms.
+- Rigid part attachment for workflow proof.
 
-### 4B — Weighted mesh skinning
+### 5B — Weighted skinning
 
 - Per-vertex bone weights.
-- Multiple bone influences.
+- Multiple influences.
 - Weight normalization.
-- Weight visualization.
-- Basic weight editing/painting.
+- Weight visualization/editing/painting.
 
-### 4C — Rig convenience
+### 5C — Convenience
 
 - Rotation constraints.
-- Simple 2-bone IK for arms/legs.
-- Optional mirror rig helpers.
+- Simple 2-bone IK.
+- Mirror rig helpers.
 
 Acceptance criteria:
 
-- Move Akino's arm by manipulating shoulder/upper-arm/forearm controls.
-- Elbow deformation is smooth under weighted skinning.
-- User can apply a direct mesh/form correction after the skeletal pose.
+- Manipulate shoulder/upper-arm/forearm to pose Akino's arm.
+- Elbow bends smoothly under weights.
+- Direct mesh/form correction can be applied after skeletal deformation.
+- Bone poses may differ between Key Arts while keeping semantic rig identity where compatible.
 
-## Phase 5 — Animation system v2
+## Phase 6 — Animation system + multi-Key-Art sequencing
 
-Goal: move from A/B prototype animation to a reusable MV animation workflow.
+Goal: turn transitions and rig controls into a reusable MV timeline workflow.
 
 Work:
 
 - Multi-track timeline.
-- Tracks for Group/Part transforms.
-- Tracks for bones and deformers.
-- Tracks for mesh/form deformation.
-- Keyframe add/move/delete/copy.
-- Linear + Ease In/Out interpolation.
-- Bezier/graph editor after the track model is stable.
+- Tracks for node/group transforms, bones, deformers, mesh/form states.
+- Keyframe CRUD.
+- Linear + Ease In/Out.
+- Bezier/graph editor after track model stabilizes.
 - Reusable Animation Clips.
-- Clip looping.
-- Clip instances on shot timeline.
-- Pose/Form states such as `EyesClosed`, `Smile`, `LookLeft`.
-- Blendable shape/form influence.
-- Optional visibility/opacity tracks.
+- Clip looping and clip instances.
+- Pose/Form/Shape states.
+- Visibility/opacity tracks.
+- Key Art strip / sequence UI.
+- Chain `A -> B -> C -> D` transitions.
+- Transition timing/curves in the timeline.
+- Draw-order step events where required.
 
 Acceptance criteria:
 
-- Build reusable `Blink`, `Breath`, `HairSway`, and `HeadTilt` clips.
-- Place multiple blink instances without recreating eye keyframes.
-- Animate body/bones, facial forms, and hair deformers together in one short shot.
-- Preview and scrub deterministically.
+- Build Blink, Breath, HairSway, HeadTilt clips.
+- Combine normal rig animation with a two-Key-Art pose transition.
+- Chain at least three Key Arts in one short shot.
+- Scrub/play deterministically.
 
-## Phase 6 — Production output and robustness
+## Phase 7 — Production output and robustness
 
-Goal: reliably finish a real MV shot with the editor.
+Goal: reliably finish a real MV shot.
 
 Work:
 
@@ -173,99 +224,118 @@ Work:
 - PNG sequence export.
 - Transparent WebM where practical.
 - Silent preview video export.
-- Export progress/cancel/error handling.
-- Recovery testing and large-PSD performance work.
-- Project diagnostics for missing source files/references.
-- Performance profiling for multi-part deformed scenes.
+- Export progress/cancel/errors.
+- Recovery testing.
+- Large PSD/multi-Key-Art performance profiling.
+- Missing-source diagnostics.
+- Project migration tests.
 
 Acceptance criteria:
 
-- Create an 8-second Akino shot, save it, reopen it, preview it, and export a transparent sequence usable in After Effects/Premiere/Blender pipeline.
-- Export is deterministic across repeated runs from the same project.
+- Create an 8-second multi-Key-Art Akino shot, save, reopen, preview, and export a transparent sequence usable downstream.
+- Repeated export from identical project state is deterministic.
 
 ### Production Beta checkpoint
 
-At the end of Phase 6, FLAMORIS 2D can reasonably be treated as a focused internal production tool rather than a prototype.
+At the end of Phase 7, FLAMORIS 2D is a focused internal production tool rather than a prototype.
 
-## Phase 7 — Secondary motion and advanced rigging
+## Phase 8 — AI correspondence + full MCP workflow + bridges
 
-Goal: reduce repetitive animation work without compromising manual control.
+Goal: use AI to reduce setup work without hiding or replacing the deterministic editor model.
 
-Candidates:
+MCP work:
 
-- simple spring/physics secondary motion
-- automatic hair sway helper
-- Glue / seam binding between adjacent meshes
-- path deformer for long hair/ribbons
-- better contour automesh
-- additional blend modes
-- optional semantic parameter/driver layer
-- idle motion helpers such as blink/breath/gaze drift
+- Production MCP server/adapter over existing typed commands/queries.
+- Transactional bulk edits and dry-run previews.
+- Semantic operations compiled to ordinary commands.
+- Structured change summaries and confidence metadata.
 
-Acceptance criteria should be defined per feature before implementation.
+Key Art AI assistance:
 
-## Phase 8 — Bridges, MCP, and assisted rigging
+- Suggest semantic part mappings between drawings.
+- Suggest Morph/Hold/Appear/Disappear/Swap modes.
+- Suggest anchor/vertex correspondence.
+- Optical-flow-assisted initialization for visually continuous changes.
+- Semantic-correspondence-assisted mapping for larger pose/view changes.
+- Confidence/ambiguity review UI.
 
-Goal: leverage the stable project/command model for automation and pipeline integration.
+Rig assistance:
 
-Work:
+- Auto clipping suggestions.
+- Auto groups/pivots.
+- Heuristic/pose-detection-assisted bones.
+- Optional AI-assisted rigging.
 
-- Low-level MCP around existing commands.
-- Semantic MCP commands such as `blink`, `tilt_head`, `bend_hair`, `raise_arm`.
+Bridges:
+
 - After Effects bridge.
 - Blender importer/bridge.
-- Auto clipping suggestions.
-- Auto group/pivot suggestions.
-- Heuristic or pose-detection-assisted bone setup.
-- Optional AI-assisted rigging.
 
 Principle:
 
-AI or MCP must not create a parallel hidden editing system. They should produce the same project operations and commands as the UI.
+> AI proposes; deterministic commands commit.
 
-## Deferred unless a concrete production need appears
+The saved project must contain normal semantic mappings, mesh keyforms, rigs, transitions, and keyframes, not opaque model-generated state.
+
+## Phase 9 — Advanced motion and specialized features
+
+Candidates:
+
+- spring/physics secondary motion
+- automatic hair sway
+- Glue/seam binding
+- path deformer
+- improved contour automesh
+- advanced occlusion/depth transitions
+- optional semantic parameter/driver layer
+- idle helpers
+- view-state graph branching
+- generative intermediate-frame suggestions as non-destructive reference layers
+
+Acceptance criteria should be defined per feature before implementation.
+
+## Deferred unless production need appears
 
 - real-time face/body tracking
-- lip-sync system
-- full Live2D parameter compatibility
-- advanced rigid-body physics
-- game-engine runtime as a primary product
-- AI image decomposition as a required dependency
+- lip-sync/audio analysis
+- full Live2D compatibility
+- advanced rigid-body simulation
+- game-engine runtime as primary product
+- mandatory cloud/AI services
 
 ## Recommended GitHub workflow
 
-Use GitHub as the durable project memory:
+Use GitHub as durable project memory:
 
 ```text
 main
-  stable reviewed state
+  reviewed stable state
 
 feature/*
-  implementation work
+  implementation
 
 docs/*
-  design/research updates
+  design/research
 ```
 
-For each phase:
+For each capability:
 
-1. maintain the roadmap acceptance criteria,
-2. create Issues for individually testable capabilities,
-3. implement through a feature branch,
-4. require tests for model/geometry/serialization behavior,
-5. review via PR,
-6. merge only when acceptance criteria are satisfied,
+1. keep acceptance criteria in roadmap/design,
+2. create an Issue for testable work,
+3. implement on a feature branch,
+4. add tests for model/geometry/serialization behavior,
+5. review through PR,
+6. merge only when acceptance criteria pass,
 7. tag meaningful checkpoints.
 
-Suggested checkpoint tags:
+Suggested checkpoints:
 
 ```text
-v0.1-prototype        PNG mesh + A/B animation
-v0.2-psd-import       PSD direct import + multi-part reconstruction
-v0.3-editor-core      scene tree + project + undo/reimport
-v0.4-rigging          clipping + deformers + bones
-v0.5-animation        clip-first timeline
-v0.6-production-beta  reliable short-shot export
+v0.1-prototype
+v0.2-psd-import
+v0.3-editor-core
+v0.4-key-art-transition
+v0.5-rigging
+v0.6-animation
+v0.7-production-beta
 ```
-
-Exact version numbers may change before the first tagged baseline.
