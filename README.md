@@ -52,6 +52,7 @@ Photoshop固有の複雑なLayer Effect、Clipping、特殊Mask表現は今後�
 npm test
 ```
 
+
 ## Viewport navigation
 
 PSDパーツ編集時は選択したパーツへ自動ズームします。
