@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FLAMORIS 2D</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">FLAMORIS</p>
+          <h1>2D Mesh Lab</h1>
+        </div>
+        <div class="status" id="status" aria-live="polite">PNG / PSDを読み込んでください</div>
+      </header>
+
+      <section class="workspace">
+        <aside class="panel controls" aria-label="メッシュ設定">
+          <label class="file-button">
+            <span>PNG / PSDを開く</span>
+            <input id="fileInput" type="file" accept="image/png,.psd,image/vnd.adobe.photoshop" />
+          </label>
+          <button id="demoButton" type="button" class="secondary">デモ素材</button>
+
+          <label class="part-field">
+            PSDパーツ
+            <select id="partSelect" disabled>
+              <option value="">PNG単体</option>
+            </select>
+          </label>
+          <div class="part-info" id="partInfo">単一PNGまたはPSDを読み込めます</div>
+
+          <div class="field-grid">
+            <label>
+              横の分割数
+              <input id="columnsInput" type="number" min="1" max="32" value="6" />
+            </label>
+            <label>
+              縦の分割数
+              <input id="rowsInput" type="number" min="1" max="32" value="6" />
+            </label>
+          </div>
+
+          <button id="generateButton" type="button" disabled>メッシュを再生成</button>
+          <button id="resetButton" type="button" class="secondary" disabled>変形をリセット</button>
+
+          <section class="timeline-card" aria-labelledby="timelineTitle">
+            <div class="section-heading">
+              <h2 id="timelineTitle">Animation</h2>
+              <span id="keyframeStatus">A ―　B ―</span>
+            </div>
+            <div class="keyframe-buttons">
+              <button id="captureAButton" type="button" class="keyframe" disabled>Aを記録</button>
+              <button id="captureBButton" type="button" class="keyframe" disabled>Bを記録</button>
+            </div>
+            <label class="duration-field">
+              クリップの長さ
+              <span><input id="durationInput" type="number" min="0.5" max="30" step="0.5" value="4" /> 秒</span>
+            </label>
+            <div class="scrubber-row">
+              <input id="timeSlider" type="range" min="0" max="4" step="0.001" value="0" disabled />
+              <output id="timeOutput">0.00s</output>
+            </div>
+            <div class="preview-buttons">
+              <button id="playButton" type="button" disabled>▶ プレビュー</button>
+              <button id="editButton" type="button" class="secondary" disabled>編集へ戻る</button>
+            </div>
+          </section>
+
+          <div class="legend">
+            <span><i class="dot vertex"></i>頂点</span>
+            <span><i class="dot selected"></i>選択中</span>
+          </div>
+          <p class="help">PSDは全体を復元して表示します。パーツ選択時は自動ズーム。ホイールで拡大縮小、Space＋ドラッグまたは中ボタンドラッグで移動できます。</p>
+        </aside>
+
+        <section class="viewport-wrap" id="viewportWrap">
+          <div class="viewport-toolbar" aria-label="表示操作">
+            <button id="fitAllButton" type="button" class="viewport-tool">全体</button>
+            <button id="fitPartButton" type="button" class="viewport-tool" disabled>パーツ</button>
+            <output id="zoomOutput" class="zoom-output">100%</output>
+          </div>
+          <canvas id="backgroundBelowCanvas"></canvas>
+          <canvas id="glCanvas"></canvas>
+          <canvas id="foregroundCanvas"></canvas>
+          <canvas id="overlayCanvas" aria-label="メッシュ編集キャンバス"></canvas>
+          <div class="empty-state" id="emptyState">
+            <span class="empty-mark">✦</span>
+            <strong>PNG / PSD</strong>
+            <span>PSDはパーツ座標と重なり順を直接読み込みます</span>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script src="/vendor/ag-psd.js"></script>
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>

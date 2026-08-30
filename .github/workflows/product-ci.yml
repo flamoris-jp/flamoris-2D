@@ -1,0 +1,28 @@
+name: Product CI
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "product/**"
+      - "package.json"
+      - ".github/workflows/product-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  product:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+
+      - name: Deterministic Product unit tests
+        run: npm test
