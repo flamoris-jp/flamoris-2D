@@ -2,6 +2,7 @@ import {
   psdIdentitySegment,
   psdLayerSourceKey,
 } from "./io/psd-project.js";
+import { rasterFingerprint } from "./io/raster-fingerprint.js";
 
 export function collectPsdParts(children, ancestors = []) {
   const parts = [];
@@ -54,6 +55,7 @@ export function collectPsdParts(children, ancestors = []) {
         canvas: node.canvas || null,
         mask: node.mask || null,
         clipping: Boolean(node.clipping),
+        rasterFingerprint: rasterFingerprint(node.canvas),
       });
     }
   }

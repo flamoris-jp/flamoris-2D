@@ -355,6 +355,12 @@ Phase 1 requirements:
 - transaction-capable mutation API
 - validation API
 
+Phase 1C provides the minimal in-process proof through
+`product/src/mcp/adapter.js`: hierarchy queries and persistent edits share the
+normal Query API, command schemas, `EditorSession`, validation, Undo/Redo, and
+UI-visible Project state. A general networked MCP service remains a later
+adapter concern.
+
 Later MCP implementation becomes an adapter over these existing capabilities rather than a retrofit.
 
 ## 17. Acceptance criteria for MCP-ready core
