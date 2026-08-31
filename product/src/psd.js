@@ -1,17 +1,35 @@
+import {
+  psdIdentitySegment,
+  psdLayerSourceKey,
+} from "./io/psd-project.js";
+
 export function collectPsdParts(children, ancestors = []) {
   const parts = [];
 
-  function walk(nodes, parentPath, parentHidden, parentOpacity) {
+  function walk(
+    nodes,
+    parentPath,
+    parentIdentityPath,
+    parentHidden,
+    parentOpacity,
+  ) {
     if (!Array.isArray(nodes)) return;
 
+    const occurrences = new Map();
     for (const node of nodes) {
       const name = node.name || "(unnamed)";
+      const occurrence = (occurrences.get(name) || 0) + 1;
+      occurrences.set(name, occurrence);
       const path = [...parentPath, name];
+      const identityPath = [
+        ...parentIdentityPath,
+        psdIdentitySegment(node, name, occurrence),
+      ];
       const hidden = parentHidden || Boolean(node.hidden);
       const opacity = parentOpacity * Number(node.opacity ?? 1);
 
       if (Array.isArray(node.children)) {
-        walk(node.children, path, hidden, opacity);
+        walk(node.children, path, identityPath, hidden, opacity);
         continue;
       }
 
@@ -21,7 +39,7 @@ export function collectPsdParts(children, ancestors = []) {
       const bottom = Number(node.bottom ?? top + Number(node.canvas?.height ?? 0));
 
       parts.push({
-        id: path.join("/"),
+        sourceKey: psdLayerSourceKey(node, identityPath),
         name,
         path: path.join("/"),
         hidden,
@@ -40,7 +58,7 @@ export function collectPsdParts(children, ancestors = []) {
     }
   }
 
-  walk(children, ancestors, false, 1);
+  walk(children, ancestors, [], false, 1);
   return parts;
 }
 
