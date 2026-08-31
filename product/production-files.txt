@@ -18,3 +18,4 @@ src/io/psd-project.js
 src/mcp/schemas.js
 src/ui/editor-adapter.js
 src/ui/canvas-interaction.js
+src/ui/editor-shortcuts.js

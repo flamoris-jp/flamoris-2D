@@ -23,6 +23,9 @@ import {
   pickNodeAtDocumentPoint,
 } from "./ui/canvas-interaction.js";
 import { transformPoint } from "./core/transforms.js";
+import {
+  projectHistoryShortcutAction,
+} from "./ui/editor-shortcuts.js";
 
 const elements = {
   fileInput: document.querySelector("#fileInput"),
@@ -948,13 +951,10 @@ elements.overlayCanvas.addEventListener("wheel", (event) => {
 }, { passive: false });
 
 window.addEventListener("keydown", (event) => {
-  if (
-    state.editor &&
-    (event.ctrlKey || event.metaKey) &&
-    event.key.toLocaleLowerCase() === "z"
-  ) {
+  const historyAction = projectHistoryShortcutAction(event);
+  if (state.editor && historyAction) {
     event.preventDefault();
-    if (event.shiftKey) state.editor.redo();
+    if (historyAction === "redo") state.editor.redo();
     else state.editor.undo();
     return;
   }
