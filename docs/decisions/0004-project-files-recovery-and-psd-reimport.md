@@ -48,6 +48,9 @@ operation checkpoint, Recovery notification, and incremental number width.
 
 Recovery snapshots use separate browser storage and never write the associated
 `.fl2d`. Intentional save and Recovery therefore remain distinct operations.
+Snapshot availability alone does not create or dirty the current Project. The
+startup UI offers an explicit latest-snapshot restore; only that choice attaches
+the recovered Project as unsaved and labels it as Recovered until intentional save.
 
 ### PSD re-import
 
