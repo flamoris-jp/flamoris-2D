@@ -80,6 +80,21 @@ test("selection is transient and persistent UI edits use Core history", () => {
   assert.equal(session.query("scene.get_node", { nodeId: partId }).visible, true);
 });
 
+test("Undo and Redo expose the next history label to the UI", () => {
+  const { adapter, partId } = fixture();
+  assert.equal(adapter.undoLabel, null);
+  assert.equal(adapter.redoLabel, null);
+
+  adapter.selectNode(partId);
+  adapter.renameSelected("左目・履歴表示");
+  assert.equal(adapter.undoLabel, "Rename node");
+  assert.equal(adapter.redoLabel, null);
+
+  adapter.undo();
+  assert.equal(adapter.undoLabel, null);
+  assert.equal(adapter.redoLabel, "Rename node");
+});
+
 test("gizmo preview commits many pointer updates as one undo entry", () => {
   const { adapter, session, groupId, partId } = fixture();
   adapter.selectNode(groupId);

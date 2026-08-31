@@ -11,14 +11,16 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); }
 body { min-height: 100vh; overflow: hidden; }
 button, input, select { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: 0.38; }
 
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
   display: grid;
   grid-template-rows: auto 1fr;
   background:
@@ -28,6 +30,8 @@ button:disabled { cursor: not-allowed; opacity: 0.38; }
 }
 
 .topbar {
+  position: relative;
+  z-index: 100;
   min-height: 82px;
   padding: 16px 24px;
   display: flex;
@@ -44,7 +48,14 @@ h1 { margin: 0; font-family: Georgia, "Yu Mincho", serif; font-size: 23px; font-
 .topbar-actions { display: flex; align-items: center; gap: 8px; }
 .compact { min-height: 32px; padding: 0 12px; font-size: 11px; }
 
-.workspace { min-height: 0; display: grid; grid-template-columns: 300px minmax(0, 1fr) 280px; }
+.workspace {
+  position: relative;
+  z-index: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) 280px;
+}
 .panel { border-right: 1px solid var(--line); background: var(--panel); }
 .controls { padding: 20px; display: flex; flex-direction: column; gap: 13px; }
 .scene-panel, .inspector-panel {
@@ -54,9 +65,11 @@ h1 { margin: 0; font-family: Georgia, "Yu Mincho", serif; font-size: 23px; font-
   flex-direction: column;
   gap: 12px;
   overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 .inspector-panel { border-right: 0; border-left: 1px solid var(--line); }
-.asset-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.asset-buttons { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .asset-buttons button, .asset-buttons .file-button { min-height: 36px; font-size: 11px; }
 .panel-heading { display: flex; align-items: baseline; justify-content: space-between; }
 .panel-heading h2 { margin: 0; font: 500 15px Georgia, "Yu Mincho", serif; letter-spacing: .04em; }
@@ -254,8 +267,8 @@ button:not(:disabled):hover, .file-button:hover { border-color: var(--mint); tra
 
 @media (max-width: 720px) {
   body { overflow: auto; }
-  .app-shell { min-height: 760px; }
-  .workspace { grid-template-columns: 1fr; grid-template-rows: auto minmax(480px, 1fr) auto; }
+  .app-shell { height: auto; min-height: 760px; overflow: visible; }
+  .workspace { overflow: visible; grid-template-columns: 1fr; grid-template-rows: auto minmax(480px, 1fr) auto; }
   .panel { border-right: 0; border-bottom: 1px solid var(--line); }
   .controls { display: grid; grid-template-columns: 1fr 1fr; }
   .field-grid, .legend, .help { grid-column: 1 / -1; }

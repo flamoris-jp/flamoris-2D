@@ -30,8 +30,8 @@
               <button type="button" data-file-action="preferences">Preferences…</button>
             </div>
           </details>
-          <button id="undoButton" type="button" class="secondary compact" disabled>↶ Undo</button>
-          <button id="redoButton" type="button" class="secondary compact" disabled>↷ Redo</button>
+          <button id="undoButton" type="button" class="secondary compact" title="Undo: No operation" disabled>↶ Undo</button>
+          <button id="redoButton" type="button" class="secondary compact" title="Redo: No operation" disabled>↷ Redo</button>
           <div class="status" id="status" aria-live="polite">PNG / PSDを読み込んでください</div>
         </div>
       </header>
@@ -43,7 +43,6 @@
               <span>PNG / PSDを開く</span>
               <input id="fileInput" type="file" accept="image/png,.psd,image/vnd.adobe.photoshop" />
             </label>
-            <button id="demoButton" type="button" class="secondary">デモ素材</button>
           </div>
           <div class="panel-heading">
             <h2>Scene Tree</h2>
@@ -176,6 +175,18 @@
           <button value="cancel" class="secondary">Cancel</button>
           <button value="discard" class="secondary">Don't Save</button>
           <button value="save">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="recoveryDialog" class="app-dialog">
+      <form method="dialog">
+        <h2>Recovery Available</h2>
+        <p id="recoveryDialogMessage"></p>
+        <p>Recoveryは現在のProjectへまだ復元されていません。</p>
+        <div class="dialog-actions">
+          <button value="dismiss" class="secondary">Not Now</button>
+          <button value="restore">Restore Latest</button>
         </div>
       </form>
     </dialog>

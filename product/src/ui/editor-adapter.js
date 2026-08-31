@@ -233,6 +233,14 @@ export class EditorUiAdapter {
   get canRedo() {
     return this.session.redoStack.length > 0;
   }
+
+  get undoLabel() {
+    return this.session.undoStack.at(-1)?.label || null;
+  }
+
+  get redoLabel() {
+    return this.session.redoStack.at(-1)?.label || null;
+  }
 }
 
 export function bindPsdPartsToProject(parts, project) {
