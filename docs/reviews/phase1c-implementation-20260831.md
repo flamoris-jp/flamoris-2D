@@ -24,7 +24,7 @@
 
 ## Automated acceptance
 
-The Product suite passes 51 deterministic Node tests. Phase 1C coverage includes:
+The Product suite passes 54 deterministic Node tests. Phase 1C coverage includes:
 
 - format/version validation, migration, and newer-version rejection;
 - filename generation and all four save semantics;
@@ -36,6 +36,8 @@ The Product suite passes 51 deterministic Node tests. Phase 1C coverage includes
 - pixel-only raster change detection, review-wide one-to-one mapping invariants,
   and render-asset consistency through Apply/Undo/Redo;
 - stale Review rejection, compatible Part/Group mapping, and raster digest reuse;
+- explicit Recovery restore/dirty semantics and visible Undo/Redo history labels;
+- Phase 1 shell reachability for File actions and independently scrolling panels;
 - headless query/edit/validation through normal Product boundaries.
 
 ## Manual acceptance still required
@@ -45,7 +47,7 @@ with the private Akino PSD and a known changed copy. In particular, verify:
 
 1. browser picker/download behavior for Save, Save As, Incremental, and Copy on
    the target browser/OS;
-2. Recovery availability notification in the real application flow;
+2. Recovery availability, Not Now, and explicit dirty restore in the real application flow;
 3. side-by-side previews and at least one manually changed Akino mapping;
 4. Apply, rendering, and whole-operation Undo with the real PSD assets;
 5. reload equivalence and the UI/headless hierarchy comparison for Akino.

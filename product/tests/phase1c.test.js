@@ -179,6 +179,23 @@ test("Preferences stay separate and Recovery keeps bounded snapshots", () => {
   assert.equal(recovery.load().displayName, "三版");
 });
 
+test("Recovery availability stays outside current dirty state until explicit restore", () => {
+  const storage = memoryStorage();
+  const snapshot = projectFixture();
+  snapshot.displayName = "前回の未保存Project";
+  const recovery = createRecoveryStore(storage, { now: fixedNow });
+  recovery.save(snapshot);
+
+  const currentSession = new EditorSession(projectFixture());
+  assert.equal(recovery.list().length, 1);
+  assert.equal(currentSession.isDirty, false);
+
+  const restoredSession = new EditorSession(recovery.load());
+  restoredSession.savedRevision = -1;
+  assert.equal(restoredSession.isDirty, true);
+  assert.equal(restoredSession.project.displayName, "前回の未保存Project");
+});
+
 test("Autosave writes Recovery only and never invokes intentional file output", () => {
   const project = projectFixture();
   const session = new EditorSession(project);

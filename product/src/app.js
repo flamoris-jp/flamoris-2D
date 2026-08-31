@@ -47,6 +47,8 @@ const elements = {
   projectOpenInput: document.querySelector("#projectOpenInput"),
   reimportPsdInput: document.querySelector("#reimportPsdInput"),
   unsavedDialog: document.querySelector("#unsavedDialog"),
+  recoveryDialog: document.querySelector("#recoveryDialog"),
+  recoveryDialogMessage: document.querySelector("#recoveryDialogMessage"),
   preferencesDialog: document.querySelector("#preferencesDialog"),
   autosaveEnabledInput: document.querySelector("#autosaveEnabledInput"),
   autosaveIntervalInput: document.querySelector("#autosaveIntervalInput"),
@@ -62,7 +64,6 @@ const elements = {
   reimportSummary: document.querySelector("#reimportSummary"),
   applyReimportButton: document.querySelector("#applyReimportButton"),
   fileInput: document.querySelector("#fileInput"),
-  demoButton: document.querySelector("#demoButton"),
   partInfo: document.querySelector("#partInfo"),
   undoButton: document.querySelector("#undoButton"),
   redoButton: document.querySelector("#redoButton"),
@@ -131,6 +132,7 @@ const state = {
   reimportParts: [],
   selectedReimportRowId: null,
   renderAssetHistory: null,
+  recoveryRestored: false,
 };
 
 const preferencesStore = createPreferencesStore(localStorage);
@@ -595,6 +597,7 @@ async function loadImage(source, label) {
   state.autosaveScheduler = null;
   state.documentController = null;
   state.renderAssetHistory = null;
+  state.recoveryRestored = false;
   state.editor = null;
   elements.sceneSearchInput.value = "";
   renderEditorUi();
@@ -730,10 +733,22 @@ function renderEditorUi() {
   renderInspector();
   elements.undoButton.disabled = !state.editor?.canUndo;
   elements.redoButton.disabled = !state.editor?.canRedo;
+  const undoTitle = state.editor?.undoLabel
+    ? `Undo: ${state.editor.undoLabel}`
+    : "Undo: No operation";
+  const redoTitle = state.editor?.redoLabel
+    ? `Redo: ${state.editor.redoLabel}`
+    : "Redo: No operation";
+  elements.undoButton.title = undoTitle;
+  elements.redoButton.title = redoTitle;
+  elements.undoButton.setAttribute("aria-label", undoTitle);
+  elements.redoButton.setAttribute("aria-label", redoTitle);
   const fileName = state.documentController?.currentFileName ||
     state.editor?.session.project.displayName || "Untitled";
   const extension = fileName.toLocaleLowerCase().endsWith(".fl2d") ? "" : ".fl2d";
-  elements.projectTitle.textContent = `${fileName}${extension}${state.editor?.session.isDirty ? " *" : ""}`;
+  const dirty = state.editor?.session.isDirty ? " *" : "";
+  const recovered = state.recoveryRestored ? " · Recovered" : "";
+  elements.projectTitle.textContent = `${fileName}${extension}${dirty}${recovered}`;
   elements.transformTools.forEach((button) => {
     button.disabled = !state.editor?.selectedNodeId;
     button.classList.toggle(
@@ -756,6 +771,7 @@ function attachProject(project, {
   parts = [],
   mode = "project",
   saved = true,
+  recovered = false,
 } = {}) {
   state.autosaveScheduler?.stop();
   const session = new EditorSession(project);
@@ -777,6 +793,7 @@ function attachProject(project, {
     preferences,
   });
   state.editor = editor;
+  state.recoveryRestored = recovered;
   state.renderAssetHistory = new ReimportRenderHistory(editor, {
     getParts: () => state.psdParts,
     setParts(nextParts) {
@@ -873,31 +890,6 @@ async function loadFile(file) {
   }
 }
 
-function createDemoUrl() {
-  const canvas = document.createElement("canvas");
-  canvas.width = 720;
-  canvas.height = 720;
-  const context = canvas.getContext("2d");
-  const gradient = context.createLinearGradient(180, 90, 560, 640);
-  gradient.addColorStop(0, "#2a746e");
-  gradient.addColorStop(0.45, "#101c29");
-  gradient.addColorStop(1, "#7f3158");
-  context.fillStyle = gradient;
-  context.beginPath();
-  context.moveTo(122, 164);
-  context.bezierCurveTo(235, 44, 516, 65, 606, 184);
-  context.bezierCurveTo(552, 250, 650, 414, 536, 635);
-  context.bezierCurveTo(446, 562, 398, 656, 337, 594);
-  context.bezierCurveTo(263, 665, 223, 553, 158, 625);
-  context.bezierCurveTo(56, 413, 167, 271, 122, 164);
-  context.closePath();
-  context.fill();
-  context.strokeStyle = "rgba(255,255,255,.35)";
-  context.lineWidth = 5;
-  context.stroke();
-  return canvas.toDataURL("image/png");
-}
-
 function pointerPosition(event) {
   const rect = elements.overlayCanvas.getBoundingClientRect();
   return { x: event.clientX - rect.left, y: event.clientY - rect.top };
@@ -957,6 +949,7 @@ async function performSave(action) {
       if (!name) return false;
       result = await state.documentController.saveCopy(name);
     }
+    if (action !== "save-copy") state.recoveryRestored = false;
     renderEditorUi();
     setStatus(`${result.fileName} を保存しました`);
     return result;
@@ -1220,11 +1213,6 @@ function redoProject() {
 elements.fileInput.addEventListener("change", async () => {
   await loadFile(elements.fileInput.files?.[0]);
   elements.fileInput.value = "";
-});
-elements.demoButton.addEventListener("click", async () => {
-  if (await confirmProjectReplacement()) {
-    await loadImage(createDemoUrl(), "front_hair_demo.png");
-  }
 });
 elements.projectOpenInput.addEventListener("change", async () => {
   await openProjectFile(elements.projectOpenInput.files?.[0]);
@@ -1547,6 +1535,40 @@ window.addEventListener("beforeunload", (event) => {
 updateButtons();
 updateZoomOutput();
 resizeCanvases();
-if (preferences.showRecoveryNotification && recoveryStore.list().length) {
-  setStatus(`Recovery snapshotが${recoveryStore.list().length}件あります`);
+elements.recoveryDialog.addEventListener("close", () => {
+  if (elements.recoveryDialog.returnValue !== "restore") {
+    setStatus("Recoveryは現在のProjectへ復元していません");
+    return;
+  }
+  try {
+    const recoveredProject = recoveryStore.load();
+    if (!recoveredProject) {
+      setStatus("復元できるRecovery snapshotがありません");
+      return;
+    }
+    attachProject(recoveredProject, {
+      saved: false,
+      recovered: true,
+      mode: "project",
+    });
+    setStatus(
+      "前回の未保存Projectを復元しました（未保存）。" +
+      "PSD renderはRe-importで再接続できます",
+    );
+  } catch (error) {
+    console.error(error);
+    setStatus("Recovery snapshotを復元できませんでした");
+  }
+});
+const recoveryCount = recoveryStore.list().length;
+if (preferences.showRecoveryNotification && recoveryCount) {
+  elements.recoveryDialogMessage.textContent =
+    `Recovery snapshotが${recoveryCount}件あります。` +
+    "最新の未保存Projectを復元しますか？";
+  elements.recoveryDialog.returnValue = "dismiss";
+  elements.recoveryDialog.showModal();
+  setStatus(
+    `Recovery snapshotが${recoveryCount}件あります` +
+    "（現在のProjectには未復元）",
+  );
 }
