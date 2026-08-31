@@ -3,6 +3,7 @@ import {
   createProject,
   createSceneNode,
 } from "../model/project.js";
+import { rasterFingerprint } from "./raster-fingerprint.js";
 
 function nativeLayerId(node) {
   return node.id ?? node.layerId;
@@ -28,6 +29,7 @@ export function createProjectFromPsd(
     fileName = "source.psd",
     projectName = fileName,
     idFactory = createIdFactory("psd"),
+    importedAt = new Date().toISOString(),
   } = {},
 ) {
   const project = createProject({
@@ -42,6 +44,8 @@ export function createProjectFromPsd(
     id: sourceAssetId,
     kind: "psd",
     fileName,
+    displayLabel: fileName,
+    importedAt,
   });
   project.keyArts.push({
     id: keyArtId,
@@ -107,6 +111,9 @@ export function createProjectFromPsd(
           identityPath: identityPath.join("/"),
           identityKind: hasNativeIdentity ? "native" : "fallback",
           orderDependent,
+          rasterFingerprint: hasChildren
+            ? null
+            : rasterFingerprint(layer.canvas),
         },
         bounds: hasChildren
           ? null

@@ -13,6 +13,17 @@ import { captureOffsets, clampDuration, sampleLoop } from "./animation.js";
 import { MeshRenderer } from "./renderer.js";
 import { collectPsdParts } from "./psd.js";
 import { createProjectFromPsd } from "./io/psd-project.js";
+import { createIdFactory, createProject } from "./model/project.js";
+import {
+  createRecoveryStore,
+  parseProjectDocument,
+} from "./io/project-json.js";
+import { ProjectDocumentController } from "./io/project-files.js";
+import { createPsdReimportReview } from "./io/psd-reimport-review.js";
+import {
+  createAutosaveScheduler,
+  createPreferencesStore,
+} from "./preferences.js";
 import { EditorSession } from "./commands/editor.js";
 import {
   bindPsdPartsToProject,
@@ -26,8 +37,30 @@ import { transformPoint } from "./core/transforms.js";
 import {
   projectHistoryShortcutAction,
 } from "./ui/editor-shortcuts.js";
+import { createBrowserProjectWriter } from "./ui/browser-project-files.js";
+import { ReimportRenderHistory } from "./ui/reimport-render-history.js";
 
 const elements = {
+  projectTitle: document.querySelector("#projectTitle"),
+  fileMenu: document.querySelector("#fileMenu"),
+  fileActions: [...document.querySelectorAll("[data-file-action]")],
+  projectOpenInput: document.querySelector("#projectOpenInput"),
+  reimportPsdInput: document.querySelector("#reimportPsdInput"),
+  unsavedDialog: document.querySelector("#unsavedDialog"),
+  preferencesDialog: document.querySelector("#preferencesDialog"),
+  autosaveEnabledInput: document.querySelector("#autosaveEnabledInput"),
+  autosaveIntervalInput: document.querySelector("#autosaveIntervalInput"),
+  recoveryVersionsInput: document.querySelector("#recoveryVersionsInput"),
+  incrementalWidthInput: document.querySelector("#incrementalWidthInput"),
+  saveAfterMajorInput: document.querySelector("#saveAfterMajorInput"),
+  recoveryNotificationInput: document.querySelector("#recoveryNotificationInput"),
+  savePreferencesButton: document.querySelector("#savePreferencesButton"),
+  reimportDialog: document.querySelector("#reimportDialog"),
+  reimportTableBody: document.querySelector("#reimportTableBody"),
+  reimportCurrentPreview: document.querySelector("#reimportCurrentPreview"),
+  reimportNewPreview: document.querySelector("#reimportNewPreview"),
+  reimportSummary: document.querySelector("#reimportSummary"),
+  applyReimportButton: document.querySelector("#applyReimportButton"),
   fileInput: document.querySelector("#fileInput"),
   demoButton: document.querySelector("#demoButton"),
   partInfo: document.querySelector("#partInfo"),
@@ -92,7 +125,20 @@ const state = {
   cameraMode: "all",
   pan: null,
   spacePressed: false,
+  documentController: null,
+  autosaveScheduler: null,
+  reimportReview: null,
+  reimportParts: [],
+  selectedReimportRowId: null,
+  renderAssetHistory: null,
 };
+
+const preferencesStore = createPreferencesStore(localStorage);
+let preferences = preferencesStore.load();
+let recoveryStore = createRecoveryStore(localStorage, {
+  maxVersions: preferences.recoveryVersions,
+});
+const projectWriter = createBrowserProjectWriter();
 
 let renderer;
 try {
@@ -545,9 +591,14 @@ async function loadImage(source, label) {
 
   state.mode = "png";
   state.psdParts = [];
+  state.autosaveScheduler?.stop();
+  state.autosaveScheduler = null;
+  state.documentController = null;
+  state.renderAssetHistory = null;
   state.editor = null;
   elements.sceneSearchInput.value = "";
   renderEditorUi();
+  elements.projectTitle.textContent = label;
   elements.partInfo.textContent = "単一PNGモード";
   clearLayerCanvas(elements.backgroundBelowCanvas);
   clearLayerCanvas(elements.foregroundCanvas);
@@ -679,6 +730,10 @@ function renderEditorUi() {
   renderInspector();
   elements.undoButton.disabled = !state.editor?.canUndo;
   elements.redoButton.disabled = !state.editor?.canRedo;
+  const fileName = state.documentController?.currentFileName ||
+    state.editor?.session.project.displayName || "Untitled";
+  const extension = fileName.toLocaleLowerCase().endsWith(".fl2d") ? "" : ".fl2d";
+  elements.projectTitle.textContent = `${fileName}${extension}${state.editor?.session.isDirty ? " *" : ""}`;
   elements.transformTools.forEach((button) => {
     button.disabled = !state.editor?.selectedNodeId;
     button.classList.toggle(
@@ -693,6 +748,77 @@ function handleEditorChange(reason) {
   if (reason === "selection") syncSelectedPsdPart();
   renderEditorUi();
   render();
+}
+
+function attachProject(project, {
+  fileName = null,
+  metadata = {},
+  parts = [],
+  mode = "project",
+  saved = true,
+} = {}) {
+  state.autosaveScheduler?.stop();
+  const session = new EditorSession(project);
+  if (!saved) session.savedRevision = -1;
+  const editor = new EditorUiAdapter(session, { onChange: handleEditorChange });
+  recoveryStore = createRecoveryStore(localStorage, {
+    maxVersions: preferences.recoveryVersions,
+  });
+  state.documentController = new ProjectDocumentController(session, {
+    writer: projectWriter,
+    currentFileName: fileName,
+    metadata,
+    recovery: recoveryStore,
+    incrementalWidth: preferences.incrementalSaveWidth,
+  });
+  state.autosaveScheduler = createAutosaveScheduler({
+    session,
+    recovery: recoveryStore,
+    preferences,
+  });
+  state.editor = editor;
+  state.renderAssetHistory = new ReimportRenderHistory(editor, {
+    getParts: () => state.psdParts,
+    setParts(nextParts) {
+      state.psdParts = nextParts;
+      clearMeshEditing();
+    },
+  });
+  state.mode = mode;
+  state.documentWidth = project.canvas.width;
+  state.documentHeight = project.canvas.height;
+  state.psdParts = parts;
+  state.view = createViewTransform(
+    elements.viewportWrap.clientWidth,
+    elements.viewportWrap.clientHeight,
+    project.canvas.width,
+    project.canvas.height,
+  );
+  state.cameraMode = "all";
+  elements.sceneSearchInput.value = "";
+  clearMeshEditing();
+  renderEditorUi();
+  elements.partInfo.textContent = parts.length
+    ? `${parts.length} parts・${project.canvas.width} × ${project.canvas.height}`
+    : `${project.canvas.width} × ${project.canvas.height}・source render未読込`;
+  elements.emptyState.hidden = true;
+  render();
+}
+
+async function confirmProjectReplacement() {
+  if (!state.editor?.session.isDirty) return true;
+  const choice = await new Promise((resolve) => {
+    const close = () => {
+      elements.unsavedDialog.removeEventListener("close", close);
+      resolve(elements.unsavedDialog.returnValue || "cancel");
+    };
+    elements.unsavedDialog.addEventListener("close", close);
+    elements.unsavedDialog.returnValue = "cancel";
+    elements.unsavedDialog.showModal();
+  });
+  if (choice === "cancel") return false;
+  if (choice === "save") return Boolean(await performSave("save"));
+  return choice === "discard";
 }
 
 async function loadPsd(file) {
@@ -711,37 +837,13 @@ async function loadPsd(file) {
     fileName: file.name,
     projectName: file.name,
   });
-  const session = new EditorSession(project);
-  const editor = new EditorUiAdapter(session, { onChange: handleEditorChange });
   const allParts = collectPsdParts(psd.children || []);
   const parts = bindPsdPartsToProject(
     allParts.filter((part) => part.canvas && part.width > 0 && part.height > 0),
-    session.project,
+    project,
   );
   if (parts.length === 0) throw new Error("表示できるPSDパーツが見つかりませんでした");
-
-  state.mode = "psd";
-  state.documentWidth = psd.width;
-  state.documentHeight = psd.height;
-  state.psdParts = parts;
-  state.editor = editor;
-  elements.sceneSearchInput.value = "";
-  state.cameraMode = "all";
-  state.view = createViewTransform(
-    elements.viewportWrap.clientWidth,
-    elements.viewportWrap.clientHeight,
-    psd.width,
-    psd.height,
-  );
-  clearMeshEditing();
-  state.mode = "psd";
-  state.documentWidth = psd.width;
-  state.documentHeight = psd.height;
-  state.psdParts = parts;
-  renderEditorUi();
-  elements.partInfo.textContent = `${parts.length} parts・${psd.width} × ${psd.height}`;
-  elements.emptyState.hidden = true;
-  render();
+  attachProject(project, { parts, mode: "psd", saved: false });
   setStatus(`${file.name}・${parts.length}パーツ・Editor Core接続済み`);
 }
 
@@ -750,10 +852,12 @@ async function loadFile(file) {
   const lower = file.name.toLowerCase();
   try {
     if (lower.endsWith(".psd")) {
+      if (!await confirmProjectReplacement()) return;
       await loadPsd(file);
       return;
     }
     if (lower.endsWith(".png") || file.type === "image/png") {
+      if (!await confirmProjectReplacement()) return;
       const url = URL.createObjectURL(file);
       try {
         await loadImage(url, file.name);
@@ -823,13 +927,337 @@ function nearestVertex(screenPoint, radius = 12) {
   return nearest;
 }
 
-elements.fileInput.addEventListener("change", () => loadFile(elements.fileInput.files?.[0]));
-elements.demoButton.addEventListener("click", () => loadImage(createDemoUrl(), "front_hair_demo.png"));
+function requestedFileName(suggestedName) {
+  const value = window.prompt(".fl2d filename", suggestedName);
+  return value?.trim() || null;
+}
+
+async function performSave(action) {
+  if (!state.documentController) return false;
+  try {
+    let result;
+    if (action === "save") {
+      if (!state.documentController.currentFileName) return performSave("save-as");
+      result = await state.documentController.save();
+    } else if (action === "save-as") {
+      const name = requestedFileName(
+        state.documentController.currentFileName ||
+        `${state.editor.session.project.displayName}.fl2d`,
+      );
+      if (!name) return false;
+      result = await state.documentController.saveAs(name);
+    } else if (action === "save-incremental") {
+      result = await state.documentController.saveIncremental(
+        projectWriter.knownFileNames(),
+      );
+    } else if (action === "save-copy") {
+      const name = requestedFileName(
+        `${state.editor.session.project.displayName}_copy.fl2d`,
+      );
+      if (!name) return false;
+      result = await state.documentController.saveCopy(name);
+    }
+    renderEditorUi();
+    setStatus(`${result.fileName} を保存しました`);
+    return result;
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || String(error));
+    return false;
+  }
+}
+
+async function createNewProject() {
+  if (!await confirmProjectReplacement()) return;
+  const project = createProject({
+    name: "Untitled",
+    width: 1920,
+    height: 1080,
+    idFactory: createIdFactory(`new-${Date.now()}`),
+  });
+  attachProject(project, { saved: false });
+  setStatus("新しいProjectを作成しました");
+}
+
+async function openProjectFile(file) {
+  if (!file || !await confirmProjectReplacement()) return;
+  try {
+    const parsed = parseProjectDocument(await file.text());
+    attachProject(parsed.project, {
+      fileName: file.name,
+      metadata: parsed.metadata,
+      saved: true,
+    });
+    setStatus(`${file.name} を開きました。PSD renderはRe-import時に再選択できます`);
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || String(error));
+  }
+}
+
+async function chooseProjectFile() {
+  if (typeof window.showOpenFilePicker !== "function") {
+    elements.projectOpenInput.click();
+    return;
+  }
+  try {
+    const [handle] = await window.showOpenFilePicker({
+      multiple: false,
+      types: [{
+        description: "FLAMORIS 2D Project",
+        accept: { "application/x-flamoris-2d+json": [".fl2d"] },
+      }],
+    });
+    const file = await handle.getFile();
+    projectWriter.rememberHandle(file.name, handle);
+    await openProjectFile(file);
+  } catch (error) {
+    if (error.name !== "AbortError") setStatus(error.message || String(error));
+  }
+}
+
+function openPreferences() {
+  elements.autosaveEnabledInput.checked = preferences.autosaveEnabled;
+  elements.autosaveIntervalInput.value = String(preferences.autosaveIntervalSeconds);
+  elements.recoveryVersionsInput.value = String(preferences.recoveryVersions);
+  elements.incrementalWidthInput.value = String(preferences.incrementalSaveWidth);
+  elements.saveAfterMajorInput.checked = preferences.saveAfterMajorOperations;
+  elements.recoveryNotificationInput.checked = preferences.showRecoveryNotification;
+  elements.preferencesDialog.showModal();
+}
+
+function savePreferences() {
+  preferences = preferencesStore.save({
+    autosaveEnabled: elements.autosaveEnabledInput.checked,
+    autosaveIntervalSeconds: Number(elements.autosaveIntervalInput.value),
+    recoveryVersions: Number(elements.recoveryVersionsInput.value),
+    incrementalSaveWidth: Number(elements.incrementalWidthInput.value),
+    saveAfterMajorOperations: elements.saveAfterMajorInput.checked,
+    showRecoveryNotification: elements.recoveryNotificationInput.checked,
+  });
+  if (state.editor) {
+    state.autosaveScheduler?.stop();
+    recoveryStore = createRecoveryStore(localStorage, {
+      maxVersions: preferences.recoveryVersions,
+    });
+    state.documentController.recovery = recoveryStore;
+    state.documentController.incrementalWidth = preferences.incrementalSaveWidth;
+    state.autosaveScheduler = createAutosaveScheduler({
+      session: state.editor.session,
+      recovery: recoveryStore,
+      preferences,
+    });
+  }
+  setStatus("Preferencesを保存しました");
+}
+
+function projectNodeLabel(project, nodeId) {
+  return nodeId ? project.scene.nodes[nodeId]?.displayName || nodeId : "—";
+}
+
+function updateReimportPreview(row) {
+  const currentPart = state.psdParts.find((part) => part.nodeId === row.currentNodeId);
+  const importedPart = state.reimportParts.find((part) => part.nodeId === row.importedNodeId);
+  elements.reimportCurrentPreview.src = currentPart?.canvas?.toDataURL?.() || "";
+  elements.reimportNewPreview.src = importedPart?.canvas?.toDataURL?.() || "";
+}
+
+function renderReimportReview() {
+  const review = state.reimportReview;
+  elements.reimportTableBody.replaceChildren();
+  if (!review) return;
+  for (const row of review.rows) {
+    const tr = document.createElement("tr");
+    if (row.id === state.selectedReimportRowId) tr.classList.add("selected");
+    const values = [
+      row.status,
+      projectNodeLabel(review.currentProject, row.currentNodeId),
+    ];
+    for (const value of values) {
+      const td = document.createElement("td");
+      td.textContent = value;
+      tr.append(td);
+    }
+    const matchCell = document.createElement("td");
+    const matchSelect = document.createElement("select");
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = row.importedNodeId ? "Current selection" : "Select…";
+    matchSelect.append(empty);
+    for (const node of Object.values(review.importedProject.scene.nodes)) {
+      if (!review.isCompatibleImportedNode(row, node.id)) continue;
+      const option = document.createElement("option");
+      option.value = node.id;
+      option.textContent = node.displayName;
+      option.selected = node.id === row.importedNodeId;
+      matchSelect.append(option);
+    }
+    matchSelect.addEventListener("change", (event) => {
+      event.stopPropagation();
+      try {
+        review.setMatch(row.id, matchSelect.value);
+        state.selectedReimportRowId = row.id;
+        renderReimportReview();
+      } catch (error) {
+        setStatus(error.message);
+        renderReimportReview();
+      }
+    });
+    matchCell.append(matchSelect);
+    tr.append(matchCell);
+    const source = document.createElement("td");
+    source.textContent = `${row.matchSource} · ${row.explanation}`;
+    tr.append(source);
+    const actionCell = document.createElement("td");
+    const action = document.createElement("select");
+    for (const [value, label] of [
+      ["update", "Keep / Update"], ["add", "Mark as New"],
+      ["keep", "Keep Existing"], ["remove", "Remove Existing"],
+      ["ignore", "Ignore"], ["reset", "Reset to Auto"],
+      ["unresolved", "Resolve…"],
+    ]) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      option.selected = value === row.action;
+      action.append(option);
+    }
+    action.addEventListener("change", (event) => {
+      event.stopPropagation();
+      try {
+        if (action.value === "add") review.markAsNew(row.id);
+        else if (action.value === "keep") review.keepExisting(row.id);
+        else if (action.value === "remove") review.removeExisting(row.id);
+        else if (action.value === "ignore") review.ignore(row.id);
+        else if (action.value === "reset") review.resetToAuto(row.id);
+        else if (action.value === "update" && row.importedNodeId) {
+          review.setMatch(row.id, row.importedNodeId);
+        }
+      } catch (error) {
+        setStatus(error.message);
+      }
+      renderReimportReview();
+    });
+    actionCell.append(action);
+    tr.append(actionCell);
+    tr.addEventListener("click", () => {
+      state.selectedReimportRowId = row.id;
+      updateReimportPreview(row);
+      renderReimportReview();
+    });
+    elements.reimportTableBody.append(tr);
+  }
+  const summary = review.summary;
+  elements.reimportSummary.textContent =
+    `Update ${summary.update} · Add ${summary.add} · Keep ${summary.keep} · ` +
+    `Remove ${summary.remove} · Unresolved ${summary.unresolved}`;
+  elements.applyReimportButton.disabled = !review.canApply;
+  const selected = review.rows.find((row) => row.id === state.selectedReimportRowId);
+  if (selected) updateReimportPreview(selected);
+}
+
+async function analyzePsdReimport(file) {
+  if (!file || !state.editor) return;
+  try {
+    setStatus("PSD Re-importを解析中…");
+    const psd = window.agPsd.readPsd(await file.arrayBuffer(), {
+      skipThumbnail: true,
+      logMissingFeatures: true,
+    });
+    const review = createPsdReimportReview(state.editor.session.project, psd, {
+      fileName: file.name,
+      projectName: state.editor.session.project.displayName,
+      idFactory: createIdFactory(`reimport-${Date.now()}`),
+      baseRevision: state.editor.session.currentRevision,
+    });
+    const parts = bindPsdPartsToProject(
+      collectPsdParts(psd.children || []).filter((part) =>
+        part.canvas && part.width > 0 && part.height > 0),
+      review.importedProject,
+    );
+    state.reimportReview = review;
+    state.reimportParts = parts;
+    state.selectedReimportRowId = review.rows[0]?.id || null;
+    renderReimportReview();
+    elements.reimportDialog.showModal();
+    setStatus("PSD Re-import: Review中（Projectは未変更）");
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || String(error));
+  }
+}
+
+function applyReviewedReimport() {
+  const review = state.reimportReview;
+  if (!review?.canApply) return;
+  try {
+    state.renderAssetHistory.apply(review, state.reimportParts);
+    state.documentWidth = state.editor.session.project.canvas.width;
+    state.documentHeight = state.editor.session.project.canvas.height;
+    if (preferences.saveAfterMajorOperations) state.autosaveScheduler?.checkpoint();
+    elements.reimportDialog.close("apply");
+    renderEditorUi();
+    render();
+    setStatus("PSD Re-importを1件のUndo操作として適用しました");
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || String(error));
+  }
+}
+
+function undoProject() {
+  const result = state.renderAssetHistory?.undo() || state.editor?.undo();
+  if (result && state.editor?.selectedNodeId) syncSelectedPsdPart();
+  return result;
+}
+
+function redoProject() {
+  const result = state.renderAssetHistory?.redo() || state.editor?.redo();
+  if (result && state.editor?.selectedNodeId) syncSelectedPsdPart();
+  return result;
+}
+
+elements.fileInput.addEventListener("change", async () => {
+  await loadFile(elements.fileInput.files?.[0]);
+  elements.fileInput.value = "";
+});
+elements.demoButton.addEventListener("click", async () => {
+  if (await confirmProjectReplacement()) {
+    await loadImage(createDemoUrl(), "front_hair_demo.png");
+  }
+});
+elements.projectOpenInput.addEventListener("change", async () => {
+  await openProjectFile(elements.projectOpenInput.files?.[0]);
+  elements.projectOpenInput.value = "";
+});
+elements.reimportPsdInput.addEventListener("change", async () => {
+  await analyzePsdReimport(elements.reimportPsdInput.files?.[0]);
+  elements.reimportPsdInput.value = "";
+});
+elements.savePreferencesButton.addEventListener("click", savePreferences);
+elements.applyReimportButton.addEventListener("click", (event) => {
+  event.preventDefault();
+  applyReviewedReimport();
+});
+elements.fileActions.forEach((button) => {
+  button.addEventListener("click", async () => {
+    const action = button.dataset.fileAction;
+    elements.fileMenu.open = false;
+    if (action === "new") await createNewProject();
+    else if (action === "open") await chooseProjectFile();
+    else if (action === "save" || action === "save-as" ||
+      action === "save-incremental" || action === "save-copy") {
+      await performSave(action);
+    } else if (action === "import-psd") elements.fileInput.click();
+    else if (action === "reimport-psd") elements.reimportPsdInput.click();
+    else if (action === "preferences") openPreferences();
+  });
+});
 elements.sceneSearchInput.addEventListener("input", () => {
   state.editor?.setFilter(elements.sceneSearchInput.value);
 });
-elements.undoButton.addEventListener("click", () => state.editor?.undo());
-elements.redoButton.addEventListener("click", () => state.editor?.redo());
+elements.undoButton.addEventListener("click", undoProject);
+elements.redoButton.addEventListener("click", redoProject);
 elements.transformTools.forEach((button) => {
   button.addEventListener("click", () => {
     state.editor?.setActiveTool(button.dataset.transformTool);
@@ -954,8 +1382,8 @@ window.addEventListener("keydown", (event) => {
   const historyAction = projectHistoryShortcutAction(event);
   if (state.editor && historyAction) {
     event.preventDefault();
-    if (historyAction === "redo") state.editor.redo();
-    else state.editor.undo();
+    if (historyAction === "redo") redoProject();
+    else undoProject();
     return;
   }
   if (event.code === "Space" && !event.repeat) {
@@ -1111,6 +1539,14 @@ for (const type of ["dragleave", "drop"]) {
 elements.viewportWrap.addEventListener("drop", (event) => loadFile(event.dataTransfer.files?.[0]));
 
 new ResizeObserver(resizeCanvases).observe(elements.viewportWrap);
+window.addEventListener("beforeunload", (event) => {
+  if (!state.editor?.session.isDirty) return;
+  event.preventDefault();
+  event.returnValue = "";
+});
 updateButtons();
 updateZoomOutput();
 resizeCanvases();
+if (preferences.showRecoveryNotification && recoveryStore.list().length) {
+  setStatus(`Recovery snapshotが${recoveryStore.list().length}件あります`);
+}

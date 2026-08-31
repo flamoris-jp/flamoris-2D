@@ -10,6 +10,7 @@
 - [`repository-boundaries.md`](repository-boundaries.md) — Product / Staging / Test / History separation, testing and CI boundary
 - [`research/rigging-tools.md`](research/rigging-tools.md) — reference research from Inochi2D/Inochi Creator, Live2D Cubism, Stretchy Studio, Iki, Godot, and Synfig
 - [`research/key-art-transition-research.md`](research/key-art-transition-research.md) — correspondence/morphing research notes
+- [`reviews/phase1c-implementation-20260831.md`](reviews/phase1c-implementation-20260831.md) — Phase 1C implementation coverage and remaining real-Akino manual acceptance
 
 Repository-wide AI/automation rules live at [`../AGENTS.md`](../AGENTS.md).
 
@@ -18,6 +19,7 @@ Repository-wide AI/automation rules live at [`../AGENTS.md`](../AGENTS.md).
 - [`decisions/0001-key-art-and-mcp-foundations.md`](decisions/0001-key-art-and-mcp-foundations.md) — Key Art transitions and MCP-ready core as product foundations
 - [`decisions/0002-coarse-to-fine-key-art-mesh.md`](decisions/0002-coarse-to-fine-key-art-mesh.md) — start with a coarse shared mesh, align it over each Key Art, then refine topology without breaking existing keyforms
 - [`decisions/0003-mesh-layout-vs-deform-mode.md`](decisions/0003-mesh-layout-vs-deform-mode.md) — separate Mesh Layout (位置決め) from Deform (変形), including topology/Key-Art/MCP implications
+- [`decisions/0004-project-files-recovery-and-psd-reimport.md`](decisions/0004-project-files-recovery-and-psd-reimport.md) — `.fl2d`, save points, Preferences/Recovery, reviewed PSD re-import, and the minimal headless boundary
 
 ## Earlier draft
 
