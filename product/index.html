@@ -11,9 +11,25 @@
       <header class="topbar">
         <div>
           <p class="eyebrow">FLAMORIS</p>
-          <h1>2D Mesh Lab</h1>
+          <h1 id="projectTitle">Untitled.fl2d</h1>
         </div>
         <div class="topbar-actions">
+          <details id="fileMenu" class="file-menu">
+            <summary>File</summary>
+            <div class="file-menu-popup">
+              <button type="button" data-file-action="new">New</button>
+              <button type="button" data-file-action="open">Open…</button>
+              <button type="button" data-file-action="save">Save</button>
+              <button type="button" data-file-action="save-as">Save As…</button>
+              <button type="button" data-file-action="save-incremental">Save Incremental</button>
+              <button type="button" data-file-action="save-copy">Save Copy…</button>
+              <hr />
+              <button type="button" data-file-action="import-psd">Import PSD…</button>
+              <button type="button" data-file-action="reimport-psd">Re-import PSD…</button>
+              <hr />
+              <button type="button" data-file-action="preferences">Preferences…</button>
+            </div>
+          </details>
           <button id="undoButton" type="button" class="secondary compact" disabled>↶ Undo</button>
           <button id="redoButton" type="button" class="secondary compact" disabled>↷ Redo</button>
           <div class="status" id="status" aria-live="polite">PNG / PSDを読み込んでください</div>
@@ -149,6 +165,71 @@
         </aside>
       </section>
     </main>
+    <input id="projectOpenInput" type="file" accept=".fl2d,application/x-flamoris-2d+json" hidden />
+    <input id="reimportPsdInput" type="file" accept=".psd,image/vnd.adobe.photoshop" hidden />
+
+    <dialog id="unsavedDialog" class="app-dialog">
+      <form method="dialog">
+        <h2>Unsaved Changes</h2>
+        <p>現在のProjectには保存されていない変更があります。</p>
+        <div class="dialog-actions">
+          <button value="cancel" class="secondary">Cancel</button>
+          <button value="discard" class="secondary">Don't Save</button>
+          <button value="save">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="preferencesDialog" class="app-dialog">
+      <form id="preferencesForm" method="dialog">
+        <h2>Preferences · Files / Recovery</h2>
+        <label><input id="autosaveEnabledInput" type="checkbox" /> Autosave</label>
+        <label>Autosave interval
+          <select id="autosaveIntervalInput">
+            <option value="30">30 sec</option><option value="60">1 min</option>
+            <option value="180">3 min</option><option value="300">5 min</option>
+            <option value="600">10 min</option>
+          </select>
+        </label>
+        <label>Recovery versions
+          <select id="recoveryVersionsInput">
+            <option value="1">1</option><option value="3">3</option>
+            <option value="5">5</option><option value="10">10</option>
+          </select>
+        </label>
+        <label>Incremental number width
+          <input id="incrementalWidthInput" type="number" min="1" max="8" value="3" />
+        </label>
+        <label><input id="saveAfterMajorInput" type="checkbox" /> Save Recovery after major operations</label>
+        <label><input id="recoveryNotificationInput" type="checkbox" /> Show Recovery notification</label>
+        <div class="dialog-actions">
+          <button value="cancel" class="secondary">Cancel</button>
+          <button id="savePreferencesButton" value="save">Save Preferences</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="reimportDialog" class="app-dialog reimport-dialog">
+      <form method="dialog">
+        <h2>PSD Re-import Review</h2>
+        <p id="reimportExplanation">Analyze結果はApplyするまでProjectを変更しません。</p>
+        <div class="reimport-table-wrap">
+          <table class="reimport-table">
+            <thead><tr><th>Status</th><th>Current Project Part</th><th>New PSD Part</th><th>Match Source</th><th>Action</th></tr></thead>
+            <tbody id="reimportTableBody"></tbody>
+          </table>
+        </div>
+        <div class="reimport-preview">
+          <figure><figcaption>Current Project</figcaption><img id="reimportCurrentPreview" alt="Current Project part preview" /></figure>
+          <figure><figcaption>New PSD</figcaption><img id="reimportNewPreview" alt="New PSD part preview" /></figure>
+        </div>
+        <output id="reimportSummary"></output>
+        <div class="dialog-actions">
+          <button value="cancel" class="secondary">Cancel</button>
+          <button id="applyReimportButton" value="apply">Apply</button>
+        </div>
+      </form>
+    </dialog>
     <script src="/vendor/ag-psd.js"></script>
     <script type="module" src="./src/app.js"></script>
   </body>

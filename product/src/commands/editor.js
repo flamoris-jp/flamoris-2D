@@ -37,6 +37,27 @@ function nodeFor(project, nodeId) {
 }
 
 const handlers = {
+  "source.apply_psd_reimport": (project, payload) => {
+    const next = cloneProject(payload.project);
+    if (next.id !== project.id) {
+      throw new CommandError(
+        "PSD re-import must preserve the logical Project ID.",
+        "project.identity_changed",
+      );
+    }
+    const inverse = {
+      type: "source.apply_psd_reimport",
+      payload: { project: cloneProject(project) },
+    };
+    const affectedIds = new Set([
+      ...Object.keys(project.scene.nodes),
+      ...Object.keys(next.scene.nodes),
+    ]);
+    for (const key of Object.keys(project)) delete project[key];
+    Object.assign(project, next);
+    return { inverse, affectedIds: [...affectedIds] };
+  },
+
   "scene.rename_node": (project, payload) => {
     const node = nodeFor(project, payload.nodeId);
     const next = String(payload.displayName ?? "").trim();
@@ -237,6 +258,9 @@ export class EditorSession {
     this.undoStack = [];
     this.redoStack = [];
     this.history = [];
+    this.revisionCounter = 0;
+    this.currentRevision = 0;
+    this.savedRevision = 0;
   }
 
   query(name, input) {
@@ -272,8 +296,11 @@ export class EditorSession {
       commands: cloneProject(commands),
       inverses,
       affectedIds: [...affected],
+      beforeRevision: this.currentRevision,
+      afterRevision: ++this.revisionCounter,
     };
     this.project = draft;
+    this.currentRevision = entry.afterRevision;
     this.undoStack.push(entry);
     this.redoStack = [];
     this.history.push({
@@ -301,6 +328,7 @@ export class EditorSession {
     const issues = validationErrors(draft);
     if (issues.length) throw new TransactionError(issues);
     this.project = draft;
+    this.currentRevision = entry.beforeRevision;
     this.redoStack.push(entry);
     this.history.push({
       label: "Undo: " + entry.label,
@@ -322,6 +350,7 @@ export class EditorSession {
     const issues = validationErrors(draft);
     if (issues.length) throw new TransactionError(issues);
     this.project = draft;
+    this.currentRevision = entry.afterRevision;
     this.undoStack.push(entry);
     this.history.push({
       label: "Redo: " + entry.label,
@@ -330,5 +359,33 @@ export class EditorSession {
     });
     this.onChange?.(cloneProject(this.project), entry);
     return { label: entry.label, affectedIds: entry.affectedIds };
+  }
+
+  markSaved() {
+    this.savedRevision = this.currentRevision;
+    this.onChange?.(cloneProject(this.project), {
+      label: "Save point",
+      transient: true,
+    });
+  }
+
+  replaceProject(project, { saved = true } = {}) {
+    const errors = validationErrors(project);
+    if (errors.length) throw new TransactionError(errors);
+    this.project = cloneProject(project);
+    this.undoStack = [];
+    this.redoStack = [];
+    this.history = [];
+    this.revisionCounter = 0;
+    this.currentRevision = 0;
+    this.savedRevision = saved ? 0 : -1;
+    this.onChange?.(cloneProject(this.project), {
+      label: "Replace project",
+      transient: true,
+    });
+  }
+
+  get isDirty() {
+    return this.currentRevision !== this.savedRevision;
   }
 }

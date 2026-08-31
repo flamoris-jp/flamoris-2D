@@ -28,6 +28,7 @@ export function createProjectFromPsd(
     fileName = "source.psd",
     projectName = fileName,
     idFactory = createIdFactory("psd"),
+    importedAt = new Date().toISOString(),
   } = {},
 ) {
   const project = createProject({
@@ -42,6 +43,8 @@ export function createProjectFromPsd(
     id: sourceAssetId,
     kind: "psd",
     fileName,
+    displayLabel: fileName,
+    importedAt,
   });
   project.keyArts.push({
     id: keyArtId,

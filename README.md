@@ -2,9 +2,10 @@
 
 FLAMORIS 2D is a PSD-native, Key-Art-transition and clip-first 2D rigging/animation editor for short MV shots.
 
-## Phase 0 baseline
+## Phase 1 editor foundation
 
-Phase 0 integrates the runnable v0.3 prototype with the reviewed design/operation baseline.
+Phase 1 connects the PSD prototype to a persistent, undoable Editor Core shared
+by the browser UI and the minimal headless/MCP-facing adapter.
 
 Current runnable capability:
 
@@ -13,9 +14,14 @@ Current runnable capability:
 - per-part Grid Mesh generation/editing
 - A/B deformation keyframes and silent preview
 - viewport zoom/pan and selected-part fit
-- 12 deterministic Node tests
+- `.fl2d` project open/save, Save As, Incremental Save, and Save Copy
+- dirty/save-point tracking and unsaved-change guards
+- separate Preferences and bounded Recovery snapshots
+- reviewed/manual PSD re-import applied as one Undo step
+- deterministic headless Query/Command smoke coverage
 
-The product direction is broader than the current prototype. Multi-Key-Art A→B→C transitions, Mesh Layout vs Deform separation, Group/Tree, clipping, deformers, bones, timeline clips, persistence, and MCP-ready commands are specified in `docs/` and implemented in later phases.
+Multi-Key-Art A→B→C transitions, clipping, deformers, bones, and the production
+timeline remain later phases.
 
 ## Run
 
@@ -56,7 +62,7 @@ See `AGENTS.md` and `docs/repository-boundaries.md`.
 
 ## Current authority
 
-After the Phase 0 integration PR is merged, `main` is the current implementation and design baseline.
+`main` is the reviewed current implementation and design baseline.
 
 The exact uploaded v0.3 snapshot remains preserved on `prototype/psd-import-zoom-pan-v0.3` for history/reference. It is not the branch for continuing Product development.
 
@@ -64,17 +70,6 @@ Current design index: `docs/README.md`.
 Current roadmap: `docs/roadmap.md`.
 Phase 0 review: `docs/reviews/phase0-review-20260830.md`.
 
-## Next phase
-
-Phase 1 is Editor Core + MCP-ready architecture:
-
-- versioned Project model and stable IDs
-- headless query/command core
-- transactions and Undo/Redo
-- save/load and autosave/recovery
-- hierarchical Scene Tree and Group transforms
-- Inspector, selection, Pivot/Gizmo
-- PSD re-import reconciliation
-- typed MCP-facing schemas
-
-Do not bypass these foundations to add later rig features directly to the v0.3 monolithic UI state.
+Phase 2 begins only after the Phase 1 manual Akino acceptance pass is complete.
+Do not bypass these foundations to add later rig features directly to prototype
+UI state.

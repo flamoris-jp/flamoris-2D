@@ -1,3 +1,5 @@
+import { validateProject } from "../model/validation.js";
+
 const nonEmptyString = {
   type: "string",
   minLength: 1,
@@ -31,6 +33,18 @@ const transform = {
 };
 
 export const commandSchemas = {
+  "source.apply_psd_reimport": {
+    type: "object",
+    required: ["project"],
+    properties: {
+      project: {
+        type: "object",
+        description: "Complete validated Project produced by reviewed PSD reconciliation.",
+        projectSchema: true,
+      },
+    },
+    additionalProperties: false,
+  },
   "scene.rename_node": {
     type: "object",
     required: ["nodeId", "displayName"],
@@ -167,6 +181,18 @@ function validateValue(value, schema, path, issues) {
     });
   }
   if (schema.type !== "object") return;
+
+  if (schema.projectSchema) {
+    for (const entry of validateProject(value)) {
+      if (entry.severity !== "error") continue;
+      issues.push({
+        code: "command.project_invalid",
+        path: `${path}.${entry.path}`,
+        message: entry.message,
+      });
+    }
+    return;
+  }
 
   const properties = schema.properties || {};
   for (const required of schema.required || []) {

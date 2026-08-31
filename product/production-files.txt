@@ -14,8 +14,13 @@ src/queries/project.js
 src/commands/editor.js
 src/commands/schemas.js
 src/io/project-json.js
+src/io/project-files.js
 src/io/psd-project.js
+src/io/psd-reimport-review.js
+src/preferences.js
+src/mcp/adapter.js
 src/mcp/schemas.js
+src/ui/browser-project-files.js
 src/ui/editor-adapter.js
 src/ui/canvas-interaction.js
 src/ui/editor-shortcuts.js
