@@ -27,12 +27,36 @@ export function localTransformMatrix(transform) {
   ];
 }
 
-export function worldTransformMatrix(project, nodeId) {
+export function invertAffine(matrix) {
+  const determinant = matrix[0] * matrix[3] - matrix[1] * matrix[2];
+  if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-12) {
+    throw new Error("Affine transform is not invertible.");
+  }
+  const inverseDeterminant = 1 / determinant;
+  const a = matrix[3] * inverseDeterminant;
+  const b = -matrix[1] * inverseDeterminant;
+  const c = -matrix[2] * inverseDeterminant;
+  const d = matrix[0] * inverseDeterminant;
+  return [
+    a,
+    b,
+    c,
+    d,
+    -(a * matrix[4] + c * matrix[5]),
+    -(b * matrix[4] + d * matrix[5]),
+  ];
+}
+
+export function worldTransformMatrix(project, nodeId, transformOverrides = null) {
   const node = project.scene.nodes[nodeId];
   if (!node) throw new Error("Unknown node " + nodeId + ".");
-  const local = localTransformMatrix(node.transform);
+  const transform = transformOverrides?.get(nodeId) || node.transform;
+  const local = localTransformMatrix(transform);
   return node.parentId
-    ? multiplyAffine(worldTransformMatrix(project, node.parentId), local)
+    ? multiplyAffine(
+      worldTransformMatrix(project, node.parentId, transformOverrides),
+      local,
+    )
     : local;
 }
 
@@ -41,4 +65,16 @@ export function transformPoint(matrix, point) {
     x: matrix[0] * point.x + matrix[2] * point.y + matrix[4],
     y: matrix[1] * point.x + matrix[3] * point.y + matrix[5],
   };
+}
+
+export function changePivotPreservingLocalMatrix(transform, nextPivot) {
+  const matrix = localTransformMatrix(transform);
+  const next = {
+    ...structuredClone(transform),
+    pivot: { ...nextPivot },
+  };
+  const nextMatrix = localTransformMatrix(next);
+  next.position.x += matrix[4] - nextMatrix[4];
+  next.position.y += matrix[5] - nextMatrix[5];
+  return next;
 }

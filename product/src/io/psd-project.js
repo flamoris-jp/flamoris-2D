@@ -8,14 +8,14 @@ function nativeLayerId(node) {
   return node.id ?? node.layerId;
 }
 
-function identitySegment(node, displayName, occurrence) {
+export function psdIdentitySegment(node, displayName, occurrence) {
   const nativeId = nativeLayerId(node);
   return nativeId == null
     ? "name:" + encodeURIComponent(displayName) + "[" + occurrence + "]"
     : "id:" + encodeURIComponent(String(nativeId));
 }
 
-function layerSourceKey(node, identityPath) {
+export function psdLayerSourceKey(node, identityPath) {
   const nativeId = nativeLayerId(node);
   return nativeId == null
     ? "path:" + identityPath.join("/")
@@ -73,7 +73,7 @@ export function createProjectFromPsd(
       const path = [...parentPath, displayName];
       const identityPath = [
         ...parentIdentityPath,
-        identitySegment(layer, displayName, occurrence),
+        psdIdentitySegment(layer, displayName, occurrence),
       ];
       const hasNativeIdentity = nativeLayerId(layer) != null;
       const orderDependent =
@@ -102,7 +102,7 @@ export function createProjectFromPsd(
         blendMode: layer.blendMode || "normal",
         sourceRef: {
           sourceAssetId,
-          sourceKey: layerSourceKey(layer, identityPath),
+          sourceKey: psdLayerSourceKey(layer, identityPath),
           path: path.join("/"),
           identityPath: identityPath.join("/"),
           identityKind: hasNativeIdentity ? "native" : "fallback",
