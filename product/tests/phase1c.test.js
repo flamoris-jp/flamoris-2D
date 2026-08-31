@@ -453,6 +453,135 @@ test("Keep Existing preserves the current canvas after reviewed re-import", () =
   assert.equal(parts[0].canvas, oldCanvas);
 });
 
+test("re-import Apply rejects a review analyzed at a stale revision", () => {
+  const psd = {
+    width: 1,
+    height: 1,
+    children: [{
+      id: 1,
+      name: "目",
+      left: 0,
+      top: 0,
+      right: 1,
+      bottom: 1,
+      canvas: canvasWithPixels(0, 0, 0, 255),
+    }],
+  };
+  const project = createProjectFromPsd(psd, {
+    idFactory: createIdFactory("stale-old"),
+  });
+  const session = new EditorSession(project);
+  const review = createPsdReimportReview(session.project, psd, {
+    idFactory: createIdFactory("stale-new"),
+    baseRevision: session.currentRevision,
+  });
+  session.execute({
+    type: "scene.rename_node",
+    payload: {
+      nodeId: session.project.scene.rootId,
+      displayName: "Review中の編集",
+    },
+  });
+
+  assert.throws(
+    () => review.apply(session),
+    /Project changed after Analyze/,
+  );
+  assert.equal(
+    session.project.scene.nodes[session.project.scene.rootId].displayName,
+    "Review中の編集",
+  );
+  assert.equal(session.history.length, 1);
+});
+
+test("manual re-import mappings require compatible node kinds", () => {
+  const psd = {
+    width: 1,
+    height: 1,
+    children: [{
+      id: 1,
+      name: "顔",
+      children: [{
+        id: 2,
+        name: "目",
+        left: 0,
+        top: 0,
+        right: 1,
+        bottom: 1,
+        canvas: canvasWithPixels(0, 0, 0, 255),
+      }],
+    }],
+  };
+  const project = createProjectFromPsd(psd, {
+    idFactory: createIdFactory("kind-old"),
+  });
+  const review = createPsdReimportReview(project, psd, {
+    idFactory: createIdFactory("kind-new"),
+  });
+  const partRow = review.rows.find((row) =>
+    review.currentProject.scene.nodes[row.currentNodeId]?.kind === "part");
+  const originalImportedNodeId = partRow.importedNodeId;
+  const importedGroup = Object.values(review.importedProject.scene.nodes)
+    .find((node) => node.kind === "group" &&
+      node.id !== review.importedProject.scene.rootId);
+
+  assert.equal(
+    review.isCompatibleImportedNode(partRow, importedGroup.id),
+    false,
+  );
+  assert.throws(
+    () => review.setMatch(partRow.id, importedGroup.id),
+    /matching node kinds/,
+  );
+  assert.equal(partRow.importedNodeId, originalImportedNodeId);
+
+  // The Apply boundary still rejects an invalid mapping if exposed row data
+  // is changed without using the review mutation methods.
+  partRow.importedNodeId = importedGroup.id;
+  partRow.action = "update";
+  assert.equal(review.canApply, false);
+  assert.throws(() => review.buildProject(), /compatible node kinds/);
+});
+
+test("raster fingerprints are cached on a shared PSD canvas", () => {
+  let pixelReads = 0;
+  const canvas = {
+    width: 1,
+    height: 1,
+    getContext: () => ({
+      getImageData: () => {
+        pixelReads += 1;
+        return { data: Uint8ClampedArray.from([1, 2, 3, 255]) };
+      },
+    }),
+  };
+  const psd = {
+    width: 1,
+    height: 1,
+    children: [{
+      id: 1,
+      name: "目",
+      left: 0,
+      top: 0,
+      right: 1,
+      bottom: 1,
+      canvas,
+    }],
+  };
+  const project = createProjectFromPsd(psd, {
+    idFactory: createIdFactory("fingerprint-cache"),
+  });
+  const [part] = collectPsdParts(psd.children);
+  const projectPart = Object.values(project.scene.nodes)
+    .find((node) => node.kind === "part");
+
+  assert.equal(pixelReads, 1);
+  assert.equal(
+    projectPart.sourceRef.rasterFingerprint,
+    part.rasterFingerprint,
+  );
+});
+
 test("headless adapter uses normal command schemas and exposes edits through queries", () => {
   const project = projectFixture();
   const session = new EditorSession(project);

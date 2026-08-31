@@ -1,15 +1,6 @@
 import { cloneProject } from "../model/project.js";
 import { reconcilePsdProject } from "./psd-project.js";
 
-export const PSD_REIMPORT_STATUSES = Object.freeze([
-  "matched",
-  "changed",
-  "added",
-  "missing",
-  "ambiguous",
-  "unmatched",
-]);
-
 function comparableSourceState(node) {
   return {
     displayName: node.displayName,
@@ -65,6 +56,8 @@ function depth(project, nodeId) {
 export class PsdReimportReview {
   constructor(project, psd, options = {}) {
     this.currentProject = cloneProject(project);
+    this.baseProjectId = project.id;
+    this.baseRevision = options.baseRevision ?? null;
     const reconciliation = reconcilePsdProject(project, psd, options);
     this.importedProject = reconciliation.importedProject;
     this.rows = [];
@@ -155,6 +148,19 @@ export class PsdReimportReview {
         });
         continue;
       }
+      if (row.currentNodeId && ["update", "keep"].includes(row.action)) {
+        const currentNode = this.currentProject.scene.nodes[row.currentNodeId];
+        const importedNode = this.importedProject.scene.nodes[row.importedNodeId];
+        if (!currentNode || currentNode.kind !== importedNode.kind) {
+          issues.push({
+            code: "reimport.incompatible_node_kind",
+            rowId: row.id,
+            currentNodeId: row.currentNodeId,
+            importedNodeId: row.importedNodeId,
+          });
+          continue;
+        }
+      }
       const previousRowId = claims.get(row.importedNodeId);
       if (previousRowId) {
         issues.push({
@@ -175,7 +181,12 @@ export class PsdReimportReview {
     const before = cloneProject(row);
     try {
       change(row);
-      if (!this.mappingIssues().length) return row;
+      const issues = this.mappingIssues();
+      if (!issues.length) return row;
+      if (issues.some((issue) =>
+        issue.code === "reimport.incompatible_node_kind")) {
+        throw new Error("PSD mappings require matching node kinds.");
+      }
       throw new Error("A PSD part can only be matched once.");
     } catch (error) {
       for (const key of Object.keys(row)) delete row[key];
@@ -195,6 +206,17 @@ export class PsdReimportReview {
       row.matchSource = "manual";
       row.manual = true;
     });
+  }
+
+  isCompatibleImportedNode(rowOrId, importedNodeId) {
+    const row = typeof rowOrId === "string" ? this.row(rowOrId) : rowOrId;
+    const importedNode = this.importedProject.scene.nodes[importedNodeId];
+    if (!importedNode || importedNodeId === this.importedProject.scene.rootId) {
+      return false;
+    }
+    if (!row.currentNodeId) return true;
+    const currentNode = this.currentProject.scene.nodes[row.currentNodeId];
+    return Boolean(currentNode && currentNode.kind === importedNode.kind);
   }
 
   markAsNew(rowId) {
@@ -261,7 +283,12 @@ export class PsdReimportReview {
     if (this.summary.unresolved > 0) {
       throw new Error("Resolve every ambiguous PSD mapping before Apply.");
     }
-    if (this.mappingIssues().length) {
+    const mappingIssues = this.mappingIssues();
+    if (mappingIssues.some((issue) =>
+      issue.code === "reimport.incompatible_node_kind")) {
+      throw new Error("Every PSD mapping must use compatible node kinds.");
+    }
+    if (mappingIssues.length) {
       throw new Error("Every PSD part must have at most one reviewed destination.");
     }
     const next = cloneProject(this.currentProject);
@@ -328,10 +355,22 @@ export class PsdReimportReview {
     return this.buildResult().project;
   }
 
-  apply(session, result = this.buildResult()) {
+  assertSessionCurrent(session) {
+    if (this.baseRevision == null) return;
+    if (session.project.id !== this.baseProjectId ||
+      session.currentRevision !== this.baseRevision) {
+      throw new Error(
+        "The Project changed after Analyze. Analyze the PSD again before Apply.",
+      );
+    }
+  }
+
+  apply(session, result = null) {
+    this.assertSessionCurrent(session);
+    const applyResult = result || this.buildResult();
     return session.execute({
       type: "source.apply_psd_reimport",
-      payload: { project: result.project },
+      payload: { project: applyResult.project },
     }, { label: "PSD Re-import" });
   }
 }

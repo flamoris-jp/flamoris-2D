@@ -24,7 +24,14 @@ export function rasterFingerprint(canvas) {
     for (let index = 0; index < pixels.length; index += 1) {
       hash = mix(hash, pixels[index]);
     }
-    return `fnv1a32:${width}x${height}:${hash.toString(16).padStart(8, "0")}`;
+    const fingerprint =
+      `fnv1a32:${width}x${height}:${hash.toString(16).padStart(8, "0")}`;
+    try {
+      canvas.flamorisRasterFingerprint = fingerprint;
+    } catch {
+      // Some canvas-like hosts may be non-extensible; the digest is still valid.
+    }
+    return fingerprint;
   } catch {
     return null;
   }

@@ -64,6 +64,7 @@ export class ReimportRenderHistory {
 
   apply(review, importedParts) {
     const session = this.editor.session;
+    review.assertSessionCurrent(session);
     const buildResult = review.buildResult();
     const beforeParts = [...this.getParts()];
     const afterParts = buildReviewedRenderParts(

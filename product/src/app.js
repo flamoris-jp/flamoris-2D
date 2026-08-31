@@ -48,7 +48,6 @@ const elements = {
   reimportPsdInput: document.querySelector("#reimportPsdInput"),
   unsavedDialog: document.querySelector("#unsavedDialog"),
   preferencesDialog: document.querySelector("#preferencesDialog"),
-  preferencesForm: document.querySelector("#preferencesForm"),
   autosaveEnabledInput: document.querySelector("#autosaveEnabledInput"),
   autosaveIntervalInput: document.querySelector("#autosaveIntervalInput"),
   recoveryVersionsInput: document.querySelector("#recoveryVersionsInput"),
@@ -1086,7 +1085,7 @@ function renderReimportReview() {
     empty.textContent = row.importedNodeId ? "Current selection" : "Select…";
     matchSelect.append(empty);
     for (const node of Object.values(review.importedProject.scene.nodes)) {
-      if (node.id === review.importedProject.scene.rootId) continue;
+      if (!review.isCompatibleImportedNode(row, node.id)) continue;
       const option = document.createElement("option");
       option.value = node.id;
       option.textContent = node.displayName;
@@ -1169,6 +1168,7 @@ async function analyzePsdReimport(file) {
       fileName: file.name,
       projectName: state.editor.session.project.displayName,
       idFactory: createIdFactory(`reimport-${Date.now()}`),
+      baseRevision: state.editor.session.currentRevision,
     });
     const parts = bindPsdPartsToProject(
       collectPsdParts(psd.children || []).filter((part) =>
