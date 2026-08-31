@@ -38,6 +38,7 @@ import {
   projectHistoryShortcutAction,
 } from "./ui/editor-shortcuts.js";
 import { createBrowserProjectWriter } from "./ui/browser-project-files.js";
+import { ReimportRenderHistory } from "./ui/reimport-render-history.js";
 
 const elements = {
   projectTitle: document.querySelector("#projectTitle"),
@@ -130,6 +131,7 @@ const state = {
   reimportReview: null,
   reimportParts: [],
   selectedReimportRowId: null,
+  renderAssetHistory: null,
 };
 
 const preferencesStore = createPreferencesStore(localStorage);
@@ -593,6 +595,7 @@ async function loadImage(source, label) {
   state.autosaveScheduler?.stop();
   state.autosaveScheduler = null;
   state.documentController = null;
+  state.renderAssetHistory = null;
   state.editor = null;
   elements.sceneSearchInput.value = "";
   renderEditorUi();
@@ -775,6 +778,13 @@ function attachProject(project, {
     preferences,
   });
   state.editor = editor;
+  state.renderAssetHistory = new ReimportRenderHistory(editor, {
+    getParts: () => state.psdParts,
+    setParts(nextParts) {
+      state.psdParts = nextParts;
+      clearMeshEditing();
+    },
+  });
   state.mode = mode;
   state.documentWidth = project.canvas.width;
   state.documentHeight = project.canvas.height;
@@ -1181,13 +1191,7 @@ function applyReviewedReimport() {
   const review = state.reimportReview;
   if (!review?.canApply) return;
   try {
-    review.apply(state.editor.session);
-    const rebound = bindPsdPartsToProject(state.reimportParts, state.editor.session.project);
-    const sourceKeys = new Set(rebound.map((part) => part.sourceKey));
-    state.psdParts = [
-      ...rebound,
-      ...state.psdParts.filter((part) => !sourceKeys.has(part.sourceKey)),
-    ];
+    state.renderAssetHistory.apply(review, state.reimportParts);
     state.documentWidth = state.editor.session.project.canvas.width;
     state.documentHeight = state.editor.session.project.canvas.height;
     if (preferences.saveAfterMajorOperations) state.autosaveScheduler?.checkpoint();
@@ -1199,6 +1203,18 @@ function applyReviewedReimport() {
     console.error(error);
     setStatus(error.message || String(error));
   }
+}
+
+function undoProject() {
+  const result = state.renderAssetHistory?.undo() || state.editor?.undo();
+  if (result && state.editor?.selectedNodeId) syncSelectedPsdPart();
+  return result;
+}
+
+function redoProject() {
+  const result = state.renderAssetHistory?.redo() || state.editor?.redo();
+  if (result && state.editor?.selectedNodeId) syncSelectedPsdPart();
+  return result;
 }
 
 elements.fileInput.addEventListener("change", async () => {
@@ -1240,8 +1256,8 @@ elements.fileActions.forEach((button) => {
 elements.sceneSearchInput.addEventListener("input", () => {
   state.editor?.setFilter(elements.sceneSearchInput.value);
 });
-elements.undoButton.addEventListener("click", () => state.editor?.undo());
-elements.redoButton.addEventListener("click", () => state.editor?.redo());
+elements.undoButton.addEventListener("click", undoProject);
+elements.redoButton.addEventListener("click", redoProject);
 elements.transformTools.forEach((button) => {
   button.addEventListener("click", () => {
     state.editor?.setActiveTool(button.dataset.transformTool);
@@ -1366,8 +1382,8 @@ window.addEventListener("keydown", (event) => {
   const historyAction = projectHistoryShortcutAction(event);
   if (state.editor && historyAction) {
     event.preventDefault();
-    if (historyAction === "redo") state.editor.redo();
-    else state.editor.undo();
+    if (historyAction === "redo") redoProject();
+    else undoProject();
     return;
   }
   if (event.code === "Space" && !event.repeat) {

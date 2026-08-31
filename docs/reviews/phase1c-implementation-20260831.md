@@ -24,7 +24,7 @@
 
 ## Automated acceptance
 
-The Product suite passes 44 deterministic Node tests. Phase 1C coverage includes:
+The Product suite passes 48 deterministic Node tests. Phase 1C coverage includes:
 
 - format/version validation, migration, and newer-version rejection;
 - filename generation and all four save semantics;
@@ -33,6 +33,8 @@ The Product suite passes 44 deterministic Node tests. Phase 1C coverage includes
 - bounded Recovery and separation from intentional output;
 - re-import classification, unresolved ambiguity, manual mapping, Apply, and
   whole-operation Undo;
+- pixel-only raster change detection, review-wide one-to-one mapping invariants,
+  and render-asset consistency through Apply/Undo/Redo;
 - headless query/edit/validation through normal Product boundaries.
 
 ## Manual acceptance still required

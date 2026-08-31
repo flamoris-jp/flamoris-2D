@@ -23,6 +23,15 @@ import {
 import { createProjectFromPsd } from "../src/io/psd-project.js";
 import { createPsdReimportReview } from "../src/io/psd-reimport-review.js";
 import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
+import { collectPsdParts } from "../src/psd.js";
+import {
+  bindPsdPartsToProject,
+  EditorUiAdapter,
+} from "../src/ui/editor-adapter.js";
+import {
+  buildReviewedRenderParts,
+  ReimportRenderHistory,
+} from "../src/ui/reimport-render-history.js";
 
 const fixedNow = () => new Date("2026-08-31T00:00:00.000Z");
 
@@ -42,6 +51,24 @@ function memoryStorage() {
     setItem: (key, value) => values.set(key, value),
     removeItem: (key) => values.delete(key),
   };
+}
+
+function canvasWithPixels(...pixels) {
+  const data = Uint8ClampedArray.from(pixels);
+  return {
+    width: 1,
+    height: Math.max(1, Math.ceil(data.length / 4)),
+    getContext: () => ({
+      getImageData: () => ({ data }),
+    }),
+  };
+}
+
+function renderParts(psd, project) {
+  return bindPsdPartsToProject(
+    collectPsdParts(psd.children).filter((part) => part.canvas),
+    project,
+  );
 }
 
 test(".fl2d identifies its format, preserves projectId, and rejects newer files", () => {
@@ -238,6 +265,192 @@ test("ambiguous re-import mappings remain unresolved until manually confirmed", 
   review.keepExisting(ambiguous[1].id);
   assert.equal(review.canApply, true);
   assert.equal(review.summary.update, 1);
+});
+
+test("a pixel-only PSD change is conservatively classified as changed", () => {
+  const first = {
+    width: 1,
+    height: 1,
+    children: [{
+      id: 1,
+      name: "目",
+      left: 0,
+      top: 0,
+      right: 1,
+      bottom: 1,
+      canvas: canvasWithPixels(0, 0, 0, 255),
+    }],
+  };
+  const next = {
+    ...first,
+    children: [{
+      ...first.children[0],
+      canvas: canvasWithPixels(255, 0, 0, 255),
+    }],
+  };
+  const project = createProjectFromPsd(first, {
+    idFactory: createIdFactory("raster-old"),
+  });
+  const review = createPsdReimportReview(project, next, {
+    idFactory: createIdFactory("raster-new"),
+  });
+  assert.equal(review.rows[0].status, "changed");
+  assert.equal(review.rows[0].action, "update");
+  assert.notEqual(
+    project.scene.nodes[review.rows[0].currentNodeId].sourceRef.rasterFingerprint,
+    review.importedProject.scene.nodes[review.rows[0].importedNodeId]
+      .sourceRef.rasterFingerprint,
+  );
+  const equalPixels = {
+    ...first,
+    children: [{
+      ...first.children[0],
+      canvas: canvasWithPixels(0, 0, 0, 255),
+    }],
+  };
+  const unchanged = createPsdReimportReview(project, equalPixels, {
+    idFactory: createIdFactory("raster-equal"),
+  });
+  assert.equal(unchanged.rows[0].status, "matched");
+});
+
+test("manual mapping invariant covers Reset to Auto, Mark as New, and Apply", () => {
+  const first = {
+    width: 10,
+    height: 10,
+    children: [
+      { id: 1, name: "A", left: 0, top: 0, right: 1, bottom: 1 },
+      { id: 2, name: "B", left: 1, top: 0, right: 2, bottom: 1 },
+    ],
+  };
+  const next = {
+    width: 10,
+    height: 10,
+    children: [{ id: 1, name: "A", left: 0, top: 0, right: 1, bottom: 1 }],
+  };
+  const createReview = () => {
+    const project = createProjectFromPsd(first, {
+      idFactory: createIdFactory("mapping-old"),
+    });
+    return createPsdReimportReview(project, next, {
+      idFactory: createIdFactory("mapping-new"),
+    });
+  };
+
+  const resetReview = createReview();
+  const resetAuto = resetReview.rows.find((row) => row.currentNodeId && row.importedNodeId);
+  const resetMissing = resetReview.rows.find((row) => row.status === "missing");
+  const claimedImportedId = resetAuto.importedNodeId;
+  resetReview.keepExisting(resetAuto.id);
+  resetReview.setMatch(resetMissing.id, claimedImportedId);
+  assert.throws(
+    () => resetReview.resetToAuto(resetAuto.id),
+    /only be matched once/,
+  );
+  assert.equal(resetAuto.importedNodeId, null);
+
+  const newReview = createReview();
+  const newAuto = newReview.rows.find((row) => row.currentNodeId && row.importedNodeId);
+  const newMissing = newReview.rows.find((row) => row.status === "missing");
+  newReview.keepExisting(newAuto.id);
+  newReview.setMatch(newMissing.id, newAuto.candidateImportedNodeIds[0]);
+  assert.throws(() => newReview.markAsNew(newAuto.id), /only be matched once/);
+
+  // Apply also protects the invariant if a caller mutates exposed review data.
+  newAuto.importedNodeId = newMissing.importedNodeId;
+  newAuto.action = "add";
+  assert.equal(newReview.canApply, false);
+  assert.throws(() => newReview.buildProject(), /at most one reviewed destination/);
+});
+
+test("re-import render parts follow reviewed actions through Apply, Undo, and Redo", () => {
+  const oldEyeCanvas = canvasWithPixels(0, 0, 0, 255);
+  const newEyeCanvas = canvasWithPixels(255, 0, 0, 255);
+  const removedCanvas = canvasWithPixels(0, 255, 0, 255);
+  const addedCanvas = canvasWithPixels(0, 0, 255, 255);
+  const first = {
+    width: 10,
+    height: 10,
+    children: [
+      { id: 1, name: "目", left: 0, top: 0, right: 1, bottom: 1, canvas: oldEyeCanvas },
+      { id: 2, name: "耳飾り", left: 1, top: 0, right: 2, bottom: 1, canvas: removedCanvas },
+    ],
+  };
+  const next = {
+    width: 10,
+    height: 10,
+    children: [
+      { id: 1, name: "目", left: 0, top: 0, right: 1, bottom: 1, canvas: newEyeCanvas },
+      { id: 3, name: "リボン", left: 2, top: 0, right: 3, bottom: 1, canvas: addedCanvas },
+    ],
+  };
+  const project = createProjectFromPsd(first, {
+    idFactory: createIdFactory("render-old"),
+  });
+  const session = new EditorSession(project);
+  let parts = renderParts(first, project);
+  let editor;
+  editor = new EditorUiAdapter(session, {
+    onChange(reason) {
+      if (reason !== "project") return;
+      assert.ok(parts.every((part) => session.project.scene.nodes[part.nodeId]));
+    },
+  });
+  const review = createPsdReimportReview(project, next, {
+    idFactory: createIdFactory("render-new"),
+  });
+  const importedParts = renderParts(next, review.importedProject);
+  review.removeExisting(review.rows.find((row) => row.status === "missing").id);
+  const history = new ReimportRenderHistory(editor, {
+    getParts: () => parts,
+    setParts: (nextParts) => { parts = nextParts; },
+  });
+
+  history.apply(review, importedParts);
+  assert.equal(parts.some((part) => part.sourceKey === "layer:2"), false);
+  assert.equal(parts.find((part) => part.sourceKey === "layer:1").canvas, newEyeCanvas);
+  assert.equal(parts.find((part) => part.sourceKey === "layer:3").canvas, addedCanvas);
+
+  history.undo();
+  assert.equal(parts.find((part) => part.sourceKey === "layer:1").canvas, oldEyeCanvas);
+  assert.equal(parts.find((part) => part.sourceKey === "layer:2").canvas, removedCanvas);
+  assert.equal(parts.some((part) => part.sourceKey === "layer:3"), false);
+
+  history.redo();
+  assert.equal(parts.find((part) => part.sourceKey === "layer:1").canvas, newEyeCanvas);
+  assert.equal(parts.some((part) => part.sourceKey === "layer:2"), false);
+  assert.equal(parts.find((part) => part.sourceKey === "layer:3").canvas, addedCanvas);
+});
+
+test("Keep Existing preserves the current canvas after reviewed re-import", () => {
+  const oldCanvas = canvasWithPixels(1, 2, 3, 255);
+  const newCanvas = canvasWithPixels(4, 5, 6, 255);
+  const first = {
+    width: 1,
+    height: 1,
+    children: [{ id: 1, name: "目", left: 0, top: 0, right: 1, bottom: 1, canvas: oldCanvas }],
+  };
+  const next = {
+    width: 1,
+    height: 1,
+    children: [{ id: 1, name: "目", left: 0, top: 0, right: 1, bottom: 1, canvas: newCanvas }],
+  };
+  const project = createProjectFromPsd(first, {
+    idFactory: createIdFactory("keep-old"),
+  });
+  const review = createPsdReimportReview(project, next, {
+    idFactory: createIdFactory("keep-new"),
+  });
+  const row = review.rows[0];
+  review.keepExisting(row.id);
+  const result = review.buildResult();
+  const parts = buildReviewedRenderParts(
+    renderParts(first, project),
+    renderParts(next, review.importedProject),
+    review,
+    result,
+  );
+  assert.equal(parts[0].canvas, oldCanvas);
 });
 
 test("headless adapter uses normal command schemas and exposes edits through queries", () => {

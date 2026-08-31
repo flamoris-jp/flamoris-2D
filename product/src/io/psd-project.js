@@ -3,6 +3,7 @@ import {
   createProject,
   createSceneNode,
 } from "../model/project.js";
+import { rasterFingerprint } from "./raster-fingerprint.js";
 
 function nativeLayerId(node) {
   return node.id ?? node.layerId;
@@ -110,6 +111,9 @@ export function createProjectFromPsd(
           identityPath: identityPath.join("/"),
           identityKind: hasNativeIdentity ? "native" : "fallback",
           orderDependent,
+          rasterFingerprint: hasChildren
+            ? null
+            : rasterFingerprint(layer.canvas),
         },
         bounds: hasChildren
           ? null

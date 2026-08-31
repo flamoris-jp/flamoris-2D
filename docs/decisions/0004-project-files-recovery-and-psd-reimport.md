@@ -61,6 +61,15 @@ Project while preserving the logical `projectId` and authored state for matched
 nodes. It commits through the typed `source.apply_psd_reimport` Command as one
 transaction/history entry. Undo restores the complete previous Project.
 
+Raster parts carry a deterministic content fingerprint in source provenance.
+A part is classified unchanged only when both structural properties and raster
+fingerprints agree; missing fingerprint evidence is treated conservatively as
+changed. Browser render assets remain transient, but a dedicated UI history
+adapter switches reviewed canvas bindings before Apply/Undo/Redo notifications,
+so every render observes assets whose node IDs exist in the current Project.
+Keep Existing preserves its prior canvas. One-to-one imported-part mapping is a
+review-wide invariant checked after every row mutation and again before Apply.
+
 ### Headless boundary
 
 The in-process headless adapter exposes the existing Query API and delegates

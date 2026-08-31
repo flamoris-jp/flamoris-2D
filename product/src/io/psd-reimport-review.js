@@ -21,8 +21,14 @@ function comparableSourceState(node) {
 }
 
 function sourceStateChanged(current, imported) {
-  return JSON.stringify(comparableSourceState(current)) !==
-    JSON.stringify(comparableSourceState(imported));
+  if (JSON.stringify(comparableSourceState(current)) !==
+    JSON.stringify(comparableSourceState(imported))) return true;
+  if (current.kind !== "part" && imported.kind !== "part") return false;
+  const currentFingerprint = current.sourceRef?.rasterFingerprint;
+  const importedFingerprint = imported.sourceRef?.rasterFingerprint;
+  // A part is unchanged only when raster equality is positively established.
+  return !currentFingerprint || !importedFingerprint ||
+    currentFingerprint !== importedFingerprint;
 }
 
 function explanation(node, ambiguousReasons = []) {
@@ -134,63 +140,107 @@ export class PsdReimportReview {
     return row;
   }
 
-  setMatch(rowId, importedNodeId) {
+  mappingIssues() {
+    const issues = [];
+    const claims = new Map();
+    for (const row of this.rows) {
+      if (!row.importedNodeId ||
+        !["update", "keep", "add"].includes(row.action)) continue;
+      if (!this.importedProject.scene.nodes[row.importedNodeId] ||
+        row.importedNodeId === this.importedProject.scene.rootId) {
+        issues.push({
+          code: "reimport.imported_node_invalid",
+          rowId: row.id,
+          importedNodeId: row.importedNodeId,
+        });
+        continue;
+      }
+      const previousRowId = claims.get(row.importedNodeId);
+      if (previousRowId) {
+        issues.push({
+          code: "reimport.duplicate_imported_mapping",
+          rowId: row.id,
+          previousRowId,
+          importedNodeId: row.importedNodeId,
+        });
+      } else {
+        claims.set(row.importedNodeId, row.id);
+      }
+    }
+    return issues;
+  }
+
+  mutateRow(rowId, change) {
     const row = this.row(rowId);
+    const before = cloneProject(row);
+    try {
+      change(row);
+      if (!this.mappingIssues().length) return row;
+      throw new Error("A PSD part can only be matched once.");
+    } catch (error) {
+      for (const key of Object.keys(row)) delete row[key];
+      Object.assign(row, before);
+      throw error;
+    }
+  }
+
+  setMatch(rowId, importedNodeId) {
     if (!this.importedProject.scene.nodes[importedNodeId] ||
       importedNodeId === this.importedProject.scene.rootId) {
       throw new Error("The selected PSD part does not exist.");
     }
-    const duplicate = this.rows.find((entry) =>
-      entry.id !== rowId &&
-      entry.importedNodeId === importedNodeId &&
-      ["update", "keep", "add"].includes(entry.action));
-    if (duplicate) throw new Error("A PSD part can only be matched once.");
-    row.importedNodeId = importedNodeId;
-    row.action = row.currentNodeId ? "update" : "add";
-    row.matchSource = "manual";
-    row.manual = true;
-    return row;
+    return this.mutateRow(rowId, (row) => {
+      row.importedNodeId = importedNodeId;
+      row.action = row.currentNodeId ? "update" : "add";
+      row.matchSource = "manual";
+      row.manual = true;
+    });
   }
 
   markAsNew(rowId) {
-    const row = this.row(rowId);
-    if (!row.importedNodeId && row.candidateImportedNodeIds.length === 1) {
-      row.importedNodeId = row.candidateImportedNodeIds[0];
-    }
-    if (!row.importedNodeId) throw new Error("Select a PSD part first.");
-    row.action = "add";
-    row.matchSource = "manual";
-    row.manual = true;
+    return this.mutateRow(rowId, (row) => {
+      if (!row.importedNodeId && row.candidateImportedNodeIds.length === 1) {
+        row.importedNodeId = row.candidateImportedNodeIds[0];
+      }
+      if (!row.importedNodeId) throw new Error("Select a PSD part first.");
+      row.action = "add";
+      row.matchSource = "manual";
+      row.manual = true;
+    });
   }
 
   keepExisting(rowId) {
-    const row = this.row(rowId);
-    if (!row.currentNodeId) throw new Error("There is no existing part to keep.");
-    row.action = "keep";
-    row.importedNodeId = null;
-    row.matchSource = "manual";
-    row.manual = true;
+    return this.mutateRow(rowId, (row) => {
+      if (!row.currentNodeId) throw new Error("There is no existing part to keep.");
+      row.action = "keep";
+      row.importedNodeId = null;
+      row.matchSource = "manual";
+      row.manual = true;
+    });
   }
 
   removeExisting(rowId) {
-    const row = this.row(rowId);
-    if (!row.currentNodeId) throw new Error("There is no existing part to remove.");
-    row.action = "remove";
-    row.importedNodeId = null;
-    row.matchSource = "manual";
-    row.manual = true;
+    return this.mutateRow(rowId, (row) => {
+      if (!row.currentNodeId) throw new Error("There is no existing part to remove.");
+      row.action = "remove";
+      row.importedNodeId = null;
+      row.matchSource = "manual";
+      row.manual = true;
+    });
   }
 
   ignore(rowId) {
-    const row = this.row(rowId);
-    row.action = "ignore";
-    row.manual = true;
+    return this.mutateRow(rowId, (row) => {
+      row.action = "ignore";
+      row.manual = true;
+    });
   }
 
   resetToAuto(rowId) {
-    const row = this.row(rowId);
-    Object.assign(row, cloneProject(row.auto), { auto: row.auto });
-    return row;
+    return this.mutateRow(rowId, (row) => {
+      const auto = row.auto;
+      Object.assign(row, cloneProject(auto), { auto });
+    });
   }
 
   get summary() {
@@ -204,12 +254,15 @@ export class PsdReimportReview {
   }
 
   get canApply() {
-    return this.summary.unresolved === 0;
+    return this.summary.unresolved === 0 && this.mappingIssues().length === 0;
   }
 
-  buildProject() {
-    if (!this.canApply) {
+  buildResult() {
+    if (this.summary.unresolved > 0) {
       throw new Error("Resolve every ambiguous PSD mapping before Apply.");
+    }
+    if (this.mappingIssues().length) {
+      throw new Error("Every PSD part must have at most one reviewed destination.");
     }
     const next = cloneProject(this.currentProject);
     const imported = this.importedProject;
@@ -268,14 +321,17 @@ export class PsdReimportReview {
       importedToCurrent.set(sourceNode.id, nodeId);
     }
     next.canvas = cloneProject(imported.canvas);
-    return next;
+    return { project: next, importedNodeAssignments: importedToCurrent };
   }
 
-  apply(session) {
-    const project = this.buildProject();
+  buildProject() {
+    return this.buildResult().project;
+  }
+
+  apply(session, result = this.buildResult()) {
     return session.execute({
       type: "source.apply_psd_reimport",
-      payload: { project },
+      payload: { project: result.project },
     }, { label: "PSD Re-import" });
   }
 }
