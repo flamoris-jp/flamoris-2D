@@ -5,10 +5,11 @@ uniform vec2 u_viewport;
 uniform vec2 u_origin;
 uniform vec2 u_partOffset;
 uniform float u_scale;
+uniform mat3 u_world;
 out vec2 v_uv;
 
 void main() {
-  vec2 documentPosition = a_position + u_partOffset;
+  vec2 documentPosition = (u_world * vec3(a_position + u_partOffset, 1.0)).xy;
   vec2 screen = u_origin + documentPosition * u_scale;
   vec2 clip = (screen / u_viewport) * 2.0 - 1.0;
   gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
@@ -70,6 +71,7 @@ export class MeshRenderer {
       origin: gl.getUniformLocation(this.program, "u_origin"),
       partOffset: gl.getUniformLocation(this.program, "u_partOffset"),
       scale: gl.getUniformLocation(this.program, "u_scale"),
+      world: gl.getUniformLocation(this.program, "u_world"),
     };
 
     gl.bindVertexArray(this.vao);
@@ -112,12 +114,18 @@ export class MeshRenderer {
     this.indexCount = 0;
   }
 
-  render(vertices, view, partOffset = { x: 0, y: 0 }) {
+  render(
+    vertices,
+    view,
+    partOffset = { x: 0, y: 0 },
+    world = [1, 0, 0, 1, 0, 0],
+    visible = true,
+  ) {
     const gl = this.gl;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
-    if (!this.indexCount) return;
+    if (!this.indexCount || !visible) return;
 
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vao);
@@ -127,6 +135,11 @@ export class MeshRenderer {
     gl.uniform2f(this.locations.origin, view.originX, view.originY);
     gl.uniform2f(this.locations.partOffset, partOffset.x, partOffset.y);
     gl.uniform1f(this.locations.scale, view.scale);
+    gl.uniformMatrix3fv(this.locations.world, false, new Float32Array([
+      world[0], world[1], 0,
+      world[2], world[3], 0,
+      world[4], world[5], 1,
+    ]));
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
     gl.drawElements(gl.TRIANGLES, this.indexCount, gl.UNSIGNED_INT, 0);
   }

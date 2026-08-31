@@ -11,13 +11,35 @@ import {
 } from "./mesh.js";
 import { captureOffsets, clampDuration, sampleLoop } from "./animation.js";
 import { MeshRenderer } from "./renderer.js";
-import { collectPsdParts, visiblePsdParts } from "./psd.js";
+import { collectPsdParts } from "./psd.js";
+import { createProjectFromPsd } from "./io/psd-project.js";
+import { EditorSession } from "./commands/editor.js";
+import {
+  bindPsdPartsToProject,
+  EditorUiAdapter,
+} from "./ui/editor-adapter.js";
+import {
+  createTransformGesture,
+  pickNodeAtDocumentPoint,
+} from "./ui/canvas-interaction.js";
+import { transformPoint } from "./core/transforms.js";
 
 const elements = {
   fileInput: document.querySelector("#fileInput"),
   demoButton: document.querySelector("#demoButton"),
-  partSelect: document.querySelector("#partSelect"),
   partInfo: document.querySelector("#partInfo"),
+  undoButton: document.querySelector("#undoButton"),
+  redoButton: document.querySelector("#redoButton"),
+  sceneSearchInput: document.querySelector("#sceneSearchInput"),
+  sceneTree: document.querySelector("#sceneTree"),
+  inspectorEmpty: document.querySelector("#inspectorEmpty"),
+  inspectorForm: document.querySelector("#inspectorForm"),
+  inspectorKind: document.querySelector("#inspectorKind"),
+  displayNameInput: document.querySelector("#displayNameInput"),
+  visibilityInput: document.querySelector("#visibilityInput"),
+  lockedInput: document.querySelector("#lockedInput"),
+  nodeIdOutput: document.querySelector("#nodeIdOutput"),
+  parentOutput: document.querySelector("#parentOutput"),
   columnsInput: document.querySelector("#columnsInput"),
   rowsInput: document.querySelector("#rowsInput"),
   generateButton: document.querySelector("#generateButton"),
@@ -40,6 +62,8 @@ const elements = {
   fitAllButton: document.querySelector("#fitAllButton"),
   fitPartButton: document.querySelector("#fitPartButton"),
   zoomOutput: document.querySelector("#zoomOutput"),
+  transformTools: [...document.querySelectorAll("[data-transform-tool]")],
+  transformInputs: [...document.querySelectorAll("[data-transform-path]")],
 };
 
 const state = {
@@ -52,7 +76,8 @@ const state = {
   documentHeight: 0,
   partOffset: { x: 0, y: 0 },
   psdParts: [],
-  selectedPartIndex: -1,
+  editor: null,
+  transformGesture: null,
   selected: new Set(),
   drag: null,
   keyframes: { a: null, b: null },
@@ -78,10 +103,24 @@ function setStatus(message) {
   elements.status.textContent = message;
 }
 
+function selectedPartIndex() {
+  if (!state.editor?.selectedNodeId) return -1;
+  return state.psdParts.findIndex(
+    (part) => part.nodeId === state.editor.selectedNodeId,
+  );
+}
+
+function selectedPart() {
+  const index = selectedPartIndex();
+  return index >= 0 ? state.psdParts[index] : null;
+}
+
 function updateZoomOutput() {
   const percent = state.view ? Math.round(state.view.scale * 100) : 100;
   elements.zoomOutput.textContent = `${percent}%`;
-  elements.fitPartButton.disabled = !(state.mode === "psd" && state.selectedPartIndex >= 0);
+  elements.fitPartButton.disabled = !(
+    state.mode === "psd" && state.editor?.selectedNodeId
+  );
 }
 
 function fitDocumentView() {
@@ -122,13 +161,34 @@ function fitBoundsView(bounds, padding = 110) {
 }
 
 function selectedPartDocumentBounds() {
-  if (state.mode !== "psd" || state.selectedPartIndex < 0) return null;
-  const part = state.psdParts[state.selectedPartIndex];
+  return selectedNodeDocumentBounds();
+}
+
+function selectedNodeDocumentBounds() {
+  const selectedId = state.editor?.selectedNodeId;
+  if (!selectedId) return null;
+  const points = [];
+  for (const part of state.psdParts) {
+    if (
+      !part.nodeId ||
+      !state.editor.isDescendantOrSelf(part.nodeId, selectedId)
+    ) continue;
+    const node = state.editor.getNode(part.nodeId);
+    if (!node.effectiveVisible) continue;
+    const world = state.editor.worldTransform(part.nodeId);
+    points.push(
+      transformPoint(world, { x: part.left, y: part.top }),
+      transformPoint(world, { x: part.right, y: part.top }),
+      transformPoint(world, { x: part.right, y: part.bottom }),
+      transformPoint(world, { x: part.left, y: part.bottom }),
+    );
+  }
+  if (!points.length) return null;
   return {
-    left: part.left,
-    top: part.top,
-    right: part.left + part.width,
-    bottom: part.top + part.height,
+    left: Math.min(...points.map((point) => point.x)),
+    top: Math.min(...points.map((point) => point.y)),
+    right: Math.max(...points.map((point) => point.x)),
+    bottom: Math.max(...points.map((point) => point.y)),
   };
 }
 
@@ -240,7 +300,15 @@ function resizeCanvases() {
 }
 
 function screenPointForPart(x, y) {
-  return imageToScreen(x + state.partOffset.x, y + state.partOffset.y, state.view);
+  const basePoint = {
+    x: x + state.partOffset.x,
+    y: y + state.partOffset.y,
+  };
+  const part = selectedPart();
+  const documentPoint = state.editor && part?.nodeId
+    ? transformPoint(state.editor.worldTransform(part.nodeId), basePoint)
+    : basePoint;
+  return imageToScreen(documentPoint.x, documentPoint.y, state.view);
 }
 
 function drawOverlay(vertices) {
@@ -249,7 +317,7 @@ function drawOverlay(vertices) {
   const ratio = window.devicePixelRatio || 1;
   context.setTransform(ratio, 0, 0, ratio, 0, 0);
   context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
-  if (!state.mesh || !state.view) return;
+  if (!state.mesh || !state.view || vertices.length === 0) return;
 
   context.lineWidth = 1;
   context.strokeStyle = "rgba(129, 221, 205, 0.48)";
@@ -278,6 +346,47 @@ function drawOverlay(vertices) {
   }
 }
 
+function drawTransformGizmo() {
+  if (!state.editor?.selectedNodeId || !state.view) return;
+  const bounds = selectedNodeDocumentBounds();
+  if (!bounds) return;
+  const node = state.editor.getNode(state.editor.selectedNodeId);
+  const context = elements.overlayCanvas.getContext("2d");
+  const topLeft = imageToScreen(bounds.left, bounds.top, state.view);
+  const bottomRight = imageToScreen(bounds.right, bounds.bottom, state.view);
+  const pivotDocument = transformPoint(
+    state.editor.worldTransform(node.id),
+    node.transform.pivot,
+  );
+  const pivot = imageToScreen(pivotDocument.x, pivotDocument.y, state.view);
+  context.save();
+  context.strokeStyle = node.locked ? "#9a8060" : "#ffca67";
+  context.fillStyle = "rgba(255, 202, 103, .12)";
+  context.lineWidth = 1.5;
+  context.setLineDash([5, 4]);
+  context.strokeRect(
+    topLeft.x,
+    topLeft.y,
+    bottomRight.x - topLeft.x,
+    bottomRight.y - topLeft.y,
+  );
+  context.setLineDash([]);
+  context.beginPath();
+  context.arc(pivot.x, pivot.y, 6, 0, Math.PI * 2);
+  context.fill();
+  context.stroke();
+  context.beginPath();
+  context.moveTo(pivot.x - 10, pivot.y);
+  context.lineTo(pivot.x + 10, pivot.y);
+  context.moveTo(pivot.x, pivot.y - 10);
+  context.lineTo(pivot.x, pivot.y + 10);
+  context.stroke();
+  context.fillStyle = "#ffdc8e";
+  context.font = "10px ui-monospace, monospace";
+  context.fillText(state.editor.activeTool, topLeft.x + 5, topLeft.y - 7);
+  context.restore();
+}
+
 const blendMap = new Map([
   ["normal", "source-over"],
   ["pass through", "source-over"],
@@ -299,15 +408,23 @@ const blendMap = new Map([
 ]);
 
 function drawPsdPart(context, part) {
-  if (!part.canvas || !state.view) return;
-  const x = state.view.originX + part.left * state.view.scale;
-  const y = state.view.originY + part.top * state.view.scale;
-  const width = part.canvas.width * state.view.scale;
-  const height = part.canvas.height * state.view.scale;
+  if (!part.canvas || !state.view || !part.nodeId || !state.editor) return;
+  const node = state.editor.getNode(part.nodeId);
+  if (!node.effectiveVisible) return;
+  const world = state.editor.worldTransform(part.nodeId);
+  const scale = state.view.scale;
   context.save();
   context.globalAlpha = part.opacity;
   context.globalCompositeOperation = blendMap.get(part.blendMode) || "source-over";
-  context.drawImage(part.canvas, x, y, width, height);
+  context.transform(
+    world[0] * scale,
+    world[1] * scale,
+    world[2] * scale,
+    world[3] * scale,
+    state.view.originX + world[4] * scale,
+    state.view.originY + world[5] * scale,
+  );
+  context.drawImage(part.canvas, part.left, part.top);
   context.restore();
 }
 
@@ -322,9 +439,10 @@ function drawPsdBackgrounds() {
   below.setTransform(ratio, 0, 0, ratio, 0, 0);
   above.setTransform(ratio, 0, 0, ratio, 0, 0);
 
+  const selectedIndex = selectedPartIndex();
   for (let index = 0; index < state.psdParts.length; index += 1) {
-    if (index === state.selectedPartIndex) continue;
-    const target = state.selectedPartIndex >= 0 && index > state.selectedPartIndex ? above : below;
+    if (index === selectedIndex && state.mesh) continue;
+    const target = selectedIndex >= 0 && index > selectedIndex ? above : below;
     drawPsdPart(target, state.psdParts[index]);
   }
 }
@@ -334,14 +452,23 @@ function render() {
   if (!state.mesh || !state.view) {
     renderer.render(new Float32Array(), { originX: 0, originY: 0, scale: 1 }, { x: 0, y: 0 });
     drawOverlay(new Float32Array());
+    drawTransformGizmo();
     return;
   }
   const previewOffsets = state.previewMode && state.keyframes.a && state.keyframes.b
     ? sampleLoop(state.keyframes.a, state.keyframes.b, state.currentTime, duration())
     : state.mesh.vertexOffsets;
   const vertices = getDeformedVertices(state.mesh, previewOffsets);
-  renderer.render(vertices, state.view, state.partOffset);
-  drawOverlay(vertices);
+  const part = selectedPart();
+  const world = part?.nodeId && state.editor
+    ? state.editor.worldTransform(part.nodeId)
+    : [1, 0, 0, 1, 0, 0];
+  const visible = part?.nodeId && state.editor
+    ? state.editor.getNode(part.nodeId).effectiveVisible
+    : true;
+  renderer.render(vertices, state.view, state.partOffset, world, visible);
+  drawOverlay(visible ? vertices : new Float32Array());
+  drawTransformGizmo();
 }
 
 function createMesh() {
@@ -362,8 +489,9 @@ function createMesh() {
   updateButtons();
   render();
   const count = state.mesh.baseVertices.length / 2;
-  const prefix = state.mode === "psd" && state.selectedPartIndex >= 0
-    ? `${state.psdParts[state.selectedPartIndex].name}・`
+  const part = selectedPart();
+  const prefix = state.mode === "psd" && part
+    ? `${part.name}・`
     : "";
   setStatus(`${prefix}${columns} × ${rows} グリッド・${count}頂点`);
 }
@@ -414,9 +542,9 @@ async function loadImage(source, label) {
 
   state.mode = "png";
   state.psdParts = [];
-  state.selectedPartIndex = -1;
-  elements.partSelect.innerHTML = '<option value="">PNG単体</option>';
-  elements.partSelect.disabled = true;
+  state.editor = null;
+  elements.sceneSearchInput.value = "";
+  renderEditorUi();
   elements.partInfo.textContent = "単一PNGモード";
   clearLayerCanvas(elements.backgroundBelowCanvas);
   clearLayerCanvas(elements.foregroundCanvas);
@@ -428,37 +556,140 @@ async function loadImage(source, label) {
   setStatus(`${label}・${image.width} × ${image.height}px`);
 }
 
-function populatePartSelect(parts) {
-  elements.partSelect.innerHTML = '<option value="-1">全体表示</option>';
-  parts.forEach((part, index) => {
-    const option = document.createElement("option");
-    option.value = String(index);
-    option.textContent = part.path;
-    elements.partSelect.append(option);
-  });
-  elements.partSelect.disabled = false;
-  elements.partSelect.value = "-1";
-}
-
-function selectPsdPart(index) {
-  state.selectedPartIndex = index;
+function syncSelectedPsdPart() {
   clearMeshEditing();
-
-  if (index < 0) {
-    state.selectedPartIndex = -1;
+  const part = selectedPart();
+  if (!part?.canvas) {
     state.documentWidth ||= 1;
     state.documentHeight ||= 1;
-    elements.partInfo.textContent = `${state.psdParts.length} parts・全体表示`;
-    fitDocumentView();
-    setStatus(`PSD全体・${state.psdParts.length}パーツ`);
+    const node = state.editor?.selectedNode();
+    elements.partInfo.textContent = node
+      ? `${node.displayName}・${node.kind}`
+      : `${state.psdParts.length} parts・全体表示`;
+    render();
     return;
   }
-
-  const part = state.psdParts[index];
   setEditableImage(part.canvas, state.documentWidth, state.documentHeight, part.left, part.top);
   elements.partInfo.textContent = `${part.name}・x ${part.left} / y ${part.top}・${part.width} × ${part.height}`;
   createMesh();
-  fitSelectedPartView();
+}
+
+function renderSceneTree() {
+  elements.sceneTree.replaceChildren();
+  elements.sceneSearchInput.disabled = !state.editor;
+  if (!state.editor) {
+    const empty = document.createElement("p");
+    empty.className = "panel-empty";
+    empty.textContent = "PSDを読み込むと階層を表示します";
+    elements.sceneTree.append(empty);
+    return;
+  }
+  const list = document.createElement("ul");
+  list.className = "tree-children";
+  const filtered = Boolean(state.editor.filterText.trim());
+  const appendNode = (node, parent, depth) => {
+    const item = document.createElement("li");
+    item.setAttribute("role", "treeitem");
+    item.setAttribute("aria-selected", String(node.id === state.editor.selectedNodeId));
+    const row = document.createElement("div");
+    row.className = "tree-row";
+    row.style.paddingLeft = `${depth * 13}px`;
+    row.dataset.nodeId = node.id;
+    if (node.id === state.editor.selectedNodeId) row.classList.add("selected");
+    if (!node.effectiveVisible) row.classList.add("effectively-hidden");
+
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "tree-toggle";
+    toggle.textContent = node.kind === "group"
+      ? (state.editor.expandedNodeIds.has(node.id) ? "▾" : "▸")
+      : "·";
+    toggle.disabled = node.kind !== "group";
+    toggle.addEventListener("click", (event) => {
+      event.stopPropagation();
+      state.editor.toggleExpanded(node.id);
+    });
+
+    const visibility = document.createElement("button");
+    visibility.type = "button";
+    visibility.className = "tree-state";
+    visibility.textContent = node.visible ? "◉" : "○";
+    visibility.title = node.visible ? "非表示にする" : "表示する";
+    visibility.addEventListener("click", (event) => {
+      event.stopPropagation();
+      state.editor.setVisibility(node.id, !node.visible);
+    });
+
+    const label = document.createElement("span");
+    label.className = "tree-label";
+    label.textContent = node.displayName;
+    label.title = `${node.displayName} (${node.id})`;
+    const lock = document.createElement("span");
+    lock.className = node.locked ? "tree-lock" : "tree-kind";
+    lock.textContent = node.locked ? "◆" : (node.kind === "group" ? "G" : "P");
+
+    row.append(toggle, visibility, label, lock);
+    row.addEventListener("click", () => state.editor.selectNode(node.id));
+    item.append(row);
+    parent.append(item);
+    if (
+      node.children.length &&
+      (filtered || state.editor.expandedNodeIds.has(node.id))
+    ) {
+      const children = document.createElement("ul");
+      children.className = "tree-children";
+      node.children.forEach((child) => appendNode(child, children, depth + 1));
+      item.append(children);
+    }
+  };
+  appendNode(state.editor.getTree(), list, 0);
+  elements.sceneTree.append(list);
+  elements.sceneTree.querySelector(".tree-row.selected")?.scrollIntoView({ block: "nearest" });
+}
+
+function renderInspector() {
+  const node = state.editor?.selectedNode();
+  elements.inspectorEmpty.hidden = Boolean(node);
+  elements.inspectorForm.hidden = !node;
+  elements.inspectorKind.textContent = node ? node.kind : "未選択";
+  if (!node) return;
+  elements.displayNameInput.value = node.displayName;
+  elements.visibilityInput.checked = node.visible;
+  elements.lockedInput.checked = node.locked;
+  elements.nodeIdOutput.textContent = node.id;
+  const parent = node.parentId
+    ? state.editor.session.query("scene.get_node", { nodeId: node.parentId })
+    : null;
+  elements.parentOutput.textContent = parent
+    ? `${parent.displayName} (${parent.id})`
+    : "— root —";
+  for (const input of elements.transformInputs) {
+    const [section, key] = input.dataset.transformPath.split(".");
+    let value = key ? node.transform[section][key] : node.transform[section];
+    if (input.dataset.transformUnit === "degrees") value = value * 180 / Math.PI;
+    input.value = String(Number(value.toFixed(4)));
+  }
+}
+
+function renderEditorUi() {
+  renderSceneTree();
+  renderInspector();
+  elements.undoButton.disabled = !state.editor?.canUndo;
+  elements.redoButton.disabled = !state.editor?.canRedo;
+  elements.transformTools.forEach((button) => {
+    button.disabled = !state.editor?.selectedNodeId;
+    button.classList.toggle(
+      "active",
+      button.dataset.transformTool === (state.editor?.activeTool || "translate"),
+    );
+  });
+  updateZoomOutput();
+}
+
+function handleEditorChange(reason) {
+  if (reason === "selection") syncSelectedPsdPart();
+  renderEditorUi();
+  render();
 }
 
 async function loadPsd(file) {
@@ -473,15 +704,25 @@ async function loadPsd(file) {
     logMissingFeatures: true,
   });
 
+  const project = createProjectFromPsd(psd, {
+    fileName: file.name,
+    projectName: file.name,
+  });
+  const session = new EditorSession(project);
+  const editor = new EditorUiAdapter(session, { onChange: handleEditorChange });
   const allParts = collectPsdParts(psd.children || []);
-  const parts = visiblePsdParts(allParts);
+  const parts = bindPsdPartsToProject(
+    allParts.filter((part) => part.canvas && part.width > 0 && part.height > 0),
+    session.project,
+  );
   if (parts.length === 0) throw new Error("表示できるPSDパーツが見つかりませんでした");
 
   state.mode = "psd";
   state.documentWidth = psd.width;
   state.documentHeight = psd.height;
   state.psdParts = parts;
-  state.selectedPartIndex = -1;
+  state.editor = editor;
+  elements.sceneSearchInput.value = "";
   state.cameraMode = "all";
   state.view = createViewTransform(
     elements.viewportWrap.clientWidth,
@@ -494,11 +735,11 @@ async function loadPsd(file) {
   state.documentWidth = psd.width;
   state.documentHeight = psd.height;
   state.psdParts = parts;
-  populatePartSelect(parts);
+  renderEditorUi();
   elements.partInfo.textContent = `${parts.length} parts・${psd.width} × ${psd.height}`;
   elements.emptyState.hidden = true;
   render();
-  setStatus(`${file.name}・${parts.length}パーツをPSDから直接読込`);
+  setStatus(`${file.name}・${parts.length}パーツ・Editor Core接続済み`);
 }
 
 async function loadFile(file) {
@@ -580,8 +821,58 @@ function nearestVertex(screenPoint, radius = 12) {
 }
 
 elements.fileInput.addEventListener("change", () => loadFile(elements.fileInput.files?.[0]));
-elements.partSelect.addEventListener("change", () => selectPsdPart(Number(elements.partSelect.value)));
 elements.demoButton.addEventListener("click", () => loadImage(createDemoUrl(), "front_hair_demo.png"));
+elements.sceneSearchInput.addEventListener("input", () => {
+  state.editor?.setFilter(elements.sceneSearchInput.value);
+});
+elements.undoButton.addEventListener("click", () => state.editor?.undo());
+elements.redoButton.addEventListener("click", () => state.editor?.redo());
+elements.transformTools.forEach((button) => {
+  button.addEventListener("click", () => {
+    state.editor?.setActiveTool(button.dataset.transformTool);
+  });
+});
+
+function commitInspectorEdit(action) {
+  try {
+    action();
+    setStatus("Editor Coreへ変更を適用しました");
+  } catch (error) {
+    console.error(error);
+    renderInspector();
+    setStatus(error.message || String(error));
+  }
+}
+
+elements.displayNameInput.addEventListener("change", () => {
+  commitInspectorEdit(() => {
+    state.editor?.renameSelected(elements.displayNameInput.value);
+  });
+});
+elements.visibilityInput.addEventListener("change", () => {
+  const nodeId = state.editor?.selectedNodeId;
+  if (nodeId) state.editor.setVisibility(nodeId, elements.visibilityInput.checked);
+});
+elements.lockedInput.addEventListener("change", () => {
+  const nodeId = state.editor?.selectedNodeId;
+  if (nodeId) state.editor.setLocked(nodeId, elements.lockedInput.checked);
+});
+elements.transformInputs.forEach((input) => {
+  input.addEventListener("change", () => {
+    commitInspectorEdit(() => {
+      const node = state.editor?.selectedNode();
+      if (!node) return;
+      let value = Number(input.value);
+      if (!Number.isFinite(value)) throw new Error("有限の数値を入力してください。");
+      if (input.dataset.transformUnit === "degrees") value = value * Math.PI / 180;
+      const transform = structuredClone(node.transform);
+      const [section, key] = input.dataset.transformPath.split(".");
+      if (key) transform[section][key] = value;
+      else transform[section] = value;
+      state.editor.setSelectedTransform(transform, "Inspector transform");
+    });
+  });
+});
 elements.generateButton.addEventListener("click", createMesh);
 elements.resetButton.addEventListener("click", () => {
   returnToEdit();
@@ -657,6 +948,16 @@ elements.overlayCanvas.addEventListener("wheel", (event) => {
 }, { passive: false });
 
 window.addEventListener("keydown", (event) => {
+  if (
+    state.editor &&
+    (event.ctrlKey || event.metaKey) &&
+    event.key.toLocaleLowerCase() === "z"
+  ) {
+    event.preventDefault();
+    if (event.shiftKey) state.editor.redo();
+    else state.editor.undo();
+    return;
+  }
   if (event.code === "Space" && !event.repeat) {
     const target = event.target;
     const editingText = target instanceof HTMLInputElement ||
@@ -693,6 +994,41 @@ elements.overlayCanvas.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     return;
   }
+
+  if (event.button === 0 && state.editor && state.mode === "psd") {
+    const documentPoint = screenToImage(screenPoint.x, screenPoint.y, state.view);
+    const pickedNodeId = pickNodeAtDocumentPoint(
+      state.psdParts,
+      state.editor,
+      documentPoint,
+    );
+    const selectedNodeId = state.editor.selectedNodeId;
+    const pickedInsideSelection = pickedNodeId && selectedNodeId &&
+      state.editor.isDescendantOrSelf(pickedNodeId, selectedNodeId);
+    if (selectedNodeId && pickedInsideSelection) {
+      const node = state.editor.selectedNode();
+      const drag = state.editor.beginTransformDrag(
+        `${state.editor.activeTool} ${node.displayName}`,
+      );
+      if (drag) {
+        state.transformGesture = {
+          pointerId: event.pointerId,
+          gesture: createTransformGesture(
+            state.editor.session.project,
+            node,
+            state.editor.activeTool,
+            documentPoint,
+          ),
+        };
+        elements.overlayCanvas.setPointerCapture(event.pointerId);
+        setStatus(`${node.displayName}・${state.editor.activeTool}中`);
+      }
+      return;
+    }
+    state.editor.selectNode(pickedNodeId);
+    return;
+  }
+
   const vertexIndex = nearestVertex(screenPoint);
   if (vertexIndex < 0) {
     if (!event.shiftKey) state.selected.clear();
@@ -724,6 +1060,18 @@ elements.overlayCanvas.addEventListener("pointermove", (event) => {
     return;
   }
 
+
+  if (
+    state.transformGesture?.pointerId === event.pointerId &&
+    state.editor?.transformDrag
+  ) {
+    const documentPoint = screenToImage(screenPoint.x, screenPoint.y, state.view);
+    state.editor.previewTransform(
+      state.transformGesture.gesture.update(documentPoint),
+    );
+    return;
+  }
+
   if (!state.drag || state.selected.size === 0) return;
   const partPoint = screenToPart(screenPoint);
   moveVertices(state.mesh, state.selected, partPoint.x - state.drag.last.x, partPoint.y - state.drag.last.y);
@@ -731,8 +1079,16 @@ elements.overlayCanvas.addEventListener("pointermove", (event) => {
   render();
 });
 
-function endDrag() {
+function endDrag(event) {
   if (state.drag) setStatus(`${state.selected.size}頂点を変形中`);
+  if (state.transformGesture?.pointerId === event.pointerId) {
+    state.transformGesture = null;
+    if (event.type === "pointercancel") state.editor?.cancelTransformDrag();
+    else {
+      state.editor?.commitTransformDrag();
+      setStatus("Gizmo操作を1件のUndo履歴として適用しました");
+    }
+  }
   state.drag = null;
   state.pan = null;
   elements.viewportWrap.classList.remove("panning");

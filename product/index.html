@@ -13,61 +13,75 @@
           <p class="eyebrow">FLAMORIS</p>
           <h1>2D Mesh Lab</h1>
         </div>
-        <div class="status" id="status" aria-live="polite">PNG / PSDを読み込んでください</div>
+        <div class="topbar-actions">
+          <button id="undoButton" type="button" class="secondary compact" disabled>↶ Undo</button>
+          <button id="redoButton" type="button" class="secondary compact" disabled>↷ Redo</button>
+          <div class="status" id="status" aria-live="polite">PNG / PSDを読み込んでください</div>
+        </div>
       </header>
 
       <section class="workspace">
-        <aside class="panel controls" aria-label="メッシュ設定">
-          <label class="file-button">
-            <span>PNG / PSDを開く</span>
-            <input id="fileInput" type="file" accept="image/png,.psd,image/vnd.adobe.photoshop" />
+        <aside class="panel scene-panel" aria-label="シーンツリー">
+          <div class="asset-buttons">
+            <label class="file-button">
+              <span>PNG / PSDを開く</span>
+              <input id="fileInput" type="file" accept="image/png,.psd,image/vnd.adobe.photoshop" />
+            </label>
+            <button id="demoButton" type="button" class="secondary">デモ素材</button>
+          </div>
+          <div class="panel-heading">
+            <h2>Scene Tree</h2>
+            <span>Project Query</span>
+          </div>
+          <label class="search-field">
+            <span class="sr-only">シーンを検索</span>
+            <input id="sceneSearchInput" type="search" placeholder="名前を検索…" disabled />
           </label>
-          <button id="demoButton" type="button" class="secondary">デモ素材</button>
-
-          <label class="part-field">
-            PSDパーツ
-            <select id="partSelect" disabled>
-              <option value="">PNG単体</option>
-            </select>
-          </label>
+          <div id="sceneTree" class="scene-tree" role="tree" aria-label="シーン階層">
+            <p class="panel-empty">PSDを読み込むと階層を表示します</p>
+          </div>
           <div class="part-info" id="partInfo">単一PNGまたはPSDを読み込めます</div>
 
-          <div class="field-grid">
-            <label>
-              横の分割数
-              <input id="columnsInput" type="number" min="1" max="32" value="6" />
-            </label>
-            <label>
-              縦の分割数
-              <input id="rowsInput" type="number" min="1" max="32" value="6" />
-            </label>
-          </div>
+          <details class="mesh-lab" open>
+            <summary>Mesh Lab</summary>
 
-          <button id="generateButton" type="button" disabled>メッシュを再生成</button>
-          <button id="resetButton" type="button" class="secondary" disabled>変形をリセット</button>
+            <div class="field-grid">
+              <label>
+                横の分割数
+                <input id="columnsInput" type="number" min="1" max="32" value="6" />
+              </label>
+              <label>
+                縦の分割数
+                <input id="rowsInput" type="number" min="1" max="32" value="6" />
+              </label>
+            </div>
 
-          <section class="timeline-card" aria-labelledby="timelineTitle">
-            <div class="section-heading">
-              <h2 id="timelineTitle">Animation</h2>
-              <span id="keyframeStatus">A ―　B ―</span>
-            </div>
-            <div class="keyframe-buttons">
-              <button id="captureAButton" type="button" class="keyframe" disabled>Aを記録</button>
-              <button id="captureBButton" type="button" class="keyframe" disabled>Bを記録</button>
-            </div>
-            <label class="duration-field">
-              クリップの長さ
-              <span><input id="durationInput" type="number" min="0.5" max="30" step="0.5" value="4" /> 秒</span>
-            </label>
-            <div class="scrubber-row">
-              <input id="timeSlider" type="range" min="0" max="4" step="0.001" value="0" disabled />
-              <output id="timeOutput">0.00s</output>
-            </div>
-            <div class="preview-buttons">
-              <button id="playButton" type="button" disabled>▶ プレビュー</button>
-              <button id="editButton" type="button" class="secondary" disabled>編集へ戻る</button>
-            </div>
-          </section>
+            <button id="generateButton" type="button" disabled>メッシュを再生成</button>
+            <button id="resetButton" type="button" class="secondary" disabled>変形をリセット</button>
+
+            <section class="timeline-card" aria-labelledby="timelineTitle">
+              <div class="section-heading">
+                <h2 id="timelineTitle">Animation Prototype</h2>
+                <span id="keyframeStatus">A ―　B ―</span>
+              </div>
+              <div class="keyframe-buttons">
+                <button id="captureAButton" type="button" class="keyframe" disabled>Aを記録</button>
+                <button id="captureBButton" type="button" class="keyframe" disabled>Bを記録</button>
+              </div>
+              <label class="duration-field">
+                クリップの長さ
+                <span><input id="durationInput" type="number" min="0.5" max="30" step="0.5" value="4" /> 秒</span>
+              </label>
+              <div class="scrubber-row">
+                <input id="timeSlider" type="range" min="0" max="4" step="0.001" value="0" disabled />
+                <output id="timeOutput">0.00s</output>
+              </div>
+              <div class="preview-buttons">
+                <button id="playButton" type="button" disabled>▶ プレビュー</button>
+                <button id="editButton" type="button" class="secondary" disabled>編集へ戻る</button>
+              </div>
+            </section>
+          </details>
 
           <div class="legend">
             <span><i class="dot vertex"></i>頂点</span>
@@ -77,6 +91,12 @@
         </aside>
 
         <section class="viewport-wrap" id="viewportWrap">
+          <div class="transform-toolbar" aria-label="変形ツール">
+            <button type="button" class="transform-tool active" data-transform-tool="translate" title="移動 (V)">移動</button>
+            <button type="button" class="transform-tool" data-transform-tool="rotate" title="回転 (R)">回転</button>
+            <button type="button" class="transform-tool" data-transform-tool="scale" title="拡縮 (S)">拡縮</button>
+            <button type="button" class="transform-tool" data-transform-tool="pivot" title="ピボット">Pivot</button>
+          </div>
           <div class="viewport-toolbar" aria-label="表示操作">
             <button id="fitAllButton" type="button" class="viewport-tool">全体</button>
             <button id="fitPartButton" type="button" class="viewport-tool" disabled>パーツ</button>
@@ -92,6 +112,41 @@
             <span>PSDはパーツ座標と重なり順を直接読み込みます</span>
           </div>
         </section>
+
+        <aside class="panel inspector-panel" aria-label="インスペクター">
+          <div class="panel-heading">
+            <h2>Inspector</h2>
+            <span id="inspectorKind">未選択</span>
+          </div>
+          <div id="inspectorEmpty" class="panel-empty">Scene TreeまたはCanvasからノードを選択</div>
+          <form id="inspectorForm" class="inspector-form" hidden>
+            <label>
+              表示名
+              <input id="displayNameInput" type="text" autocomplete="off" />
+            </label>
+            <div class="toggle-row">
+              <label><input id="visibilityInput" type="checkbox" /> 表示</label>
+              <label><input id="lockedInput" type="checkbox" /> ロック</label>
+            </div>
+            <dl class="identity-list">
+              <div><dt>Product ID</dt><dd id="nodeIdOutput"></dd></div>
+              <div><dt>Parent</dt><dd id="parentOutput"></dd></div>
+            </dl>
+            <fieldset>
+              <legend>Local Transform</legend>
+              <div class="inspector-grid">
+                <label>X<input id="positionXInput" type="number" step="0.1" data-transform-path="position.x" /></label>
+                <label>Y<input id="positionYInput" type="number" step="0.1" data-transform-path="position.y" /></label>
+                <label>回転°<input id="rotationInput" type="number" step="0.1" data-transform-path="rotation" data-transform-unit="degrees" /></label>
+                <span></span>
+                <label>Scale X<input id="scaleXInput" type="number" step="0.01" data-transform-path="scale.x" /></label>
+                <label>Scale Y<input id="scaleYInput" type="number" step="0.01" data-transform-path="scale.y" /></label>
+                <label>Pivot X<input id="pivotXInput" type="number" step="0.1" data-transform-path="pivot.x" /></label>
+                <label>Pivot Y<input id="pivotYInput" type="number" step="0.1" data-transform-path="pivot.y" /></label>
+              </div>
+            </fieldset>
+          </form>
+        </aside>
       </section>
     </main>
     <script src="/vendor/ag-psd.js"></script>
