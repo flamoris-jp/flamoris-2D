@@ -32,7 +32,12 @@ function isoTimestamp(value, fallback) {
 
 export function createFl2dDocument(
   project,
-  { createdAt, modifiedAt, now = () => new Date() } = {},
+  {
+    createdAt,
+    modifiedAt,
+    renderAssets = [],
+    now = () => new Date(),
+  } = {},
 ) {
   assertValid(project);
   const timestamp = now().toISOString();
@@ -47,6 +52,7 @@ export function createFl2dDocument(
     createdAt: isoTimestamp(createdAt, timestamp),
     modifiedAt: isoTimestamp(modifiedAt, timestamp),
     project: body,
+    renderAssets: Array.isArray(renderAssets) ? cloneProject(renderAssets) : [],
   };
 }
 
@@ -69,6 +75,7 @@ function migrateLegacyProject(value) {
         modifiedAt: null,
         migratedFrom: 0,
       },
+      renderAssets: [],
     };
   }
   throw new ProjectFormatError(
@@ -126,6 +133,9 @@ export function parseProjectDocument(source) {
   assertValid(project);
   return {
     project,
+    renderAssets: Array.isArray(value.renderAssets)
+      ? cloneProject(value.renderAssets)
+      : [],
     metadata: {
       format: value.format,
       formatVersion: value.formatVersion,

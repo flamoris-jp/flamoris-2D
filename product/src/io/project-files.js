@@ -52,6 +52,7 @@ export class ProjectDocumentController {
       recovery = null,
       now = () => new Date(),
       incrementalWidth = 3,
+      getRenderAssets = () => [],
     } = {},
   ) {
     if (!writer?.write) {
@@ -65,6 +66,7 @@ export class ProjectDocumentController {
     this.recovery = recovery;
     this.now = now;
     this.incrementalWidth = incrementalWidth;
+    this.getRenderAssets = getRenderAssets;
   }
 
   async write(fileName, {
@@ -79,6 +81,7 @@ export class ProjectDocumentController {
     const contents = serializeProject(this.session.project, 2, {
       createdAt,
       modifiedAt: timestamp,
+      renderAssets: this.getRenderAssets(),
       now: this.now,
     });
     const writeResult = await this.writer.write({

@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 import { createIdFactory, createProject } from "../src/model/project.js";
 import { EditorSession } from "../src/commands/editor.js";
 import { ProjectDocumentController } from "../src/io/project-files.js";
+import { parseProjectDocument } from "../src/io/project-json.js";
 import {
   documentTitle,
   nextIncrementalFilePath,
@@ -16,6 +17,10 @@ import {
   createDesktopProjectWriter,
   desktopFileFromPayload,
 } from "../src/ui/desktop-project-files.js";
+import {
+  hydratePsdRenderAssets,
+  serializePsdRenderAssets,
+} from "../src/ui/psd-render-assets.js";
 import {
   atomicWriteFile,
   atomicWriteFileSync,
@@ -137,6 +142,75 @@ test("desktop file payload provides browser-compatible text and bytes", async ()
   const objectUrl = URL.createObjectURL(pngFile);
   assert.match(objectUrl, /^blob:/);
   URL.revokeObjectURL(objectUrl);
+});
+
+test("desktop file payload exposes safe Recent Files errors without IPC text", () => {
+  assert.throws(
+    () => desktopFileFromPayload({
+      desktopError: {
+        code: "recent.missing",
+        message: "Recent Fileが見つからないため、一覧から削除しました。",
+      },
+    }),
+    (error) => error.name === "DesktopFileOpenError" &&
+      error.code === "recent.missing" &&
+      !error.message.includes("Error invoking remote method"),
+  );
+});
+
+test("PSD render assets serialize and hydrate outside Project Core", async () => {
+  const project = projectFixture();
+  const nodeId = project.scene.rootId;
+  const dataUrl = "data:image/png;base64,AA==";
+  const records = serializePsdRenderAssets([{
+    nodeId,
+    sourceKey: "layer:1",
+    name: "Akino",
+    path: "Akino",
+    left: 0,
+    top: 0,
+    right: 1,
+    bottom: 1,
+    width: 1,
+    height: 1,
+    canvas: { toDataURL: () => dataUrl },
+  }]);
+  assert.equal(records[0].dataUrl, dataUrl);
+  const image = { width: 1, height: 1 };
+  const hydrated = await hydratePsdRenderAssets(records, project, {
+    loadImage: async (source) => {
+      assert.equal(source, dataUrl);
+      return image;
+    },
+  });
+  assert.equal(hydrated[0].canvas, image);
+  assert.equal(hydrated[0].nodeId, nodeId);
+  assert.equal(hydrated[0].dataUrl, dataUrl);
+});
+
+test("Project saves include render assets without adding them to Project state", async () => {
+  const project = projectFixture();
+  const session = new EditorSession(project);
+  let savedContents = null;
+  const renderAssets = [{
+    nodeId: project.scene.rootId,
+    sourceKey: "layer:1",
+    dataUrl: "data:image/png;base64,AA==",
+  }];
+  const controller = new ProjectDocumentController(session, {
+    writer: {
+      write: async ({ contents }) => {
+        savedContents = contents;
+        return { fileName: "Akino.fl2d" };
+      },
+    },
+    getRenderAssets: () => renderAssets,
+  });
+  await controller.saveAs("Akino.fl2d");
+  const document = JSON.parse(savedContents);
+  assert.deepEqual(document.renderAssets, renderAssets);
+  assert.deepEqual(parseProjectDocument(savedContents).renderAssets, renderAssets);
+  assert.equal(Object.hasOwn(session.project, "renderAssets"), false);
 });
 
 test("atomic writes preserve the previous file when replace fails", async () => {

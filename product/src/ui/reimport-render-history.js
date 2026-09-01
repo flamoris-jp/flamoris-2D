@@ -25,6 +25,16 @@ export function buildReviewedRenderParts(
     importedParts.map((part) => [part.nodeId, part]),
   );
   for (const row of review.rows) {
+    if (row.action === "keep" && row.currentNodeId && row.importedNodeId &&
+      !partsByNodeId.has(row.currentNodeId)) {
+      const importedPart = importedByNodeId.get(row.importedNodeId);
+      if (importedPart && project.scene.nodes[row.currentNodeId]) {
+        partsByNodeId.set(row.currentNodeId, {
+          ...importedPart,
+          nodeId: row.currentNodeId,
+        });
+      }
+    }
     if (row.action === "update" && row.currentNodeId) {
       partsByNodeId.delete(row.currentNodeId);
       const importedPart = importedByNodeId.get(row.importedNodeId);
