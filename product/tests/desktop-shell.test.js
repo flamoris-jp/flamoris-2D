@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { createIdFactory, createProject } from "../src/model/project.js";
 import { EditorSession } from "../src/commands/editor.js";
 import { ProjectDocumentController } from "../src/io/project-files.js";
@@ -43,21 +43,26 @@ test("desktop title keeps file identity, dirty, and Recovery distinct", () => {
 });
 
 test("incremental targets stay beside the associated project", () => {
+  const projectPath = join(resolve("work"), "Akino.fl2d");
   const target = nextIncrementalFilePath({
-    currentFilePath: "/work/Akino.fl2d",
+    currentFilePath: projectPath,
     existingFileNames: ["Akino_001.fl2d", "Akino_002.fl2d"],
   });
-  assert.equal(target, "/work/Akino_003.fl2d");
+  assert.equal(target, join(resolve("work"), "Akino_003.fl2d"));
 });
 
 test("Recent Files are bounded, deduplicated, and missing-safe", () => {
-  const existing = new Set(["/projects/A.fl2d", "/projects/B.fl2d"]);
+  const projectDirectory = resolve("projects");
+  const projectA = join(projectDirectory, "A.fl2d");
+  const projectB = join(projectDirectory, "B.fl2d");
+  const missingProject = join(projectDirectory, "missing.fl2d");
+  const existing = new Set([projectA, projectB]);
   const recent = updateRecentFiles(
-    ["/projects/A.fl2d", "/projects/missing.fl2d", "/projects/B.fl2d"],
-    "/projects/B.fl2d",
+    [projectA, missingProject, projectB],
+    projectB,
     { exists: (filePath) => existing.has(filePath), limit: 2 },
   );
-  assert.deepEqual(recent, ["/projects/B.fl2d", "/projects/A.fl2d"]);
+  assert.deepEqual(recent, [projectB, projectA]);
 });
 
 test("dirty close proceeds only after discard or a successful Save", () => {
