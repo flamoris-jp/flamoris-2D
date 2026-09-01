@@ -38,7 +38,14 @@ import {
   projectHistoryShortcutAction,
 } from "./ui/editor-shortcuts.js";
 import { createBrowserProjectWriter } from "./ui/browser-project-files.js";
+import {
+  createDesktopProjectWriter,
+  desktopFileFromPayload,
+} from "./ui/desktop-project-files.js";
 import { ReimportRenderHistory } from "./ui/reimport-render-history.js";
+
+const desktopApi = window.flamorisDesktop || null;
+const appStorage = desktopApi?.storage || localStorage;
 
 const elements = {
   projectTitle: document.querySelector("#projectTitle"),
@@ -135,12 +142,14 @@ const state = {
   recoveryRestored: false,
 };
 
-const preferencesStore = createPreferencesStore(localStorage);
+const preferencesStore = createPreferencesStore(appStorage);
 let preferences = preferencesStore.load();
-let recoveryStore = createRecoveryStore(localStorage, {
+let recoveryStore = createRecoveryStore(appStorage, {
   maxVersions: preferences.recoveryVersions,
 });
-const projectWriter = createBrowserProjectWriter();
+const projectWriter = desktopApi
+  ? createDesktopProjectWriter(desktopApi)
+  : createBrowserProjectWriter();
 
 let renderer;
 try {
@@ -599,6 +608,7 @@ async function loadImage(source, label) {
   state.renderAssetHistory = null;
   state.recoveryRestored = false;
   state.editor = null;
+  desktopApi?.clearAssociation();
   elements.sceneSearchInput.value = "";
   renderEditorUi();
   elements.projectTitle.textContent = label;
@@ -748,7 +758,15 @@ function renderEditorUi() {
   const extension = fileName.toLocaleLowerCase().endsWith(".fl2d") ? "" : ".fl2d";
   const dirty = state.editor?.session.isDirty ? " *" : "";
   const recovered = state.recoveryRestored ? " · Recovered" : "";
-  elements.projectTitle.textContent = `${fileName}${extension}${dirty}${recovered}`;
+  const title = `${fileName}${extension}${dirty}${recovered}`;
+  elements.projectTitle.textContent = title;
+  document.title = `${title} — FLAMORIS 2D`;
+  desktopApi?.updateWindowState({
+    fileName: `${fileName}${extension}`,
+    displayName: state.editor?.session.project.displayName || "Untitled",
+    dirty: Boolean(state.editor?.session.isDirty),
+    recovered: state.recoveryRestored,
+  });
   elements.transformTools.forEach((button) => {
     button.disabled = !state.editor?.selectedNodeId;
     button.classList.toggle(
@@ -767,6 +785,7 @@ function handleEditorChange(reason) {
 
 function attachProject(project, {
   fileName = null,
+  filePath = null,
   metadata = {},
   parts = [],
   mode = "project",
@@ -777,12 +796,13 @@ function attachProject(project, {
   const session = new EditorSession(project);
   if (!saved) session.savedRevision = -1;
   const editor = new EditorUiAdapter(session, { onChange: handleEditorChange });
-  recoveryStore = createRecoveryStore(localStorage, {
+  recoveryStore = createRecoveryStore(appStorage, {
     maxVersions: preferences.recoveryVersions,
   });
   state.documentController = new ProjectDocumentController(session, {
     writer: projectWriter,
     currentFileName: fileName,
+    currentFilePath: filePath,
     metadata,
     recovery: recoveryStore,
     incrementalWidth: preferences.incrementalSaveWidth,
@@ -793,6 +813,7 @@ function attachProject(project, {
     preferences,
   });
   state.editor = editor;
+  if (desktopApi && !filePath) desktopApi.clearAssociation();
   state.recoveryRestored = recovered;
   state.renderAssetHistory = new ReimportRenderHistory(editor, {
     getParts: () => state.psdParts,
@@ -824,15 +845,19 @@ function attachProject(project, {
 
 async function confirmProjectReplacement() {
   if (!state.editor?.session.isDirty) return true;
-  const choice = await new Promise((resolve) => {
-    const close = () => {
-      elements.unsavedDialog.removeEventListener("close", close);
-      resolve(elements.unsavedDialog.returnValue || "cancel");
-    };
-    elements.unsavedDialog.addEventListener("close", close);
-    elements.unsavedDialog.returnValue = "cancel";
-    elements.unsavedDialog.showModal();
-  });
+  const choice = desktopApi
+    ? await desktopApi.confirmUnsaved({
+      fileName: state.documentController?.currentFileName,
+    })
+    : await new Promise((resolve) => {
+      const close = () => {
+        elements.unsavedDialog.removeEventListener("close", close);
+        resolve(elements.unsavedDialog.returnValue || "cancel");
+      };
+      elements.unsavedDialog.addEventListener("close", close);
+      elements.unsavedDialog.returnValue = "cancel";
+      elements.unsavedDialog.showModal();
+    });
   if (choice === "cancel") return false;
   if (choice === "save") return Boolean(await performSave("save"));
   return choice === "discard";
@@ -864,17 +889,17 @@ async function loadPsd(file) {
   setStatus(`${file.name}・${parts.length}パーツ・Editor Core接続済み`);
 }
 
-async function loadFile(file) {
+async function loadFile(file, { skipConfirmation = false } = {}) {
   if (!file) return;
   const lower = file.name.toLowerCase();
   try {
     if (lower.endsWith(".psd")) {
-      if (!await confirmProjectReplacement()) return;
+      if (!skipConfirmation && !await confirmProjectReplacement()) return;
       await loadPsd(file);
       return;
     }
     if (lower.endsWith(".png") || file.type === "image/png") {
-      if (!await confirmProjectReplacement()) return;
+      if (!skipConfirmation && !await confirmProjectReplacement()) return;
       const url = URL.createObjectURL(file);
       try {
         await loadImage(url, file.name);
@@ -929,26 +954,28 @@ async function performSave(action) {
   try {
     let result;
     if (action === "save") {
-      if (!state.documentController.currentFileName) return performSave("save-as");
+      if (!state.documentController.currentFileName &&
+          !state.documentController.currentFilePath) {
+        return performSave("save-as");
+      }
       result = await state.documentController.save();
     } else if (action === "save-as") {
-      const name = requestedFileName(
-        state.documentController.currentFileName ||
-        `${state.editor.session.project.displayName}.fl2d`,
-      );
+      const suggestedName = state.documentController.currentFileName ||
+        `${state.editor.session.project.displayName}.fl2d`;
+      const name = desktopApi ? suggestedName : requestedFileName(suggestedName);
       if (!name) return false;
       result = await state.documentController.saveAs(name);
     } else if (action === "save-incremental") {
       result = await state.documentController.saveIncremental(
-        projectWriter.knownFileNames(),
+        await projectWriter.knownFileNames(),
       );
     } else if (action === "save-copy") {
-      const name = requestedFileName(
-        `${state.editor.session.project.displayName}_copy.fl2d`,
-      );
+      const suggestedName = `${state.editor.session.project.displayName}_copy.fl2d`;
+      const name = desktopApi ? suggestedName : requestedFileName(suggestedName);
       if (!name) return false;
       result = await state.documentController.saveCopy(name);
     }
+    if (!result) return false;
     if (action !== "save-copy") state.recoveryRestored = false;
     renderEditorUi();
     setStatus(`${result.fileName} を保存しました`);
@@ -972,12 +999,17 @@ async function createNewProject() {
   setStatus("新しいProjectを作成しました");
 }
 
-async function openProjectFile(file) {
-  if (!file || !await confirmProjectReplacement()) return;
+async function openProjectFile(file, {
+  skipConfirmation = false,
+  filePath = null,
+} = {}) {
+  if (!file || (!skipConfirmation && !await confirmProjectReplacement())) return;
   try {
     const parsed = parseProjectDocument(await file.text());
+    if (desktopApi && filePath) await desktopApi.acceptOpenedProject(filePath);
     attachProject(parsed.project, {
       fileName: file.name,
+      filePath,
       metadata: parsed.metadata,
       saved: true,
     });
@@ -989,6 +1021,25 @@ async function openProjectFile(file) {
 }
 
 async function chooseProjectFile() {
+  if (desktopApi) {
+    if (!await confirmProjectReplacement()) return;
+    try {
+      const payload = await desktopApi.openFile({ purpose: "open" });
+      const file = desktopFileFromPayload(payload);
+      if (!file) return;
+      if (file.name.toLocaleLowerCase().endsWith(".fl2d")) {
+        await openProjectFile(file, {
+          skipConfirmation: true,
+          filePath: file.filePath,
+        });
+      } else {
+        await loadFile(file, { skipConfirmation: true });
+      }
+    } catch (error) {
+      setStatus(error.message || String(error));
+    }
+    return;
+  }
   if (typeof window.showOpenFilePicker !== "function") {
     elements.projectOpenInput.click();
     return;
@@ -1030,7 +1081,7 @@ function savePreferences() {
   });
   if (state.editor) {
     state.autosaveScheduler?.stop();
-    recoveryStore = createRecoveryStore(localStorage, {
+    recoveryStore = createRecoveryStore(appStorage, {
       maxVersions: preferences.recoveryVersions,
     });
     state.documentController.recovery = recoveryStore;
@@ -1210,6 +1261,54 @@ function redoProject() {
   return result;
 }
 
+async function choosePsdFile(action) {
+  if (!desktopApi) {
+    if (action === "import-psd") elements.fileInput.click();
+    else elements.reimportPsdInput.click();
+    return;
+  }
+  if (action === "import-psd" && !await confirmProjectReplacement()) return;
+  try {
+    const payload = await desktopApi.openFile({ purpose: action });
+    const file = desktopFileFromPayload(payload);
+    if (!file) return;
+    if (action === "import-psd") await loadPsd(file);
+    else await analyzePsdReimport(file);
+  } catch (error) {
+    setStatus(error.message || String(error));
+  }
+}
+
+async function openDesktopProjectFrom(source, filePath) {
+  if (!desktopApi || !await confirmProjectReplacement()) return;
+  try {
+    const payload = source === "recent"
+      ? await desktopApi.openRecent(filePath)
+      : await desktopApi.openExternalProject(filePath);
+    const file = desktopFileFromPayload(payload);
+    if (!file) return;
+    await openProjectFile(file, {
+      skipConfirmation: true,
+      filePath: file.filePath,
+    });
+  } catch (error) {
+    setStatus(error.message || String(error));
+  }
+}
+
+async function handleFileAction(action) {
+  if (action === "new") await createNewProject();
+  else if (action === "open") await chooseProjectFile();
+  else if (action === "save" || action === "save-as" ||
+    action === "save-incremental" || action === "save-copy") {
+    await performSave(action);
+  } else if (action === "import-psd" || action === "reimport-psd") {
+    await choosePsdFile(action);
+  } else if (action === "preferences") openPreferences();
+  else if (action === "undo") undoProject();
+  else if (action === "redo") redoProject();
+}
+
 elements.fileInput.addEventListener("change", async () => {
   await loadFile(elements.fileInput.files?.[0]);
   elements.fileInput.value = "";
@@ -1231,15 +1330,27 @@ elements.fileActions.forEach((button) => {
   button.addEventListener("click", async () => {
     const action = button.dataset.fileAction;
     elements.fileMenu.open = false;
-    if (action === "new") await createNewProject();
-    else if (action === "open") await chooseProjectFile();
-    else if (action === "save" || action === "save-as" ||
-      action === "save-incremental" || action === "save-copy") {
-      await performSave(action);
-    } else if (action === "import-psd") elements.fileInput.click();
-    else if (action === "reimport-psd") elements.reimportPsdInput.click();
-    else if (action === "preferences") openPreferences();
+    await handleFileAction(action);
   });
+});
+desktopApi?.onMenuAction(async (action) => {
+  if (action?.type === "open-recent") {
+    await openDesktopProjectFrom("recent", action.filePath);
+  } else if (action?.type === "open-external") {
+    await openDesktopProjectFrom("external", action.filePath);
+  } else {
+    await handleFileAction(action);
+  }
+});
+desktopApi?.onRequest(async (action) => {
+  if (action === "save") return Boolean(await performSave("save"));
+  if (action === "get-document-state") {
+    return {
+      dirty: Boolean(state.editor?.session.isDirty),
+      recovered: state.recoveryRestored,
+    };
+  }
+  return false;
 });
 elements.sceneSearchInput.addEventListener("input", () => {
   state.editor?.setFilter(elements.sceneSearchInput.value);
@@ -1527,11 +1638,13 @@ for (const type of ["dragleave", "drop"]) {
 elements.viewportWrap.addEventListener("drop", (event) => loadFile(event.dataTransfer.files?.[0]));
 
 new ResizeObserver(resizeCanvases).observe(elements.viewportWrap);
-window.addEventListener("beforeunload", (event) => {
-  if (!state.editor?.session.isDirty) return;
-  event.preventDefault();
-  event.returnValue = "";
-});
+if (!desktopApi) {
+  window.addEventListener("beforeunload", (event) => {
+    if (!state.editor?.session.isDirty) return;
+    event.preventDefault();
+    event.returnValue = "";
+  });
+}
 updateButtons();
 updateZoomOutput();
 resizeCanvases();

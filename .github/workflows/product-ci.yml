@@ -26,3 +26,24 @@ jobs:
 
       - name: Deterministic Product unit tests
         run: npm test
+
+  windows-desktop-package:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+
+      - name: Install Desktop dependencies
+        run: npm install
+
+      - name: Product tests on Windows
+        run: npm test
+
+      - name: Package Windows Desktop app
+        run: npm run desktop:pack

@@ -1,5 +1,7 @@
 package.json
 index.html
+desktop/main.mjs
+desktop/preload.cjs
 scripts/serve.mjs
 src/animation.js
 src/app.js
@@ -26,3 +28,6 @@ src/ui/editor-adapter.js
 src/ui/canvas-interaction.js
 src/ui/editor-shortcuts.js
 src/ui/reimport-render-history.js
+src/ui/desktop-project-files.js
+src/desktop/shell-logic.js
+src/desktop/atomic-write.js

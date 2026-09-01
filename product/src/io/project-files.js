@@ -47,6 +47,7 @@ export class ProjectDocumentController {
     {
       writer,
       currentFileName = null,
+      currentFilePath = null,
       metadata = {},
       recovery = null,
       now = () => new Date(),
@@ -59,13 +60,19 @@ export class ProjectDocumentController {
     this.session = session;
     this.writer = writer;
     this.currentFileName = currentFileName;
+    this.currentFilePath = currentFilePath;
     this.metadata = { ...metadata };
     this.recovery = recovery;
     this.now = now;
     this.incrementalWidth = incrementalWidth;
   }
 
-  async write(fileName, { makeCurrent, markClean, allowOverwrite = true } = {}) {
+  async write(fileName, {
+    operation = "save",
+    makeCurrent,
+    markClean,
+    allowOverwrite = true,
+  } = {}) {
     const normalized = normalizeFl2dFilename(fileName);
     const timestamp = this.now().toISOString();
     const createdAt = this.metadata.createdAt || timestamp;
@@ -75,38 +82,53 @@ export class ProjectDocumentController {
       now: this.now,
     });
     const writeResult = await this.writer.write({
+      operation,
       fileName: normalized,
+      currentFilePath: this.currentFilePath,
       contents,
       allowOverwrite,
       mimeType: "application/x-flamoris-2d+json",
     });
+    if (writeResult?.canceled) return null;
     const writtenFileName = normalizeFl2dFilename(
       writeResult?.fileName || normalized,
     );
-    if (makeCurrent) this.currentFileName = writtenFileName;
+    if (makeCurrent) {
+      this.currentFileName = writtenFileName;
+      this.currentFilePath = writeResult?.filePath || this.currentFilePath;
+    }
     if (markClean) {
       this.metadata = { createdAt, modifiedAt: timestamp };
       this.session.markSaved();
       this.recovery?.clear?.();
     }
-    return { fileName: writtenFileName, projectId: this.session.project.id };
+    return {
+      fileName: writtenFileName,
+      filePath: writeResult?.filePath || null,
+      projectId: this.session.project.id,
+    };
   }
 
   async save() {
-    if (!this.currentFileName) {
+    if (!this.currentFileName && !this.currentFilePath) {
       throw new ProjectFileOperationError(
         "Save As is required for an unsaved project.",
         "file.save_as_required",
       );
     }
-    return this.write(this.currentFileName, {
-      makeCurrent: true,
-      markClean: true,
-    });
+    return this.write(
+      this.currentFileName || this.session.project.displayName,
+      {
+        operation: "save",
+        makeCurrent: true,
+        markClean: true,
+      },
+    );
   }
 
   async saveAs(fileName) {
     return this.write(fileName, {
+      operation: "save-as",
       makeCurrent: true,
       markClean: true,
     });
@@ -126,6 +148,7 @@ export class ProjectDocumentController {
       );
     }
     return this.write(candidate, {
+      operation: "save-incremental",
       makeCurrent: true,
       markClean: true,
       allowOverwrite: false,
@@ -134,6 +157,7 @@ export class ProjectDocumentController {
 
   async saveCopy(fileName) {
     return this.write(fileName, {
+      operation: "save-copy",
       makeCurrent: false,
       markClean: false,
     });

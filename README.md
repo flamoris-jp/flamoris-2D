@@ -5,7 +5,9 @@ FLAMORIS 2D is a PSD-native, Key-Art-transition and clip-first 2D rigging/animat
 ## Phase 1 editor foundation
 
 Phase 1 connects the PSD prototype to a persistent, undoable Editor Core shared
-by the browser UI and the minimal headless/MCP-facing adapter.
+by the Windows Desktop shell, browser UI, and minimal headless/MCP-facing
+adapter. Windows Desktop is the production target; the browser shell remains a
+development-compatible adapter.
 
 Current runnable capability:
 
@@ -19,11 +21,24 @@ Current runnable capability:
 - separate Preferences and bounded Recovery snapshots
 - reviewed/manual PSD re-import applied as one Undo step
 - deterministic headless Query/Command smoke coverage
+- native Windows Open/Save dialogs, close handling, Recent Files, Recovery
+  storage, window title, and `.fl2d` file association
 
 Multi-Key-Art A→B→C transitions, clipping, deformers, bones, and the production
 timeline remain later phases.
 
-## Run
+## Run Windows Desktop
+
+```powershell
+npm install
+npm test
+npm run desktop
+```
+
+Create an unpacked Windows app with `npm run desktop:pack`, or an NSIS installer
+with `npm run desktop:dist`.
+
+## Run browser shell
 
 From the repository root after Phase 0 integration:
 
