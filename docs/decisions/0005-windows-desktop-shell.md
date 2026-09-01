@@ -61,7 +61,9 @@ but the path is document context, not Project data, and is never serialized in
   into the Project model, so Core queries, commands, transactions, and
   headless/MCP state remain serializable and renderer-independent. Older files
   without this optional envelope field remain valid and can rehydrate missing
-  renders through PSD Re-import.
+  renders through PSD Re-import. Each embedded image is decoded independently;
+  an invalid image is skipped and reported without preventing the valid Project
+  or other render assets from opening.
 
 ## Recovery and Recent Files
 

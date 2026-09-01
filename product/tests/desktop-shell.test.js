@@ -161,7 +161,17 @@ test("desktop file payload exposes safe Recent Files errors without IPC text", (
 test("PSD render assets serialize and hydrate outside Project Core", async () => {
   const project = projectFixture();
   const nodeId = project.scene.rootId;
-  const dataUrl = "data:image/png;base64,AA==";
+  const secondNodeId = "node_desktop_render_0002";
+  project.scene.nodes[secondNodeId] = {
+    ...structuredClone(project.scene.nodes[nodeId]),
+    id: secondNodeId,
+    kind: "part",
+    parentId: nodeId,
+    children: [],
+  };
+  project.scene.nodes[nodeId].children.push(secondNodeId);
+  const validDataUrl = "data:image/png;base64,AA==";
+  const brokenDataUrl = "data:image/png;base64,AQ==";
   const records = serializePsdRenderAssets([{
     nodeId,
     sourceKey: "layer:1",
@@ -173,19 +183,35 @@ test("PSD render assets serialize and hydrate outside Project Core", async () =>
     bottom: 1,
     width: 1,
     height: 1,
-    canvas: { toDataURL: () => dataUrl },
+    canvas: { toDataURL: () => validDataUrl },
+  }, {
+    nodeId: secondNodeId,
+    sourceKey: "layer:2",
+    name: "Broken",
+    path: "Broken",
+    left: 0,
+    top: 0,
+    right: 1,
+    bottom: 1,
+    width: 1,
+    height: 1,
+    canvas: { toDataURL: () => brokenDataUrl },
   }]);
-  assert.equal(records[0].dataUrl, dataUrl);
+  assert.equal(records[0].dataUrl, validDataUrl);
   const image = { width: 1, height: 1 };
-  const hydrated = await hydratePsdRenderAssets(records, project, {
+  const hydration = await hydratePsdRenderAssets(records, project, {
     loadImage: async (source) => {
-      assert.equal(source, dataUrl);
+      if (source === brokenDataUrl) throw new Error("decode failed");
+      assert.equal(source, validDataUrl);
       return image;
     },
   });
-  assert.equal(hydrated[0].canvas, image);
-  assert.equal(hydrated[0].nodeId, nodeId);
-  assert.equal(hydrated[0].dataUrl, dataUrl);
+  assert.equal(hydration.totalCount, 2);
+  assert.equal(hydration.failedCount, 1);
+  assert.equal(hydration.parts.length, 1);
+  assert.equal(hydration.parts[0].canvas, image);
+  assert.equal(hydration.parts[0].nodeId, nodeId);
+  assert.equal(hydration.parts[0].dataUrl, validDataUrl);
 });
 
 test("Project saves include render assets without adding them to Project state", async () => {

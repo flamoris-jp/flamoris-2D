@@ -59,8 +59,18 @@ export async function hydratePsdRenderAssets(
   if (typeof loadImage !== "function") {
     throw new TypeError("A render asset image loader is required.");
   }
-  return Promise.all(normalizePsdRenderAssets(records, project).map(async (part) => ({
+  const sourceCount = Array.isArray(records) ? records.length : 0;
+  const normalized = normalizePsdRenderAssets(records, project);
+  const outcomes = await Promise.allSettled(normalized.map(async (part) => ({
     ...part,
     canvas: await loadImage(part.dataUrl),
   })));
+  const parts = outcomes
+    .filter((outcome) => outcome.status === "fulfilled")
+    .map((outcome) => outcome.value);
+  return {
+    parts,
+    totalCount: sourceCount,
+    failedCount: sourceCount - normalized.length + outcomes.length - parts.length,
+  };
 }

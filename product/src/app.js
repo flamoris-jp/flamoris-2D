@@ -1028,11 +1028,12 @@ async function openProjectFile(file, {
   if (!file || (!skipConfirmation && !await confirmProjectReplacement())) return;
   try {
     const parsed = parseProjectDocument(await file.text());
-    const parts = await hydratePsdRenderAssets(
+    const hydration = await hydratePsdRenderAssets(
       parsed.renderAssets,
       parsed.project,
       { loadImage: loadPersistedRenderImage },
     );
+    const parts = hydration.parts;
     if (desktopApi && filePath) await desktopApi.acceptOpenedProject(filePath);
     attachProject(parsed.project, {
       fileName: file.name,
@@ -1042,9 +1043,16 @@ async function openProjectFile(file, {
       mode: parts.length ? "psd" : "project",
       saved: true,
     });
-    setStatus(parts.length
-      ? `${file.name} を開き、PSD render ${parts.length}件を復元しました`
-      : `${file.name} を開きました。PSD renderはRe-import時に再選択できます`);
+    if (hydration.failedCount) {
+      setStatus(
+        `${file.name} を開き、PSD render ${parts.length}/${hydration.totalCount}件を復元。` +
+        `${hydration.failedCount}件は読み込めないため、Re-importで復元できます`,
+      );
+    } else {
+      setStatus(parts.length
+        ? `${file.name} を開き、PSD render ${parts.length}件を復元しました`
+        : `${file.name} を開きました。PSD renderはRe-import時に再選択できます`);
+    }
   } catch (error) {
     console.error(error);
     setStatus(error.message || String(error));
