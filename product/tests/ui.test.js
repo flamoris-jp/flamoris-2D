@@ -29,4 +29,5 @@ test("Phase 1 shell keeps File and sidebar controls reachable", async () => {
     css,
     /\.scene-panel, \.inspector-panel\s*\{[^}]*overflow:\s*auto/s,
   );
+  assert.match(css, /\.inspector-form\[hidden\]\s*\{[^}]*display:\s*none/s);
 });

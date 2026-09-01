@@ -470,6 +470,53 @@ test("Keep Existing preserves the current canvas after reviewed re-import", () =
   assert.equal(parts[0].canvas, oldCanvas);
 });
 
+test("Re-import restores a missing persisted render with the matched PSD canvas", () => {
+  const canvas = canvasWithPixels(7, 8, 9, 255);
+  const psd = {
+    width: 1,
+    height: 1,
+    children: [{ id: 1, name: "目", left: 0, top: 0, right: 1, bottom: 1, canvas }],
+  };
+  const project = createProjectFromPsd(psd, {
+    idFactory: createIdFactory("rehydrate"),
+  });
+  const review = createPsdReimportReview(project, psd, {
+    idFactory: createIdFactory("rehydrate-import"),
+  });
+  assert.equal(review.rows[0].action, "keep");
+  const importedParts = renderParts(psd, review.importedProject);
+  const restored = buildReviewedRenderParts(
+    [],
+    importedParts,
+    review,
+    review.buildResult(),
+  );
+  assert.equal(restored.length, 1);
+  assert.equal(restored[0].canvas, canvas);
+  assert.equal(restored[0].nodeId, review.rows[0].currentNodeId);
+});
+
+test("normal Transform Undo and Redo remain valid through render history", () => {
+  const project = projectFixture();
+  const session = new EditorSession(project);
+  const editor = new EditorUiAdapter(session);
+  editor.selectNode(project.scene.rootId);
+  const history = new ReimportRenderHistory(editor, {
+    getParts: () => [],
+    setParts: () => {},
+  });
+  editor.setSelectedTransform({
+    position: { x: 42, y: 21 },
+    rotation: 0,
+    scale: { x: 1, y: 1 },
+    pivot: { x: 0, y: 0 },
+  });
+  history.undo();
+  assert.deepEqual(editor.selectedNode().transform.position, { x: 0, y: 0 });
+  history.redo();
+  assert.deepEqual(editor.selectedNode().transform.position, { x: 42, y: 21 });
+});
+
 test("re-import Apply rejects a review analyzed at a stale revision", () => {
   const psd = {
     width: 1,

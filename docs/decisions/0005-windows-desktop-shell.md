@@ -56,6 +56,14 @@ but the path is document context, not Project data, and is never serialized in
 - Opened projects are parsed and validated before the selected path becomes the
   current association.
 - `projectId` remains Project identity and is preserved by every save mode.
+- PSD layer renders are stored as PNG data URLs in the `.fl2d` document
+  envelope and restored by the UI adapter. They are deliberately not inserted
+  into the Project model, so Core queries, commands, transactions, and
+  headless/MCP state remain serializable and renderer-independent. Older files
+  without this optional envelope field remain valid and can rehydrate missing
+  renders through PSD Re-import. Each embedded image is decoded independently;
+  an invalid image is skipped and reported without preventing the valid Project
+  or other render assets from opening.
 
 ## Recovery and Recent Files
 
@@ -73,7 +81,8 @@ or dirty a Project. Restore Latest explicitly creates a dirty, Recovered
 session; intentional Save clears Recovery and the Recovered label.
 
 Recent Files is capped at ten entries. Missing paths are removed when the list
-is loaded or used.
+is loaded or used, and the Main process returns a typed, user-facing failure
+instead of leaking Electron IPC wrapper text into the status bar.
 
 ## Security boundary
 

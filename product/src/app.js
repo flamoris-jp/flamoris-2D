@@ -42,6 +42,10 @@ import {
   createDesktopProjectWriter,
   desktopFileFromPayload,
 } from "./ui/desktop-project-files.js";
+import {
+  hydratePsdRenderAssets,
+  serializePsdRenderAssets,
+} from "./ui/psd-render-assets.js";
 import { ReimportRenderHistory } from "./ui/reimport-render-history.js";
 
 const desktopApi = window.flamorisDesktop || null;
@@ -719,7 +723,13 @@ function renderInspector() {
   elements.inspectorEmpty.hidden = Boolean(node);
   elements.inspectorForm.hidden = !node;
   elements.inspectorKind.textContent = node ? node.kind : "未選択";
-  if (!node) return;
+  if (!node) {
+    elements.inspectorForm.reset();
+    elements.nodeIdOutput.textContent = "";
+    elements.parentOutput.textContent = "";
+    elements.transformInputs.forEach((input) => { input.value = ""; });
+    return;
+  }
   elements.displayNameInput.value = node.displayName;
   elements.visibilityInput.checked = node.visible;
   elements.lockedInput.checked = node.locked;
@@ -806,6 +816,7 @@ function attachProject(project, {
     metadata,
     recovery: recoveryStore,
     incrementalWidth: preferences.incrementalSaveWidth,
+    getRenderAssets: () => serializePsdRenderAssets(state.psdParts),
   });
   state.autosaveScheduler = createAutosaveScheduler({
     session,
@@ -999,6 +1010,17 @@ async function createNewProject() {
   setStatus("新しいProjectを作成しました");
 }
 
+async function loadPersistedRenderImage(source) {
+  const image = new Image();
+  image.decoding = "async";
+  await new Promise((resolve, reject) => {
+    image.onload = resolve;
+    image.onerror = () => reject(new Error("保存済みPSD renderを読み込めませんでした"));
+    image.src = source;
+  });
+  return image;
+}
+
 async function openProjectFile(file, {
   skipConfirmation = false,
   filePath = null,
@@ -1006,14 +1028,31 @@ async function openProjectFile(file, {
   if (!file || (!skipConfirmation && !await confirmProjectReplacement())) return;
   try {
     const parsed = parseProjectDocument(await file.text());
+    const hydration = await hydratePsdRenderAssets(
+      parsed.renderAssets,
+      parsed.project,
+      { loadImage: loadPersistedRenderImage },
+    );
+    const parts = hydration.parts;
     if (desktopApi && filePath) await desktopApi.acceptOpenedProject(filePath);
     attachProject(parsed.project, {
       fileName: file.name,
       filePath,
       metadata: parsed.metadata,
+      parts,
+      mode: parts.length ? "psd" : "project",
       saved: true,
     });
-    setStatus(`${file.name} を開きました。PSD renderはRe-import時に再選択できます`);
+    if (hydration.failedCount) {
+      setStatus(
+        `${file.name} を開き、PSD render ${parts.length}/${hydration.totalCount}件を復元。` +
+        `${hydration.failedCount}件は読み込めないため、Re-importで復元できます`,
+      );
+    } else {
+      setStatus(parts.length
+        ? `${file.name} を開き、PSD render ${parts.length}件を復元しました`
+        : `${file.name} を開きました。PSD renderはRe-import時に再選択できます`);
+    }
   } catch (error) {
     console.error(error);
     setStatus(error.message || String(error));
@@ -1252,12 +1291,20 @@ function applyReviewedReimport() {
 function undoProject() {
   const result = state.renderAssetHistory?.undo() || state.editor?.undo();
   if (result && state.editor?.selectedNodeId) syncSelectedPsdPart();
+  if (result) {
+    renderEditorUi();
+    render();
+  }
   return result;
 }
 
 function redoProject() {
   const result = state.renderAssetHistory?.redo() || state.editor?.redo();
   if (result && state.editor?.selectedNodeId) syncSelectedPsdPart();
+  if (result) {
+    renderEditorUi();
+    render();
+  }
   return result;
 }
 
