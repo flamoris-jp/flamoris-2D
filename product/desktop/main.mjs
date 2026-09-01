@@ -464,9 +464,25 @@ function registerIpc() {
     assertTrusted(event);
     const absolute = resolve(String(filePath || ""));
     if (!recentFiles.some((entry) => resolve(entry) === absolute)) {
-      throw new Error("This path is not in Recent Files.");
+      return {
+        desktopError: {
+          code: "recent.not_listed",
+          message: "Recent Filesに登録されていないProjectです。",
+        },
+      };
     }
-    return openProjectPath(absolute);
+    try {
+      return await openProjectPath(absolute);
+    } catch (error) {
+      return {
+        desktopError: {
+          code: existsSync(absolute) ? "recent.open_failed" : "recent.missing",
+          message: existsSync(absolute)
+            ? "Recent Fileを開けませんでした。"
+            : "Recent Fileが見つからないため、一覧から削除しました。",
+        },
+      };
+    }
   });
 
   ipcMain.handle("desktop:open-external-project", async (event, { filePath } = {}) => {

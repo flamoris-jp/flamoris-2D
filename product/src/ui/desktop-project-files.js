@@ -1,4 +1,10 @@
 export function desktopFileFromPayload(payload) {
+  if (payload?.desktopError) {
+    const error = new Error(payload.desktopError.message || "Fileを開けませんでした。");
+    error.name = "DesktopFileOpenError";
+    error.code = payload.desktopError.code || "desktop.open_failed";
+    throw error;
+  }
   if (!payload || typeof payload.name !== "string") return null;
   const contents = typeof payload.contents === "string"
     ? payload.contents

@@ -13,6 +13,8 @@
 - filename, dirty, and Recovered window title
 - isolated preload bridge with no Renderer Node integration
 - flushed temporary-file replacement for overwriting saves and app-data state
+- persisted PSD render assets in the `.fl2d` envelope, outside Project Core
+- safe missing-Recent messaging and selection reset on Project replacement
 - Windows CI smoke coverage for tests and unpacked Electron packaging
 
 The Project model, EditorSession, Query API, commands, transactions,
@@ -50,7 +52,8 @@ npm run desktop:dist
    title.
 5. Use **Save As…** to create `Akino.fl2d`; confirm `*` disappears.
 6. Exit, restart, and use **Open…** to open `Akino.fl2d`.
-7. Confirm hierarchy, transforms, identity, and Project state match.
+7. Confirm hierarchy, transforms, identity, Project state, and PSD canvas
+   rendering match without selecting the source PSD again.
 8. Edit, press Ctrl+S, and confirm dirty clears.
 9. Use **Save Incremental** and confirm `Akino_001.fl2d` is created and becomes
    current. Repeat if a numbered sibling already exists.
@@ -66,7 +69,9 @@ npm run desktop:dist
 14. Re-import the Akino PSD, Review and Apply, then confirm whole-operation Undo
     and Redo keep Scene Tree and render assets synchronized.
 15. In an Inspector input, confirm Ctrl+Z edits text rather than Project history.
-16. Build/install with `npm run desktop:dist`, double-click an `.fl2d`, and
+16. Change a Transform, then confirm Undo and Redo both update the Inspector and
+    Canvas; use New and PNG Open and confirm the old Inspector selection clears.
+17. Build/install with `npm run desktop:dist`, double-click an `.fl2d`, and
     confirm Windows opens it in the existing or new FLAMORIS 2D process.
 
 Real Akino artwork, Windows dialogs, installer registration, and GPU/Canvas
