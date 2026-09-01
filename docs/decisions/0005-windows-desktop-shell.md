@@ -49,6 +49,10 @@ but the path is document context, not Project data, and is never serialized in
   creation so an external race cannot silently overwrite a file.
 - **Save Copy** uses a native dialog while leaving association and dirty state
   unchanged.
+- Overwriting saves write and flush a uniquely-created temporary file in the
+  destination directory, close it, then replace the destination with a
+  same-directory rename. A failed write or replace leaves the previous project
+  intact; Incremental retains exclusive no-overwrite creation.
 - Opened projects are parsed and validated before the selected path becomes the
   current association.
 - `projectId` remains Project identity and is preserved by every save mode.
@@ -89,5 +93,8 @@ Windows-opened project validation stay in the Main process.
 - Native dialogs themselves remain manual acceptance items; deterministic file
   naming, save semantics, title, Recent Files, close decisions, and payload
   adapters have OS/dialog-independent unit coverage.
+- Windows CI runs the Product tests and creates an unpacked Electron package,
+  protecting the Desktop dependency and packaging boundary separately from the
+  deterministic Linux Product job.
 - Bones, masks, proportional mesh editing, animation timeline, Key Art
   transitions, and export work remain Phase 2+ and are not introduced here.

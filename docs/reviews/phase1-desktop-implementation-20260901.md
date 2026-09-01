@@ -12,6 +12,8 @@
 - native File menu and required file shortcuts
 - filename, dirty, and Recovered window title
 - isolated preload bridge with no Renderer Node integration
+- flushed temporary-file replacement for overwriting saves and app-data state
+- Windows CI smoke coverage for tests and unpacked Electron packaging
 
 The Project model, EditorSession, Query API, commands, transactions,
 Undo/Redo, PSD import/re-import, and headless/MCP adapters are unchanged as the

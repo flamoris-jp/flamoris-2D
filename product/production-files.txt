@@ -30,3 +30,4 @@ src/ui/editor-shortcuts.js
 src/ui/reimport-render-history.js
 src/ui/desktop-project-files.js
 src/desktop/shell-logic.js
+src/desktop/atomic-write.js

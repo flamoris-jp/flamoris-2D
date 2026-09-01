@@ -1,27 +1,18 @@
-function copyArrayBuffer(bytes) {
-  const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
-  return view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength);
-}
-
 export function desktopFileFromPayload(payload) {
   if (!payload || typeof payload.name !== "string") return null;
-  const textContents = typeof payload.contents === "string"
+  const contents = typeof payload.contents === "string"
     ? payload.contents
-    : null;
-  const bytes = payload.bytes ? new Uint8Array(payload.bytes) : null;
-  return {
-    name: payload.name,
+    : new Uint8Array(payload.bytes || []);
+  const file = new File([contents], payload.name, {
     type: payload.mimeType || "application/octet-stream",
-    filePath: payload.filePath || null,
-    async text() {
-      if (textContents !== null) return textContents;
-      return new TextDecoder().decode(bytes || new Uint8Array());
-    },
-    async arrayBuffer() {
-      if (bytes) return copyArrayBuffer(bytes);
-      return new TextEncoder().encode(textContents || "").buffer;
-    },
-  };
+  });
+  Object.defineProperty(file, "filePath", {
+    configurable: false,
+    enumerable: true,
+    value: payload.filePath || null,
+    writable: false,
+  });
+  return file;
 }
 
 export function createDesktopProjectWriter(desktopApi) {

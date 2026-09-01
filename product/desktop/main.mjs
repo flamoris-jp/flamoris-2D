@@ -12,9 +12,8 @@ import {
   mkdirSync,
   readFileSync,
   unlinkSync,
-  writeFileSync,
 } from "node:fs";
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import {
   basename,
@@ -32,6 +31,11 @@ import {
   resolveUnsavedDecision,
   updateRecentFiles,
 } from "../src/desktop/shell-logic.js";
+import {
+  atomicWriteFile,
+  atomicWriteFileSync,
+  exclusiveWriteFile,
+} from "../src/desktop/atomic-write.js";
 
 protocol.registerSchemesAsPrivileged([{
   scheme: "flamoris",
@@ -95,7 +99,7 @@ function writeStorage(key, value) {
   }
   const target = storagePath(key);
   mkdirSync(dirname(target), { recursive: true });
-  writeFileSync(target, value, "utf8");
+  atomicWriteFileSync(target, value);
 }
 
 function removeStorage(key) {
@@ -122,7 +126,10 @@ function loadRecentFiles() {
 
 function saveRecentFiles() {
   mkdirSync(stateRoot(), { recursive: true });
-  writeFileSync(recentFilesPath(), JSON.stringify(recentFiles, null, 2), "utf8");
+  atomicWriteFileSync(
+    recentFilesPath(),
+    JSON.stringify(recentFiles, null, 2),
+  );
 }
 
 function rememberRecent(filePath) {
@@ -382,10 +389,8 @@ async function handleWriteProject(request) {
 
   const allowOverwrite = effectiveOperation !== "save-incremental";
   try {
-    await writeFile(target, request.contents, {
-      encoding: "utf8",
-      flag: allowOverwrite ? "w" : "wx",
-    });
+    if (allowOverwrite) await atomicWriteFile(target, request.contents);
+    else await exclusiveWriteFile(target, request.contents);
   } catch (error) {
     if (error.code === "EEXIST" && effectiveOperation === "save-incremental") {
       return handleWriteProject(request);
