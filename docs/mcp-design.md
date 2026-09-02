@@ -289,8 +289,9 @@ preview and tests:
 ```
 
 The result contains `EvaluatedPartState[]` with zero or more complete
-`renderInstances[]` per semantic part. It does not ask the renderer or MCP
-client to reinterpret Morph/Replace/Occlusion semantics.
+`renderInstances[]` per semantic part, normalized `appearanceSamples[]`, and
+any generic weighted-premultiplied `compositeGroups[]`. It does not ask the
+renderer or MCP client to reinterpret Morph/Replace/Occlusion semantics.
 
 A semantic operation such as `prepare_turn_sequence` may propose Key Arts,
 mappings, modes, typed keys, and diagnostic acknowledgments. Preview returns
