@@ -13,6 +13,7 @@ import {
 import {
   createTransformGesture,
   pickNodeAtDocumentPoint,
+  screenToMeshLocal,
 } from "../src/ui/canvas-interaction.js";
 import {
   changePivotPreservingLocalMatrix,
@@ -241,4 +242,101 @@ test("affine inversion and pivot editing preserve rendered geometry", () => {
   );
   assert.ok(Math.abs(roundTrip.x - point.x) < 1e-9);
   assert.ok(Math.abs(roundTrip.y - point.y) < 1e-9);
+});
+
+function assertPointClose(actual, expected) {
+  assert.ok(Math.abs(actual.x - expected.x) < 1e-9, `${actual.x} != ${expected.x}`);
+  assert.ok(Math.abs(actual.y - expected.y) < 1e-9, `${actual.y} != ${expected.y}`);
+}
+
+function screenPointForMeshLocal(meshLocal, view, partOffset, worldTransform) {
+  const partPoint = {
+    x: meshLocal.x + partOffset.x,
+    y: meshLocal.y + partOffset.y,
+  };
+  const documentPoint = transformPoint(worldTransform, partPoint);
+  return {
+    x: view.originX + documentPoint.x * view.scale,
+    y: view.originY + documentPoint.y * view.scale,
+  };
+}
+
+test("mesh-local pointer conversion preserves identity transform coordinates", () => {
+  const view = { originX: 30, originY: -12, scale: 2 };
+  const partOffset = { x: 10, y: 20 };
+  const expected = { x: 4, y: 7 };
+  const identity = [1, 0, 0, 1, 0, 0];
+  assertPointClose(screenToMeshLocal(
+    screenPointForMeshLocal(expected, view, partOffset, identity),
+    view,
+    { worldTransform: identity, partOffset },
+  ), expected);
+});
+
+test("mesh-local pointer conversion inverts translated parts", () => {
+  const view = { originX: 5, originY: 8, scale: 1.5 };
+  const partOffset = { x: 12, y: 6 };
+  const expected = { x: 9, y: -3 };
+  const translated = localTransformMatrix({
+    position: { x: 40, y: -15 },
+    rotation: 0,
+    scale: { x: 1, y: 1 },
+    pivot: { x: 0, y: 0 },
+  });
+  assertPointClose(screenToMeshLocal(
+    screenPointForMeshLocal(expected, view, partOffset, translated),
+    view,
+    { worldTransform: translated, partOffset },
+  ), expected);
+});
+
+test("mesh-local pointer conversion inversely rotates drag direction", () => {
+  const view = { originX: 0, originY: 0, scale: 1 };
+  const rotation = localTransformMatrix({
+    position: { x: 0, y: 0 },
+    rotation: Math.PI / 2,
+    scale: { x: 1, y: 1 },
+    pivot: { x: 0, y: 0 },
+  });
+  const start = screenToMeshLocal({ x: 0, y: 0 }, view, {
+    worldTransform: rotation,
+  });
+  const end = screenToMeshLocal({ x: 0, y: 10 }, view, {
+    worldTransform: rotation,
+  });
+  assertPointClose({ x: end.x - start.x, y: end.y - start.y }, { x: 10, y: 0 });
+});
+
+test("mesh-local pointer conversion inversely scales drag amount", () => {
+  const view = { originX: 0, originY: 0, scale: 1 };
+  const scaled = localTransformMatrix({
+    position: { x: 0, y: 0 },
+    rotation: 0,
+    scale: { x: 2, y: 0.5 },
+    pivot: { x: 0, y: 0 },
+  });
+  const start = screenToMeshLocal({ x: 0, y: 0 }, view, {
+    worldTransform: scaled,
+  });
+  const end = screenToMeshLocal({ x: 10, y: 10 }, view, {
+    worldTransform: scaled,
+  });
+  assertPointClose({ x: end.x - start.x, y: end.y - start.y }, { x: 5, y: 20 });
+});
+
+test("mesh-local pointer conversion handles combined rotation and scale", () => {
+  const view = { originX: 17, originY: 23, scale: 2.5 };
+  const partOffset = { x: 14, y: -5 };
+  const expected = { x: -8, y: 11 };
+  const combined = localTransformMatrix({
+    position: { x: 31, y: -19 },
+    rotation: Math.PI / 3,
+    scale: { x: 2.25, y: 0.6 },
+    pivot: { x: 4, y: 7 },
+  });
+  assertPointClose(screenToMeshLocal(
+    screenPointForMeshLocal(expected, view, partOffset, combined),
+    view,
+    { worldTransform: combined, partOffset },
+  ), expected);
 });

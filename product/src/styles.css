@@ -265,6 +265,7 @@ button:not(:disabled):hover, .file-button:hover { border-color: var(--mint); tra
   overflow-wrap: anywhere;
 }
 .viewport-wrap.drag-over { outline: 2px solid var(--mint); outline-offset: -7px; }
+.viewport-wrap.edit-mode { box-shadow: inset 0 0 0 2px rgba(255, 202, 103, .42); }
 
 @media (max-width: 720px) {
   body { overflow: auto; }
@@ -307,6 +308,41 @@ button:not(:disabled):hover, .file-button:hover { border-color: var(--mint); tra
   border-radius: 10px;
   background: rgba(7, 16, 15, .78);
   backdrop-filter: blur(10px);
+}
+.transform-toolbar[hidden] { display: none; }
+.mode-selector {
+  position: absolute;
+  z-index: 9;
+  top: 14px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  border: 1px solid rgba(129, 221, 205, .22);
+  border-radius: 10px;
+  background: rgba(7, 16, 15, .84);
+  color: #7f9b96;
+  font: 9px ui-monospace, SFMono-Regular, Consolas, monospace;
+  transform: translateX(-50%);
+  backdrop-filter: blur(10px);
+}
+.mode-selector select {
+  min-height: 28px;
+  padding: 0 28px 0 9px;
+  border: 1px solid rgba(129, 221, 205, .34);
+  border-radius: 7px;
+  background: #102422;
+  color: #dceeea;
+  font: 11px system-ui, sans-serif;
+}
+.viewport-wrap.edit-mode .mode-selector {
+  border-color: rgba(255, 202, 103, .58);
+  box-shadow: 0 0 14px rgba(255, 202, 103, .1);
+}
+.viewport-wrap.edit-mode .mode-selector select {
+  border-color: var(--gold);
+  color: #ffe5aa;
 }
 .transform-tool { min-width: 46px; min-height: 30px; padding: 0 8px; border-radius: 7px; font-size: 10px; background: rgba(129, 221, 205, .06); }
 .transform-tool.active { border-color: var(--gold); color: #ffe5aa; background: rgba(255, 202, 103, .12); }
