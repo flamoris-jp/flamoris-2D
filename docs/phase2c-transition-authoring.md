@@ -28,6 +28,9 @@ Phase 2C reuses the existing Project, Command, Transaction, EditorSession, Undo/
 4. The Phase 2C scrubber edits a Transition-owned `TemporalProgram`; it is not the Phase 6 general timeline.
 5. UI presets may compile to core modes/tracks, but no new persistent transition mode is introduced.
 6. Temporary selection, hover, panel layout, ghost opacity, and scrub position remain editor/workspace state unless they are actual project data.
+7. Creating a Transition together with its owned TemporalProgram is one atomic transaction: failure leaves neither object, and one Undo/Redo step removes/restores both while preserving the one-owner invariant.
+8. Endpoint mesh editing persists mesh/keyform-local coordinates only. Pointer conversion must follow `screen -> document -> inverse endpoint part world transform -> mesh/keyform local`; transformed parts must never write screen/document coordinates into MeshKeyform positions.
+9. Preview authority is explicit. Structural invalidity or renderer-unsupported features mark the viewport preview non-authoritative rather than silently approximating a valid final result.
 
 ## 1. Key Art authoring surface
 
@@ -124,6 +127,30 @@ Minimum editing behavior:
 - endpoint reset/reload only if representable by existing commands;
 - clear visual distinction between A-keyform editing, B-keyform editing, and Transition preview.
 
+### Endpoint edit coordinate contract
+
+Endpoint vertex editing must use the same transform discipline as the existing PSD Edit Mode and must remain correct after Object Mode transforms.
+
+Pointer conversion is:
+
+```text
+screen
+  -> document
+  -> inverse endpoint PartNode world transform
+  -> mesh/keyform-local
+```
+
+Requirements:
+
+- rendering and dragging use the same endpoint PartNode world transform and inverse;
+- parent/group transforms are included through the resolved world transform;
+- Rotate / Scale / Translate applied in Object Mode must not change the semantic direction or amount of a local vertex drag;
+- MeshKeyform `positions[]` store mesh/keyform-local coordinates only;
+- changing viewport zoom/pan must not change persisted coordinates;
+- A and B endpoint editing use their respective endpoint node/world transforms rather than assuming identical transforms.
+
+A regression test must cover a transformed endpoint part, including non-identity rotation and scale, and verify that screen drag round-trips to the expected mesh/keyform-local delta.
+
 Explicitly deferred to Phase 3:
 
 - proportional editing;
@@ -168,7 +195,8 @@ Requirements:
 - normalized progress display is derived only;
 - scrubbing does not mutate persistent project state;
 - repeated evaluation of the same Project + tick displays equivalent output;
-- endpoint preview must respect the Phase 2B endpoint invariant.
+- endpoint evaluation must respect the Phase 2B endpoint invariant;
+- endpoint visual equivalence is asserted only for renderer-supported features; unsupported rendering capabilities must be surfaced as non-authoritative preview state.
 
 The scrubber may expose human-friendly seconds/frames, but conversion must use the established 120000 ticks/second timebase and rational FPS rules.
 
@@ -219,7 +247,24 @@ The renderer must not:
 - invent draw-order handoffs;
 - decide diagnostic validity.
 
-If clipping rasterization remains unsupported until Phase 4, the UI must display the Phase 2B unsupported diagnostic rather than pretending the preview is authoritative.
+### Preview authority
+
+The viewport must expose whether the displayed Transition preview is authoritative for the evaluated state.
+
+`authoritative` means:
+
+- Transition evaluation is structurally valid for the current tick; and
+- every evaluated feature that contributes to the expected visible result is supported by the current renderer path.
+
+The preview is `non-authoritative` when, for example:
+
+- structural diagnostics invalidate the Transition/current evaluated state; or
+- the evaluator emits valid clipping state/reference data but Phase 4 clipping rasterization is not yet implemented; or
+- another evaluated renderer instruction required for visual equivalence is unsupported.
+
+Non-authoritative preview may still render the supported subset for editing convenience, but the UI must visibly label it and surface the reason-specific diagnostic. It must never silently present a partial rendering as proof of endpoint visual equivalence.
+
+If clipping rasterization remains unsupported until Phase 4, the UI must display the Phase 2B unsupported diagnostic and mark the preview non-authoritative.
 
 ## 9. Diagnostics UX
 
@@ -232,6 +277,7 @@ Minimum behavior:
 - identify SemanticSlot and tick where supplied;
 - selecting a diagnostic should focus the relevant slot/part when practical;
 - structural invalidity blocks or clearly marks authoritative preview;
+- renderer-unsupported diagnostics mark preview non-authoritative even when core evaluation itself is structurally valid;
 - scoped acknowledgements use existing persistent commands only when supported;
 - never collapse all diagnostics into one opaque quality score.
 
@@ -249,6 +295,19 @@ Examples:
 - create/update endpoint MeshKeyform;
 - move endpoint vertices;
 - add/update/remove Transition keyframes.
+
+### Transition creation atomicity
+
+Creating a Transition and its owned TemporalProgram is one semantic operation and one transaction.
+
+Requirements:
+
+- validate both objects and ownership before commit;
+- if any step fails, neither Transition nor TemporalProgram remains in Project state;
+- one Undo removes both objects and restores the pre-transaction state;
+- one Redo restores both objects with the same stable IDs and ownership;
+- the operation must never expose an intermediate committed state containing a Transition with a missing program or a program multiply owned by Transitions;
+- tests must cover validation failure rollback, Undo, Redo, and ownership invariant preservation.
 
 Scrub position, selected Key Art, selected slot, viewport ghost mode, and temporary preview state must not pollute Project history unless later explicitly designed as persistent project data.
 
@@ -300,6 +359,7 @@ The exact panel layout is not persistence architecture and may evolve during imp
 - A/B Key Art controls;
 - SemanticSlot mapping UI;
 - PartTransition mode inspector;
+- atomic Transition + TemporalProgram creation;
 - resilient selection state.
 
 ### 2C-2 Endpoint mesh/keyform workflow
@@ -307,6 +367,8 @@ The exact panel layout is not persistence architecture and may evolve during imp
 - A/B endpoint edit context;
 - shared topology/keyform selection/creation;
 - move existing vertices on A/B;
+- screen/document/world/local coordinate conversion contract;
+- transformed-part drag regression;
 - mesh overlay and endpoint view controls.
 
 ### 2C-3 Preview and temporal controls
@@ -314,6 +376,7 @@ The exact panel layout is not persistence architecture and may evolve during imp
 - deterministic scrubber;
 - `transition.evaluate` -> viewport renderer;
 - weighted appearance / Replace preview;
+- explicit authoritative/non-authoritative preview state;
 - focused typed-track/keyframe controls.
 
 ### 2C-4 Diagnostics and regression
@@ -321,7 +384,11 @@ The exact panel layout is not persistence architecture and may evolve during imp
 - diagnostics panel/focus;
 - save/reload equivalence;
 - Undo/Redo UI consistency;
-- endpoint equivalence;
+- Transition + TemporalProgram rollback/Undo/Redo regression;
+- transformed endpoint mesh drag regression;
+- endpoint evaluation equivalence;
+- endpoint visual equivalence for renderer-supported features;
+- non-authoritative preview for renderer-unsupported evaluated features;
 - full Phase 1 / 2A / 2B regression suite.
 
 ## 15. Explicitly out of scope
@@ -347,17 +414,17 @@ Those remain assigned to later roadmap phases.
 Phase 2C is complete when a user can, through the editor UI:
 
 1. import or use two Key Arts A and B in one Project;
-2. create/select an A -> B Transition;
+2. create/select an A -> B Transition and its owned TemporalProgram atomically, with failure rollback and one-step Undo/Redo preserving the ownership invariant;
 3. review and edit explicit SemanticSlot correspondence;
 4. configure Morph / Hold / Replace / Appear / Disappear / Occlusion for parts;
 5. create/use shared topology and A/B MeshKeyforms for a Morph part;
-6. move B endpoint vertices while viewing B artwork;
+6. move B endpoint vertices while viewing B artwork, including after non-identity Object Mode transform, with pointer conversion `screen -> document -> inverse world transform -> mesh/keyform local` and local-only persisted positions;
 7. scrub any tick and see the deterministic evaluated result in the viewport;
 8. see dual-texture/per-Key-Art-UV Morph preview where applicable;
 9. see simultaneous Replace instances and explicit handoff behavior;
 10. edit Transition-owned typed keyframes without a general animation timeline;
-11. inspect reason-specific diagnostics;
-12. jump to tick 0 and duration and visually/evaluationally reproduce A and B for a valid complete Transition;
+11. inspect reason-specific diagnostics and clearly distinguish authoritative from non-authoritative preview;
+12. jump to tick 0 and duration and evaluationally reproduce A and B for a valid complete Transition; visually reproduce endpoints for renderer-supported features, while renderer-unsupported features are explicitly diagnosed and marked non-authoritative rather than silently approximated;
 13. Undo/Redo persistent authoring edits correctly;
 14. save, reopen, and obtain equivalent Transition evaluation;
 15. complete the workflow without UI-only persistent state or DOM-only mutation paths;
