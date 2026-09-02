@@ -31,6 +31,7 @@ import {
 import {
   createTransformGesture,
   pickNodeAtDocumentPoint,
+  screenToMeshLocal,
 } from "./ui/canvas-interaction.js";
 import { transformPoint } from "./core/transforms.js";
 import {
@@ -1049,11 +1050,14 @@ function pointerPosition(event) {
 }
 
 function screenToPart(screenPoint) {
-  const documentPoint = screenToImage(screenPoint.x, screenPoint.y, state.view);
-  return {
-    x: documentPoint.x - state.partOffset.x,
-    y: documentPoint.y - state.partOffset.y,
-  };
+  const part = selectedPart();
+  const worldTransform = state.mode === "psd" && part?.nodeId && state.editor
+    ? state.editor.worldTransform(part.nodeId)
+    : null;
+  return screenToMeshLocal(screenPoint, state.view, {
+    worldTransform,
+    partOffset: state.partOffset,
+  });
 }
 
 function nearestVertex(screenPoint, radius = 12) {
