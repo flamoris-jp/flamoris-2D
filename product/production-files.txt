@@ -9,6 +9,10 @@ src/mesh.js
 src/psd.js
 src/renderer.js
 src/styles.css
+src/styles/base.css
+src/styles/editor-panels.css
+src/styles/viewport.css
+src/styles/dialogs.css
 src/model/project.js
 src/model/validation.js
 src/model/temporal-validation.js
@@ -16,6 +20,9 @@ src/core/transforms.js
 src/core/temporal.js
 src/queries/project.js
 src/commands/editor.js
+src/commands/errors.js
+src/commands/scene-command-handlers.js
+src/commands/temporal-command-handlers.js
 src/commands/schemas.js
 src/io/project-json.js
 src/io/project-files.js
@@ -26,11 +33,16 @@ src/preferences.js
 src/mcp/adapter.js
 src/mcp/schemas.js
 src/ui/browser-project-files.js
+src/ui/app-elements.js
 src/ui/editor-adapter.js
 src/ui/canvas-interaction.js
 src/ui/editor-shortcuts.js
 src/ui/editor-modes.js
 src/ui/reimport-render-history.js
+src/ui/reimport-review-view.js
+src/ui/scene-editor-view.js
+src/ui/viewport-input-controller.js
+src/ui/viewport-renderer.js
 src/ui/desktop-project-files.js
 src/ui/psd-render-assets.js
 src/desktop/shell-logic.js
