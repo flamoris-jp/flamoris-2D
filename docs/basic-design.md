@@ -90,16 +90,18 @@ Project
 ├── Transition[]
 │   ├── fromKeyArtId
 │   ├── toKeyArtId
+│   ├── program: TemporalProgram
 │   └── PartTransition[]
 ├── Animation
-│   ├── Clip[]
-│   ├── Track[]
-│   └── Keyframe[]
+│   ├── Clip[] -> TemporalProgram
+│   └── ClipInstance[]
 ├── Sequence
 └── RenderSettings
 ```
 
-Detailed Key-Art behavior is defined in `docs/key-art-transition.md`.
+Detailed Key-Art behavior is defined in `docs/key-art-transition.md` and
+`docs/transition-evaluation.md`. The shared temporal schema and evaluated
+frame contract are defined in `docs/animation-data-model.md`.
 Detailed AI/MCP behavior is defined in `docs/mcp-design.md`.
 
 ## 5. Stable identity and semantic mapping
@@ -223,15 +225,18 @@ Direct edits create ordinary keyform/deformation changes through commands.
 Conceptually:
 
 ```text
-Selected Key Art / Transition base geometry
-  -> Key-Art geometry interpolation
+Sequence/ViewLane at integer timeTicks
+  -> Active Key Art / Transition base evaluation
+  -> Animation control values (Phase 6)
   -> Rig deformation
        bone skinning
        warp/lattice deformation
        optional path effects
   -> Animation/form corrections
   -> Node/world transform
-  -> Render Mesh
+  -> Appearance / opacity / presence / draw order / clipping resolution
+  -> EvaluatedFrame with complete renderInstances[]
+  -> Renderer rasterization/compositing
 ```
 
 The mathematical order must be tested because changing it later can invalidate authored work.
@@ -250,11 +255,12 @@ For a compatible part:
 position_i(t) = lerp(positionA_i, positionB_i, curve(t))
 ```
 
-When the artwork itself differs, the renderer can morph using two textures and two UV sets on the interpolated triangles:
+When the artwork itself differs, the Evaluation Core can emit two explicit
+texture/UV render instances on the interpolated triangles:
 
 ```text
 Texture A / UV A ----┐
-                     ├-> interpolated geometry -> blended color
+                     ├-> evaluated render instances -> renderer compositing
 Texture B / UV B ----┘
 ```
 
@@ -485,6 +491,10 @@ Contextual properties for selected node, mesh, Key Art, transition, bone, clip, 
 
 ### Timeline
 
+The Phase 2 Transition inspector/scrubber edits Transition-owned typed tracks
+without requiring the general timeline. In Phase 6, the timeline reuses the
+same `TemporalProgram`, keyframes, and sampling rules.
+
 Tracks may target:
 
 - node/group transforms
@@ -498,6 +508,10 @@ Tracks may target:
 - draw-order step events where needed
 
 ## 15. Animation model
+
+Animation clips and Transitions share the versioned `TemporalProgram` defined
+in `docs/animation-data-model.md`. Project time uses 120000 integer ticks per
+second; render FPS remains a separate rational display/output setting.
 
 ### Clip-first
 
@@ -644,7 +658,9 @@ Transient panel sizes/hover state should remain workspace/editor preferences, no
 
 Continue using indexed GPU meshes.
 
-Renderer must grow to support:
+The Evaluation Core emits a renderer-ready `EvaluatedFrame`. The renderer
+does not interpret Transition modes, infer correspondence, or invent timing.
+It must grow to rasterize/composite:
 
 - hierarchy transforms
 - multiple deformed parts
