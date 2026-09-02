@@ -98,11 +98,13 @@ Work:
 - Interpolate mesh geometry between A and B.
 - Per-Key-Art UV sets.
 - Dual-texture Morph evaluation with per-instance texture/UV state for compatible parts.
-- Transition modes: Morph, Hold, Crossfade/Replace, Appear, Disappear.
+- Persistent transition modes: Morph, Hold, Replace, Appear, Disappear,
+  Occlusion. Crossfade/Swap are UI presets that compile to core modes.
 - Presence model: present / occluded / absent.
 - Basic per-Key-Art draw order and transition visibility/opacity.
-- Deterministic presence/draw-order/clipping handoffs and reason-specific
-  feasibility diagnostics, including intermediate-Key-Art recommendations.
+- Deterministic presence/draw-order handoffs, clipping-reference evaluation,
+  and reason-specific feasibility diagnostics, including intermediate-Key-Art
+  recommendations. Clipping authoring/rendering remains Phase 4.
 - Save/load/undo/redo of mappings, TemporalProgram, and transition data.
 
 Acceptance criteria:
@@ -262,7 +264,8 @@ MCP work:
 Key Art AI assistance:
 
 - Suggest semantic part mappings between drawings.
-- Suggest Morph/Hold/Appear/Disappear/Swap modes.
+- Suggest core Morph/Hold/Replace/Appear/Disappear/Occlusion modes; a Swap
+  suggestion compiles to ordinary core-mode commands.
 - Suggest anchor/vertex correspondence.
 - Optical-flow-assisted initialization for visually continuous changes.
 - Semantic-correspondence-assisted mapping for larger pose/view changes.
