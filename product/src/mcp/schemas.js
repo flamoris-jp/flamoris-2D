@@ -1,6 +1,6 @@
 export { commandSchemas } from "../commands/schemas.js";
 
-export const MCP_SCHEMA_VERSION = 2;
+export const MCP_SCHEMA_VERSION = 3;
 
 const nodeId = {
   type: "string",
@@ -8,8 +8,35 @@ const nodeId = {
 };
 
 const programId = { ...nodeId };
+const transitionId = { ...nodeId };
+const keyArtId = { ...nodeId };
+const semanticSlotId = { ...nodeId };
 
 export const querySchemas = {
+  "keyart.get": idQuery("keyArtId", keyArtId),
+  "keyart.list": emptyQuery(),
+  "semantic_slot.get": idQuery("semanticSlotId", semanticSlotId),
+  "semantic_slot.list": emptyQuery(),
+  "semantic_slot.get_mapping": {
+    type: "object",
+    required: ["semanticSlotId", "keyArtId"],
+    properties: { semanticSlotId, keyArtId },
+    additionalProperties: false,
+  },
+  "mesh.get_topology": idQuery("topologyId", nodeId),
+  "mesh.get_keyform": idQuery("keyformId", nodeId),
+  "transition.get": idQuery("transitionId", transitionId),
+  "transition.list": emptyQuery(),
+  "transition.evaluate": {
+    type: "object",
+    required: ["transitionId", "timeTicks"],
+    properties: {
+      transitionId,
+      timeTicks: { type: "integer", minimum: 0 },
+    },
+    additionalProperties: false,
+  },
+  "transition.get_diagnostics": idQuery("transitionId", transitionId),
   "animation.get_program": {
     type: "object",
     required: ["programId"],
@@ -59,3 +86,16 @@ export const querySchemas = {
     additionalProperties: false,
   },
 };
+
+function emptyQuery() {
+  return { type: "object", additionalProperties: false };
+}
+
+function idQuery(name, schema) {
+  return {
+    type: "object",
+    required: [name],
+    properties: { [name]: schema },
+    additionalProperties: false,
+  };
+}

@@ -47,12 +47,16 @@ export function createProjectFromPsd(
     displayLabel: fileName,
     importedAt,
   });
-  project.keyArts.push({
+  const keyArt = {
     id: keyArtId,
     displayName: projectName,
     sourceAssetId,
     rootNodeId: project.scene.rootId,
-  });
+    members: [],
+    metadata: {},
+  };
+  project.keyArts.push(keyArt);
+  let nextDrawOrder = 0;
 
   function walk(
     children,
@@ -121,6 +125,16 @@ export function createProjectFromPsd(
       });
       project.scene.nodes[id] = node;
       project.scene.nodes[parentId].children.push(id);
+      if (!hasChildren) {
+        keyArt.members.push({
+          nodeId: node.id,
+          appearanceId: sourceAssetId + ":" + node.sourceRef.sourceKey,
+          opacity: node.opacity,
+          presence: node.visible ? "present" : "absent",
+          drawOrder: nextDrawOrder++,
+          clipping: { sourceNodeId: null },
+        });
+      }
       if (hasChildren) {
         walk(
           layer.children,

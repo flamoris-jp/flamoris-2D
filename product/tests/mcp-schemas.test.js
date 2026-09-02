@@ -7,7 +7,7 @@ import {
 } from "../src/mcp/schemas.js";
 
 test("MCP schema module imports with wired query and command schemas", () => {
-  assert.equal(MCP_SCHEMA_VERSION, 2);
+  assert.equal(MCP_SCHEMA_VERSION, 3);
   assert.equal(
     querySchemas["scene.get_node"].properties.nodeId.type,
     "string",
