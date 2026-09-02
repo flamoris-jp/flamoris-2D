@@ -84,6 +84,10 @@ test("step, linear, and bezier sampling preserve exact endpoints", () => {
   assert.equal(sampleKeyframes(endpoints(linear), 60000), 0.5);
   const curved = sampleKeyframes(endpoints(ease), 60000);
   assert.ok(curved > 0.5 && curved < 1);
+  assert.deepEqual(sampleKeyframes([
+    keyframe("sample_a", 0, { deformationSampleId: "sample", weight: 0 }, linear),
+    keyframe("sample_b", 100, { deformationSampleId: "sample", weight: 1 }, step),
+  ], 50), { deformationSampleId: "sample", weight: 0.5 });
 });
 
 test("temporal commands create, edit, remove, undo, and redo exact state", () => {

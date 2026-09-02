@@ -186,6 +186,22 @@ function validateTrack(track, program, project, path, issues, register) {
       validateValue(keyframe.value, definition.value, keyPath + ".value", issues, project);
       validateInterpolation(keyframe.interpolationToNext, keyPath + ".interpolationToNext", issues, definition.discrete);
     });
+    if (definition.value === "deformation") {
+      const ordered = [...channel.keyframes].sort((a, b) => a.timeTicks - b.timeTicks);
+      for (let keyIndex = 0; keyIndex < ordered.length - 1; keyIndex += 1) {
+        const current = ordered[keyIndex];
+        const next = ordered[keyIndex + 1];
+        if (current.interpolationToNext?.kind !== "step" &&
+          current.value?.deformationSampleId !== next.value?.deformationSampleId) {
+          issues.push(problem(
+            "ANIMATION_MESH_SAMPLE_INCOMPATIBLE",
+            channelPath,
+            "Continuous interpolation requires the same deformationSampleId at both endpoints.",
+            track.trackId,
+          ));
+        }
+      }
+    }
   }
 }
 

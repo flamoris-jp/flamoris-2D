@@ -165,8 +165,13 @@ function interpolateValue(from, to, progress) {
     for (const key of keys) {
       const left = from[key] ?? 0;
       const right = to[key] ?? 0;
-      if (typeof left !== "number" || typeof right !== "number") return structuredClone(from);
-      result[key] = left + (right - left) * progress;
+      if (typeof left === "number" && typeof right === "number") {
+        result[key] = left + (right - left) * progress;
+      } else if (left === right) {
+        result[key] = structuredClone(left);
+      } else {
+        return structuredClone(from);
+      }
     }
     return result;
   }
