@@ -8,6 +8,19 @@ export function createSceneEditorView({
   updateEditorModeUi,
   updateZoomOutput,
 }) {
+  function selectSceneNode(nodeId) {
+    const nextNodeId = objectSelectionForMode(
+      state.editorMode,
+      state.editor.selectedNodeId,
+      nodeId,
+    );
+    if (nextNodeId === state.editor.selectedNodeId && nodeId !== nextNodeId) {
+      setStatus("Edit Mode中はactive mesh-edit targetを変更できません");
+      return;
+    }
+    state.editor.selectNode(nextNodeId);
+  }
+
   function renderSceneTree() {
     elements.sceneTree.replaceChildren();
     elements.sceneSearchInput.disabled = !state.editor;
@@ -64,16 +77,7 @@ export function createSceneEditorView({
 
       row.append(toggle, visibility, label, lock);
       row.addEventListener("click", () => {
-        const nextNodeId = objectSelectionForMode(
-          state.editorMode,
-          state.editor.selectedNodeId,
-          node.id,
-        );
-        if (nextNodeId === state.editor.selectedNodeId && node.id !== nextNodeId) {
-          setStatus("Edit Mode中はactive mesh-edit targetを変更できません");
-          return;
-        }
-        state.editor.selectNode(nextNodeId);
+        selectSceneNode(node.id);
       });
       item.append(row);
       parent.append(item);
@@ -163,5 +167,5 @@ export function createSceneEditorView({
     updateZoomOutput();
   }
 
-  return { render, renderInspector, renderSceneTree };
+  return { render, renderInspector, renderSceneTree, selectSceneNode };
 }

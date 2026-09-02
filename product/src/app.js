@@ -1,12 +1,7 @@
 import {
-  clampGridSize,
   createViewTransform,
-  findAlphaBounds,
-  generateGridMesh,
-  resetDeformation,
   screenToImage,
 } from "./mesh.js";
-import { captureOffsets, clampDuration } from "./animation.js";
 import { MeshRenderer } from "./renderer.js";
 import { collectPsdParts } from "./psd.js";
 import { createProjectFromPsd } from "./io/psd-project.js";
@@ -49,6 +44,7 @@ import { createSceneEditorView } from "./ui/scene-editor-view.js";
 import { bindViewportInteractions } from "./ui/viewport-input-controller.js";
 import { queryAppElements } from "./ui/app-elements.js";
 import { createReimportReviewView } from "./ui/reimport-review-view.js";
+import { createMeshEditingController } from "./ui/mesh-editing-controller.js";
 
 const desktopApi = window.flamorisDesktop || null;
 const appStorage = desktopApi?.storage || localStorage;
@@ -106,11 +102,27 @@ try {
   throw error;
 }
 
+const meshEditingController = createMeshEditingController({
+  state,
+  elements,
+  renderer,
+  selectedPart,
+  setStatus,
+  render: () => render(),
+});
+const {
+  clearMeshEditing,
+  createMesh,
+  returnToEdit,
+  setEditableImage,
+  updateButtons,
+} = meshEditingController;
+
 const viewportRenderer = createViewportRenderer({
   state,
   elements,
   renderer,
-  duration,
+  duration: meshEditingController.duration,
   selectedPart,
   selectedPartIndex,
   selectedNodeDocumentBounds,
@@ -313,56 +325,6 @@ function panViewBy(deltaX, deltaY) {
   render();
 }
 
-function updateButtons() {
-  const enabled = Boolean(state.image);
-  elements.generateButton.disabled = !enabled;
-  elements.resetButton.disabled = !state.mesh;
-  elements.captureAButton.disabled = !state.mesh;
-  elements.captureBButton.disabled = !state.mesh;
-  const complete = Boolean(state.keyframes.a && state.keyframes.b);
-  elements.playButton.disabled = !complete;
-  elements.timeSlider.disabled = !complete;
-  elements.editButton.disabled = !state.previewMode;
-  elements.captureAButton.classList.toggle("recorded", Boolean(state.keyframes.a));
-  elements.captureBButton.classList.toggle("recorded", Boolean(state.keyframes.b));
-  elements.keyframeStatus.textContent = `A ${state.keyframes.a ? "●" : "―"}　B ${state.keyframes.b ? "●" : "―"}`;
-  elements.playButton.textContent = state.playing ? "Ⅱ 一時停止" : "▶ プレビュー";
-}
-
-function duration() {
-  return clampDuration(elements.durationInput.value);
-}
-
-function updateTimeDisplay() {
-  elements.timeSlider.value = String(state.currentTime);
-  elements.timeOutput.value = `${state.currentTime.toFixed(2)}s`;
-  elements.timeOutput.textContent = `${state.currentTime.toFixed(2)}s`;
-}
-
-function stopPlayback() {
-  state.playing = false;
-  if (state.animationFrame !== null) cancelAnimationFrame(state.animationFrame);
-  state.animationFrame = null;
-  updateButtons();
-}
-
-function returnToEdit() {
-  stopPlayback();
-  state.previewMode = false;
-  state.currentTime = 0;
-  updateTimeDisplay();
-  updateButtons();
-  render();
-}
-
-function clearKeyframes() {
-  stopPlayback();
-  state.keyframes = { a: null, b: null };
-  state.previewMode = false;
-  state.currentTime = 0;
-  updateTimeDisplay();
-}
-
 function resizeCanvases() {
   const rect = elements.viewportWrap.getBoundingClientRect();
   const ratio = window.devicePixelRatio || 1;
@@ -387,65 +349,6 @@ function resizeCanvases() {
 
 function render() {
   viewportRenderer.render();
-}
-
-function createMesh() {
-  if (!state.imageData || !state.image) return;
-  const columns = clampGridSize(elements.columnsInput.value);
-  const rows = clampGridSize(elements.rowsInput.value);
-  elements.columnsInput.value = String(columns);
-  elements.rowsInput.value = String(rows);
-  const bounds = findAlphaBounds(state.imageData);
-  if (!bounds) {
-    setStatus("透明部分しかないパーツです");
-    return;
-  }
-  state.mesh = generateGridMesh(bounds, state.image.width, state.image.height, columns, rows);
-  state.selected.clear();
-  clearKeyframes();
-  renderer.setMesh(state.mesh);
-  updateButtons();
-  render();
-  const count = state.mesh.baseVertices.length / 2;
-  const part = selectedPart();
-  const prefix = state.mode === "psd" && part
-    ? `${part.name}・`
-    : "";
-  setStatus(`${prefix}${columns} × ${rows} グリッド・${count}頂点`);
-}
-
-function setEditableImage(image, documentWidth, documentHeight, offsetX = 0, offsetY = 0) {
-  const contextCanvas = document.createElement("canvas");
-  contextCanvas.width = image.width;
-  contextCanvas.height = image.height;
-  const context = contextCanvas.getContext("2d", { willReadFrequently: true });
-  context.drawImage(image, 0, 0);
-
-  state.image = image;
-  state.imageData = context.getImageData(0, 0, image.width, image.height);
-  state.documentWidth = documentWidth;
-  state.documentHeight = documentHeight;
-  state.partOffset = { x: offsetX, y: offsetY };
-  if (!state.view) {
-    state.view = createViewTransform(
-      elements.viewportWrap.clientWidth,
-      elements.viewportWrap.clientHeight,
-      documentWidth,
-      documentHeight,
-    );
-  }
-  renderer.setTexture(image);
-}
-
-function clearMeshEditing() {
-  state.image = null;
-  state.imageData = null;
-  state.mesh = null;
-  state.partOffset = { x: 0, y: 0 };
-  state.selected.clear();
-  clearKeyframes();
-  renderer.clearMesh();
-  updateButtons();
 }
 
 async function loadImage(source, label) {
@@ -1057,68 +960,7 @@ elements.transformInputs.forEach((input) => {
     });
   });
 });
-elements.generateButton.addEventListener("click", createMesh);
-elements.resetButton.addEventListener("click", () => {
-  returnToEdit();
-  resetDeformation(state.mesh);
-  state.selected.clear();
-  setStatus("変形をリセットしました");
-  render();
-});
-
-function captureKeyframe(name) {
-  stopPlayback();
-  state.previewMode = false;
-  state.keyframes[name] = captureOffsets(state.mesh.vertexOffsets);
-  state.currentTime = 0;
-  updateTimeDisplay();
-  updateButtons();
-  setStatus(`キーフレーム${name.toUpperCase()}を記録しました`);
-  render();
-}
-
-elements.captureAButton.addEventListener("click", () => captureKeyframe("a"));
-elements.captureBButton.addEventListener("click", () => captureKeyframe("b"));
-
-function playbackFrame(now) {
-  if (!state.playing) return;
-  const clipDuration = duration();
-  state.currentTime = ((now - state.playbackStartedAt) / 1000) % clipDuration;
-  updateTimeDisplay();
-  render();
-  state.animationFrame = requestAnimationFrame(playbackFrame);
-}
-
-elements.playButton.addEventListener("click", () => {
-  if (state.playing) {
-    stopPlayback();
-    return;
-  }
-  state.previewMode = true;
-  state.playing = true;
-  state.playbackStartedAt = performance.now() - state.currentTime * 1000;
-  updateButtons();
-  state.animationFrame = requestAnimationFrame(playbackFrame);
-  setStatus("A → B → A を無音プレビュー中");
-});
-
-elements.editButton.addEventListener("click", returnToEdit);
-elements.timeSlider.addEventListener("input", () => {
-  stopPlayback();
-  state.previewMode = true;
-  state.currentTime = Number(elements.timeSlider.value);
-  updateTimeDisplay();
-  updateButtons();
-  render();
-});
-elements.durationInput.addEventListener("change", () => {
-  const value = duration();
-  elements.durationInput.value = String(value);
-  elements.timeSlider.max = String(value);
-  state.currentTime = Math.min(state.currentTime, value);
-  updateTimeDisplay();
-  render();
-});
+meshEditingController.bind();
 
 elements.fitAllButton.addEventListener("click", fitDocumentView);
 elements.fitPartButton.addEventListener("click", fitSelectedPartView);

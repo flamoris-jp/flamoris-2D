@@ -30,6 +30,7 @@ export function bindViewportInteractions({
   setStatus,
   selectedPart,
   loadFile,
+  windowTarget = window,
 }) {
   function pointerPosition(event) {
     const rect = elements.overlayCanvas.getBoundingClientRect();
@@ -74,7 +75,7 @@ export function bindViewportInteractions({
     zoomAtScreenPoint(point.x, point.y, factor);
   }, { passive: false });
 
-  window.addEventListener("keydown", (event) => {
+  windowTarget.addEventListener("keydown", (event) => {
     const historyAction = projectHistoryShortcutAction(event);
     if (state.editor && historyAction) {
       event.preventDefault();
@@ -102,14 +103,14 @@ export function bindViewportInteractions({
     }
   });
 
-  window.addEventListener("keyup", (event) => {
+  windowTarget.addEventListener("keyup", (event) => {
     if (event.code === "Space") {
       state.spacePressed = false;
       elements.viewportWrap.classList.remove("pan-ready");
     }
   });
 
-  elements.overlayCanvas.addEventListener("pointerdown", (event) => {
+  function handlePointerDown(event) {
     if (state.previewMode) returnToEdit();
 
     const screenPoint = pointerPosition(event);
@@ -185,7 +186,9 @@ export function bindViewportInteractions({
     state.drag = { last: partPoint };
     elements.overlayCanvas.setPointerCapture(event.pointerId);
     render();
-  });
+  }
+
+  elements.overlayCanvas.addEventListener("pointerdown", handlePointerDown);
 
   elements.overlayCanvas.addEventListener("pointermove", (event) => {
     const screenPoint = pointerPosition(event);
@@ -249,4 +252,6 @@ export function bindViewportInteractions({
   elements.viewportWrap.addEventListener("drop", (event) => {
     loadFile(event.dataTransfer.files?.[0]);
   });
+
+  return { handlePointerDown, nearestVertex, screenToPart };
 }

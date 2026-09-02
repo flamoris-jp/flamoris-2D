@@ -2,6 +2,17 @@ function projectNodeLabel(project, nodeId) {
   return nodeId ? project.scene.nodes[nodeId]?.displayName || nodeId : "—";
 }
 
+export function applyReimportRowAction(review, row, action) {
+  if (action === "add") review.markAsNew(row.id);
+  else if (action === "keep") review.keepExisting(row.id);
+  else if (action === "remove") review.removeExisting(row.id);
+  else if (action === "ignore") review.ignore(row.id);
+  else if (action === "reset") review.resetToAuto(row.id);
+  else if (action === "update" && row.importedNodeId) {
+    review.setMatch(row.id, row.importedNodeId);
+  }
+}
+
 export function createReimportReviewView({ state, elements, setStatus }) {
   function updatePreview(row) {
     const currentPart = state.psdParts.find((part) => part.nodeId === row.currentNodeId);
@@ -73,14 +84,7 @@ export function createReimportReviewView({ state, elements, setStatus }) {
       action.addEventListener("change", (event) => {
         event.stopPropagation();
         try {
-          if (action.value === "add") review.markAsNew(row.id);
-          else if (action.value === "keep") review.keepExisting(row.id);
-          else if (action.value === "remove") review.removeExisting(row.id);
-          else if (action.value === "ignore") review.ignore(row.id);
-          else if (action.value === "reset") review.resetToAuto(row.id);
-          else if (action.value === "update" && row.importedNodeId) {
-            review.setMatch(row.id, row.importedNodeId);
-          }
+          applyReimportRowAction(review, row, action.value);
         } catch (error) {
           setStatus(error.message);
         }
