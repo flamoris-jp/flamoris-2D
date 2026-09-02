@@ -1,13 +1,36 @@
 export { commandSchemas } from "../commands/schemas.js";
 
-export const MCP_SCHEMA_VERSION = 1;
+export const MCP_SCHEMA_VERSION = 2;
 
 const nodeId = {
   type: "string",
   minLength: 1,
 };
 
+const programId = { ...nodeId };
+
 export const querySchemas = {
+  "animation.get_program": {
+    type: "object",
+    required: ["programId"],
+    properties: { programId },
+    additionalProperties: false,
+  },
+  "animation.list_tracks": {
+    type: "object",
+    required: ["programId"],
+    properties: { programId },
+    additionalProperties: false,
+  },
+  "animation.sample_program": {
+    type: "object",
+    required: ["programId", "timeTicks"],
+    properties: {
+      programId,
+      timeTicks: { type: "integer", minimum: 0 },
+    },
+    additionalProperties: false,
+  },
   "project.get_summary": {
     type: "object",
     additionalProperties: false,
