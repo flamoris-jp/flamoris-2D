@@ -78,6 +78,8 @@ export class ProjectDocumentController {
     const normalized = normalizeFl2dFilename(fileName);
     const timestamp = this.now().toISOString();
     const createdAt = this.metadata.createdAt || timestamp;
+    const savedRevision = this.session.currentRevision;
+    const savedProjectId = this.session.project.id;
     const contents = serializeProject(this.session.project, 2, {
       createdAt,
       modifiedAt: timestamp,
@@ -100,15 +102,15 @@ export class ProjectDocumentController {
       this.currentFileName = writtenFileName;
       this.currentFilePath = writeResult?.filePath || this.currentFilePath;
     }
-    if (markClean) {
+    if (markClean && this.session.project.id === savedProjectId) {
       this.metadata = { createdAt, modifiedAt: timestamp };
-      this.session.markSaved();
-      this.recovery?.clear?.();
+      this.session.markSaved(savedRevision);
+      if (!this.session.isDirty) this.recovery?.clear?.();
     }
     return {
       fileName: writtenFileName,
       filePath: writeResult?.filePath || null,
-      projectId: this.session.project.id,
+      projectId: savedProjectId,
     };
   }
 
