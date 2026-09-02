@@ -463,13 +463,17 @@ Front: iris -> ClipTo eye_white_front
 Side:  iris -> ClipTo eye_white_side
 ```
 
-Phase 2 minimum behavior:
+Phase 2 minimum behavior is a data/evaluation contract:
 
-- each endpoint can define its clipping relationship;
-- a transition may explicitly step/handoff between valid clipping states;
+- each endpoint can reference a clipping relationship;
+- a transition may explicitly step/handoff between already-valid clipping references;
 - evaluated clipping is deterministic and inspectable.
 
-Mask/clipping morphing beyond this minimum belongs to the later clipping/deformer phase.
+Phase 2 does not pull the clipping authoring tools or clipping-aware render pass
+forward from Phase 4. Until those capabilities exist, the evaluator preserves
+and validates references it can understand and reports unsupported clipping
+requirements. Mask authoring, clipping rasterization, and mask/clipping morphing
+belong to the later clipping/deformer phase.
 
 ## 19. Transition evaluation order
 
@@ -699,7 +703,7 @@ In scope for the first transition foundation:
 - dual-texture sampling with per-Key-Art UVs for compatible Morph parts;
 - opacity and `present/occluded/absent` state;
 - explicit draw-order state/events;
-- deterministic clipping-state handoff minimum;
+- deterministic clipping-reference handoff data/evaluation minimum (full clipping authoring/rendering remains Phase 4);
 - machine-readable feasibility diagnostics;
 - save/load/undo/redo/validation;
 - deterministic arbitrary-time evaluation.
