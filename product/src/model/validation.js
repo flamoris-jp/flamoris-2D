@@ -1,4 +1,6 @@
 import { PROJECT_SCHEMA_VERSION } from "./project.js";
+import { validateTemporalPrograms } from "./temporal-validation.js";
+import { TIMEBASE_TICKS_PER_SECOND, normalizeFrameRate } from "../core/temporal.js";
 
 function issue(code, path, message, entityId = null, severity = "error") {
   return { code, path, message, entityId, severity };
@@ -16,12 +18,27 @@ export function validateProject(project) {
   if (project.schemaVersion !== PROJECT_SCHEMA_VERSION) {
     issues.push(issue("project.unsupported_schema", "schemaVersion", "Unsupported project schema."));
   }
+  if (project.timebaseTicksPerSecond !== TIMEBASE_TICKS_PER_SECOND) {
+    issues.push(issue("ANIMATION_INVALID_TIMEBASE", "timebaseTicksPerSecond", "Project timebase must be 120000 ticks per second."));
+  }
   if (!project.id) issues.push(issue("project.missing_id", "id", "Project ID is required."));
   if (!finite(project.canvas?.width) || project.canvas.width <= 0) {
     issues.push(issue("canvas.invalid_width", "canvas.width", "Canvas width must be positive."));
   }
   if (!finite(project.canvas?.height) || project.canvas.height <= 0) {
     issues.push(issue("canvas.invalid_height", "canvas.height", "Canvas height must be positive."));
+  }
+  try {
+    const normalized = normalizeFrameRate(project.renderSettings?.frameRate);
+    if (normalized.numerator !== project.renderSettings.frameRate.numerator ||
+      normalized.denominator !== project.renderSettings.frameRate.denominator) {
+      issues.push(issue("ANIMATION_INVALID_FRAME_RATE", "renderSettings.frameRate", "Frame rate must be a reduced positive rational."));
+    }
+  } catch {
+    issues.push(issue("ANIMATION_INVALID_FRAME_RATE", "renderSettings.frameRate", "Frame rate must be a reduced positive rational."));
+  }
+  if (!Number.isSafeInteger(project.renderSettings?.durationTicks) || project.renderSettings.durationTicks <= 0) {
+    issues.push(issue("ANIMATION_INVALID_DURATION", "renderSettings.durationTicks", "Render duration must be a positive integer tick value."));
   }
 
   const nodes = project.scene?.nodes;
@@ -104,6 +121,8 @@ export function validateProject(project) {
     if (!Array.isArray(values)) issues.push(issue("collection.invalid", path, path + " must be an array."));
     else values.forEach((value, index) => register(value?.id, path + "." + index + ".id"));
   }
+
+  issues.push(...validateTemporalPrograms(project, register));
 
   if (nodes[rootId]) {
     const visiting = new Set();

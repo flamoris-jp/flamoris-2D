@@ -8,6 +8,9 @@ const nonEmptyString = {
 
 const nodeId = { ...nonEmptyString };
 const finiteNumber = { type: "number" };
+const nonNegativeInteger = { type: "integer", minimum: 0 };
+const positiveInteger = { type: "integer", minimum: 1 };
+const temporalObject = { type: "object" };
 
 const point = {
   type: "object",
@@ -33,6 +36,64 @@ const transform = {
 };
 
 export const commandSchemas = {
+  "animation.temporal.create_program": {
+    type: "object",
+    required: ["programId", "durationTicks"],
+    properties: { programId: nonEmptyString, durationTicks: positiveInteger },
+    additionalProperties: false,
+  },
+  "animation.temporal.add_track": {
+    type: "object",
+    required: ["programId", "track"],
+    properties: { programId: nonEmptyString, track: temporalObject },
+    additionalProperties: false,
+  },
+  "animation.temporal.add_keyframe": {
+    type: "object",
+    required: ["programId", "trackId", "channel", "keyframe"],
+    properties: {
+      programId: nonEmptyString,
+      trackId: nonEmptyString,
+      channel: nonEmptyString,
+      keyframe: temporalObject,
+    },
+    additionalProperties: false,
+  },
+  "animation.temporal.update_keyframe": {
+    type: "object",
+    required: ["programId", "trackId", "channel", "keyframeId", "keyframe"],
+    properties: {
+      programId: nonEmptyString,
+      trackId: nonEmptyString,
+      channel: nonEmptyString,
+      keyframeId: nonEmptyString,
+      keyframe: temporalObject,
+    },
+    additionalProperties: false,
+  },
+  "animation.temporal.remove_keyframe": {
+    type: "object",
+    required: ["programId", "trackId", "channel", "keyframeId"],
+    properties: {
+      programId: nonEmptyString,
+      trackId: nonEmptyString,
+      channel: nonEmptyString,
+      keyframeId: nonEmptyString,
+    },
+    additionalProperties: false,
+  },
+  "animation.temporal.add_event": {
+    type: "object",
+    required: ["programId", "event"],
+    properties: { programId: nonEmptyString, event: temporalObject },
+    additionalProperties: false,
+  },
+  "animation.temporal.add_region": {
+    type: "object",
+    required: ["programId", "region"],
+    properties: { programId: nonEmptyString, region: temporalObject },
+    additionalProperties: false,
+  },
   "source.apply_psd_reimport": {
     type: "object",
     required: ["project"],
@@ -110,6 +171,66 @@ export const commandSchemas = {
 };
 
 const internalCommandSchemas = {
+  "animation.temporal.remove_program": {
+    type: "object",
+    required: ["programId"],
+    properties: { programId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "animation.temporal.restore_program": {
+    type: "object",
+    required: ["program", "index"],
+    properties: { program: temporalObject, index: nonNegativeInteger },
+    additionalProperties: false,
+  },
+  "animation.temporal.remove_track": {
+    type: "object",
+    required: ["programId", "trackId"],
+    properties: { programId: nonEmptyString, trackId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "animation.temporal.restore_track": {
+    type: "object",
+    required: ["programId", "track", "index"],
+    properties: { programId: nonEmptyString, track: temporalObject, index: nonNegativeInteger },
+    additionalProperties: false,
+  },
+  "animation.temporal.restore_keyframe": {
+    type: "object",
+    required: ["programId", "trackId", "channel", "keyframe", "index"],
+    properties: {
+      programId: nonEmptyString,
+      trackId: nonEmptyString,
+      channel: nonEmptyString,
+      keyframe: temporalObject,
+      index: nonNegativeInteger,
+    },
+    additionalProperties: false,
+  },
+  "animation.temporal.remove_event": {
+    type: "object",
+    required: ["programId", "eventId"],
+    properties: { programId: nonEmptyString, eventId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "animation.temporal.restore_event": {
+    type: "object",
+    required: ["programId", "event", "index"],
+    properties: { programId: nonEmptyString, event: temporalObject, index: nonNegativeInteger },
+    additionalProperties: false,
+  },
+  "animation.temporal.remove_region": {
+    type: "object",
+    required: ["programId", "regionId"],
+    properties: { programId: nonEmptyString, regionId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "animation.temporal.restore_region": {
+    type: "object",
+    required: ["programId", "region", "index"],
+    properties: { programId: nonEmptyString, region: temporalObject, index: nonNegativeInteger },
+    additionalProperties: false,
+  },
   "scene.remove_empty_group": {
     type: "object",
     required: ["nodeId"],

@@ -1,4 +1,6 @@
-export const PROJECT_SCHEMA_VERSION = 1;
+import { TIMEBASE_TICKS_PER_SECOND } from "../core/temporal.js";
+
+export const PROJECT_SCHEMA_VERSION = 2;
 
 export function identityTransform() {
   return {
@@ -25,6 +27,7 @@ export function createProject({ id, name = "Untitled", width, height, idFactory 
   const rootId = idFactory("node");
   return {
     schemaVersion: PROJECT_SCHEMA_VERSION,
+    timebaseTicksPerSecond: TIMEBASE_TICKS_PER_SECOND,
     id: projectId,
     displayName: name,
     canvas: { width, height },
@@ -52,9 +55,14 @@ export function createProject({ id, name = "Untitled", width, height, idFactory 
     meshes: [],
     rig: { deformers: [], bones: [], constraints: [] },
     transitions: [],
+    temporalPrograms: [],
     animation: { clips: [], tracks: [], keyframes: [] },
     sequence: [],
-    renderSettings: { fps: 30, duration: 8, alpha: true },
+    renderSettings: {
+      frameRate: { numerator: 30, denominator: 1 },
+      durationTicks: 8 * TIMEBASE_TICKS_PER_SECOND,
+      alpha: true,
+    },
   };
 }
 
