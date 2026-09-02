@@ -2,6 +2,11 @@
 
 Status: draft
 
+The authoritative timing and renderer-boundary contracts are defined in
+`docs/animation-data-model.md` and `docs/transition-evaluation.md`. This
+document describes the authoring/domain concept and must not define a parallel
+curve or evaluation model.
+
 ## 1. Core idea
 
 FLAMORIS 2D should not assume that one illustration is the only visual source for a shot.
@@ -45,9 +50,8 @@ Project
 ├── Transition[]
 │   ├── fromKeyArtId
 │   ├── toKeyArtId
-│   ├── duration
-│   ├── PartTransition[]
-│   └── curves
+│   ├── program: TemporalProgram
+│   └── PartTransition[]
 └── Sequence
     └── KeyArt/Transition instances
 ```
@@ -124,13 +128,16 @@ For compatible topology:
 position_i(t) = lerp(positionA_i, positionB_i, curve(t))
 ```
 
-The interpolation curve may initially be Linear or Ease and later Bezier.
+Geometry weight is sampled from a typed `GeometryBlendTrack`. Phase 2
+supports step, linear, and explicit cubic Bezier interpolation; Ease presets
+compile to Bezier control points.
 
 ### 4.2 Dual-texture morph
 
 Geometry interpolation alone is insufficient when the end drawing contains a genuinely redrawn shape or shading.
 
-For compatible topology, the renderer should support two texture/UV sets during a transition:
+For compatible topology, the Evaluation Core should emit explicit render
+instances for two texture/UV sets during a transition:
 
 ```text
 Texture A + UV A
@@ -148,7 +155,10 @@ color(t) = (1-w) * sample(textureA, uvA)
          +    w  * sample(textureB, uvB)
 ```
 
-Each source texture is mapped through its own UVs onto the same interpolated triangle geometry. This is the mesh-based image-morphing model.
+Each source texture is mapped through its own UVs onto the same interpolated
+triangle geometry. This is the mesh-based image-morphing model. The renderer
+only rasterizes/composites the resulting instances; it does not interpret
+`Morph` or choose the blend timing.
 
 Do not require UV A and UV B to be identical.
 
@@ -172,9 +182,11 @@ Uses geometry interpolation and optionally dual-texture blend.
 
 Keep one appearance/pose unchanged for all or part of the transition.
 
-### Crossfade / Replace
+### Replace
 
-Use when A and B represent the same concept but topology/correspondence is not trustworthy.
+Use when A and B represent the same concept but topology/correspondence is not
+trustworthy. “Crossfade” is an authoring preset for a Replace handoff, not a
+separate persistent mode.
 
 ### Appear
 
@@ -200,9 +212,12 @@ occluded
 absent
 ```
 
-### Swap
+### Swap (authoring convenience)
 
-A-only and B-only visual parts replace each other, useful when a turn changes which drawing layers are appropriate.
+A-only and B-only visual parts may replace each other when a turn changes which
+drawing layers are appropriate. Swap compiles to ordinary
+Replace/Appear/Disappear part transitions and is not a separate persistent
+mode.
 
 ## 6. Turns and major viewpoint changes
 
@@ -246,7 +261,9 @@ Later options:
 - user-authored occlusion masks
 - automatic crossing suggestions
 
-A sudden layer-order change must be visible/editable in the timeline rather than hidden inside the renderer.
+A sudden layer-order change must be visible/editable in the Phase 2 Transition
+inspector/scrubber rather than hidden inside the renderer. Phase 6 exposes the
+same typed state in the general timeline.
 
 ## 8. AI-assisted correspondence
 
@@ -304,7 +321,8 @@ Suggested workflow:
 6. User positions mesh vertices over B, with proportional editing and anchors.
 7. Preview geometry interpolation.
 8. Enable dual-texture blend.
-9. Mark unmatched parts as Appear/Disappear/Hold/Swap.
+9. Mark unmatched parts with core modes such as Appear/Disappear/Hold/Replace;
+   a Swap UI action compiles to those modes.
 10. Save Transition as project data.
 
 This is testable and production-safe before AI correspondence exists.
