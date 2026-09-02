@@ -1,3 +1,14 @@
+import {
+  mixWeightedPremultiplied,
+  rendererProofBatches,
+} from "./core/evaluated-render.js";
+
+export { mixWeightedPremultiplied };
+
+export function prepareEvaluatedTransition(evaluatedTransition) {
+  return rendererProofBatches(evaluatedTransition);
+}
+
 const VERTEX_SHADER = `#version 300 es
 in vec2 a_position;
 in vec2 a_uv;

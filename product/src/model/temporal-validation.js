@@ -75,7 +75,7 @@ function validateInterpolation(value, path, issues, discrete) {
   }
 }
 
-function validateTarget(track, definition, project, path, issues) {
+function validateTarget(track, definition, program, project, path, issues) {
   const target = track.target;
   if (!object(target)) {
     issues.push(problem("ANIMATION_UNKNOWN_TARGET", path, "Track target must be a typed object.", track.trackId));
@@ -83,10 +83,18 @@ function validateTarget(track, definition, project, path, issues) {
   }
   const hasNode = typeof target.nodeId === "string" && target.nodeId.length > 0;
   const hasSemantic = typeof target.semanticSlotId === "string" && target.semanticSlotId.length > 0;
+  const hasTransitionDefault = target.transitionDefault === true;
   const fields = Object.keys(target);
   let valid = false;
   if (definition.target === "semantic") valid = hasSemantic && fields.length === 1;
+  if (definition.target === "transition") {
+    valid = (hasSemantic !== hasTransitionDefault) && fields.length === 1;
+  }
   if (definition.target === "node-or-semantic") valid = hasNode !== hasSemantic && fields.length === 1;
+  if (definition.target === "node-semantic-or-transition") {
+    valid = Number(hasNode) + Number(hasSemantic) + Number(hasTransitionDefault) === 1 &&
+      fields.length === 1;
+  }
   if (definition.target === "node") {
     valid = hasNode && target.coordinateSpace === "node-local" && fields.length === 2;
   }
@@ -103,6 +111,15 @@ function validateTarget(track, definition, project, path, issues) {
   }
   if (hasSemantic && !(project.semanticSlots || []).some((slot) => slot.id === target.semanticSlotId)) {
     issues.push(problem("ANIMATION_UNKNOWN_TARGET", path + ".semanticSlotId", "Target semantic slot does not exist.", target.semanticSlotId));
+  }
+  if (hasTransitionDefault && !(project.transitions || []).some((transition) =>
+    transition.temporalProgramId === program.id)) {
+    issues.push(problem(
+      "ANIMATION_UNKNOWN_TARGET",
+      path + ".transitionDefault",
+      "transitionDefault may target only a Transition-owned TemporalProgram.",
+      track.trackId,
+    ));
   }
   if (target.meshId && !(project.meshes || []).some((mesh) => mesh.id === target.meshId)) {
     issues.push(problem("ANIMATION_UNKNOWN_TARGET", path + ".meshId", "Target mesh does not exist.", target.meshId));
@@ -160,7 +177,7 @@ function validateTrack(track, program, project, path, issues, register) {
   if (track.version !== 1) {
     issues.push(problem("ANIMATION_TRACK_VERSION_UNSUPPORTED", path + ".version", "Track version must be 1.", track.trackId));
   }
-  validateTarget(track, definition, project, path + ".target", issues);
+  validateTarget(track, definition, program, project, path + ".target", issues);
   if (!object(track.channels) || Object.keys(track.channels).length === 0) {
     issues.push(problem("ANIMATION_INVALID_CHANNEL", path + ".channels", "Track must contain at least one typed channel.", track.trackId));
     return;
@@ -222,7 +239,7 @@ function validateTrack(track, program, project, path, issues, register) {
   }
 }
 
-function validateDrawOrderConflicts(program, path, issues) {
+function validateDrawOrderConflicts(program, project, path, issues) {
   const tracks = program.tracks.filter((track) =>
     track?.kind === "DrawOrderTrack" &&
     Array.isArray(track.channels?.drawOrder?.keyframes) &&
@@ -233,9 +250,8 @@ function validateDrawOrderConflicts(program, path, issues) {
       keyframe.interpolationToNext?.kind === "step"));
   if (tracks.length < 2) return;
 
-  // Phase 2A has no Transition/renderer compositing-scope model yet. Treat the
-  // whole TemporalProgram as one conservative scope so ambiguous authored
-  // order never reaches Phase 2B and gains an insertion-order tie-break.
+  const transitionOwner = (project.transitions || []).find((transition) =>
+    transition.temporalProgramId === program.id);
   const sampleTimes = new Set([0, program.durationTicks]);
   for (const track of tracks) {
     for (const keyframe of track.channels.drawOrder.keyframes) {
@@ -266,12 +282,36 @@ function validateDrawOrderConflicts(program, path, issues) {
         "error",
         {
           trackKind: "DrawOrderTrack",
-          scope: "temporal-program",
+          scope: transitionOwner ? "transition" : "temporal-program",
+          ...(transitionOwner ? { transitionId: transitionOwner.id } : {}),
           timeTicks,
           drawOrder,
           trackIds: [...trackIds].sort(),
         },
       ));
+    }
+  }
+}
+
+function validateDuplicateTrackTargets(program, path, issues) {
+  const owners = new Map();
+  for (const track of program.tracks) {
+    if (!track?.kind || !track?.target || !track?.channels) continue;
+    const targetKey = JSON.stringify(Object.fromEntries(Object.entries(track.target).sort(([a], [b]) =>
+      a < b ? -1 : a > b ? 1 : 0)));
+    for (const channel of Object.keys(track.channels).sort()) {
+      const key = track.kind + "\u0000" + targetKey + "\u0000" + channel;
+      const previous = owners.get(key);
+      if (previous) {
+        issues.push(problem(
+          "ANIMATION_TRACK_CONFLICT",
+          path + ".tracks",
+          "Tracks at the same target specificity may not author the same typed channel twice.",
+          program.id,
+          "error",
+          { trackKind: track.kind, target: track.target, channel, trackIds: [previous, track.trackId].sort() },
+        ));
+      } else owners.set(key, track.trackId);
     }
   }
 }
@@ -305,7 +345,8 @@ export function validateTemporalPrograms(project, registerExternal = null) {
     }
     program.tracks.forEach((track, trackIndex) =>
       validateTrack(track, program, project, path + ".tracks." + trackIndex, issues, register));
-    validateDrawOrderConflicts(program, path, issues);
+    validateDuplicateTrackTargets(program, path, issues);
+    validateDrawOrderConflicts(program, project, path, issues);
     program.events.forEach((event, eventIndex) => {
       const eventPath = path + ".events." + eventIndex;
       if (!object(event) || typeof event.id !== "string" || !event.id) {

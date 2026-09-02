@@ -1,6 +1,7 @@
 import { PROJECT_SCHEMA_VERSION } from "./project.js";
 import { validateTemporalPrograms } from "./temporal-validation.js";
 import { TIMEBASE_TICKS_PER_SECOND, normalizeFrameRate } from "../core/temporal.js";
+import { validateTransitionDomain } from "./transition-validation.js";
 
 function issue(code, path, message, entityId = null, severity = "error") {
   return { code, path, message, entityId, severity };
@@ -112,6 +113,8 @@ export function validateProject(project) {
     ["semanticSlots", project.semanticSlots],
     ["keyArts", project.keyArts],
     ["meshes", project.meshes],
+    ["meshTopologies", project.meshTopologies],
+    ["meshKeyforms", project.meshKeyforms],
     ["transitions", project.transitions],
     ["animation.clips", project.animation?.clips],
     ["animation.tracks", project.animation?.tracks],
@@ -123,6 +126,7 @@ export function validateProject(project) {
   }
 
   issues.push(...validateTemporalPrograms(project, register));
+  issues.push(...validateTransitionDomain(project, register));
 
   if (nodes[rootId]) {
     const visiting = new Set();

@@ -16,13 +16,17 @@ src/styles/dialogs.css
 src/model/project.js
 src/model/validation.js
 src/model/temporal-validation.js
+src/model/transition-validation.js
 src/core/transforms.js
 src/core/temporal.js
+src/core/transition-evaluator.js
+src/core/evaluated-render.js
 src/queries/project.js
 src/commands/editor.js
 src/commands/errors.js
 src/commands/scene-command-handlers.js
 src/commands/temporal-command-handlers.js
+src/commands/transition-command-handlers.js
 src/commands/schemas.js
 src/io/project-json.js
 src/io/project-files.js

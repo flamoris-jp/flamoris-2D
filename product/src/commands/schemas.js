@@ -11,6 +11,7 @@ const finiteNumber = { type: "number" };
 const nonNegativeInteger = { type: "integer", minimum: 0 };
 const positiveInteger = { type: "integer", minimum: 1 };
 const temporalObject = { type: "object" };
+const domainObject = { type: "object" };
 
 const point = {
   type: "object",
@@ -36,6 +37,138 @@ const transform = {
 };
 
 export const commandSchemas = {
+  "keyart.create": {
+    type: "object",
+    required: ["keyArt"],
+    properties: { keyArt: domainObject },
+    additionalProperties: false,
+  },
+  "keyart.update": {
+    type: "object",
+    required: ["keyArtId", "keyArt"],
+    properties: { keyArtId: nonEmptyString, keyArt: domainObject },
+    additionalProperties: false,
+  },
+  "keyart.remove": {
+    type: "object",
+    required: ["keyArtId"],
+    properties: { keyArtId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "semantic_slot.create": {
+    type: "object",
+    required: ["semanticSlot"],
+    properties: { semanticSlot: domainObject },
+    additionalProperties: false,
+  },
+  "semantic_slot.update": {
+    type: "object",
+    required: ["semanticSlotId", "semanticSlot"],
+    properties: { semanticSlotId: nonEmptyString, semanticSlot: domainObject },
+    additionalProperties: false,
+  },
+  "semantic_slot.remove": {
+    type: "object",
+    required: ["semanticSlotId"],
+    properties: { semanticSlotId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "semantic_slot.map_node": {
+    type: "object",
+    required: ["semanticSlotId", "keyArtId", "nodeId"],
+    properties: { semanticSlotId: nonEmptyString, keyArtId: nonEmptyString, nodeId },
+    additionalProperties: false,
+  },
+  "semantic_slot.unmap_node": {
+    type: "object",
+    required: ["semanticSlotId", "keyArtId"],
+    properties: { semanticSlotId: nonEmptyString, keyArtId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "mesh_topology.create": {
+    type: "object",
+    required: ["topology"],
+    properties: { topology: domainObject },
+    additionalProperties: false,
+  },
+  "mesh_topology.remove": {
+    type: "object",
+    required: ["topologyId"],
+    properties: { topologyId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "mesh_keyform.create": {
+    type: "object",
+    required: ["keyform"],
+    properties: { keyform: domainObject },
+    additionalProperties: false,
+  },
+  "mesh_keyform.update": {
+    type: "object",
+    required: ["keyformId", "keyform"],
+    properties: { keyformId: nonEmptyString, keyform: domainObject },
+    additionalProperties: false,
+  },
+  "mesh_keyform.remove": {
+    type: "object",
+    required: ["keyformId"],
+    properties: { keyformId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "transition.create": {
+    type: "object",
+    required: ["transition"],
+    properties: { transition: domainObject },
+    additionalProperties: false,
+  },
+  "transition.update": {
+    type: "object",
+    required: ["transitionId", "transition"],
+    properties: { transitionId: nonEmptyString, transition: domainObject },
+    additionalProperties: false,
+  },
+  "transition.remove": {
+    type: "object",
+    required: ["transitionId"],
+    properties: { transitionId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "transition.set_part_mode": {
+    type: "object",
+    required: ["transitionId", "partTransitionId", "semanticSlotId", "mode"],
+    properties: {
+      transitionId: nonEmptyString,
+      partTransitionId: nonEmptyString,
+      semanticSlotId: nonEmptyString,
+      mode: { type: "string", enum: ["morph", "hold", "replace", "appear", "disappear", "occlusion"] },
+      configuration: domainObject,
+    },
+    additionalProperties: false,
+  },
+  "transition.set_part_topology": {
+    type: "object",
+    required: ["transitionId", "semanticSlotId", "topologyId", "fromKeyformId", "toKeyformId"],
+    properties: {
+      transitionId: nonEmptyString,
+      semanticSlotId: nonEmptyString,
+      topologyId: nonEmptyString,
+      fromKeyformId: nonEmptyString,
+      toKeyformId: nonEmptyString,
+    },
+    additionalProperties: false,
+  },
+  "transition.set_diagnostic_override": {
+    type: "object",
+    required: ["transitionId", "override"],
+    properties: { transitionId: nonEmptyString, override: domainObject },
+    additionalProperties: false,
+  },
+  "transition.clear_diagnostic_override": {
+    type: "object",
+    required: ["transitionId", "key"],
+    properties: { transitionId: nonEmptyString, key: nonEmptyString },
+    additionalProperties: false,
+  },
   "animation.temporal.create_program": {
     type: "object",
     required: ["programId", "durationTicks"],
@@ -170,7 +303,53 @@ export const commandSchemas = {
   },
 };
 
+function entityRemovalSchema() {
+  return {
+    type: "object",
+    required: ["id"],
+    properties: { id: nonEmptyString },
+    additionalProperties: false,
+  };
+}
+
+function entityRestoreSchema() {
+  return {
+    type: "object",
+    required: ["entity", "index"],
+    properties: { entity: domainObject, index: nonNegativeInteger },
+    additionalProperties: false,
+  };
+}
+
 const internalCommandSchemas = {
+  "keyArts.remove_internal": entityRemovalSchema(),
+  "keyart.restore": entityRestoreSchema(),
+  "semanticSlots.remove_internal": entityRemovalSchema(),
+  "semantic_slot.restore": entityRestoreSchema(),
+  "semantic_slot.restore_mapping": {
+    type: "object",
+    required: ["semanticSlotId", "mapping", "index"],
+    properties: { semanticSlotId: nonEmptyString, mapping: domainObject, index: nonNegativeInteger },
+    additionalProperties: false,
+  },
+  "meshTopologies.remove_internal": entityRemovalSchema(),
+  "mesh_topology.restore": entityRestoreSchema(),
+  "meshKeyforms.remove_internal": entityRemovalSchema(),
+  "mesh_keyform.restore": entityRestoreSchema(),
+  "transitions.remove_internal": entityRemovalSchema(),
+  "transition.restore": entityRestoreSchema(),
+  "transition.remove_part": {
+    type: "object",
+    required: ["transitionId", "semanticSlotId"],
+    properties: { transitionId: nonEmptyString, semanticSlotId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "transition.restore_part": {
+    type: "object",
+    required: ["transitionId", "part", "index"],
+    properties: { transitionId: nonEmptyString, part: domainObject, index: nonNegativeInteger },
+    additionalProperties: false,
+  },
   "animation.temporal.remove_program": {
     type: "object",
     required: ["programId"],
@@ -272,6 +451,13 @@ function validateValue(value, schema, path, issues) {
       code: "command.payload_const",
       path,
       message: "Expected " + JSON.stringify(schema.const) + ".",
+    });
+  }
+  if (schema.enum && !schema.enum.includes(value)) {
+    issues.push({
+      code: "command.payload_enum",
+      path,
+      message: "Value is not one of the supported literals.",
     });
   }
   if (schema.type === "string") {

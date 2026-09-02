@@ -49,9 +49,29 @@ export function createFl2dDocument(
   assertValid(project);
   const timestamp = now().toISOString();
   const body = cloneProject(project);
+  const byId = (left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
   body.temporalPrograms = [...body.temporalPrograms]
-    .sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+    .sort(byId)
     .map(sortTemporalProgram);
+  body.keyArts = [...body.keyArts].sort(byId).map((keyArt) => ({
+    ...keyArt,
+    members: [...(keyArt.members || [])].sort((a, b) =>
+      a.nodeId < b.nodeId ? -1 : a.nodeId > b.nodeId ? 1 : 0),
+  }));
+  body.semanticSlots = [...body.semanticSlots].sort(byId).map((slot) => ({
+    ...slot,
+    mappings: [...(slot.mappings || [])].sort((a, b) =>
+      a.keyArtId < b.keyArtId ? -1 : a.keyArtId > b.keyArtId ? 1 :
+        a.nodeId < b.nodeId ? -1 : a.nodeId > b.nodeId ? 1 : 0),
+  }));
+  body.meshTopologies = [...body.meshTopologies].sort(byId);
+  body.meshKeyforms = [...body.meshKeyforms].sort(byId);
+  body.transitions = [...body.transitions].sort(byId).map((transition) => ({
+    ...transition,
+    partTransitions: [...transition.partTransitions].sort(byId),
+    diagnosticOverrides: [...transition.diagnosticOverrides].sort((a, b) =>
+      a.key < b.key ? -1 : a.key > b.key ? 1 : 0),
+  }));
   delete body.id;
   delete body.displayName;
   return {
@@ -92,6 +112,28 @@ export function migrateProjectSchema(value) {
     };
     project.temporalPrograms = [];
     project.schemaVersion = 2;
+  }
+  if (project?.schemaVersion === 2) {
+    project.keyArts = (project.keyArts || []).map((keyArt) => ({
+      ...keyArt,
+      members: Array.isArray(keyArt.members) ? keyArt.members : [],
+      metadata: keyArt.metadata && typeof keyArt.metadata === "object"
+        ? keyArt.metadata
+        : {},
+    }));
+    project.semanticSlots = (project.semanticSlots || []).map((slot) => ({
+      ...slot,
+      mappings: Array.isArray(slot.mappings) ? slot.mappings : [],
+      metadata: slot.metadata && typeof slot.metadata === "object"
+        ? slot.metadata
+        : {},
+    }));
+    project.meshTopologies = [];
+    project.meshKeyforms = [];
+    project.transitions = Array.isArray(project.transitions)
+      ? project.transitions
+      : [];
+    project.schemaVersion = 3;
   }
   if (project?.schemaVersion !== PROJECT_SCHEMA_VERSION) {
     throw new ProjectFormatError(
