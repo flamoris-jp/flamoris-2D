@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  editorModeShortcutAction,
   isNativeEditingTarget,
   projectHistoryShortcutAction,
 } from "../src/ui/editor-shortcuts.js";
@@ -22,8 +23,8 @@ test("Project Undo and Redo are recognized outside editing controls", () => {
   }), "redo");
 });
 
-test("Inspector input and textarea keep native Ctrl/Cmd+Z", () => {
-  for (const tagName of ["INPUT", "textarea"]) {
+test("Inspector input, textarea, and select keep native Ctrl/Cmd+Z", () => {
+  for (const tagName of ["INPUT", "textarea", "select"]) {
     assert.equal(projectHistoryShortcutAction({
       target: { tagName },
       ctrlKey: true,
@@ -60,5 +61,42 @@ test("plain Z is not a Project history shortcut", () => {
     metaKey: false,
     shiftKey: false,
     key: "z",
+  }), null);
+});
+
+test("Tab toggles mode only outside native UI editing contexts", () => {
+  assert.equal(editorModeShortcutAction({
+    target: { tagName: "CANVAS" },
+    key: "Tab",
+    repeat: false,
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    shiftKey: false,
+  }), "toggle-editor-mode");
+
+  for (const tagName of ["INPUT", "TEXTAREA", "SELECT", "DIALOG"]) {
+    assert.equal(editorModeShortcutAction({
+      target: { tagName },
+      key: "Tab",
+      repeat: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+      shiftKey: false,
+    }), null);
+  }
+
+  assert.equal(editorModeShortcutAction({
+    target: {
+      tagName: "SPAN",
+      closest: (selector) => selector.includes("dialog") ? {} : null,
+    },
+    key: "Tab",
+    repeat: false,
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    shiftKey: false,
   }), null);
 });

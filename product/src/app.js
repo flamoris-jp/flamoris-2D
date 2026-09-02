@@ -5,7 +5,6 @@ import {
   generateGridMesh,
   getDeformedVertices,
   imageToScreen,
-  moveVertices,
   resetDeformation,
   screenToImage,
 } from "./mesh.js";
@@ -35,8 +34,17 @@ import {
 } from "./ui/canvas-interaction.js";
 import { transformPoint } from "./core/transforms.js";
 import {
+  editorModeShortcutAction,
   projectHistoryShortcutAction,
 } from "./ui/editor-shortcuts.js";
+import {
+  canvasInteractionRoute,
+  dragSelectedVertices,
+  EDITOR_MODES,
+  editModeAvailability,
+  objectSelectionForMode,
+  updateVertexSelection,
+} from "./ui/editor-modes.js";
 import { createBrowserProjectWriter } from "./ui/browser-project-files.js";
 import {
   createDesktopProjectWriter,
@@ -110,12 +118,15 @@ const elements = {
   fitAllButton: document.querySelector("#fitAllButton"),
   fitPartButton: document.querySelector("#fitPartButton"),
   zoomOutput: document.querySelector("#zoomOutput"),
+  editorModeSelect: document.querySelector("#editorModeSelect"),
   transformTools: [...document.querySelectorAll("[data-transform-tool]")],
   transformInputs: [...document.querySelectorAll("[data-transform-path]")],
 };
 
 const state = {
   mode: "empty",
+  editorMode: EDITOR_MODES.OBJECT,
+  editTargetNodeId: null,
   image: null,
   imageData: null,
   mesh: null,
@@ -168,15 +179,76 @@ function setStatus(message) {
 }
 
 function selectedPartIndex() {
-  if (!state.editor?.selectedNodeId) return -1;
+  const targetNodeId = state.editorMode === EDITOR_MODES.EDIT
+    ? state.editTargetNodeId
+    : state.editor?.selectedNodeId;
+  if (!targetNodeId) return -1;
   return state.psdParts.findIndex(
-    (part) => part.nodeId === state.editor.selectedNodeId,
+    (part) => part.nodeId === targetNodeId,
   );
 }
 
 function selectedPart() {
   const index = selectedPartIndex();
   return index >= 0 ? state.psdParts[index] : null;
+}
+
+function currentEditModeAvailability() {
+  const selectedNode = state.editor?.selectedNode() || null;
+  return editModeAvailability({
+    contentMode: state.mode,
+    selectedNodeId: state.editor?.selectedNodeId || null,
+    selectedPart: selectedPart(),
+    selectedNode,
+    mesh: state.mesh,
+  });
+}
+
+function updateEditorModeUi() {
+  elements.editorModeSelect.value = state.editorMode;
+  elements.editorModeSelect.disabled = state.mode !== "psd";
+  elements.editorModeSelect.title = state.mode === "png"
+    ? "単一PNGは既存のmesh editingを使用します"
+    : "TabでObject/Edit Modeを切り替え";
+  const editing = state.editorMode === EDITOR_MODES.EDIT;
+  elements.viewportWrap.classList.toggle("edit-mode", editing);
+  const transformToolbar = elements.transformTools[0]?.parentElement;
+  if (transformToolbar) transformToolbar.hidden = editing;
+}
+
+function setEditorMode(requestedMode) {
+  if (state.mode === "png") {
+    state.editorMode = EDITOR_MODES.EDIT;
+    state.editTargetNodeId = null;
+    updateEditorModeUi();
+    return true;
+  }
+  if (requestedMode === EDITOR_MODES.EDIT) {
+    const availability = currentEditModeAvailability();
+    if (!availability.allowed) {
+      state.editorMode = EDITOR_MODES.OBJECT;
+      state.editTargetNodeId = null;
+      updateEditorModeUi();
+      setStatus(availability.reason);
+      render();
+      return false;
+    }
+    state.editorMode = EDITOR_MODES.EDIT;
+    state.editTargetNodeId = state.editor.selectedNodeId;
+    state.transformGesture = null;
+    state.editor.cancelTransformDrag();
+    setStatus(`${state.editor.selectedNode().displayName}・Edit Mode`);
+  } else {
+    state.editorMode = EDITOR_MODES.OBJECT;
+    state.editTargetNodeId = null;
+    state.drag = null;
+    state.selected.clear();
+    setStatus("Object Mode・scene selectionとTransformを有効化しました");
+  }
+  updateEditorModeUi();
+  renderEditorUi();
+  render();
+  return true;
 }
 
 function updateZoomOutput() {
@@ -382,9 +454,12 @@ function drawOverlay(vertices) {
   context.setTransform(ratio, 0, 0, ratio, 0, 0);
   context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
   if (!state.mesh || !state.view || vertices.length === 0) return;
+  if (state.mode === "psd" && state.editorMode !== EDITOR_MODES.EDIT) return;
 
-  context.lineWidth = 1;
-  context.strokeStyle = "rgba(129, 221, 205, 0.48)";
+  context.lineWidth = state.editorMode === EDITOR_MODES.EDIT ? 1.5 : 1;
+  context.strokeStyle = state.editorMode === EDITOR_MODES.EDIT
+    ? "rgba(255, 202, 103, 0.72)"
+    : "rgba(129, 221, 205, 0.48)";
   context.beginPath();
   for (let index = 0; index < state.mesh.indices.length; index += 3) {
     const triangle = state.mesh.indices.slice(index, index + 3);
@@ -411,7 +486,11 @@ function drawOverlay(vertices) {
 }
 
 function drawTransformGizmo() {
-  if (!state.editor?.selectedNodeId || !state.view) return;
+  if (
+    state.editorMode !== EDITOR_MODES.OBJECT ||
+    !state.editor?.selectedNodeId ||
+    !state.view
+  ) return;
   const bounds = selectedNodeDocumentBounds();
   if (!bounds) return;
   const node = state.editor.getNode(state.editor.selectedNodeId);
@@ -605,6 +684,8 @@ async function loadImage(source, label) {
   await loaded;
 
   state.mode = "png";
+  state.editorMode = EDITOR_MODES.EDIT;
+  state.editTargetNodeId = null;
   state.psdParts = [];
   state.autosaveScheduler?.stop();
   state.autosaveScheduler = null;
@@ -700,7 +781,18 @@ function renderSceneTree() {
     lock.textContent = node.locked ? "◆" : (node.kind === "group" ? "G" : "P");
 
     row.append(toggle, visibility, label, lock);
-    row.addEventListener("click", () => state.editor.selectNode(node.id));
+    row.addEventListener("click", () => {
+      const nextNodeId = objectSelectionForMode(
+        state.editorMode,
+        state.editor.selectedNodeId,
+        node.id,
+      );
+      if (nextNodeId === state.editor.selectedNodeId && node.id !== nextNodeId) {
+        setStatus("Edit Mode中はactive mesh-edit targetを変更できません");
+        return;
+      }
+      state.editor.selectNode(nextNodeId);
+    });
     item.append(row);
     parent.append(item);
     if (
@@ -778,16 +870,39 @@ function renderEditorUi() {
     recovered: state.recoveryRestored,
   });
   elements.transformTools.forEach((button) => {
-    button.disabled = !state.editor?.selectedNodeId;
+    button.disabled = !state.editor?.selectedNodeId ||
+      state.editorMode !== EDITOR_MODES.OBJECT;
     button.classList.toggle(
       "active",
       button.dataset.transformTool === (state.editor?.activeTool || "translate"),
     );
   });
+  updateEditorModeUi();
   updateZoomOutput();
 }
 
 function handleEditorChange(reason) {
+  if (
+    state.editorMode === EDITOR_MODES.EDIT &&
+    state.editTargetNodeId &&
+    !state.editor?.session.project.scene.nodes[state.editTargetNodeId]
+  ) {
+    state.editorMode = EDITOR_MODES.OBJECT;
+    state.editTargetNodeId = null;
+    setStatus("active mesh-edit targetが存在しないためObject Modeへ戻りました");
+  }
+  if (
+    reason === "selection" &&
+    state.editorMode === EDITOR_MODES.EDIT &&
+    state.editTargetNodeId &&
+    state.editor.selectedNodeId !== state.editTargetNodeId
+  ) {
+    state.editor.selectedNodeId = state.editTargetNodeId;
+    setStatus("Edit Mode中はactive mesh-edit targetを変更できません");
+    renderEditorUi();
+    render();
+    return;
+  }
   if (reason === "selection") syncSelectedPsdPart();
   renderEditorUi();
   render();
@@ -824,6 +939,8 @@ function attachProject(project, {
     preferences,
   });
   state.editor = editor;
+  state.editorMode = EDITOR_MODES.OBJECT;
+  state.editTargetNodeId = null;
   if (desktopApi && !filePath) desktopApi.clearAssociation();
   state.recoveryRestored = recovered;
   state.renderAssetHistory = new ReimportRenderHistory(editor, {
@@ -1515,6 +1632,9 @@ elements.durationInput.addEventListener("change", () => {
 
 elements.fitAllButton.addEventListener("click", fitDocumentView);
 elements.fitPartButton.addEventListener("click", fitSelectedPartView);
+elements.editorModeSelect.addEventListener("change", () => {
+  setEditorMode(elements.editorModeSelect.value);
+});
 
 elements.overlayCanvas.addEventListener("wheel", (event) => {
   if (!state.view) return;
@@ -1530,6 +1650,13 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
     if (historyAction === "redo") redoProject();
     else undoProject();
+    return;
+  }
+  if (editorModeShortcutAction(event) && state.mode === "psd") {
+    event.preventDefault();
+    setEditorMode(state.editorMode === EDITOR_MODES.OBJECT
+      ? EDITOR_MODES.EDIT
+      : EDITOR_MODES.OBJECT);
     return;
   }
   if (event.code === "Space" && !event.repeat) {
@@ -1556,9 +1683,14 @@ elements.overlayCanvas.addEventListener("pointerdown", (event) => {
   if (state.previewMode) returnToEdit();
 
   const screenPoint = pointerPosition(event);
+  const route = canvasInteractionRoute({
+    contentMode: state.mode,
+    editorMode: state.editorMode,
+    button: event.button,
+    panRequested: state.spacePressed,
+  });
 
-  // Middle mouse, or Space + left mouse = viewport pan.
-  if (event.button === 1 || (event.button === 0 && state.spacePressed)) {
+  if (route === "pan") {
     state.pan = {
       pointerId: event.pointerId,
       last: screenPoint,
@@ -1569,7 +1701,7 @@ elements.overlayCanvas.addEventListener("pointerdown", (event) => {
     return;
   }
 
-  if (event.button === 0 && state.editor && state.mode === "psd") {
+  if (route === "object" && state.editor) {
     const documentPoint = screenToImage(screenPoint.x, screenPoint.y, state.view);
     const pickedNodeId = pickNodeAtDocumentPoint(
       state.psdParts,
@@ -1599,22 +1731,25 @@ elements.overlayCanvas.addEventListener("pointerdown", (event) => {
       }
       return;
     }
-    state.editor.selectNode(pickedNodeId);
+    state.editor.selectNode(objectSelectionForMode(
+      state.editorMode,
+      state.editor.selectedNodeId,
+      pickedNodeId,
+    ));
     return;
   }
 
+  if (route !== "mesh") return;
+
   const vertexIndex = nearestVertex(screenPoint);
+  state.selected = updateVertexSelection(
+    state.selected,
+    vertexIndex,
+    event.shiftKey,
+  );
   if (vertexIndex < 0) {
-    if (!event.shiftKey) state.selected.clear();
     render();
     return;
-  }
-  if (event.shiftKey) {
-    if (state.selected.has(vertexIndex)) state.selected.delete(vertexIndex);
-    else state.selected.add(vertexIndex);
-  } else if (!state.selected.has(vertexIndex)) {
-    state.selected.clear();
-    state.selected.add(vertexIndex);
   }
   const partPoint = screenToPart(screenPoint);
   state.drag = { last: partPoint };
@@ -1648,7 +1783,7 @@ elements.overlayCanvas.addEventListener("pointermove", (event) => {
 
   if (!state.drag || state.selected.size === 0) return;
   const partPoint = screenToPart(screenPoint);
-  moveVertices(state.mesh, state.selected, partPoint.x - state.drag.last.x, partPoint.y - state.drag.last.y);
+  dragSelectedVertices(state.mesh, state.selected, state.drag.last, partPoint);
   state.drag.last = partPoint;
   render();
 });
