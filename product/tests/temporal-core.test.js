@@ -265,6 +265,53 @@ test("Phase 2A typed track families validate without arbitrary property paths", 
   assert.deepEqual(validateProject(project), []);
 });
 
+test("DrawOrder conflicts fail atomically within the Phase 2A program scope", () => {
+  const project = fixture();
+  project.semanticSlots.push({ id: "semantic.hair.front" });
+  const session = new EditorSession(project);
+  const drawTrack = (trackId, semanticSlotId, drawOrder) => ({
+    trackId,
+    version: 1,
+    kind: "DrawOrderTrack",
+    target: { semanticSlotId },
+    channels: {
+      drawOrder: {
+        keyframes: [keyframe("key_" + trackId, 0, drawOrder, step)],
+      },
+    },
+  });
+
+  assert.throws(() => session.executeTransaction([
+    {
+      type: "animation.temporal.create_program",
+      payload: { programId: "program_draw_order", durationTicks: 100 },
+    },
+    {
+      type: "animation.temporal.add_track",
+      payload: {
+        programId: "program_draw_order",
+        track: drawTrack("track_eye_order", "semantic.eye.left", 4),
+      },
+    },
+    {
+      type: "animation.temporal.add_track",
+      payload: {
+        programId: "program_draw_order",
+        track: drawTrack("track_hair_order", "semantic.hair.front", 4),
+      },
+    },
+  ]), (error) => error instanceof TransactionError &&
+    error.issues.some((entry) =>
+      entry.code === "ANIMATION_TRACK_CONFLICT" &&
+      entry.details?.scope === "temporal-program" &&
+      entry.details?.timeTicks === 0 &&
+      entry.details?.drawOrder === 4 &&
+      entry.details?.trackIds.join(",") ===
+        "track_eye_order,track_hair_order"));
+  assert.deepEqual(session.project, project);
+  assert.equal(session.history.length, 0);
+});
+
 test("events and regions persist as semantic metadata without changing sampled tracks", () => {
   const session = new EditorSession(fixture());
   session.executeTransaction([
@@ -343,12 +390,22 @@ test("temporal serialization is deterministic and round-trips stable IDs", () =>
 test("Phase 1 schema migrates to an empty Temporal Core", () => {
   const phase1 = fixture();
   phase1.schemaVersion = 1;
+  delete phase1.timebaseTicksPerSecond;
   delete phase1.temporalPrograms;
+  phase1.renderSettings = {
+    fps: 23.976,
+    duration: 2.5,
+    alpha: false,
+  };
   const migrated = deserializeProject(JSON.stringify(phase1));
   assert.equal(migrated.schemaVersion, PROJECT_SCHEMA_VERSION);
   assert.equal(migrated.timebaseTicksPerSecond, TIMEBASE_TICKS_PER_SECOND);
-  assert.deepEqual(migrated.renderSettings.frameRate, { numerator: 30, denominator: 1 });
-  assert.equal(migrated.renderSettings.durationTicks, 960000);
+  assert.deepEqual(migrated.renderSettings.frameRate, {
+    numerator: 24000,
+    denominator: 1001,
+  });
+  assert.equal(migrated.renderSettings.durationTicks, 300000);
+  assert.equal(migrated.renderSettings.alpha, false);
   assert.deepEqual(migrated.temporalPrograms, []);
 });
 

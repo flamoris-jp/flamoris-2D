@@ -1,4 +1,7 @@
-import { TEMPORAL_TRACK_DEFINITIONS } from "../core/temporal.js";
+import {
+  TEMPORAL_TRACK_DEFINITIONS,
+  sampleKeyframes,
+} from "../core/temporal.js";
 
 const EVENT_TYPES = new Set([
   "contact", "release", "blink", "occlusion_change",
@@ -8,8 +11,22 @@ const REGION_TYPES = new Set([
   "idle", "anticipation", "action", "contact", "settle", "hold",
 ]);
 
-function problem(code, path, message, entityId = null, severity = "error") {
-  return { code, path, message, entityId, severity };
+function problem(
+  code,
+  path,
+  message,
+  entityId = null,
+  severity = "error",
+  details = null,
+) {
+  return {
+    code,
+    path,
+    message,
+    entityId,
+    severity,
+    ...(details ? { details } : {}),
+  };
 }
 
 function object(value) {
@@ -205,6 +222,60 @@ function validateTrack(track, program, project, path, issues, register) {
   }
 }
 
+function validateDrawOrderConflicts(program, path, issues) {
+  const tracks = program.tracks.filter((track) =>
+    track?.kind === "DrawOrderTrack" &&
+    Array.isArray(track.channels?.drawOrder?.keyframes) &&
+    track.channels.drawOrder.keyframes.every((keyframe) =>
+      typeof keyframe?.id === "string" &&
+      validTime(keyframe.timeTicks) &&
+      Number.isSafeInteger(keyframe.value) &&
+      keyframe.interpolationToNext?.kind === "step"));
+  if (tracks.length < 2) return;
+
+  // Phase 2A has no Transition/renderer compositing-scope model yet. Treat the
+  // whole TemporalProgram as one conservative scope so ambiguous authored
+  // order never reaches Phase 2B and gains an insertion-order tie-break.
+  const sampleTimes = new Set([0, program.durationTicks]);
+  for (const track of tracks) {
+    for (const keyframe of track.channels.drawOrder.keyframes) {
+      if (keyframe.timeTicks <= program.durationTicks) {
+        sampleTimes.add(keyframe.timeTicks);
+      }
+    }
+  }
+  for (const timeTicks of [...sampleTimes].sort((a, b) => a - b)) {
+    const byDrawOrder = new Map();
+    for (const track of tracks) {
+      const drawOrder = sampleKeyframes(
+        track.channels.drawOrder.keyframes,
+        timeTicks,
+      );
+      if (drawOrder === null) continue;
+      const trackIds = byDrawOrder.get(drawOrder) || [];
+      trackIds.push(track.trackId);
+      byDrawOrder.set(drawOrder, trackIds);
+    }
+    for (const [drawOrder, trackIds] of byDrawOrder) {
+      if (trackIds.length < 2) continue;
+      issues.push(problem(
+        "ANIMATION_TRACK_CONFLICT",
+        path + ".tracks",
+        "DrawOrderTrack values must be unique within the Phase 2A TemporalProgram scope.",
+        program.id,
+        "error",
+        {
+          trackKind: "DrawOrderTrack",
+          scope: "temporal-program",
+          timeTicks,
+          drawOrder,
+          trackIds: [...trackIds].sort(),
+        },
+      ));
+    }
+  }
+}
+
 export function validateTemporalPrograms(project, registerExternal = null) {
   const issues = [];
   const localIds = new Map();
@@ -234,6 +305,7 @@ export function validateTemporalPrograms(project, registerExternal = null) {
     }
     program.tracks.forEach((track, trackIndex) =>
       validateTrack(track, program, project, path + ".tracks." + trackIndex, issues, register));
+    validateDrawOrderConflicts(program, path, issues);
     program.events.forEach((event, eventIndex) => {
       const eventPath = path + ".events." + eventIndex;
       if (!object(event) || typeof event.id !== "string" || !event.id) {
