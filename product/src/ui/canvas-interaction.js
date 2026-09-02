@@ -4,8 +4,24 @@ import {
   transformPoint,
   worldTransformMatrix,
 } from "../core/transforms.js";
+import { screenToImage } from "../mesh.js";
 
 const MIN_SCALE = 0.001;
+
+export function screenToMeshLocal(
+  screenPoint,
+  view,
+  { worldTransform = null, partOffset = { x: 0, y: 0 } } = {},
+) {
+  const documentPoint = screenToImage(screenPoint.x, screenPoint.y, view);
+  const partPoint = worldTransform
+    ? transformPoint(invertAffine(worldTransform), documentPoint)
+    : documentPoint;
+  return {
+    x: partPoint.x - partOffset.x,
+    y: partPoint.y - partOffset.y,
+  };
+}
 
 export function pickNodeAtDocumentPoint(parts, adapter, point) {
   for (let index = parts.length - 1; index >= 0; index -= 1) {
