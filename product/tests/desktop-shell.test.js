@@ -239,6 +239,50 @@ test("Project saves include render assets without adding them to Project state",
   assert.equal(Object.hasOwn(session.project, "renderAssets"), false);
 });
 
+test("a completed Save marks only the revision that was serialized", async () => {
+  const project = projectFixture();
+  const session = new EditorSession(project);
+  let finishWrite;
+  let savedContents;
+  let recoveryClears = 0;
+  const controller = new ProjectDocumentController(session, {
+    writer: {
+      write: async ({ contents }) => {
+        savedContents = contents;
+        await new Promise((resolve) => { finishWrite = resolve; });
+        return { fileName: "Akino.fl2d", filePath: "/work/Akino.fl2d" };
+      },
+    },
+    recovery: { clear: () => { recoveryClears += 1; } },
+  });
+
+  session.execute({
+    type: "scene.rename_node",
+    payload: { nodeId: project.scene.rootId, displayName: "Saved revision" },
+  });
+  const save = controller.saveAs("Akino.fl2d");
+  await Promise.resolve();
+
+  session.execute({
+    type: "scene.rename_node",
+    payload: { nodeId: project.scene.rootId, displayName: "Newer edit" },
+  });
+  finishWrite();
+  await save;
+
+  assert.equal(parseProjectDocument(savedContents).project.scene.nodes[
+    project.scene.rootId
+  ].displayName, "Saved revision");
+  assert.equal(session.savedRevision, 1);
+  assert.equal(session.currentRevision, 2);
+  assert.equal(session.isDirty, true);
+  assert.equal(recoveryClears, 0);
+
+  session.undo();
+  assert.equal(session.currentRevision, 1);
+  assert.equal(session.isDirty, false);
+});
+
 test("atomic writes preserve the previous file when replace fails", async () => {
   const directory = await mkdtemp(join(tmpdir(), "flamoris-atomic-"));
   const target = join(directory, "Akino.fl2d");
@@ -262,6 +306,7 @@ test("atomic writes preserve the previous file when replace fails", async () => 
     await rm(directory, { recursive: true, force: true });
   }
 });
+
 
 test("exclusive writes never overwrite an incremental file", async () => {
   const directory = await mkdtemp(join(tmpdir(), "flamoris-exclusive-"));
