@@ -269,11 +269,10 @@ Minimum transition modes:
 ```text
 Morph
 Hold
-Crossfade/Replace
+Replace
 Appear
 Disappear
 Occlusion
-Swap
 ```
 
 Presence is not binary. Distinguish:
@@ -292,7 +291,9 @@ Major viewpoint changes should be represented as several Key Arts when needed:
 Front -> 3/4 -> Side -> Back
 ```
 
-Do not pretend that unseen art can always be reconstructed from one source drawing.
+Do not pretend that unseen art can always be reconstructed from one source
+drawing. “Crossfade” and “Swap” may remain UI presets, but they compile to the
+core modes and typed tracks rather than becoming additional persistent modes.
 
 ## 9. Mesh editing
 
