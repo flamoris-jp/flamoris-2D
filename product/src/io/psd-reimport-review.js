@@ -347,6 +347,29 @@ export class PsdReimportReview {
       next.scene.nodes[parentId].children.push(nodeId);
       importedToCurrent.set(sourceNode.id, nodeId);
     }
+    const currentKeyArt = next.keyArts.find((keyArt) =>
+      keyArt.sourceAssetId === currentSource?.id);
+    if (currentKeyArt && Array.isArray(currentKeyArt.members)) {
+      currentKeyArt.members = currentKeyArt.members.filter((member) =>
+        Boolean(next.scene.nodes[member.nodeId]));
+      const existingMemberIds = new Set(currentKeyArt.members.map((member) => member.nodeId));
+      let nextDrawOrder = currentKeyArt.members.reduce((maximum, member) =>
+        Math.max(maximum, member.drawOrder), -1) + 1;
+      const importedKeyArt = imported.keyArts.find((keyArt) =>
+        keyArt.sourceAssetId === importedSource?.id);
+      for (const importedMember of importedKeyArt?.members || []) {
+        const nodeId = importedToCurrent.get(importedMember.nodeId);
+        if (!nodeId || existingMemberIds.has(nodeId) || !next.scene.nodes[nodeId]) continue;
+        const node = next.scene.nodes[nodeId];
+        currentKeyArt.members.push({
+          ...cloneProject(importedMember),
+          nodeId,
+          appearanceId: currentSource.id + ":" + node.sourceRef.sourceKey,
+          drawOrder: nextDrawOrder++,
+        });
+        existingMemberIds.add(nodeId);
+      }
+    }
     next.canvas = cloneProject(imported.canvas);
     return { project: next, importedNodeAssignments: importedToCurrent };
   }

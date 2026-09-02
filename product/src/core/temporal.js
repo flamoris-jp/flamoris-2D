@@ -1,12 +1,12 @@
 export const TIMEBASE_TICKS_PER_SECOND = 120000;
 
 export const TEMPORAL_TRACK_DEFINITIONS = Object.freeze({
-  GeometryBlendTrack: { channels: ["geometryWeight"], value: "unit-number", target: "semantic" },
-  AppearanceTrack: { channels: ["appearance"], value: "weights", target: "semantic" },
-  OpacityTrack: { channels: ["opacity"], value: "unit-number", target: "node-or-semantic" },
-  PresenceTrack: { channels: ["presence"], value: "presence", target: "node-or-semantic", discrete: true },
-  DrawOrderTrack: { channels: ["drawOrder"], value: "integer", target: "node-or-semantic", discrete: true },
-  ClippingTrack: { channels: ["clipping"], value: "clipping", target: "node-or-semantic", discrete: true },
+  GeometryBlendTrack: { channels: ["geometryWeight"], value: "unit-number", target: "transition" },
+  AppearanceTrack: { channels: ["appearance"], value: "weights", target: "transition" },
+  OpacityTrack: { channels: ["opacity"], value: "unit-number", target: "node-semantic-or-transition" },
+  PresenceTrack: { channels: ["presence"], value: "presence", target: "node-semantic-or-transition", discrete: true },
+  DrawOrderTrack: { channels: ["drawOrder"], value: "integer", target: "node-semantic-or-transition", discrete: true },
+  ClippingTrack: { channels: ["clipping"], value: "clipping", target: "node-semantic-or-transition", discrete: true },
   TransformTrack: {
     channels: ["positionX", "positionY", "rotation", "scaleX", "scaleY"],
     value: "number",
