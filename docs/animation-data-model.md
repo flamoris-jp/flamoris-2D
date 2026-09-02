@@ -243,8 +243,11 @@ geometry weight `0..1`. `ClippingTrack` is discrete and selects an explicit
 validated clipping state/reference.
 
 Phase 2 implements the Transition subset: GeometryBlend, Appearance, Opacity,
-Presence, DrawOrder, and Clipping. Transform and Camera may be serialized only
-when required by Transition evaluation; general animation authoring for those
+Presence, DrawOrder, and Clipping. The Clipping track initially selects and
+evaluates endpoint clipping references only; mask authoring, mask morphing, and
+the clipping-aware render pass remain Phase 4. Transform and Camera may be
+serialized only when required by Transition evaluation; general animation
+authoring for those
 tracks, plus MeshDeformation/Bone/Deformer/Parameter, belongs to Phase 6 or its
 own later feature phase. Defining the union now does not put all track editors
 into Phase 2.
