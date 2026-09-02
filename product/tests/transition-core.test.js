@@ -276,6 +276,35 @@ test("Replace emits simultaneous independent render instances", () => {
   assert.equal(prepareEvaluatedTransition(result).length, 2);
 });
 
+test("Replace applies weighted-premultiplied composite weights exactly once", () => {
+  const { project } = transitionFixture({ mode: "replace" });
+  project.transitions[0].partTransitions[0].configuration = { compositeGroupId: "composite_eye" };
+  const result = evaluateTransition(project, "transition_eye", 50);
+  const instances = result.evaluatedParts[0].renderInstances;
+  const weights = new Map(result.compositeGroups[0].members.map((entry) => [entry.renderInstanceId, entry.weight]));
+  assert.deepEqual(instances.map((entry) => entry.opacity), [0.8, 0.6]);
+  assert.deepEqual(mixWeightedPremultiplied(instances.map((entry, index) => ({
+    color: index === 0 ? [1, 0, 0] : [0, 0, 1],
+    alpha: entry.opacity,
+    weight: weights.get(entry.renderInstanceId),
+  }))), {
+    premultipliedColor: [0.4, 0, 0.3],
+    alpha: 0.7,
+  });
+});
+
+test("Morph interpolates rotation semantically without a singular midpoint", () => {
+  const { project, toNodeId } = transitionFixture();
+  project.meshKeyforms[1].positions = [...project.meshKeyforms[0].positions];
+  project.scene.nodes[toNodeId].transform.rotation = Math.PI;
+  const transform = evaluateTransition(project, "transition_eye", 50)
+    .evaluatedParts[0].renderInstances[0].transform;
+  const determinant = transform[0] * transform[3] - transform[1] * transform[2];
+  assert.ok(Math.abs(determinant - 1) < 1e-12);
+  assert.ok(Math.abs(transform[0]) < 1e-12);
+  assert.ok(Math.abs(Math.abs(transform[1]) - 1) < 1e-12);
+});
+
 test("Appear changes absent to present with rising opacity", () => {
   const { project } = transitionFixture({ mode: "appear", mapping: "to" });
   assert.equal(evaluateTransition(project, "transition_eye", 0).evaluatedParts[0].presence, "absent");
