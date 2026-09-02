@@ -4,6 +4,13 @@ import {
   EditorSession,
   TransactionError,
 } from "../commands/editor.js";
+import { PROJECT_SCHEMA_VERSION } from "../model/project.js";
+import {
+  TIMEBASE_TICKS_PER_SECOND,
+  normalizeFrameRate,
+  secondsToTicks,
+  sortTemporalProgram,
+} from "../core/temporal.js";
 
 export const FL2D_FORMAT = "flamoris-2d-project";
 export const FL2D_FORMAT_VERSION = 1;
@@ -42,6 +49,9 @@ export function createFl2dDocument(
   assertValid(project);
   const timestamp = now().toISOString();
   const body = cloneProject(project);
+  body.temporalPrograms = [...body.temporalPrograms]
+    .sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+    .map(sortTemporalProgram);
   delete body.id;
   delete body.displayName;
   return {
@@ -60,17 +70,51 @@ export function serializeProject(project, spacing = 2, metadata = {}) {
   return JSON.stringify(createFl2dDocument(project, metadata), null, spacing);
 }
 
+export function migrateProjectSchema(value) {
+  const project = cloneProject(value);
+  if (project?.schemaVersion === 1) {
+    const legacyFps = project.renderSettings?.fps;
+    let frameRate;
+    if (legacyFps === 23.976) frameRate = { numerator: 24000, denominator: 1001 };
+    else if (legacyFps === 29.97) frameRate = { numerator: 30000, denominator: 1001 };
+    else if (legacyFps === 59.94) frameRate = { numerator: 60000, denominator: 1001 };
+    else if (Number.isFinite(legacyFps) && legacyFps > 0) {
+      frameRate = normalizeFrameRate({
+        numerator: Math.round(legacyFps * 1000000),
+        denominator: 1000000,
+      });
+    } else frameRate = { numerator: 30, denominator: 1 };
+    project.timebaseTicksPerSecond = TIMEBASE_TICKS_PER_SECOND;
+    project.renderSettings = {
+      frameRate,
+      durationTicks: secondsToTicks(project.renderSettings?.duration ?? 8),
+      alpha: project.renderSettings?.alpha !== false,
+    };
+    project.temporalPrograms = [];
+    project.schemaVersion = 2;
+  }
+  if (project?.schemaVersion !== PROJECT_SCHEMA_VERSION) {
+    throw new ProjectFormatError(
+      "This project uses an unsupported Project schema.",
+      "project.schema_unsupported",
+      { schemaVersion: project?.schemaVersion },
+    );
+  }
+  return project;
+}
+
 function migrateLegacyProject(value) {
   // Pre-.fl2d Phase 1A/1B JSON was the Project model itself.
   if (value?.schemaVersion && value?.scene) {
-    assertValid(value);
+    const project = migrateProjectSchema(value);
+    assertValid(project);
     return {
-      project: cloneProject(value),
+      project,
       metadata: {
         format: FL2D_FORMAT,
         formatVersion: FL2D_FORMAT_VERSION,
-        projectId: value.id,
-        name: value.displayName,
+        projectId: project.id,
+        name: project.displayName,
         createdAt: null,
         modifiedAt: null,
         migratedFrom: 0,
@@ -125,11 +169,11 @@ export function parseProjectDocument(source) {
       "project.identity_invalid",
     );
   }
-  const project = {
+  const project = migrateProjectSchema({
     ...cloneProject(value.project),
     id: value.projectId,
     displayName: value.name,
-  };
+  });
   assertValid(project);
   return {
     project,

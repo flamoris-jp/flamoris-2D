@@ -11,7 +11,9 @@ src/renderer.js
 src/styles.css
 src/model/project.js
 src/model/validation.js
+src/model/temporal-validation.js
 src/core/transforms.js
+src/core/temporal.js
 src/queries/project.js
 src/commands/editor.js
 src/commands/schemas.js

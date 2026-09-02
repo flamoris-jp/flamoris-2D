@@ -1,6 +1,13 @@
 import { cloneProject } from "../model/project.js";
 import { validationResult } from "../model/validation.js";
 import { worldTransformMatrix } from "../core/transforms.js";
+import { sampleTemporalProgram, sortTemporalProgram } from "../core/temporal.js";
+
+function temporalProgram(project, programId) {
+  const program = project.temporalPrograms.find((entry) => entry.id === programId);
+  if (!program) throw new Error("Unknown TemporalProgram " + programId + ".");
+  return program;
+}
 
 function treeNode(
   project,
@@ -54,6 +61,7 @@ export const projectQueries = {
       meshes: project.meshes.length,
       transitions: project.transitions.length,
       clips: project.animation.clips.length,
+      temporalPrograms: project.temporalPrograms.length,
     },
   }),
   "project.validate": (project) => validationResult(project),
@@ -86,6 +94,12 @@ export const projectQueries = {
         locked: node.locked,
       }));
   },
+  "animation.get_program": (project, input) =>
+    sortTemporalProgram(temporalProgram(project, input.programId)),
+  "animation.list_tracks": (project, input) =>
+    sortTemporalProgram(temporalProgram(project, input.programId)).tracks,
+  "animation.sample_program": (project, input) =>
+    sampleTemporalProgram(temporalProgram(project, input.programId), input.timeTicks),
 };
 
 export function queryProject(project, name, input = {}) {
