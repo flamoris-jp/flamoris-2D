@@ -372,7 +372,9 @@ Conceptual keyframe:
 
 Rules:
 
-- weights are deterministic project data;
+- weights are finite, non-negative deterministic project data;
+- weights in one weighted appearance key are normalized to sum to 1; invalid
+  zero-sum keys fail validation rather than gaining an implicit fallback;
 - appearance blending does not imply shared geometry unless the corresponding transition mode supports it;
 - when ghosting or silhouette mismatch makes blending unsuitable, use Replace or an intermediate Key Art instead;
 - an AI-generated intermediate image is only a suggestion until imported/accepted as ordinary Key-Art data.
@@ -658,6 +660,10 @@ An evaluated frame should expose typed state suitable for tests and MCP inspecti
 EvaluatedFrame
 ├── timeTicks
 ├── camera
+├── compositeGroups[]
+│   ├── compositeGroupId
+│   ├── mode: weighted-premultiplied
+│   └── member renderInstanceIds + weights
 └── parts[]
     ├── semanticSlotId
     ├── presence
@@ -666,11 +672,20 @@ EvaluatedFrame
         ├── nodeId / source reference
         ├── worldTransform
         ├── meshPositions
-        ├── texture/appearance + UV source
+        ├── appearanceSamples[]
+        │   ├── texture/appearance + UV source
+        │   └── normalized weight
         ├── opacity
         ├── drawOrder
         └── clipping state
 ```
+
+A compatible Morph normally emits one geometry instance with multiple weighted
+`appearanceSamples`. A Replace handoff may emit independent geometry instances;
+when it promises a true crossfade rather than ordinary source-over overlap, the
+evaluator also emits a generic `compositeGroup`. For a weighted-premultiplied
+group, the renderer combines premultiplied color and alpha linearly by the
+explicit weights. Array/draw order must not silently change that equation.
 
 This enables assertions such as:
 
