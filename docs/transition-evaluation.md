@@ -173,8 +173,10 @@ EvaluatedPartState
     ├── node/source reference
     ├── transform
     ├── meshPositions
-    ├── appearance/texture source
-    ├── uv source
+    ├── appearanceSamples[]
+    │   ├── appearance/texture + UV source
+    │   └── normalized weight
+    ├── optional compositeGroupId / compositeWeight
     ├── opacity
     ├── drawOrder
     └── clipping state
@@ -182,8 +184,14 @@ EvaluatedPartState
 
 A list is required because `Replace` and handoff intervals can contain
 independent A and B instances at the same tick. Each instance carries its own
-geometry, UV, appearance, opacity, order, and clipping state; these values must
-not be flattened into one ambiguous part payload.
+geometry, appearance samples/UVs, opacity, order, and clipping state; these
+values must not be flattened into one ambiguous part payload. A compatible
+Morph may instead emit one geometry instance with multiple weighted appearance
+samples.
+
+If independent instances promise a true crossfade, the evaluator emits an
+explicit generic composite group and weights. Ordinary source-over overlap is a
+different authored result and must not be mislabeled as a linear crossfade.
 
 Presence is semantic state, while `renderInstances` is the complete raster
 instruction. `absent` emits no instances. `occluded` preserves semantic
@@ -293,13 +301,19 @@ Texture A + UV A ----┐
 Texture B + UV B ----┘
 ```
 
-Conceptually:
+Conceptually, with `wA + wB = 1`:
 
 ```text
-color = sampleA * alphaA + sampleB * alphaB
-alphaA = 1 - appearanceWeight
-alphaB = appearanceWeight
+premultipliedColor = wA * (alphaA * colorA)
+                   + wB * (alphaB * colorB)
+outputAlpha        = wA * alphaA + wB * alphaB
 ```
+
+The evaluator emits one geometry render instance with the two appearance
+samples and their normalized weights. The renderer performs this generic
+weighted-premultiplied sample mix; it does not infer that the source was a
+Transition. Straight-alpha source-over of two ordered instances is not an
+equivalent substitute because its result depends on order.
 
 Important rules:
 
@@ -421,11 +435,14 @@ No renderer-only hidden z-order heuristic is allowed.
 During the replacement window, A and B may be separate render instances:
 
 ```text
-A opacity: 1 --------\____ 0
-B opacity: 0 ____/-------- 1
+A weight: 1 --------\____ 0
+B weight: 0 ____/-------- 1
 ```
 
-Each instance retains its own geometry, UV, texture, mask/clipping, and draw order as needed.
+Each instance retains its own geometry, UV, texture, mask/clipping, and draw
+order as needed. For a true crossfade, both belong to an explicit
+weighted-premultiplied composite group. If the author chooses ordinary overlap
+instead, its source-over ordering is explicit and is not called a crossfade.
 
 The overlap window is explicit and may be shortened to reduce ghosting.
 
