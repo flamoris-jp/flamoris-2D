@@ -1,0 +1,39 @@
+name: Windows Desktop Package
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "product/desktop/**"
+      - "product/src/**"
+      - "product/index.html"
+      - "product/package.json"
+      - "package.json"
+      - ".github/workflows/windows-desktop-package.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-desktop-package:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+
+      - name: Install Desktop dependencies
+        run: npm install
+
+      - name: Product tests on Windows
+        run: npm test
+
+      - name: Package Windows Desktop app
+        run: npm run desktop:pack
