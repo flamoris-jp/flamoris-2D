@@ -50,10 +50,9 @@ Transition
 ├── id
 ├── fromKeyArtId
 ├── toKeyArtId
-├── durationTicks
 ├── program: TemporalProgram
 ├── partTransitions[]
-└── diagnostics
+└── diagnosticOverrides[]
 ```
 
 Per semantic part:
@@ -70,7 +69,10 @@ PartTransition
 └── clipping policy
 ```
 
-`TemporalProgram` and its typed tracks are defined in `docs/animation-data-model.md`.
+`TemporalProgram` and its typed tracks are defined in
+`docs/animation-data-model.md`. `program.durationTicks` is the sole duration;
+the Transition must not persist a second duration field. Diagnostics are derived
+from current project data. Only scoped user acknowledgments are persistent.
 
 ## 4. Semantic correspondence is a prerequisite
 
@@ -146,8 +148,13 @@ The semantic object continues to exist but becomes hidden by viewpoint/depth/com
 For local transition time `localTicks`:
 
 ```text
-u = clamp(localTicks / durationTicks, 0, 1)
+u = clamp(localTicks / program.durationTicks, 0, 1)
 ```
+
+The endpoints are inclusive: tick `0` evaluates Key Art A and tick
+`program.durationTicks` evaluates Key Art B. Persistent sampling uses integer
+ticks; normalized floating-point `u` is an evaluation intermediate and must
+not be accumulated from frame to frame.
 
 Individual tracks may use independent keyframe timing and curves. `u` is only the common normalized position through the transition.
 
@@ -160,19 +167,34 @@ For each semantic part, transition evaluation produces a renderer-ready intermed
 ```text
 EvaluatedPartState
 ├── semanticSlotId
-├── node/render instance references
-├── transform
-├── meshPositions
-├── appearance/texture sources
-├── uv sources
-├── opacity
 ├── presence
-├── drawOrder
-├── clipping state
-└── diagnostics metadata as needed for preview
+└── renderInstances[]
+    ├── renderInstanceId
+    ├── node/source reference
+    ├── transform
+    ├── meshPositions
+    ├── appearance/texture source
+    ├── uv source
+    ├── opacity
+    ├── drawOrder
+    └── clipping state
 ```
 
-The renderer consumes evaluated state. It should not decide whether a part is Morph, Replace, or Occlusion by itself.
+A list is required because `Replace` and handoff intervals can contain
+independent A and B instances at the same tick. Each instance carries its own
+geometry, UV, appearance, opacity, order, and clipping state; these values must
+not be flattened into one ambiguous part payload.
+
+Presence is semantic state, while `renderInstances` is the complete raster
+instruction. `absent` emits no instances. `occluded` preserves semantic
+identity but must already evaluate to no visible contribution (for example no
+instance, zero effective alpha, validated clipping, or ordinary coverage by
+other evaluated instances). The renderer does not invent how occlusion happens.
+
+The renderer consumes evaluated render instances. It rasterizes and composites
+them in explicit order, but does not decide whether a part is Morph, Replace,
+or Occlusion. Transition diagnostics remain evaluator/query metadata rather
+than renderer input.
 
 ## 8. Geometry evaluation
 
@@ -370,7 +392,10 @@ Occlusion is not required to use opacity if clipping/masking gives a better dete
 
 Key Arts may require different part ordering.
 
-Draw order is discrete and evaluated from explicit transition state.
+Draw order is discrete and evaluated from explicit transition state. Within a
+compositing scope, authored draw-order values must be unique at a sampled tick
+or validation must provide an explicit stable tie-break key. Accidental array or
+insertion order is not a valid tie-break.
 
 A raw one-frame swap may pop when two parts cross. The minimum deterministic model permits:
 
@@ -460,7 +485,7 @@ For each active part at transition time `t`:
 7. Resolve presence
 8. Resolve draw order
 9. Resolve clipping state
-10. Emit EvaluatedPartState
+10. Emit EvaluatedPartState with zero or more complete render instances
 ```
 
 The complete frame pipeline then layers rig/animation/camera according to `docs/animation-data-model.md`.
@@ -589,16 +614,22 @@ Diagnostics
 
 A user may explicitly accept a risky transition.
 
-The project should store the ordinary authored transition plus an explicit acknowledgment/override if needed for diagnostics suppression. It must not silently convert an unsafe transition into safe status.
+The project should store the ordinary authored transition plus an explicit
+scoped acknowledgment. An acknowledgment identifies at least the diagnostic
+code, affected semantic slot/transition scope, and an evidence revision or
+fingerprint. It becomes stale when relevant geometry, mapping, appearance, or
+policy changes. Accepting a warning does not convert an unsafe transition into
+safe status; it changes review state only.
 
 Potential command semantics:
 
 ```text
-transition.accept_diagnostic(transitionId, diagnosticCode)
+transition.accept_diagnostic(transitionId, diagnosticKey)
 transition.clear_diagnostic_override(...)
 ```
 
-The exact command naming may be decided during implementation.
+The exact command naming and fingerprint representation may be decided during
+implementation, but code-only global suppression is not allowed.
 
 ## 24. MCP/query surface
 
@@ -642,7 +673,19 @@ This document is intended to provide the shared evaluation model for:
 - Issue #10: occlusion, visibility, and layer-order changes;
 - Issue #11: transition feasibility and intermediate Key Art.
 
-Those issues remain useful as focused acceptance/checklist discussions. This document supplies the common model that connects them.
+Those issues remain useful as focused acceptance/checklist discussions. This
+document supplies the common model that connects them.
+
+| Issue | Retained responsibility | Supplied here / not redesigned there |
+| --- | --- | --- |
+| #8 | prove no final-frame texture pop for representative parts | independent geometry/appearance tracks, dual-source render instances, Replace fallback |
+| #9 | correspondence authoring, confirmation, split/merge/missing cases, re-import behavior | evaluator consumes confirmed `SemanticSlot` mappings only |
+| #10 | authoring and QA of presence, occlusion, clipping handoffs, and crossings | typed Presence/DrawOrder/Clipping state and deterministic sampling |
+| #11 | thresholds, fixtures, severity policy, override UX, intermediate-Key-Art workflow | reason-specific diagnostic contract and non-authoritative recommendation flow |
+
+#19 owns the shared Temporal Core and evaluator contract. #8-#11 should not
+introduce alternate timing containers, runtime name matching, renderer-only
+transition rules, or a second feasibility score model.
 
 ## 26. Phase 2 implementation boundary
 
@@ -661,7 +704,14 @@ In scope for the first transition foundation:
 - save/load/undo/redo/validation;
 - deterministic arbitrary-time evaluation.
 
-Deferred:
+Deferred to Phase 6:
+
+- reusable AnimationClip authoring and ClipInstance sequencing;
+- general multi-track timeline, mixer, looping, retiming, and graph editor;
+- production bone/deformer/mesh animation authoring;
+- combining multiple reusable clips with Transition output.
+
+Deferred beyond the Phase 2 foundation:
 
 - automatic generated intermediate artwork as committed state;
 - advanced mask morphing;
