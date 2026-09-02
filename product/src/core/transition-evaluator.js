@@ -128,10 +128,44 @@ function endpointOpacity(from, to, amount) {
   return lerp(from?.member.opacity ?? 0, to?.member.opacity ?? 0, amount);
 }
 
+function decomposeAffine(matrix) {
+  const scaleX = Math.hypot(matrix[0], matrix[1]);
+  if (!(scaleX > 1e-12)) throw new Error("Cannot interpolate a singular affine transform.");
+  return {
+    rotation: Math.atan2(matrix[1], matrix[0]),
+    scaleX,
+    scaleY: (matrix[0] * matrix[3] - matrix[1] * matrix[2]) / scaleX,
+    shear: (matrix[0] * matrix[2] + matrix[1] * matrix[3]) / scaleX,
+    translateX: matrix[4],
+    translateY: matrix[5],
+  };
+}
+
+function interpolateAngle(from, to, amount) {
+  const turn = Math.PI * 2;
+  const delta = ((to - from + Math.PI) % turn + turn) % turn - Math.PI;
+  return from + delta * amount;
+}
+
 function endpointTransform(from, to, amount) {
   if (!from) return [...to.worldTransform];
   if (!to) return [...from.worldTransform];
-  return lerpArray(from.worldTransform, to.worldTransform, amount);
+  const left = decomposeAffine(from.worldTransform);
+  const right = decomposeAffine(to.worldTransform);
+  const rotation = interpolateAngle(left.rotation, right.rotation, amount);
+  const cosine = Math.cos(rotation);
+  const sine = Math.sin(rotation);
+  const scaleX = lerp(left.scaleX, right.scaleX, amount);
+  const scaleY = lerp(left.scaleY, right.scaleY, amount);
+  const shear = lerp(left.shear, right.shear, amount);
+  return [
+    cosine * scaleX,
+    sine * scaleX,
+    cosine * shear - sine * scaleY,
+    sine * shear + cosine * scaleY,
+    lerp(left.translateX, right.translateX, amount),
+    lerp(left.translateY, right.translateY, amount),
+  ];
 }
 
 function instance({
@@ -226,7 +260,8 @@ function evaluateMorph(project, transition, part, slot, from, to, fromMesh, toMe
 
 function sourceInstance(project, transition, part, slot, endpoint, state, mesh, weight, sample, compositeGroupId = null) {
   const opacityValue = sampledValue(sample, "OpacityTrack", "opacity", slot.id, state.node.id);
-  const opacity = clamp(state.member.opacity * weight * (opacityValue ?? 1), 0, 1);
+  const sourceWeight = compositeGroupId ? 1 : weight;
+  const opacity = clamp(state.member.opacity * sourceWeight * (opacityValue ?? 1), 0, 1);
   const drawOrder = sampledValue(sample, "DrawOrderTrack", "drawOrder", slot.id, state.node.id) ?? state.member.drawOrder;
   const clipping = sampledValue(sample, "ClippingTrack", "clipping", slot.id, state.node.id) ?? state.member.clipping;
   return instance({
