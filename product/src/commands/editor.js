@@ -361,8 +361,15 @@ export class EditorSession {
     return { label: entry.label, affectedIds: entry.affectedIds };
   }
 
-  markSaved() {
-    this.savedRevision = this.currentRevision;
+  markSaved(revision = this.currentRevision) {
+    if (!Number.isInteger(revision) || revision < 0 ||
+      revision > this.revisionCounter) {
+      throw new CommandError(
+        "The saved revision is invalid.",
+        "history.saved_revision_invalid",
+      );
+    }
+    this.savedRevision = revision;
     this.onChange?.(cloneProject(this.project), {
       label: "Save point",
       transient: true,
