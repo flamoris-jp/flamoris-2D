@@ -86,16 +86,26 @@ Work:
 - Multiple PSD source assets in one project.
 - `SemanticSlot` mapping across different drawings/layer names.
 - `Transition` domain object connecting Key Art A -> B.
+- Project timebase of 120000 integer ticks/second with rational render FPS.
+- Shared `TemporalProgram`, integer keyframes, and step/linear/Bezier sampling.
+- Typed Phase 2 tracks for geometry blend, appearance, opacity, presence,
+  draw order, and clipping; no arbitrary persistent property paths.
+- Headless arbitrary-time Transition evaluation that emits renderer-ready
+  `EvaluatedPartState` / render instances.
 - Reuse stable mesh topology from A on B.
 - Per-Key-Art mesh keyforms with stable vertex IDs.
 - Edit target mesh positions while viewing End Key Art B.
 - Interpolate mesh geometry between A and B.
 - Per-Key-Art UV sets.
-- Dual-texture morph renderer for compatible parts.
-- Transition modes: Morph, Hold, Crossfade/Replace, Appear, Disappear.
+- Dual-texture Morph evaluation with per-instance texture/UV state for compatible parts.
+- Persistent transition modes: Morph, Hold, Replace, Appear, Disappear,
+  Occlusion. Crossfade/Swap are UI presets that compile to core modes.
 - Presence model: present / occluded / absent.
 - Basic per-Key-Art draw order and transition visibility/opacity.
-- Save/load/undo/redo of mappings and transition data.
+- Deterministic presence/draw-order handoffs, clipping-reference evaluation,
+  and reason-specific feasibility diagnostics, including intermediate-Key-Art
+  recommendations. Clipping authoring/rendering remains Phase 4.
+- Save/load/undo/redo of mappings, TemporalProgram, and transition data.
 
 Acceptance criteria:
 
@@ -193,12 +203,13 @@ Goal: turn transitions and rig controls into a reusable MV timeline workflow.
 
 Work:
 
-- Multi-track timeline.
+- Reuse the Phase 2 `TemporalProgram`, 120000-tick timebase, typed-track
+  union, keyframe IDs, and step/linear/Bezier sampler without redefining them.
+- Multi-track timeline and deterministic clip/transition mixer.
 - Tracks for node/group transforms, bones, deformers, mesh/form states.
-- Keyframe CRUD.
-- Linear + Ease In/Out.
-- Bezier/graph editor after track model stabilizes.
-- Reusable Animation Clips.
+- General keyframe CRUD and Ease presets compiled to existing Bezier data.
+- Bezier graph editor after the track model stabilizes.
+- Reusable Animation Clips and ClipInstances.
 - Clip looping and clip instances.
 - Pose/Form/Shape states.
 - Visibility/opacity tracks.
@@ -253,7 +264,8 @@ MCP work:
 Key Art AI assistance:
 
 - Suggest semantic part mappings between drawings.
-- Suggest Morph/Hold/Appear/Disappear/Swap modes.
+- Suggest core Morph/Hold/Replace/Appear/Disappear/Occlusion modes; a Swap
+  suggestion compiles to ordinary core-mode commands.
 - Suggest anchor/vertex correspondence.
 - Optical-flow-assisted initialization for visually continuous changes.
 - Semantic-correspondence-assisted mapping for larger pose/view changes.

@@ -13,9 +13,13 @@ The architecture should be:
 ```text
 Human UI ───────┐
                 │
-AI / MCP ───────┼──> Domain Commands ──> Project Model ──> Renderer
-                │
-Scripts/Tests ──┘
+AI / MCP ───────┼──> Domain Commands ──> Project Model
+                │                              ↓
+Scripts/Tests ──┘                       Evaluation Core
+                                               ↓
+                                  EvaluatedFrame / renderInstances
+                                               ↓
+                                           Renderer
 ```
 
 The UI and MCP are clients of one deterministic editor core.
@@ -110,8 +114,11 @@ scene.get_tree
 scene.get_node
 keyart.list
 transition.get
+transition.evaluate
+transition.get_diagnostics
 mesh.get_summary
 animation.get_timeline
+animation.evaluate_frame
 project.validate
 render.get_preview_info
 ```
@@ -130,6 +137,12 @@ keyart.map_semantic_slot
 transition.create
 transition.set_part_mode
 transition.set_correspondence
+transition.add_geometry_blend_key
+transition.add_appearance_key
+transition.set_presence_key
+transition.set_draw_order_key
+transition.set_clipping_key
+transition.accept_diagnostic
 rig.add_bone
 rig.set_weights
 animation.add_keyframe
@@ -243,7 +256,48 @@ transition.preview
 transition.commit_suggestions
 ```
 
-AI suggestions should include confidence and rationale fields suitable for logs, but the persistent project stores deterministic mappings and geometry, not hidden model reasoning.
+AI suggestions should include confidence and rationale fields suitable for logs,
+but the persistent project stores deterministic mappings and geometry, not
+hidden model reasoning.
+
+Transition and animation commands use typed payloads rather than property paths.
+For example:
+
+```json
+{
+  "command": "transition.set_presence_key",
+  "transitionId": "transition_ab",
+  "semanticSlotId": "eye.left.iris",
+  "keyframe": {
+    "id": "key_presence_02",
+    "timeTicks": 420000,
+    "value": "occluded",
+    "interpolationToNext": { "kind": "step" }
+  }
+}
+```
+
+A headless evaluation query returns the same renderer-ready contract used by
+preview and tests:
+
+```json
+{
+  "query": "transition.evaluate",
+  "transitionId": "transition_ab",
+  "timeTicks": 420000
+}
+```
+
+The result contains `EvaluatedPartState[]` with zero or more complete
+`renderInstances[]` per semantic part, normalized `appearanceSamples[]`, and
+any generic weighted-premultiplied `compositeGroups[]`. It does not ask the
+renderer or MCP client to reinterpret Morph/Replace/Occlusion semantics.
+
+A semantic operation such as `prepare_turn_sequence` may propose Key Arts,
+mappings, modes, typed keys, and diagnostic acknowledgments. Preview returns
+the proposed ordinary commands and diagnostics. Commit applies those commands
+transactionally through the same Command Layer. This is the concrete meaning
+of “AI proposes; deterministic commands commit.”
 
 ## 10. Versioned MCP schemas
 
@@ -272,6 +326,9 @@ Validation examples:
 - mismatched mesh keyform vertex counts
 - unknown semantic-slot mappings
 - transition between incompatible mesh topologies
+- invalid or duplicate temporal keys
+- invalid typed-track target/value/interpolation
+- transition diagnostic evidence and stale acknowledgments
 - clipping cycles/invalid sources
 - bone weight sums
 - timeline references to deleted nodes
@@ -374,8 +431,9 @@ Before an MCP server is considered ready, tests should prove that code without b
 5. group commands transactionally,
 6. validate the result,
 7. serialize/reload deterministically,
-8. render/preview from project state,
-9. perform a complete two-Key-Art transition edit without directly driving DOM events.
+8. evaluate a tick to the same `EvaluatedFrame` used by render/preview,
+9. perform a complete two-Key-Art transition edit without directly driving DOM events,
+10. reject arbitrary property-path tracks and malformed typed temporal commands.
 
 Success condition:
 
