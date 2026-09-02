@@ -111,11 +111,29 @@ This makes common production frame rates exact integer tick durations, including
 
 The UI may display seconds, timecode, or frame numbers. Persistent commands and evaluation use integer ticks.
 
+Render/display frame rates are stored as reduced rational values:
+
+```text
+FrameRate
+├── numerator
+└── denominator
+```
+
+For frame index `f`, the exact tick position is
+`f * TIMEBASE_TICKS_PER_SECOND * denominator / numerator`. The common rates
+listed above produce integers. If a future arbitrary rate does not land on an
+integer tick, conversion uses non-negative round-half-up and the UI must report
+that the frame grid is approximate. Conversion must use integer/rational
+arithmetic rather than accumulating floating-point frame durations.
+
 Required rules:
 
 - all persistent keyframe/event times are integer ticks;
 - sequence FPS is render/display configuration, not the fundamental storage unit;
-- conversion between ticks and frames must be deterministic;
+- frame-rate numerator and denominator must be positive and reduced;
+- conversion between ticks and frames must use the explicit rule above;
+- frame zero is tick zero and a program evaluates both endpoints `0` and
+  `durationTicks`;
 - negative persistent timeline time is invalid unless explicitly introduced by a future pre-roll feature.
 
 ## 6. TemporalProgram
@@ -129,6 +147,12 @@ TemporalProgram
 ├── events[]
 └── regions[]
 ```
+
+The owning object does not duplicate `durationTicks`. A `Transition` or
+future `AnimationClip` obtains its duration from `program.durationTicks`,
+which is the single source of truth. `durationTicks` must be a positive
+integer. Track keys and events must lie in `0..durationTicks`; regions use
+`0 <= startTicks <= endTicks <= durationTicks`.
 
 Example:
 
@@ -195,20 +219,35 @@ Do not use an unrestricted string property path such as `"foo.bar.anything"` as 
 
 Tracks are a versioned typed union so UI, commands, MCP, validation, and tests can discover exact behavior.
 
-Initial track kinds:
+Versioned track kinds:
 
 ```text
-TransformTrack
-BoneTrack
-DeformerTrack
-MeshDeformationTrack
+GeometryBlendTrack
 AppearanceTrack
 OpacityTrack
 PresenceTrack
 DrawOrderTrack
+ClippingTrack
+TransformTrack
 CameraTrack
+MeshDeformationTrack
+BoneTrack
+DeformerTrack
 ParameterTrack
 ```
+
+Each track has a stable `trackId`, a literal `kind`, an explicit typed
+target, and kind-specific channels/keyframes. `GeometryBlendTrack` targets a
+Transition default or one `semanticSlotId`; its scalar value is the endpoint
+geometry weight `0..1`. `ClippingTrack` is discrete and selects an explicit
+validated clipping state/reference.
+
+Phase 2 implements the Transition subset: GeometryBlend, Appearance, Opacity,
+Presence, DrawOrder, and Clipping. Transform and Camera may be serialized only
+when required by Transition evaluation; general animation authoring for those
+tracks, plus MeshDeformation/Bone/Deformer/Parameter, belongs to Phase 6 or its
+own later feature phase. Defining the union now does not put all track editors
+into Phase 2.
 
 Two broad categories are sufficient conceptually:
 
@@ -232,6 +271,7 @@ State changes sampled by step:
 
 - presence
 - draw order
+- clipping-state selection
 - discrete appearance state selection where blending is disabled
 - mode/state switches
 
@@ -616,14 +656,17 @@ EvaluatedFrame
 ├── timeTicks
 ├── camera
 └── parts[]
-    ├── nodeId / semanticSlotId
-    ├── worldTransform
-    ├── meshPositions
-    ├── texture/appearance sources
-    ├── opacity
+    ├── semanticSlotId
     ├── presence
-    ├── drawOrder
-    └── clipping state
+    └── renderInstances[]
+        ├── renderInstanceId
+        ├── nodeId / source reference
+        ├── worldTransform
+        ├── meshPositions
+        ├── texture/appearance + UV source
+        ├── opacity
+        ├── drawOrder
+        └── clipping state
 ```
 
 This enables assertions such as:
@@ -713,7 +756,7 @@ In scope:
 - Keyframe + step/linear/bezier interpolation
 - `TemporalProgram`
 - typed transition-relevant tracks
-- appearance/opacity/presence/draw-order state
+- GeometryBlend/Appearance/Opacity/Presence/DrawOrder/Clipping tracks
 - events needed for explicit transition semantics
 - deterministic transition/frame evaluation foundation
 - serialization, validation, undo/redo commands for these objects
@@ -746,7 +789,9 @@ The temporal data model is ready for Phase 2 implementation when tests can prove
 1. integer-tick times serialize/reload exactly;
 2. step, linear, and Bezier sampling is deterministic;
 3. a Transition and AnimationClip can both own a `TemporalProgram` without schema duplication;
-4. transform, opacity, presence, draw order, appearance, and camera tracks are typed and validated;
+4. Transition tracks for geometry blend, appearance, opacity, presence, draw
+   order, and clipping are typed and validated; future track kinds cannot be
+   smuggled in through arbitrary property paths;
 5. mesh deformation remains separate from Key-Art mesh keyforms;
 6. events/regions can be edited without directly changing renderer output;
 7. evaluated state is identical before and after save/reload;
