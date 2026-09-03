@@ -34,6 +34,19 @@ function keyframeIndex(channel, keyframeId) {
 }
 
 export const temporalCommandHandlers = {
+  "animation.temporal.set_duration": (project, payload) => {
+    const program = temporalProgramFor(project, payload.programId);
+    const previousDurationTicks = program.durationTicks;
+    program.durationTicks = payload.durationTicks;
+    return {
+      inverse: {
+        type: "animation.temporal.set_duration",
+        payload: { programId: program.id, durationTicks: previousDurationTicks },
+      },
+      affectedIds: [program.id],
+    };
+  },
+
   "animation.temporal.create_program": (project, payload) => {
     if (project.temporalPrograms.some((entry) => entry.id === payload.programId)) {
       throw new CommandError("TemporalProgram ID already exists.", "identity.duplicate", { programId: payload.programId });

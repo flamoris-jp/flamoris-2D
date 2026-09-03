@@ -1,6 +1,6 @@
 export { commandSchemas } from "../commands/schemas.js";
 
-export const MCP_SCHEMA_VERSION = 4;
+export const MCP_SCHEMA_VERSION = 5;
 
 const nodeId = {
   type: "string",

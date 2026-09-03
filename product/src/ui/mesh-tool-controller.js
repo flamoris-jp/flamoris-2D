@@ -99,11 +99,16 @@ export function createDefaultMeshToolRegistry() {
  * ordinary EditorSession Command/Transaction path.
  */
 export class MeshToolController {
-  constructor(session, endpointMesh, { onChange = null, registry = null } = {}) {
+  constructor(session, endpointMesh, {
+    onChange = null,
+    registry = null,
+    isPreviewReadOnly = () => false,
+  } = {}) {
     this.session = session;
     this.endpointMesh = endpointMesh;
     this.onChange = onChange;
     this.registry = registry || createDefaultMeshToolRegistry();
+    this.isPreviewReadOnly = isPreviewReadOnly;
     this.mode = MESH_AUTHORING_MODES.DEFORM;
     this.activeToolId = "deform.move";
     this.selectedVertexIds = new Set();
@@ -132,6 +137,9 @@ export class MeshToolController {
   }
 
   execute(toolId = this.activeToolId, input = {}) {
+    if (this.isPreviewReadOnly()) {
+      throw new Error("Preview is read-only. Select a Key State marker before editing.");
+    }
     return this.registry.execute(this, toolId, input);
   }
 
@@ -176,6 +184,9 @@ export class MeshToolController {
   }
 
   commitDeformPositions(positions) {
+    if (this.isPreviewReadOnly()) {
+      throw new Error("Preview is read-only. Select a Key State marker before editing.");
+    }
     if (this.mode !== MESH_AUTHORING_MODES.DEFORM) {
       throw new Error("MeshKeyform deformation is available only in Deform Mode.");
     }
@@ -188,6 +199,9 @@ export class MeshToolController {
   }
 
   assertTopologyMode() {
+    if (this.isPreviewReadOnly()) {
+      throw new Error("Preview is read-only. Select a Key State marker before editing.");
+    }
     if (this.mode !== MESH_AUTHORING_MODES.TOPOLOGY) {
       throw new Error("Topology mutation is disabled in Deform Mode.");
     }

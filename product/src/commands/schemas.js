@@ -242,6 +242,12 @@ export const commandSchemas = {
     properties: { programId: nonEmptyString, durationTicks: positiveInteger },
     additionalProperties: false,
   },
+  "animation.temporal.set_duration": {
+    type: "object",
+    required: ["programId", "durationTicks"],
+    properties: { programId: nonEmptyString, durationTicks: positiveInteger },
+    additionalProperties: false,
+  },
   "animation.temporal.add_track": {
     type: "object",
     required: ["programId", "track"],
