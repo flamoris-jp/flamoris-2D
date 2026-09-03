@@ -51,6 +51,7 @@ import { createTransitionPreviewView } from "./ui/transition-preview-view.js";
 import { createTransitionDiagnosticsView } from "./ui/transition-diagnostics-view.js";
 import { createMeshAuthoringView } from "./ui/mesh-authoring-view.js";
 import { createKeyStateStripView } from "./ui/key-state-strip-view.js";
+import { AutoMeshPreviewController } from "./ui/automesh-preview-controller.js";
 
 const desktopApi = window.flamorisDesktop || null;
 const appStorage = desktopApi?.storage || localStorage;
@@ -90,6 +91,13 @@ const state = {
   renderAssetHistory: null,
   recoveryRestored: false,
 };
+
+const autoMeshPreview = new AutoMeshPreviewController({
+  onChange: () => {
+    renderEditorUi();
+    render();
+  },
+});
 
 const preferencesStore = createPreferencesStore(appStorage);
 let preferences = preferencesStore.load();
@@ -134,6 +142,7 @@ const viewportRenderer = createViewportRenderer({
   selectedNodeDocumentBounds,
   endpointContext: activeEndpointContext,
   transitionPreviewContext: () => state.editor?.transitionPreview.getState() || null,
+  autoMeshPreviewContext: () => autoMeshPreview.getState(),
 });
 
 const sceneEditorView = createSceneEditorView({
@@ -200,6 +209,9 @@ const meshAuthoringView = createMeshAuthoringView({
   state,
   elements,
   setStatus,
+  autoMeshPreview,
+  selectedPart,
+  onAutoMeshApplied: () => syncEndpointMeshViewport(),
 });
 
 function setStatus(message) {
@@ -332,13 +344,11 @@ function setEditorMode(requestedMode) {
       return false;
     }
     if (requestedMode === EDITOR_MODES.TOPOLOGY &&
-      (!state.editor?.endpointMesh.getState().editingEnabled ||
-        !activeEndpointContext()?.topology ||
-        !activeEndpointContext()?.keyform)) {
+      !state.editor?.endpointMesh.getState().editingEnabled) {
       state.editorMode = EDITOR_MODES.OBJECT;
       state.editTargetNodeId = null;
       updateEditorModeUi();
-      setStatus("Topology Edit Modeには、endpoint workflowで共有MeshTopologyと表示用MeshKeyformを選択してください。");
+      setStatus("Topology Edit Modeには、endpoint workflowでAまたはBのpartを選択してください。");
       renderEditorUi();
       render();
       return false;
@@ -347,6 +357,7 @@ function setEditorMode(requestedMode) {
       ? EDITOR_MODES.TOPOLOGY
       : EDITOR_MODES.DEFORM;
     state.editor.meshTools.setMode(state.editorMode);
+    if (requestedMode !== EDITOR_MODES.TOPOLOGY) autoMeshPreview.clear();
     state.editTargetNodeId = activeEndpointContext()?.nodeId || state.editor.selectedNodeId;
     state.transformGesture = null;
     state.editor.cancelTransformDrag();
