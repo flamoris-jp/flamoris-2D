@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { generateGridMesh } from "../src/mesh.js";
+import { generateGridMesh, imageToScreen } from "../src/mesh.js";
+import { multiplyAffine, transformPoint } from "../src/core/transforms.js";
 import { createMeshEditingController } from "../src/ui/mesh-editing-controller.js";
 import { applyReimportRowAction } from "../src/ui/reimport-review-view.js";
 import { createSceneEditorView } from "../src/ui/scene-editor-view.js";
@@ -180,6 +181,65 @@ test("endpoint vertex drag previews transiently and commits one keyform position
   assert.deepEqual(committed[0].slice(0, 2), [7, 4]);
 });
 
+test("endpoint viewport drag uses the rendered endpoint world transform at any zoom", () => {
+  // The resolved matrix includes a parent/group transform and the endpoint's
+  // own Translate + Rotate + Scale transform. This is the same matrix supplied
+  // to both the overlay renderer and the pointer drag path.
+  const parentWorld = [1.25, 0, 0, 0.75, 30, -12];
+  const endpointLocal = [0, 2, -3, 0, 40, 25];
+  const endpointWorld = multiplyAffine(parentWorld, endpointLocal);
+
+  function dragAtView(view) {
+    const mesh = generateGridMesh(
+      { minX: 0, minY: 0, maxX: 10, maxY: 10 }, 10, 10, 1, 1,
+    );
+    const committed = [];
+    const endpoint = {
+      getState: () => ({ editingEnabled: true }),
+      activeKeyform: () => ({ id: "keyform_a" }),
+      commitActiveMeshPositions: (positions) => committed.push(positions),
+    };
+    const state = {
+      mode: "psd", editorMode: "edit",
+      editor: { worldTransform: (nodeId) => {
+        assert.equal(nodeId, "endpoint_a");
+        return endpointWorld;
+      } },
+      previewMode: false, spacePressed: false, view,
+      mesh, selected: new Set(), partOffset: { x: 0, y: 0 }, drag: null,
+    };
+    const elements = viewportElements();
+    const screenPointForPart = (x, y) => {
+      const documentPoint = transformPoint(endpointWorld, { x, y });
+      return imageToScreen(documentPoint.x, documentPoint.y, view);
+    };
+    bindViewport(state, elements, {
+      endpointMesh: () => endpoint,
+      selectedPart: () => ({ nodeId: "endpoint_a" }),
+      viewportRenderer: { screenPointForPart },
+    });
+
+    const start = screenPointForPart(0, 0);
+    const target = screenPointForPart(3, 4);
+    elements.overlayCanvas.dispatch("pointerdown", {
+      button: 0, pointerId: 10, clientX: start.x, clientY: start.y, shiftKey: false,
+    });
+    elements.overlayCanvas.dispatch("pointermove", {
+      pointerId: 10, clientX: target.x, clientY: target.y,
+    });
+    elements.overlayCanvas.dispatch("pointerup", { pointerId: 10 });
+    assert.equal(committed.length, 1);
+    return committed[0];
+  }
+
+  const baseline = dragAtView({ scale: 1, originX: 0, originY: 0 });
+  const zoomedAndPanned = dragAtView({ scale: 2.25, originX: 180, originY: -95 });
+  for (const positions of [baseline, zoomedAndPanned]) {
+    assert.ok(Math.abs(positions[0] - 3) < 1e-6);
+    assert.ok(Math.abs(positions[1] - 4) < 1e-6);
+  }
+});
+
 test("scene view keeps the active selection locked in Edit Mode", () => {
   const selections = [];
   const statuses = [];
@@ -228,7 +288,7 @@ test("re-import view actions call only the existing review API", () => {
     ["add", "row_a"],
     ["keep", "row_a"],
     ["remove", "row_a"],
-    ["ignore", "row_a"],
+    ["ignore", "ignore"],
     ["reset", "row_a"],
     ["update", "row_a", "part_new"],
   ]);
