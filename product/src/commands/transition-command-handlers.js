@@ -58,11 +58,19 @@ function normalizedTransition(transition) {
 }
 
 function normalizedTopology(topology) {
+  const nextFromIds = Math.max(0, ...(topology.vertexIds || []).map((vertexId) => {
+    const match = /^vtx_(\d+)$/.exec(vertexId);
+    return match ? Number(match[1]) : 0;
+  })) + 1;
   return {
     ...cloneProject(topology),
     vertexIds: cloneProject(topology.vertexIds || []),
     indices: cloneProject(topology.indices || []),
     vertexMetadata: cloneProject(topology.vertexMetadata || {}),
+    nextVertexSequence: Math.max(
+      Number.isSafeInteger(topology.nextVertexSequence) ? topology.nextVertexSequence : 1,
+      nextFromIds,
+    ),
   };
 }
 

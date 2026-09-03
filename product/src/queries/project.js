@@ -65,7 +65,7 @@ function mappingStatus(from, to) {
   return "unmapped";
 }
 
-function nextStableVertexId(project) {
+function nextStableVertexId(project, activeTopology) {
   let maximum = 0;
   const used = new Set();
   for (const topology of project.meshTopologies || []) {
@@ -75,7 +75,12 @@ function nextStableVertexId(project) {
       if (match) maximum = Math.max(maximum, Number(match[1]));
     }
   }
-  let sequence = maximum + 1;
+  let sequence = Math.max(
+    maximum + 1,
+    Number.isSafeInteger(activeTopology?.nextVertexSequence)
+      ? activeTopology.nextVertexSequence
+      : 1,
+  );
   let candidate;
   do {
     candidate = `vtx_${String(sequence++).padStart(4, "0")}`;
@@ -93,7 +98,7 @@ function topologyProjection(project, topology) {
       index,
       semanticLabel: vertexMetadata[id]?.semanticLabel || null,
     })),
-    nextVertexId: nextStableVertexId(project),
+    nextVertexId: nextStableVertexId(project, topology),
   };
 }
 

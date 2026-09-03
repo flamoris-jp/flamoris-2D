@@ -1,7 +1,7 @@
 import { cloneProject } from "../model/project.js";
 import { CommandError } from "./errors.js";
 
-const TRIANGLE_AREA_EPSILON = 1e-8;
+const TRIANGLE_AREA_EPSILON = 2e-4;
 
 function topologyFor(project, topologyId) {
   const topology = project.meshTopologies.find((entry) => entry.id === topologyId);
@@ -10,8 +10,16 @@ function topologyFor(project, topologyId) {
       topologyId,
     });
   }
-  topology.vertexMetadata ||= {};
   return topology;
+}
+
+function advanceVertexSequence(topology, vertexId) {
+  const match = /^vtx_(\d+)$/.exec(vertexId);
+  if (!match) return;
+  topology.nextVertexSequence = Math.max(
+    Number.isSafeInteger(topology.nextVertexSequence) ? topology.nextVertexSequence : 1,
+    Number(match[1]) + 1,
+  );
 }
 
 function keyformFor(project, keyformId) {
@@ -135,7 +143,8 @@ export const meshTopologyCommandHandlers = {
     const topology = topologyFor(project, payload.topologyId);
     vertexIndex(topology, payload.vertexId);
     assertLabelAvailable(topology, payload.vertexId, payload.semanticLabel);
-    const previous = topology.vertexMetadata[payload.vertexId]?.semanticLabel || null;
+    const previous = topology.vertexMetadata?.[payload.vertexId]?.semanticLabel || null;
+    topology.vertexMetadata ||= {};
     topology.vertexMetadata[payload.vertexId] = { semanticLabel: payload.semanticLabel };
     return {
       inverse: previous
@@ -158,7 +167,7 @@ export const meshTopologyCommandHandlers = {
   "mesh_topology.clear_vertex_label": (project, payload) => {
     const topology = topologyFor(project, payload.topologyId);
     vertexIndex(topology, payload.vertexId);
-    const previous = topology.vertexMetadata[payload.vertexId]?.semanticLabel;
+    const previous = topology.vertexMetadata?.[payload.vertexId]?.semanticLabel;
     if (!previous) {
       throw new CommandError("Vertex has no semantic label.",
         "MESH_TOPOLOGY_SEMANTIC_LABEL_NOT_FOUND", { vertexId: payload.vertexId });
@@ -188,7 +197,9 @@ export const meshTopologyCommandHandlers = {
     const inverse = snapshotInverse(project, topology);
     const keyforms = keyformsFor(project, topology.id);
     topology.vertexIds.push(payload.vertexId);
+    advanceVertexSequence(topology, payload.vertexId);
     if (payload.semanticLabel) {
+      topology.vertexMetadata ||= {};
       topology.vertexMetadata[payload.vertexId] = {
         semanticLabel: payload.semanticLabel,
       };
@@ -224,7 +235,7 @@ export const meshTopologyCommandHandlers = {
     const keyforms = keyformsFor(project, topology.id);
     topology.vertexIds.splice(removedIndex, 1);
     topology.indices = nextIndices;
-    delete topology.vertexMetadata[payload.vertexId];
+    if (topology.vertexMetadata) delete topology.vertexMetadata[payload.vertexId];
     for (const keyform of keyforms) {
       keyform.positions.splice(removedIndex * 2, 2);
       keyform.uvs.splice(removedIndex * 2, 2);
@@ -297,6 +308,7 @@ export const meshTopologyCommandHandlers = {
     const inverse = snapshotInverse(project, topology);
     const keyforms = keyformsFor(project, topology.id);
     topology.vertexIds.push(payload.newVertexId);
+    advanceVertexSequence(topology, payload.newVertexId);
     topology.indices = triangles;
     for (const keyform of keyforms) {
       keyform.positions.push(

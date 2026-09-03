@@ -222,8 +222,20 @@ export function validateTransitionDomain(project, register = () => {}) {
       issues.push(problem("MESH_TOPOLOGY_INVALID", path, "MeshTopology requires vertexIds and indices arrays.", topology?.id));
       continue;
     }
-    if (unknownKeys(topology, ["id", "vertexIds", "indices", "vertexMetadata"]).length) {
+    if (unknownKeys(topology, ["id", "vertexIds", "indices", "vertexMetadata", "nextVertexSequence"]).length) {
       issues.push(problem("MESH_TOPOLOGY_INVALID", path, "MeshTopology contains unsupported persistent fields.", topology.id));
+    }
+    if (Object.hasOwn(topology, "nextVertexSequence") &&
+      (!Number.isSafeInteger(topology.nextVertexSequence) || topology.nextVertexSequence < 1)) {
+      issues.push(problem("MESH_TOPOLOGY_VERTEX_SEQUENCE_INVALID", path + ".nextVertexSequence", "MeshTopology nextVertexSequence must be a positive integer.", topology.id));
+    } else if (Object.hasOwn(topology, "nextVertexSequence")) {
+      const issuedMaximum = Math.max(0, ...topology.vertexIds.map((vertexId) => {
+        const match = /^vtx_(\d+)$/.exec(vertexId);
+        return match ? Number(match[1]) : 0;
+      }));
+      if (topology.nextVertexSequence <= issuedMaximum) {
+        issues.push(problem("MESH_TOPOLOGY_VERTEX_SEQUENCE_INVALID", path + ".nextVertexSequence", "MeshTopology nextVertexSequence must be greater than every issued vtx_ ID.", topology.id));
+      }
     }
     if (topology.vertexIds.length < 3 || topology.vertexIds.some((id) => !nonEmpty(id))) {
       issues.push(problem("MESH_TOPOLOGY_INVALID", path + ".vertexIds", "MeshTopology requires at least three stable vertex IDs.", topology.id));

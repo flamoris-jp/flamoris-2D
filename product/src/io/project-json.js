@@ -153,6 +153,10 @@ export function migrateProjectSchema(value) {
         !Array.isArray(topology.vertexMetadata)
         ? topology.vertexMetadata
         : {},
+      nextVertexSequence: Math.max(0, ...(topology.vertexIds || []).map((vertexId) => {
+        const match = /^vtx_(\d+)$/.exec(vertexId);
+        return match ? Number(match[1]) : 0;
+      })) + 1,
     }));
     project.schemaVersion = 4;
   }
