@@ -10,6 +10,8 @@ boundaries. It does not introduce another mesh model or history stack.
   vertex ID. The index may change when an earlier vertex is removed; the ID
   does not.
 - A stable vertex ID is globally unique among live project topologies.
+  `mesh_topology.create` rejects cross-topology reuse before mutation, and
+  Project validation reports the same violation during import or migration.
 - `MeshTopology.nextVertexSequence` is a monotonic persisted allocation cursor
   for generated `vtx_NNNN` IDs. Removing a vertex does not rewind it.
 - `MeshTopology.vertexMetadata[vertexId].semanticLabel` is optional,

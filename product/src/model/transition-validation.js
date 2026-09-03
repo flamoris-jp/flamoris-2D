@@ -216,6 +216,7 @@ export function validateTransitionDomain(project, register = () => {}) {
     }
   }
 
+  const topologyVertexOwners = new Map();
   for (const [index, topology] of topologies.entries()) {
     const path = "meshTopologies." + index;
     if (!object(topology) || !Array.isArray(topology.vertexIds) || !Array.isArray(topology.indices)) {
@@ -241,7 +242,27 @@ export function validateTransitionDomain(project, register = () => {}) {
       issues.push(problem("MESH_TOPOLOGY_INVALID", path + ".vertexIds", "MeshTopology requires at least three stable vertex IDs.", topology.id));
     }
     topology.vertexIds.forEach((vertexId, vertexIndex) => {
-      if (nonEmpty(vertexId)) register(vertexId, path + ".vertexIds." + vertexIndex);
+      if (!nonEmpty(vertexId)) return;
+      const owner = topologyVertexOwners.get(vertexId);
+      if (owner && owner.topologyId !== topology.id) {
+        issues.push(problem(
+          "MESH_TOPOLOGY_DUPLICATE_VERTEX_ACROSS_TOPOLOGIES",
+          path + ".vertexIds." + vertexIndex,
+          "Stable vertex IDs must be unique across all MeshTopologies in one Project.",
+          vertexId,
+          "error",
+          {
+            topologyIds: [owner.topologyId, topology.id].sort(),
+            firstPath: owner.path,
+          },
+        ));
+      } else if (!owner) {
+        topologyVertexOwners.set(vertexId, {
+          topologyId: topology.id,
+          path: path + ".vertexIds." + vertexIndex,
+        });
+      }
+      register(vertexId, path + ".vertexIds." + vertexIndex);
     });
     if (new Set(topology.vertexIds).size !== topology.vertexIds.length) {
       issues.push(problem("MESH_TOPOLOGY_DUPLICATE_VERTEX", path + ".vertexIds", "MeshTopology vertex IDs must be unique.", topology.id));

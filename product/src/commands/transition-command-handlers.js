@@ -74,6 +74,25 @@ function normalizedTopology(topology) {
   };
 }
 
+function assertTopologyVertexIdsAvailable(project, topology) {
+  const owners = new Map();
+  for (const existing of project.meshTopologies || []) {
+    for (const vertexId of existing.vertexIds || []) owners.set(vertexId, existing.id);
+  }
+  const duplicate = topology.vertexIds.find((vertexId) => owners.has(vertexId));
+  if (duplicate) {
+    throw new CommandError(
+      "Stable vertex ID already belongs to another MeshTopology.",
+      "MESH_TOPOLOGY_DUPLICATE_VERTEX_ACROSS_TOPOLOGIES",
+      {
+        vertexId: duplicate,
+        topologyId: topology.id,
+        existingTopologyId: owners.get(duplicate),
+      },
+    );
+  }
+}
+
 function createEntity(collection, normalizer, notFoundCode) {
   return (project, payload) => {
     const value = normalizer(payload.entity);
@@ -188,7 +207,13 @@ export const transitionCommandHandlers = {
     };
   },
 
-  "mesh_topology.create": (project, payload) => createEntity("meshTopologies", normalizedTopology)(project, { entity: payload.topology }),
+  "mesh_topology.create": (project, payload) => {
+    const topology = normalizedTopology(payload.topology);
+    assertTopologyVertexIdsAvailable(project, topology);
+    return createEntity("meshTopologies", normalizedTopology)(project, {
+      entity: topology,
+    });
+  },
   "mesh_topology.update": (project, payload) => {
     const current = entityFor(project, "meshTopologies", payload.topologyId, "mesh_topology.not_found");
     const next = normalizedTopology(payload.topology);

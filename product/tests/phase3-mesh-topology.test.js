@@ -359,6 +359,63 @@ test("schema 3 migration adds identity metadata and a monotonic cursor without r
   assert.deepEqual(validateProject(migrated), []);
 });
 
+test("two topologies consistently enforce Project-global stable vertex identity", () => {
+  const { project, session } = setup();
+  assert.throws(
+    () => session.execute({
+      type: "mesh_topology.create",
+      payload: { topology: {
+        id: "topology_duplicate",
+        vertexIds: ["vtx_0001", "vtx_0010", "vtx_0011"],
+        indices: [0, 1, 2],
+      } },
+    }),
+    (error) => error.code === "MESH_TOPOLOGY_DUPLICATE_VERTEX_ACROSS_TOPOLOGIES",
+  );
+
+  session.execute({
+    type: "mesh_topology.create",
+    payload: { topology: {
+      id: "topology_second",
+      vertexIds: ["vtx_0010", "vtx_0011", "vtx_0012"],
+      indices: [0, 1, 2],
+    } },
+  });
+  assert.equal(
+    session.query("mesh.get_topology", { topologyId: "topology" }).nextVertexId,
+    "vtx_0013",
+  );
+  assert.equal(
+    session.query("mesh.get_topology", { topologyId: "topology_second" }).nextVertexId,
+    "vtx_0013",
+  );
+  session.execute({
+    type: "mesh_topology.add_vertex",
+    payload: {
+      topologyId: "topology",
+      vertexId: "vtx_0013",
+      position: { x: 5, y: 5 },
+      uv: { x: 0.5, y: 0.5 },
+    },
+  });
+  assert.equal(
+    session.query("mesh.get_topology", { topologyId: "topology_second" }).nextVertexId,
+    "vtx_0014",
+  );
+
+  const legacy = structuredClone(project);
+  legacy.schemaVersion = 3;
+  legacy.meshTopologies.push({
+    id: "legacy_duplicate",
+    vertexIds: ["vtx_0001", "vtx_0020", "vtx_0021"],
+    indices: [0, 1, 2],
+  });
+  const migrated = migrateProjectSchema(legacy);
+  assert.ok(validateProject(migrated).some((issue) =>
+    issue.code === "MESH_TOPOLOGY_DUPLICATE_VERTEX_ACROSS_TOPOLOGIES"));
+  assert.throws(() => deserializeProject(JSON.stringify(legacy)), TransactionError);
+});
+
 test("headless command/query path is DOM independent and registry is extensible", async () => {
   const { session, endpoint } = setup();
   const adapter = new HeadlessProductAdapter(session);
