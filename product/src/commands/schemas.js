@@ -12,6 +12,8 @@ const nonNegativeInteger = { type: "integer", minimum: 0 };
 const positiveInteger = { type: "integer", minimum: 1 };
 const temporalObject = { type: "object" };
 const domainObject = { type: "object" };
+const numberArray = { type: "array", items: finiteNumber };
+const vertexIdArray = { type: "array", items: nonEmptyString };
 
 const point = {
   type: "object",
@@ -103,6 +105,59 @@ export const commandSchemas = {
     properties: { topologyId: nonEmptyString },
     additionalProperties: false,
   },
+  "mesh_topology.add_vertex": {
+    type: "object",
+    required: ["topologyId", "vertexId", "position", "uv"],
+    properties: {
+      topologyId: nonEmptyString,
+      vertexId: nonEmptyString,
+      position: point,
+      uv: point,
+      semanticLabel: nonEmptyString,
+    },
+    additionalProperties: false,
+  },
+  "mesh_topology.remove_vertex": {
+    type: "object",
+    required: ["topologyId", "vertexId"],
+    properties: { topologyId: nonEmptyString, vertexId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "mesh_topology.create_triangle": {
+    type: "object",
+    required: ["topologyId", "vertexIds"],
+    properties: {
+      topologyId: nonEmptyString,
+      vertexIds: { ...vertexIdArray, minItems: 3, maxItems: 3 },
+    },
+    additionalProperties: false,
+  },
+  "mesh_topology.subdivide_edge": {
+    type: "object",
+    required: ["topologyId", "vertexIds", "newVertexId"],
+    properties: {
+      topologyId: nonEmptyString,
+      vertexIds: { ...vertexIdArray, minItems: 2, maxItems: 2 },
+      newVertexId: nonEmptyString,
+    },
+    additionalProperties: false,
+  },
+  "mesh_topology.set_vertex_label": {
+    type: "object",
+    required: ["topologyId", "vertexId", "semanticLabel"],
+    properties: {
+      topologyId: nonEmptyString,
+      vertexId: nonEmptyString,
+      semanticLabel: nonEmptyString,
+    },
+    additionalProperties: false,
+  },
+  "mesh_topology.clear_vertex_label": {
+    type: "object",
+    required: ["topologyId", "vertexId"],
+    properties: { topologyId: nonEmptyString, vertexId: nonEmptyString },
+    additionalProperties: false,
+  },
   "mesh_keyform.create": {
     type: "object",
     required: ["keyform"],
@@ -119,6 +174,12 @@ export const commandSchemas = {
     type: "object",
     required: ["keyformId"],
     properties: { keyformId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "mesh_keyform.move_vertices": {
+    type: "object",
+    required: ["keyformId", "positions"],
+    properties: { keyformId: nonEmptyString, positions: numberArray },
     additionalProperties: false,
   },
   "transition.create": {
@@ -340,6 +401,12 @@ const internalCommandSchemas = {
   },
   "meshTopologies.remove_internal": entityRemovalSchema(),
   "mesh_topology.restore": entityRestoreSchema(),
+  "mesh_topology.restore_snapshot": {
+    type: "object",
+    required: ["snapshot"],
+    properties: { snapshot: domainObject },
+    additionalProperties: false,
+  },
   "meshKeyforms.remove_internal": entityRemovalSchema(),
   "mesh_keyform.restore": entityRestoreSchema(),
   "transitions.remove_internal": entityRemovalSchema(),
@@ -431,6 +498,7 @@ function actualType(value) {
 }
 
 function matchesType(value, type) {
+  if (type === "array") return Array.isArray(value);
   if (type === "object") {
     return value !== null &&
       typeof value === "object" &&
@@ -492,6 +560,27 @@ function validateValue(value, schema, path, issues) {
       path,
       message: "Value must be at least " + schema.minimum + ".",
     });
+  }
+  if (schema.type === "array") {
+    if (schema.minItems !== undefined && value.length < schema.minItems) {
+      issues.push({
+        code: "command.payload_min_items",
+        path,
+        message: "Array has fewer than " + schema.minItems + " items.",
+      });
+    }
+    if (schema.maxItems !== undefined && value.length > schema.maxItems) {
+      issues.push({
+        code: "command.payload_max_items",
+        path,
+        message: "Array has more than " + schema.maxItems + " items.",
+      });
+    }
+    if (schema.items) {
+      value.forEach((entry, index) =>
+        validateValue(entry, schema.items, path + "." + index, issues));
+    }
+    return;
   }
   if (schema.type !== "object") return;
 

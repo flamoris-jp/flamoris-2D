@@ -1,6 +1,6 @@
 import { TIMEBASE_TICKS_PER_SECOND } from "../core/temporal.js";
 
-export const PROJECT_SCHEMA_VERSION = 3;
+export const PROJECT_SCHEMA_VERSION = 4;
 
 export function identityTransform() {
   return {

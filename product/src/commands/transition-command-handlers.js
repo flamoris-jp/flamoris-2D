@@ -57,6 +57,42 @@ function normalizedTransition(transition) {
   };
 }
 
+function normalizedTopology(topology) {
+  const nextFromIds = Math.max(0, ...(topology.vertexIds || []).map((vertexId) => {
+    const match = /^vtx_(\d+)$/.exec(vertexId);
+    return match ? Number(match[1]) : 0;
+  })) + 1;
+  return {
+    ...cloneProject(topology),
+    vertexIds: cloneProject(topology.vertexIds || []),
+    indices: cloneProject(topology.indices || []),
+    vertexMetadata: cloneProject(topology.vertexMetadata || {}),
+    nextVertexSequence: Math.max(
+      Number.isSafeInteger(topology.nextVertexSequence) ? topology.nextVertexSequence : 1,
+      nextFromIds,
+    ),
+  };
+}
+
+function assertTopologyVertexIdsAvailable(project, topology) {
+  const owners = new Map();
+  for (const existing of project.meshTopologies || []) {
+    for (const vertexId of existing.vertexIds || []) owners.set(vertexId, existing.id);
+  }
+  const duplicate = topology.vertexIds.find((vertexId) => owners.has(vertexId));
+  if (duplicate) {
+    throw new CommandError(
+      "Stable vertex ID already belongs to another MeshTopology.",
+      "MESH_TOPOLOGY_DUPLICATE_VERTEX_ACROSS_TOPOLOGIES",
+      {
+        vertexId: duplicate,
+        topologyId: topology.id,
+        existingTopologyId: owners.get(duplicate),
+      },
+    );
+  }
+}
+
 function createEntity(collection, normalizer, notFoundCode) {
   return (project, payload) => {
     const value = normalizer(payload.entity);
@@ -171,11 +207,40 @@ export const transitionCommandHandlers = {
     };
   },
 
-  "mesh_topology.create": (project, payload) => createEntity("meshTopologies", identity)(project, { entity: payload.topology }),
-  "mesh_topology.update": (project, payload) => updateEntity("meshTopologies", identity, "mesh_topology.not_found", "mesh_topology.update", "topologyId", "topology")(project, {
-    id: payload.topologyId,
-    entity: payload.topology,
-  }),
+  "mesh_topology.create": (project, payload) => {
+    const topology = normalizedTopology(payload.topology);
+    assertTopologyVertexIdsAvailable(project, topology);
+    return createEntity("meshTopologies", normalizedTopology)(project, {
+      entity: topology,
+    });
+  },
+  "mesh_topology.update": (project, payload) => {
+    const current = entityFor(project, "meshTopologies", payload.topologyId, "mesh_topology.not_found");
+    const next = normalizedTopology(payload.topology);
+    if (next.id !== current.id) {
+      throw new CommandError("Updates must preserve stable identity.", "identity.changed");
+    }
+    const hasKeyforms = (project.meshKeyforms || []).some((keyform) =>
+      keyform.topologyId === current.id);
+    const changesStructure =
+      JSON.stringify(current.vertexIds) !== JSON.stringify(next.vertexIds) ||
+      JSON.stringify(current.indices) !== JSON.stringify(next.indices);
+    if (hasKeyforms && changesStructure) {
+      throw new CommandError(
+        "Topology with MeshKeyforms must use an atomic topology mutation command.",
+        "MESH_TOPOLOGY_MUTATION_REQUIRES_CONTRACT",
+      );
+    }
+    const previous = cloneProject(current);
+    Object.assign(current, next);
+    return {
+      inverse: {
+        type: "mesh_topology.update",
+        payload: { topologyId: previous.id, topology: previous },
+      },
+      affectedIds: [current.id],
+    };
+  },
   "mesh_topology.remove": (project, payload) => removeEntity("meshTopologies", "mesh_topology.restore", "mesh_topology.not_found")(project, { id: payload.topologyId }),
   "meshTopologies.remove_internal": removeEntity("meshTopologies", "mesh_topology.restore", "mesh_topology.not_found"),
   "mesh_topology.restore": restoreEntity("meshTopologies", "meshTopologies.remove_internal"),

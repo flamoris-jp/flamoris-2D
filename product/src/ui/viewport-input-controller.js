@@ -30,6 +30,7 @@ export function bindViewportInteractions({
   setStatus,
   selectedPart,
   endpointMesh = () => null,
+  meshTools = () => null,
   loadFile,
   windowTarget = window,
 }) {
@@ -87,7 +88,7 @@ export function bindViewportInteractions({
     if (editorModeShortcutAction(event) && state.mode === "psd") {
       event.preventDefault();
       setEditorMode(state.editorMode === EDITOR_MODES.OBJECT
-        ? EDITOR_MODES.EDIT
+        ? EDITOR_MODES.DEFORM
         : EDITOR_MODES.OBJECT);
       return;
     }
@@ -174,12 +175,37 @@ export function bindViewportInteractions({
     if (route !== "mesh") return;
 
     const vertexIndex = nearestVertex(screenPoint);
+    const tools = endpointMesh()?.getState().editingEnabled ? meshTools() : null;
     state.selected = updateVertexSelection(
       state.selected,
       vertexIndex,
       event.shiftKey,
     );
+    tools?.selectVertexByIndex(vertexIndex, event.shiftKey);
     if (vertexIndex < 0) {
+      if (state.editorMode === EDITOR_MODES.TOPOLOGY &&
+        tools?.activeToolId === "topology.add") {
+        const partPoint = screenToPart(screenPoint);
+        const part = selectedPart();
+        const width = Math.max(1, part?.width || 1);
+        const height = Math.max(1, part?.height || 1);
+        try {
+          tools.execute("topology.add", {
+            position: partPoint,
+            uv: {
+              x: Math.min(1, Math.max(0, (partPoint.x - (part?.left || 0)) / width)),
+              y: Math.min(1, Math.max(0, (partPoint.y - (part?.top || 0)) / height)),
+            },
+          });
+          setStatus("共有MeshTopologyへvertexを追加し、全MeshKeyformを更新しました");
+        } catch (error) {
+          setStatus(error.message || String(error));
+        }
+      }
+      render();
+      return;
+    }
+    if (state.editorMode === EDITOR_MODES.TOPOLOGY) {
       render();
       return;
     }
@@ -224,9 +250,12 @@ export function bindViewportInteractions({
   function endDrag(event) {
     if (state.drag) {
       const endpoint = endpointMesh();
+      const tools = meshTools();
       if (endpoint?.getState().editingEnabled && endpoint.activeKeyform()) {
         if (event.type !== "pointercancel") {
-          endpoint.commitActiveMeshPositions([...getDeformedVertices(state.mesh)]);
+          const positions = [...getDeformedVertices(state.mesh)];
+          if (tools) tools.execute("deform.move", { positions });
+          else endpoint.commitActiveMeshPositions(positions);
           setStatus(`${state.selected.size}頂点をendpoint MeshKeyformへ反映しました`);
         } else {
           state.mesh.vertexOffsets.fill(0);

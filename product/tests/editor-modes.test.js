@@ -18,12 +18,14 @@ test("Object Mode routes PSD canvas input to scene interaction", () => {
   }), "object");
 });
 
-test("Edit Mode routes PSD canvas input to mesh interaction", () => {
-  assert.equal(canvasInteractionRoute({
-    contentMode: "psd",
-    editorMode: EDITOR_MODES.EDIT,
-    button: 0,
-  }), "mesh");
+test("Deform and Topology Edit modes route PSD input to mesh authoring", () => {
+  for (const editorMode of [EDITOR_MODES.DEFORM, EDITOR_MODES.TOPOLOGY]) {
+    assert.equal(canvasInteractionRoute({
+      contentMode: "psd",
+      editorMode,
+      button: 0,
+    }), "mesh");
+  }
 });
 
 test("Edit Mode locks active object while Object Mode restores picking", () => {

@@ -1,7 +1,7 @@
 import { getDeformedVertices, imageToScreen } from "../mesh.js";
 import { sampleLoop } from "../animation.js";
 import { transformPoint } from "../core/transforms.js";
-import { EDITOR_MODES } from "./editor-modes.js";
+import { EDITOR_MODES, isMeshAuthoringMode } from "./editor-modes.js";
 import { createEvaluatedRenderPlan } from "../core/evaluated-render.js";
 
 export function renderEvaluatedTransitionViewport({
@@ -82,10 +82,10 @@ export function createViewportRenderer({
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     if (!state.mesh || !state.view || vertices.length === 0) return;
-    if (state.mode === "psd" && state.editorMode !== EDITOR_MODES.EDIT) return;
+    if (state.mode === "psd" && !isMeshAuthoringMode(state.editorMode)) return;
 
-    context.lineWidth = state.editorMode === EDITOR_MODES.EDIT ? 1.5 : 1;
-    context.strokeStyle = state.editorMode === EDITOR_MODES.EDIT
+    context.lineWidth = isMeshAuthoringMode(state.editorMode) ? 1.5 : 1;
+    context.strokeStyle = isMeshAuthoringMode(state.editorMode)
       ? "rgba(255, 202, 103, 0.72)"
       : "rgba(129, 221, 205, 0.48)";
     context.beginPath();
@@ -118,12 +118,35 @@ export function createViewportRenderer({
       context.stroke();
     }
     const endpoint = endpointContext();
+    const meshToolState = state.editor?.meshTools.getState() || null;
+    if (endpoint?.topology && meshToolState) {
+      context.save();
+      context.font = "600 10px ui-monospace, monospace";
+      context.textBaseline = "bottom";
+      for (let index = 0; index < vertices.length / 2; index += 1) {
+        if (!meshToolState.vertexIdOverlayVisible && !state.selected.has(index)) continue;
+        const vertexId = endpoint.topology.vertexIds[index];
+        if (!vertexId) continue;
+        const point = screenPointForPart(vertices[index * 2], vertices[index * 2 + 1]);
+        const semanticLabel = endpoint.topology.vertexMetadata?.[vertexId]?.semanticLabel;
+        const label = semanticLabel ? `${vertexId} · ${semanticLabel}` : vertexId;
+        const width = context.measureText(label).width + 8;
+        context.fillStyle = "rgba(12, 26, 25, .88)";
+        context.fillRect(point.x + 7, point.y - 17, width, 15);
+        context.fillStyle = state.selected.has(index) ? "#ffca67" : "#eafdf9";
+        context.fillText(label, point.x + 11, point.y - 4);
+      }
+      context.restore();
+    }
     if (endpoint) {
       context.fillStyle = "rgba(12, 26, 25, .82)";
-      context.fillRect(14, 14, 190, 28);
+      context.fillRect(14, 14, 230, 28);
       context.fillStyle = "#ffca67";
       context.font = "700 12px ui-monospace, monospace";
-      context.fillText(`EDIT ENDPOINT ${endpoint.endpoint === "from" ? "A" : "B"}`, 24, 33);
+      const mode = state.editorMode === EDITOR_MODES.TOPOLOGY
+        ? "TOPOLOGY EDIT"
+        : `DEFORM ENDPOINT ${endpoint.endpoint === "from" ? "A" : "B"}`;
+      context.fillText(mode, 24, 33);
     }
   }
 
