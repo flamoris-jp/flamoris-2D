@@ -1,6 +1,7 @@
 import { cloneProject } from "../model/project.js";
 import { worldTransformMatrix } from "../core/transforms.js";
 import { TransitionAuthoringController } from "./transition-authoring-controller.js";
+import { EndpointMeshController } from "./endpoint-mesh-controller.js";
 
 function filterTree(node, matches) {
   const children = node.children
@@ -32,6 +33,9 @@ export class EditorUiAdapter {
     this.activeTool = "translate";
     this.transformDrag = null;
     this.transitionAuthoring = new TransitionAuthoringController(session, {
+      onChange: (reason) => this.notify(reason),
+    });
+    this.endpointMesh = new EndpointMeshController(session, this.transitionAuthoring, {
       onChange: (reason) => this.notify(reason),
     });
     this.expandAllGroups();

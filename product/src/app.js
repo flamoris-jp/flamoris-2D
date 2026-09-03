@@ -127,6 +127,7 @@ const viewportRenderer = createViewportRenderer({
   selectedPart,
   selectedPartIndex,
   selectedNodeDocumentBounds,
+  endpointContext: activeEndpointContext,
 });
 
 const sceneEditorView = createSceneEditorView({
@@ -148,6 +149,7 @@ const transitionAuthoringView = createTransitionAuthoringView({
   state,
   elements,
   setStatus,
+  onEndpointContextChange: () => syncEndpointMeshViewport(),
 });
 
 function setStatus(message) {
@@ -155,6 +157,8 @@ function setStatus(message) {
 }
 
 function selectedPartIndex() {
+  const endpoint = activeEndpointContext();
+  if (endpoint) return state.psdParts.findIndex((part) => part.nodeId === endpoint.nodeId);
   const targetNodeId = state.editorMode === EDITOR_MODES.EDIT
     ? state.editTargetNodeId
     : state.editor?.selectedNodeId;
@@ -162,6 +166,68 @@ function selectedPartIndex() {
   return state.psdParts.findIndex(
     (part) => part.nodeId === targetNodeId,
   );
+}
+
+function activeEndpointContext() {
+  const controller = state.editor?.endpointMesh;
+  const endpointState = controller?.getState();
+  if (!controller || !endpointState?.editingEnabled || !endpointState.selectedSemanticSlot) return null;
+  const endpoint = endpointState.activeEndpoint;
+  const mapping = endpointState.selectedSemanticSlot[endpoint]?.mapping;
+  const keyArt = endpointState.endpoints?.[endpoint]?.keyArt;
+  if (!mapping || !keyArt) return null;
+  return {
+    endpoint,
+    nodeId: mapping.nodeId,
+    keyArt,
+    keyform: endpointState.activeKeyform,
+    topology: endpointState.topologies.find((entry) =>
+      entry.id === endpointState.activeKeyform?.topologyId) || null,
+    worldTransform: controller.activeEndpointWorldTransform(),
+  };
+}
+
+function syncEndpointMeshViewport() {
+  const context = activeEndpointContext();
+  if (!context) {
+    renderEditorUi();
+    render();
+    return;
+  }
+  const part = state.psdParts.find((entry) => entry.nodeId === context.nodeId);
+  if (!part?.canvas) {
+    clearMeshEditing();
+    setStatus("Active endpoint artwork render is missing. Re-import the PSD render asset.");
+    renderEditorUi();
+    render();
+    return;
+  }
+  clearMeshEditing();
+  setEditableImage(
+    part.canvas,
+    state.documentWidth,
+    state.documentHeight,
+    context.keyform ? 0 : part.left,
+    context.keyform ? 0 : part.top,
+  );
+  if (context.keyform && context.topology) {
+    state.mesh = {
+      columns: 0,
+      rows: 0,
+      baseVertices: new Float32Array(context.keyform.positions),
+      vertexOffsets: new Float32Array(context.keyform.positions.length),
+      uvs: new Float32Array(context.keyform.uvs),
+      indices: new Uint32Array(context.topology.indices),
+    };
+    renderer.setMesh(state.mesh);
+  } else createMesh();
+  state.editorMode = EDITOR_MODES.EDIT;
+  state.editTargetNodeId = context.nodeId;
+  state.selected.clear();
+  elements.partInfo.textContent = `${context.endpoint === "from" ? "A" : "B"} · ${part.name} · endpoint mesh`;
+  updateEditorModeUi();
+  renderEditorUi();
+  render();
 }
 
 function selectedPart() {
@@ -417,6 +483,21 @@ function renderEditorUi() {
 }
 
 function handleEditorChange(reason) {
+  if (reason === "endpoint-exit") {
+    syncSelectedPsdPart();
+    renderEditorUi();
+    render();
+    return;
+  }
+  if (["transition-selection", "semantic-slot-selection"].includes(reason)) {
+    state.editor?.endpointMesh.exitEditing();
+    return;
+  }
+  if (reason.startsWith("endpoint-") ||
+    (reason === "project" && state.editor?.endpointMesh.getState().editingEnabled)) {
+    syncEndpointMeshViewport();
+    return;
+  }
   if (
     state.editorMode === EDITOR_MODES.EDIT &&
     state.editTargetNodeId &&
@@ -989,6 +1070,7 @@ bindViewportInteractions({
   render,
   setStatus,
   selectedPart,
+  endpointMesh: () => state.editor?.endpointMesh || null,
   loadFile,
 });
 

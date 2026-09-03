@@ -42,6 +42,7 @@ src/ui/editor-adapter.js
 src/ui/canvas-interaction.js
 src/ui/editor-shortcuts.js
 src/ui/editor-modes.js
+src/ui/endpoint-mesh-controller.js
 src/ui/mesh-editing-controller.js
 src/ui/reimport-render-history.js
 src/ui/reimport-review-view.js

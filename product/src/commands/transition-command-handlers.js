@@ -172,6 +172,10 @@ export const transitionCommandHandlers = {
   },
 
   "mesh_topology.create": (project, payload) => createEntity("meshTopologies", identity)(project, { entity: payload.topology }),
+  "mesh_topology.update": (project, payload) => updateEntity("meshTopologies", identity, "mesh_topology.not_found", "mesh_topology.update", "topologyId", "topology")(project, {
+    id: payload.topologyId,
+    entity: payload.topology,
+  }),
   "mesh_topology.remove": (project, payload) => removeEntity("meshTopologies", "mesh_topology.restore", "mesh_topology.not_found")(project, { id: payload.topologyId }),
   "meshTopologies.remove_internal": removeEntity("meshTopologies", "mesh_topology.restore", "mesh_topology.not_found"),
   "mesh_topology.restore": restoreEntity("meshTopologies", "meshTopologies.remove_internal"),

@@ -24,7 +24,17 @@ export const querySchemas = {
     additionalProperties: false,
   },
   "mesh.get_topology": idQuery("topologyId", nodeId),
+  "mesh.list_topologies": emptyQuery(),
   "mesh.get_keyform": idQuery("keyformId", nodeId),
+  "mesh.list_keyforms": {
+    type: "object",
+    properties: {
+      topologyId: nodeId,
+      keyArtId,
+      semanticSlotId,
+    },
+    additionalProperties: false,
+  },
   "transition.get": idQuery("transitionId", transitionId),
   "transition.list": emptyQuery(),
   "transition.get_authoring": idQuery("transitionId", transitionId),
