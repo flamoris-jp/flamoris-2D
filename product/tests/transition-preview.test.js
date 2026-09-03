@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 import { EditorSession, TransactionError } from "../src/commands/editor.js";
+import { createEvaluatedRenderPlan } from "../src/core/evaluated-render.js";
 import { serializeProject } from "../src/io/project-json.js";
 import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
 import { TransitionAuthoringController } from "../src/ui/transition-authoring-controller.js";
@@ -140,4 +141,95 @@ test("preview controller is DOM-free and never writes session.project directly",
   assert.match(source, /animation\.temporal\.add_keyframe/);
   assert.match(source, /animation\.temporal\.update_keyframe/);
   assert.match(source, /animation\.temporal\.remove_keyframe/);
+});
+
+test("renderer plan consumes evaluator instances, Morph weights, dual artwork, and per-Key-Art UVs unchanged", () => {
+  const { preview } = fixture();
+  preview.addTrack({ kind: "GeometryBlendTrack", target: { semanticSlotId: "semantic_eye" }, trackId: "geometry" });
+  preview.addKeyframe("geometry", "geometryWeight", {
+    id: "geometry_mid", timeTicks: 0, value: 0.25, interpolationToNext: { kind: "linear" },
+  });
+  preview.addTrack({ kind: "AppearanceTrack", target: { semanticSlotId: "semantic_eye" }, trackId: "appearance" });
+  preview.addKeyframe("appearance", "appearance", {
+    id: "appearance_mid", timeTicks: 0,
+    value: { appearance_a: 0.8, appearance_b: 0.2 }, interpolationToNext: { kind: "linear" },
+  });
+  const evaluation = preview.setTick(60000);
+  const source = evaluation.evaluatedParts[0].renderInstances[0];
+  const requestedArtwork = [];
+  const plan = createEvaluatedRenderPlan(evaluation, {
+    resolveArtwork: (nodeId) => {
+      requestedArtwork.push(nodeId);
+      return { nodeId };
+    },
+  });
+  assert.equal(plan.batches[0].renderInstances[0], source);
+  assert.deepEqual(source.mesh.positions, [1.25, 1.25, 11.25, 1.25, 1.25, 11.25]);
+  assert.deepEqual(source.appearanceSamples.map((sample) => sample.weight), [0.8, 0.2]);
+  assert.deepEqual(source.appearanceSamples.map((sample) => sample.uvs), [
+    [0, 0, 1, 0, 0, 1],
+    [0.1, 0.2, 0.9, 0.2, 0.1, 0.8],
+  ]);
+  assert.deepEqual(requestedArtwork.sort(), ["node_a", "node_b"]);
+  assert.deepEqual(plan.unsupportedReasons, []);
+});
+
+test("Replace keeps both simultaneous evaluator instances in one weighted-premultiplied batch", () => {
+  const { session, preview } = fixture();
+  session.execute({
+    type: "transition.set_part_mode",
+    payload: {
+      transitionId: "transition_ab", partTransitionId: "part_eye", semanticSlotId: "semantic_eye",
+      mode: "replace", configuration: { compositeGroupId: "eye_handoff" },
+    },
+  });
+  const evaluation = preview.setTick(60000);
+  const plan = createEvaluatedRenderPlan(evaluation, { resolveArtwork: () => ({}) });
+  assert.equal(evaluation.evaluatedParts[0].renderInstances.length, 2);
+  assert.equal(plan.renderInstanceCount, 2);
+  assert.equal(plan.batches.length, 1);
+  assert.equal(plan.batches[0].kind, "weighted-premultiplied");
+  assert.equal(plan.batches[0].compositeGroupId, "eye_handoff");
+  assert.deepEqual(plan.batches[0].renderInstances, evaluation.evaluatedParts[0].renderInstances);
+  assert.deepEqual(plan.batches[0].renderInstances.map((instance) => instance.opacity), [1, 1]);
+  assert.deepEqual(plan.batches[0].renderInstances.map((instance) => instance.compositeWeight), [0.5, 0.5]);
+});
+
+test("renderer plan honors presence and explicit draw order without reading PartTransition mode", async () => {
+  const presentHigh = {
+    renderInstanceId: "high", sourceNodeId: "node_b", transform: [1, 0, 0, 1, 0, 0],
+    mesh: { positions: [0, 0, 1, 0, 0, 1], indices: [0, 1, 2] },
+    appearanceSamples: [{ appearanceId: "b", sourceNodeId: "node_b", uvs: [0, 0, 1, 0, 0, 1], weight: 1 }],
+    opacity: 0.35, drawOrder: 10, clipping: { sourceNodeId: null },
+  };
+  const presentLow = { ...presentHigh, renderInstanceId: "low", sourceNodeId: "node_a", drawOrder: 2, opacity: 0.8,
+    appearanceSamples: [{ ...presentHigh.appearanceSamples[0], appearanceId: "a", sourceNodeId: "node_a" }] };
+  const hidden = { ...presentHigh, renderInstanceId: "hidden", drawOrder: 0 };
+  const evaluation = {
+    evaluatedParts: [
+      { semanticSlotId: "absent", presence: "absent", renderInstances: [hidden] },
+      { semanticSlotId: "occluded", presence: "occluded", renderInstances: [hidden] },
+      { semanticSlotId: "visible", presence: "present", renderInstances: [presentHigh, presentLow] },
+    ],
+  };
+  const plan = createEvaluatedRenderPlan(evaluation, { resolveArtwork: () => ({}) });
+  assert.deepEqual(plan.batches.map((batch) => batch.renderInstances[0].renderInstanceId), ["low", "high"]);
+  assert.deepEqual(plan.batches.map((batch) => batch.renderInstances[0].opacity), [0.8, 0.35]);
+  const source = await readFile(new URL("../src/core/evaluated-render.js", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /PartTransition|part\.mode|transition\.partTransitions/);
+});
+
+test("preview authority reports structural and renderer unsupported reasons explicitly", () => {
+  const { preview } = fixture();
+  preview.setTick(40000);
+  preview.setRenderReport({ unsupportedReasons: ["Clipping rasterization is unsupported."] });
+  let state = preview.getState();
+  assert.equal(state.authoritative, false);
+  assert.deepEqual(state.authorityReasons, ["Clipping rasterization is unsupported."]);
+  preview.setRenderReport({ unsupportedReasons: [] });
+  assert.equal(preview.getState().authoritative, true);
+  preview.evaluation = { ...preview.evaluation, diagnostics: [{ code: "STRUCTURAL_INVALID", severity: "error" }] };
+  state = preview.getState();
+  assert.equal(state.authoritative, false);
+  assert.deepEqual(state.authorityReasons, ["STRUCTURAL_INVALID"]);
 });
