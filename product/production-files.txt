@@ -52,6 +52,7 @@ src/ui/transition-authoring-view.js
 src/ui/transition-preview-controller.js
 src/ui/transition-diagnostics-controller.js
 src/ui/transition-diagnostics-projection.js
+src/ui/transition-diagnostics-view.js
 src/ui/transition-preview-view.js
 src/ui/viewport-input-controller.js
 src/ui/viewport-renderer.js

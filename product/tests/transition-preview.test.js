@@ -136,14 +136,19 @@ test("invalid interpolation and duplicate/conflicting typed state are rejected w
   }), /outside the focused/);
 });
 
-test("preview controller is DOM-free and never writes session.project directly", async () => {
-  const [source, viewSource] = await Promise.all([
+test("preview and diagnostics controllers are DOM-free and views never access session.project", async () => {
+  const [source, viewSource, diagnosticsSource, diagnosticsViewSource] = await Promise.all([
     readFile(new URL("../src/ui/transition-preview-controller.js", import.meta.url), "utf8"),
     readFile(new URL("../src/ui/transition-preview-view.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/ui/transition-diagnostics-controller.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/ui/transition-diagnostics-view.js", import.meta.url), "utf8"),
   ]);
   assert.doesNotMatch(source, /\bdocument\b|\bwindow\b/);
+  assert.doesNotMatch(diagnosticsSource, /\bdocument\b|\bwindow\b/);
   assert.doesNotMatch(source, /session\.project/);
+  assert.doesNotMatch(diagnosticsSource, /session\.project/);
   assert.doesNotMatch(viewSource, /session\.project/);
+  assert.doesNotMatch(diagnosticsViewSource, /session\.project/);
   assert.match(source, /session\.query\("transition\.evaluate"/);
   assert.match(source, /animation\.temporal\.add_keyframe/);
   assert.match(source, /animation\.temporal\.update_keyframe/);
