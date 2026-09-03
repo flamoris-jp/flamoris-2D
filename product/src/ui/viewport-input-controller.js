@@ -29,6 +29,7 @@ export function bindViewportInteractions({
   render,
   setStatus,
   selectedPart,
+  endpointMesh = () => null,
   loadFile,
   windowTarget = window,
 }) {
@@ -221,7 +222,18 @@ export function bindViewportInteractions({
   });
 
   function endDrag(event) {
-    if (state.drag) setStatus(`${state.selected.size}頂点を変形中`);
+    if (state.drag) {
+      const endpoint = endpointMesh();
+      if (endpoint?.getState().editingEnabled && endpoint.activeKeyform()) {
+        if (event.type !== "pointercancel") {
+          endpoint.commitActiveMeshPositions([...getDeformedVertices(state.mesh)]);
+          setStatus(`${state.selected.size}頂点をendpoint MeshKeyformへ反映しました`);
+        } else {
+          state.mesh.vertexOffsets.fill(0);
+          render();
+        }
+      } else setStatus(`${state.selected.size}頂点を変形中`);
+    }
     if (state.transformGesture?.pointerId === event.pointerId) {
       state.transformGesture = null;
       if (event.type === "pointercancel") state.editor?.cancelTransformDrag();

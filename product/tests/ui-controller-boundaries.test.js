@@ -147,6 +147,39 @@ test("viewport controller binds Edit Mode pointer input to vertex selection", ()
   assert.deepEqual(state.drag.last, { x: 0, y: 0 });
 });
 
+test("endpoint vertex drag previews transiently and commits one keyform position update", () => {
+  const mesh = generateGridMesh(
+    { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+    10,
+    10,
+    1,
+    1,
+  );
+  const committed = [];
+  const endpoint = {
+    getState: () => ({ editingEnabled: true }),
+    activeKeyform: () => ({ id: "keyform_a" }),
+    commitActiveMeshPositions: (positions) => committed.push(positions),
+  };
+  const state = {
+    mode: "psd", editorMode: "edit", editor: null, previewMode: false,
+    spacePressed: false, view: { scale: 1, originX: 0, originY: 0 },
+    mesh, selected: new Set(), partOffset: { x: 0, y: 0 }, drag: null,
+  };
+  const elements = viewportElements();
+  bindViewport(state, elements, { endpointMesh: () => endpoint });
+  elements.overlayCanvas.dispatch("pointerdown", {
+    button: 0, pointerId: 9, clientX: 0, clientY: 0, shiftKey: false,
+  });
+  elements.overlayCanvas.dispatch("pointermove", {
+    pointerId: 9, clientX: 7, clientY: 4,
+  });
+  assert.equal(committed.length, 0);
+  elements.overlayCanvas.dispatch("pointerup", { pointerId: 9 });
+  assert.equal(committed.length, 1);
+  assert.deepEqual(committed[0].slice(0, 2), [7, 4]);
+});
+
 test("scene view keeps the active selection locked in Edit Mode", () => {
   const selections = [];
   const statuses = [];

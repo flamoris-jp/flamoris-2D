@@ -1,4 +1,5 @@
 import { PART_TRANSITION_MODES } from "./transition-authoring-controller.js";
+import { getDeformedVertices } from "../mesh.js";
 
 const STATUS_LABELS = {
   mapped: "Mapped",
@@ -27,9 +28,13 @@ function memberLabel(member) {
     : `[Missing node] ${member.nodeId}`;
 }
 
-export function createTransitionAuthoringView({ state, elements, setStatus }) {
+export function createTransitionAuthoringView({ state, elements, setStatus, onEndpointContextChange = null }) {
   function controller() {
     return state.editor?.transitionAuthoring || null;
+  }
+
+  function endpointMesh() {
+    return state.editor?.endpointMesh || null;
   }
 
   function act(action) {
@@ -123,6 +128,76 @@ export function createTransitionAuthoringView({ state, elements, setStatus }) {
       compositeGroupId: elements.replaceCompositeGroupInput.value.trim(),
     }));
   });
+
+  elements.editEndpointAButton.addEventListener("click", () => act(() => {
+    const result = endpointMesh()?.selectEndpoint("from");
+    onEndpointContextChange?.();
+    return result;
+  }));
+  elements.editEndpointBButton.addEventListener("click", () => act(() => {
+    const result = endpointMesh()?.selectEndpoint("to");
+    onEndpointContextChange?.();
+    return result;
+  }));
+  elements.endpointTopologySelect.addEventListener("change", () => act(() =>
+    endpointMesh()?.selectTopology(elements.endpointTopologySelect.value || null)));
+  for (const [endpoint, select] of [
+    ["from", elements.endpointAKeyformSelect],
+    ["to", elements.endpointBKeyformSelect],
+  ]) {
+    select.addEventListener("change", () => act(() => {
+      const result = endpointMesh()?.selectKeyform(endpoint, select.value || null);
+      onEndpointContextChange?.();
+      return result;
+    }));
+  }
+
+  function currentMeshData() {
+    if (!state.mesh) throw new Error("Create or select the endpoint artwork mesh first.");
+    const positions = [...getDeformedVertices(state.mesh)];
+    for (let index = 0; index < positions.length; index += 2) {
+      positions[index] += state.partOffset.x;
+      positions[index + 1] += state.partOffset.y;
+    }
+    return {
+      positions,
+      uvs: [...state.mesh.uvs],
+      indices: [...state.mesh.indices],
+      vertexIds: Array.from({ length: positions.length / 2 }, () =>
+        endpointMesh().idFactory("vertex")),
+    };
+  }
+
+  elements.createSharedEndpointMeshButton.addEventListener("click", () => act(() => {
+    const data = currentMeshData();
+    const result = endpointMesh()?.createSharedTopologyAndKeyforms({
+      ...data,
+      fromPositions: data.positions,
+      fromUvs: data.uvs,
+      toPositions: data.positions,
+      toUvs: data.uvs,
+    });
+    onEndpointContextChange?.();
+    setStatus("Shared MeshTopologyとA/B MeshKeyformを1件のUndo操作として作成しました");
+    return result;
+  }));
+
+  for (const [endpoint, button] of [
+    ["from", elements.createEndpointAKeyformButton],
+    ["to", elements.createEndpointBKeyformButton],
+  ]) {
+    button.addEventListener("click", () => act(() => {
+      const data = currentMeshData();
+      const topology = endpointMesh()?.getState().topologies.find((entry) =>
+        entry.id === endpointMesh().getState().selectedTopologyId);
+      if (!topology || topology.vertexIds.length * 2 !== data.positions.length) {
+        throw new Error("Current mesh vertex count must match the selected MeshTopology.");
+      }
+      const result = endpointMesh().createKeyform(endpoint, data);
+      onEndpointContextChange?.();
+      return result;
+    }));
+  }
 
   function renderKeyArts(authoring) {
     elements.keyArtList.replaceChildren();
@@ -258,6 +333,35 @@ export function createTransitionAuthoringView({ state, elements, setStatus }) {
     elements.morphConfiguration.textContent = slot?.morphReferences
       ? `Topology ${slot.morphReferences.topologyId} · endpoint keyforms ready`
       : "Topology / endpoint keyforms are unavailable (Phase 2C-2)";
+
+    const mesh = endpointMesh();
+    const meshState = mesh?.getState();
+    const meshAvailable = Boolean(meshState?.activeTransition && meshState?.selectedSemanticSlot);
+    elements.endpointMeshCard.hidden = !meshAvailable;
+    if (!meshAvailable) return;
+    elements.editEndpointAButton.classList.toggle("selected", meshState.activeEndpoint === "from");
+    elements.editEndpointBButton.classList.toggle("selected", meshState.activeEndpoint === "to");
+    elements.activeEndpointLabel.textContent = meshState.activeEndpoint === "from"
+      ? "Editing endpoint A — A artwork / world transform"
+      : "Editing endpoint B — B artwork / world transform";
+    const topologyOptions = [option("", "— Select topology —")];
+    topologyOptions.push(...meshState.topologies.map((topology) =>
+      option(topology.id, `${topology.id} · ${topology.vertexIds.length} vertices`)));
+    setOptions(elements.endpointTopologySelect, topologyOptions, meshState.selectedTopologyId || "");
+    elements.endpointTopologySelect.disabled = !meshState.topologies.length;
+    elements.createSharedEndpointMeshButton.disabled = !state.mesh || meshState.selectedSemanticSlot.status !== "mapped";
+    for (const [endpoint, select] of [
+      ["from", elements.endpointAKeyformSelect],
+      ["to", elements.endpointBKeyformSelect],
+    ]) {
+      const options = [option("", "— Select keyform —")];
+      options.push(...meshState.endpointCandidates[endpoint].map((keyform) =>
+        option(keyform.id, keyform.id)));
+      setOptions(select, options, meshState.selectedKeyformIds[endpoint] || "");
+      select.disabled = !meshState.selectedTopologyId;
+    }
+    elements.createEndpointAKeyformButton.disabled = !state.mesh || !meshState.selectedTopologyId || Boolean(meshState.selectedKeyformIds.from);
+    elements.createEndpointBKeyformButton.disabled = !state.mesh || !meshState.selectedTopologyId || Boolean(meshState.selectedKeyformIds.to);
   }
 
   return { render };

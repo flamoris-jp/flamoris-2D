@@ -38,6 +38,7 @@ export function createViewportRenderer({
   selectedPart,
   selectedPartIndex,
   selectedNodeDocumentBounds,
+  endpointContext = () => null,
 }) {
   function screenPointForPart(x, y) {
     const basePoint = {
@@ -92,6 +93,14 @@ export function createViewportRenderer({
       context.fill();
       context.strokeStyle = state.selected.has(index) ? "#4f3412" : "#183a37";
       context.stroke();
+    }
+    const endpoint = endpointContext();
+    if (endpoint) {
+      context.fillStyle = "rgba(12, 26, 25, .82)";
+      context.fillRect(14, 14, 190, 28);
+      context.fillStyle = "#ffca67";
+      context.font = "700 12px ui-monospace, monospace";
+      context.fillText(`EDIT ENDPOINT ${endpoint.endpoint === "from" ? "A" : "B"}`, 24, 33);
     }
   }
 
@@ -173,7 +182,12 @@ export function createViewportRenderer({
     above.setTransform(ratio, 0, 0, ratio, 0, 0);
 
     const activeIndex = selectedPartIndex();
+    const endpoint = endpointContext();
+    const endpointMembers = endpoint
+      ? new Set(endpoint.keyArt.members.map((member) => member.nodeId))
+      : null;
     for (let index = 0; index < state.psdParts.length; index += 1) {
+      if (endpointMembers && !endpointMembers.has(state.psdParts[index].nodeId)) continue;
       if (index === activeIndex && state.mesh) continue;
       const target = activeIndex >= 0 && index > activeIndex ? above : below;
       drawPsdPart(target, state.psdParts[index]);

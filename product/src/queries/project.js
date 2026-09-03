@@ -213,11 +213,20 @@ export const projectQueries = {
     if (!topology) throw new Error("Unknown MeshTopology " + input.topologyId + ".");
     return cloneProject(topology);
   },
+  "mesh.list_topologies": (project) => [...project.meshTopologies]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map(cloneProject),
   "mesh.get_keyform": (project, input) => {
     const keyform = project.meshKeyforms.find((entry) => entry.id === input.keyformId);
     if (!keyform) throw new Error("Unknown MeshKeyform " + input.keyformId + ".");
     return cloneProject(keyform);
   },
+  "mesh.list_keyforms": (project, input = {}) => project.meshKeyforms
+    .filter((entry) => !input.topologyId || entry.topologyId === input.topologyId)
+    .filter((entry) => !input.keyArtId || entry.keyArtId === input.keyArtId)
+    .filter((entry) => !input.semanticSlotId || entry.semanticSlotId === input.semanticSlotId)
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map(cloneProject),
   "transition.get": (project, input) => {
     const transition = project.transitions.find((entry) => entry.id === input.transitionId);
     if (!transition) throw new Error("Unknown Transition " + input.transitionId + ".");

@@ -79,5 +79,15 @@ export function queryAppElements(root = document) {
   replaceConfiguration: root.querySelector("#replaceConfiguration"),
   replaceCompositeGroupInput: root.querySelector("#replaceCompositeGroupInput"),
   morphConfiguration: root.querySelector("#morphConfiguration"),
+  endpointMeshCard: root.querySelector("#endpointMeshCard"),
+  editEndpointAButton: root.querySelector("#editEndpointAButton"),
+  editEndpointBButton: root.querySelector("#editEndpointBButton"),
+  activeEndpointLabel: root.querySelector("#activeEndpointLabel"),
+  endpointTopologySelect: root.querySelector("#endpointTopologySelect"),
+  createSharedEndpointMeshButton: root.querySelector("#createSharedEndpointMeshButton"),
+  endpointAKeyformSelect: root.querySelector("#endpointAKeyformSelect"),
+  createEndpointAKeyformButton: root.querySelector("#createEndpointAKeyformButton"),
+  endpointBKeyformSelect: root.querySelector("#endpointBKeyformSelect"),
+  createEndpointBKeyformButton: root.querySelector("#createEndpointBKeyformButton"),
   };
 }
