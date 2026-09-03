@@ -115,9 +115,11 @@ export function createTransitionPreviewView({
     const definition = selectedTrack ? TEMPORAL_TRACK_DEFINITIONS[selectedTrack.kind] : null;
     return {
       channel,
-      timeTicks: Number(elements.keyframeTickInput.value),
-      value: parseKeyframeValue(elements.keyframeValueInput.value, definition?.value),
-      interpolationToNext: interpolationFromElements(elements),
+      keyframe: {
+        timeTicks: Number(elements.keyframeTickInput.value),
+        value: parseKeyframeValue(elements.keyframeValueInput.value, definition?.value),
+        interpolationToNext: interpolationFromElements(elements),
+      },
     };
   }
 
@@ -126,7 +128,7 @@ export function createTransitionPreviewView({
     const selectedTrack = preview?.getState().selectedTrack;
     if (!selectedTrack) throw new Error("Select a typed track first.");
     const draft = keyframeDraft(selectedTrack);
-    preview.addKeyframe(selectedTrack.trackId, draft.channel, draft);
+    preview.addKeyframe(selectedTrack.trackId, draft.channel, draft.keyframe);
     setStatus("Typed keyframeを追加しました");
   }));
   elements.updateTransitionKeyframeButton.addEventListener("click", () => act(() => {
@@ -134,8 +136,8 @@ export function createTransitionPreviewView({
     const previewState = preview?.getState();
     const selection = previewState?.selectedKeyframe;
     if (!selection) throw new Error("Select a keyframe first.");
-    preview.updateKeyframe(selection.trackId, selection.channel, selection.keyframeId,
-      keyframeDraft(previewState.selectedTrack));
+    const draft = keyframeDraft(previewState.selectedTrack);
+    preview.updateKeyframe(selection.trackId, selection.channel, selection.keyframeId, draft.keyframe);
     setStatus("Typed keyframeを更新しました");
   }));
   elements.removeTransitionKeyframeButton.addEventListener("click", () => act(() => {

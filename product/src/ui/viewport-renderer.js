@@ -217,6 +217,12 @@ export function createViewportRenderer({
       clearLayerCanvas(elements.foregroundCanvas);
       clearLayerCanvas(elements.overlayCanvas);
       if (!state.view || !transitionPreview.evaluation) {
+        state.editor?.transitionPreview.setRenderReport({
+          unsupportedReasons: [state.view
+            ? "Transition evaluation is unavailable."
+            : "Viewport transform is unavailable."],
+          renderInstanceCount: 0,
+        });
         renderer.render(new Float32Array(), { originX: 0, originY: 0, scale: 1 });
         return;
       }
