@@ -7,7 +7,9 @@ import { createEvaluatedRenderPlan } from "../src/core/evaluated-render.js";
 import { serializeProject } from "../src/io/project-json.js";
 import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
 import { TransitionAuthoringController } from "../src/ui/transition-authoring-controller.js";
+import { TransitionDiagnosticsController } from "../src/ui/transition-diagnostics-controller.js";
 import { TransitionPreviewController } from "../src/ui/transition-preview-controller.js";
+import { EndpointMeshController } from "../src/ui/endpoint-mesh-controller.js";
 import { renderEvaluatedTransitionViewport } from "../src/ui/viewport-renderer.js";
 
 function member(nodeId, appearanceId, drawOrder) {
@@ -240,6 +242,97 @@ test("preview authority reports structural and renderer unsupported reasons expl
   state = preview.getState();
   assert.equal(state.authoritative, false);
   assert.deepEqual(state.authorityReasons, ["STRUCTURAL_INVALID"]);
+});
+
+test("diagnostic projection preserves severity and shares the preview authority contract", () => {
+  const { preview } = fixture();
+  preview.setTick(40000);
+  preview.evaluation = {
+    ...preview.evaluation,
+    diagnostics: [{
+      key: "warning_eye",
+      code: "TRANSITION_TRIANGLE_INVERSION",
+      severity: "warning",
+      message: "A mesh triangle changes winding between endpoints.",
+      transitionId: "transition_ab",
+      semanticSlotId: "semantic_eye",
+      details: { triangleIndex: 0 },
+    }],
+  };
+  preview.setRenderReport({ unsupportedReasons: [], renderInstanceCount: 1 });
+  const state = preview.getState();
+  assert.equal(state.authoritative, true);
+  assert.equal(state.diagnostics.find((entry) => entry.key === "warning_eye").severity, "warning");
+  assert.equal(state.diagnostics.find((entry) => entry.key === "warning_eye").authorityImpact, "advisory");
+});
+
+test("diagnostic focus navigates by stable IDs without mutating Project or history", () => {
+  const { session, authoring, preview } = fixture();
+  const endpointMesh = new EndpointMeshController(session, authoring);
+  const diagnostics = new TransitionDiagnosticsController(session, authoring, endpointMesh, preview);
+  preview.setTick(40000);
+  preview.evaluation = {
+    ...preview.evaluation,
+    diagnostics: [{
+      key: "endpoint_b",
+      code: "TRANSITION_MISSING_KEYFORM",
+      severity: "error",
+      message: "A required endpoint MeshKeyform is missing.",
+      transitionId: "transition_ab",
+      semanticSlotId: "semantic_eye",
+      details: { missingEndpoints: ["to"], toKeyformId: "keyform_b" },
+    }],
+  };
+  const before = JSON.stringify(session.project);
+  const historyLength = session.history.length;
+  const result = diagnostics.focusDiagnostic("endpoint_b");
+  assert.deepEqual(result, { focused: true, missing: false, diagnostic: result.diagnostic });
+  assert.equal(authoring.getState().selectedSemanticSlotId, "semantic_eye");
+  assert.equal(endpointMesh.getState().activeEndpoint, "to");
+  assert.equal(preview.getState().viewMode, "endpoint-b");
+  assert.equal(JSON.stringify(session.project), before);
+  assert.equal(session.history.length, historyLength);
+});
+
+test("diagnostic focus is safe for missing targets and can focus a restored track/keyframe", () => {
+  const { session, authoring, preview } = fixture();
+  const endpointMesh = new EndpointMeshController(session, authoring);
+  const diagnostics = new TransitionDiagnosticsController(session, authoring, endpointMesh, preview);
+  preview.addTrack({ kind: "OpacityTrack", target: { semanticSlotId: "semantic_eye" }, trackId: "track_focus" });
+  preview.addKeyframe("track_focus", "opacity", {
+    id: "key_focus", timeTicks: 0, value: 0.5, interpolationToNext: { kind: "linear" },
+  });
+  preview.evaluation = {
+    transitionId: "transition_ab",
+    diagnostics: [{
+      key: "track_key",
+      code: "ANIMATION_DIAGNOSTIC",
+      severity: "warning",
+      message: "Track needs attention.",
+      transitionId: "transition_ab",
+      details: { trackId: "track_focus", channel: "opacity", keyframeId: "key_focus" },
+    }],
+    evaluatedParts: [],
+  };
+  assert.equal(diagnostics.focusDiagnostic("track_key").missing, false);
+  assert.deepEqual(preview.getState().selectedKeyframe, {
+    trackId: "track_focus", channel: "opacity", keyframeId: "key_focus",
+  });
+  session.undo();
+  preview.projectChanged();
+  assert.equal(preview.getState().selectedKeyframe, null);
+  assert.equal(diagnostics.focusDiagnostic("track_key").missing, true);
+  session.redo();
+  preview.projectChanged();
+  assert.equal(diagnostics.focusDiagnostic("track_key").missing, false);
+
+  preview.evaluation.diagnostics[0] = {
+    ...preview.evaluation.diagnostics[0],
+    key: "missing_slot",
+    semanticSlotId: "slot_removed",
+  };
+  assert.equal(diagnostics.focusDiagnostic("missing_slot").missing, true);
+  assert.equal(diagnostics.getState().selectedDiagnosticMissing, false);
 });
 
 test("mixed draw-order composite groups are non-authoritative instead of choosing a hidden z position", () => {
