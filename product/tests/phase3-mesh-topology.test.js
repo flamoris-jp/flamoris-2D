@@ -210,6 +210,18 @@ test("Remove Vertex does not renumber survivors or reuse an issued ID", () => {
     session.query("mesh.get_topology", { topologyId: "topology" }).nextVertexId,
     "vtx_0006",
   );
+  assert.throws(
+    () => session.execute({
+      type: "mesh_topology.add_vertex",
+      payload: {
+        topologyId: "topology",
+        vertexId: "vtx_0005",
+        position: { x: 1, y: 1 },
+        uv: { x: 0.1, y: 0.1 },
+      },
+    }),
+    (error) => error.code === "MESH_TOPOLOGY_VERTEX_ID_REUSED",
+  );
   meshTools.execute("topology.remove", { vertexId: "vtx_0002" });
   const topology = session.query("mesh.get_topology", { topologyId: "topology" });
   assert.deepEqual(topology.vertexIds, ["vtx_0001", "vtx_0003", "vtx_0004"]);

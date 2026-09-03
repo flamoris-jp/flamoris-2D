@@ -89,13 +89,23 @@ function assertFinitePoint(point, label) {
   }
 }
 
-function assertNewVertexId(project, vertexId) {
+function assertNewVertexId(project, topology, vertexId) {
   const existing = project.meshTopologies
     .flatMap((topology) => topology.vertexIds || [])
     .includes(vertexId);
   if (existing) {
     throw new CommandError("Stable vertex ID already exists.",
       "MESH_TOPOLOGY_DUPLICATE_VERTEX", { vertexId });
+  }
+  const match = /^vtx_(\d+)$/.exec(vertexId);
+  if (match && Number.isSafeInteger(topology.nextVertexSequence) &&
+    Number(match[1]) < topology.nextVertexSequence) {
+    throw new CommandError("Stable vertex ID was already issued by this topology.",
+      "MESH_TOPOLOGY_VERTEX_ID_REUSED", {
+        topologyId: topology.id,
+        vertexId,
+        nextVertexSequence: topology.nextVertexSequence,
+      });
   }
 }
 
@@ -188,7 +198,7 @@ export const meshTopologyCommandHandlers = {
 
   "mesh_topology.add_vertex": (project, payload) => {
     const topology = topologyFor(project, payload.topologyId);
-    assertNewVertexId(project, payload.vertexId);
+    assertNewVertexId(project, topology, payload.vertexId);
     assertFinitePoint(payload.position, "Position");
     assertFinitePoint(payload.uv, "UV");
     if (payload.semanticLabel) {
@@ -280,7 +290,7 @@ export const meshTopologyCommandHandlers = {
         "MESH_TOPOLOGY_EDGE_INVALID");
     }
     const [a, b] = payload.vertexIds.map((vertexId) => vertexIndex(topology, vertexId));
-    assertNewVertexId(project, payload.newVertexId);
+    assertNewVertexId(project, topology, payload.newVertexId);
     const triangles = [];
     let affectedTriangles = 0;
     const newIndex = topology.vertexIds.length;

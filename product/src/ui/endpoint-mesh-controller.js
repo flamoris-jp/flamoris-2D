@@ -99,9 +99,18 @@ export class EndpointMeshController {
   }
 
   updateTopology(topologyId, { vertexIds, indices }) {
+    const current = this.session.query("mesh.get_topology", { topologyId });
     return this.session.execute({
       type: "mesh_topology.update",
-      payload: { topologyId, topology: { id: topologyId, vertexIds: [...vertexIds], indices: [...indices], vertexMetadata: {} } },
+      payload: { topologyId, topology: {
+        id: topologyId,
+        vertexIds: [...vertexIds],
+        indices: [...indices],
+        vertexMetadata: cloneProject(current.vertexMetadata),
+        ...(Number.isSafeInteger(current.nextVertexSequence)
+          ? { nextVertexSequence: current.nextVertexSequence }
+          : {}),
+      } },
     }, { label: "Update MeshTopology" });
   }
 
