@@ -91,6 +91,12 @@ export const commandSchemas = {
     properties: { topology: domainObject },
     additionalProperties: false,
   },
+  "mesh_topology.update": {
+    type: "object",
+    required: ["topologyId", "topology"],
+    properties: { topologyId: nonEmptyString, topology: domainObject },
+    additionalProperties: false,
+  },
   "mesh_topology.remove": {
     type: "object",
     required: ["topologyId"],

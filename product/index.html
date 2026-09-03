@@ -173,7 +173,7 @@
           <section id="transitionAuthoringPanel" class="transition-authoring" aria-labelledby="transitionAuthoringTitle">
             <div class="panel-heading">
               <h2 id="transitionAuthoringTitle">Transition Authoring</h2>
-              <span>Phase 2C-1</span>
+              <span>Phase 2C-2</span>
             </div>
 
             <label class="authoring-field">Active Transition
@@ -216,6 +216,28 @@
                 <input id="replaceCompositeGroupInput" type="text" autocomplete="off" />
               </label>
               <p id="morphConfiguration" class="authoring-status" hidden></p>
+            </fieldset>
+
+            <fieldset id="endpointMeshCard" class="part-transition-card">
+              <legend>Endpoint Mesh / Keyform</legend>
+              <div class="endpoint-switch" role="group" aria-label="Endpoint edit context">
+                <button id="editEndpointAButton" type="button">Edit A</button>
+                <button id="editEndpointBButton" type="button">Edit B</button>
+              </div>
+              <output id="activeEndpointLabel" class="authoring-status">Select Morph SemanticSlot</output>
+              <label class="authoring-field">Shared MeshTopology
+                <select id="endpointTopologySelect" disabled><option value="">— Select topology —</option></select>
+              </label>
+              <button id="createSharedEndpointMeshButton" type="button" disabled>Create shared mesh from current vertices</button>
+              <label class="authoring-field">A MeshKeyform
+                <select id="endpointAKeyformSelect" disabled><option value="">— Select keyform —</option></select>
+              </label>
+              <button id="createEndpointAKeyformButton" type="button" disabled>Create A keyform</button>
+              <label class="authoring-field">B MeshKeyform
+                <select id="endpointBKeyformSelect" disabled><option value="">— Select keyform —</option></select>
+              </label>
+              <button id="createEndpointBKeyformButton" type="button" disabled>Create B keyform</button>
+              <p class="authoring-status">Topology/keyform creation uses the existing command API. Vertex movement is endpoint-local.</p>
             </fieldset>
           </section>
         </aside>

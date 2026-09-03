@@ -195,3 +195,9 @@ button:not(:disabled):hover, .file-button:hover { border-color: var(--mint); tra
 .mapping-status[data-status="mapped"] { color: var(--mint); }
 .mapping-status[data-status="a-only"], .mapping-status[data-status="b-only"] { color: var(--gold); }
 .mapping-status[data-status="missing-invalid"] { color: #ff9191; background: rgba(255, 90, 90, .08); }
+.endpoint-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.endpoint-switch button.selected {
+  border-color: var(--gold);
+  color: #ffe4a7;
+  background: rgba(255, 202, 103, .12);
+}
