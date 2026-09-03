@@ -198,6 +198,7 @@ test("Topology Edit selects through the stable-ID controller and Add never start
   };
   const elements = viewportElements();
   bindViewport(state, elements, {
+    endpointMesh: () => ({ getState: () => ({ editingEnabled: true }) }),
     meshTools: () => tools,
     selectedPart: () => ({ left: 0, top: 0, width: 100, height: 100 }),
   });
