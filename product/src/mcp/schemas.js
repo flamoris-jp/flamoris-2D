@@ -27,6 +27,7 @@ export const querySchemas = {
   "mesh.get_keyform": idQuery("keyformId", nodeId),
   "transition.get": idQuery("transitionId", transitionId),
   "transition.list": emptyQuery(),
+  "transition.get_authoring": idQuery("transitionId", transitionId),
   "transition.evaluate": {
     type: "object",
     required: ["transitionId", "timeTicks"],
