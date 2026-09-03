@@ -169,6 +169,55 @@
               </div>
             </fieldset>
           </form>
+
+          <section id="transitionAuthoringPanel" class="transition-authoring" aria-labelledby="transitionAuthoringTitle">
+            <div class="panel-heading">
+              <h2 id="transitionAuthoringTitle">Transition Authoring</h2>
+              <span>Phase 2C-1</span>
+            </div>
+
+            <label class="authoring-field">Active Transition
+              <select id="activeTransitionSelect"><option value="">— No Project —</option></select>
+            </label>
+
+            <fieldset class="endpoint-card">
+              <legend>A / B Key Art</legend>
+              <label><strong>A</strong> Start Key Art<select id="transitionFromKeyArtSelect"><option value="">— Key Art —</option></select></label>
+              <label><strong>B</strong> End Key Art<select id="transitionToKeyArtSelect"><option value="">— Key Art —</option></select></label>
+              <label>Duration ticks<input id="transitionDurationInput" type="number" min="1" step="1" value="120000" /></label>
+              <button id="createTransitionButton" type="button" disabled>New Transition + Program</button>
+              <output id="transitionEndpointStatus" class="authoring-status">Projectを開くとAuthoringを開始できます</output>
+            </fieldset>
+
+            <details class="keyart-summary" open>
+              <summary>Key Art list</summary>
+              <ul id="keyArtList"><li class="panel-empty">Key Artがありません</li></ul>
+            </details>
+
+            <fieldset class="mapping-card">
+              <legend>SemanticSlot Mapping</legend>
+              <label class="authoring-field">SemanticSlot
+                <select id="semanticSlotSelect" disabled><option value="">— Select SemanticSlot —</option></select>
+              </label>
+              <output id="semanticMappingStatus" class="mapping-status">SemanticSlotを選択</output>
+              <label><strong>A</strong> mapped node<select id="semanticFromNodeSelect" disabled><option value="">— Unmapped —</option></select></label>
+              <label><strong>B</strong> mapped node<select id="semanticToNodeSelect" disabled><option value="">— Unmapped —</option></select></label>
+            </fieldset>
+
+            <fieldset class="part-transition-card">
+              <legend>PartTransition Mode</legend>
+              <label class="authoring-field">Persistent mode
+                <select id="partTransitionModeSelect" disabled><option value="">— No PartTransition —</option></select>
+              </label>
+              <label id="holdConfiguration" hidden>Hold endpoint
+                <select id="holdEndpointSelect"><option value="from">A / from</option><option value="to">B / to</option></select>
+              </label>
+              <label id="replaceConfiguration" hidden>Composite group ID
+                <input id="replaceCompositeGroupInput" type="text" autocomplete="off" />
+              </label>
+              <p id="morphConfiguration" class="authoring-status" hidden></p>
+            </fieldset>
+          </section>
         </aside>
       </section>
     </main>

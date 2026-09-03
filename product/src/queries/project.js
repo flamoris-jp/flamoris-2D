@@ -13,6 +13,86 @@ function temporalProgram(project, programId) {
   return program;
 }
 
+function keyArtEndpoint(project, keyArtId) {
+  const keyArt = project.keyArts.find((entry) => entry.id === keyArtId) || null;
+  return {
+    id: keyArtId,
+    keyArt: keyArt ? {
+      ...cloneProject(keyArt),
+      members: keyArt.members.map((member) => {
+        const node = project.scene.nodes[member.nodeId] || null;
+        return {
+          ...cloneProject(member),
+          node: node ? {
+            id: node.id,
+            displayName: node.displayName,
+            kind: node.kind,
+          } : null,
+        };
+      }),
+    } : null,
+    missing: !keyArt,
+  };
+}
+
+function mappingProjection(project, endpoint, mapping) {
+  if (!mapping) return { mapping: null, node: null, valid: false, missing: false };
+  const node = project.scene.nodes[mapping.nodeId] || null;
+  const isMember = Boolean(endpoint.keyArt?.members.some((member) =>
+    member.nodeId === mapping.nodeId));
+  return {
+    mapping: cloneProject(mapping),
+    node: node ? {
+      id: node.id,
+      displayName: node.displayName,
+      kind: node.kind,
+    } : null,
+    valid: Boolean(endpoint.keyArt && node && isMember),
+    missing: !endpoint.keyArt || !node || !isMember,
+  };
+}
+
+function mappingFor(slot, keyArtId) {
+  return (slot.mappings || []).find((mapping) =>
+    mapping.keyArtId === keyArtId) || null;
+}
+
+function mappingStatus(from, to) {
+  if (from.missing || to.missing) return "missing-invalid";
+  if (from.valid && to.valid) return "mapped";
+  if (from.valid) return "a-only";
+  if (to.valid) return "b-only";
+  return "unmapped";
+}
+
+function explicitMorphReferences(project, transition, slot, part) {
+  if (!part?.topologyId || !part.fromKeyformId || !part.toKeyformId) return null;
+  const topology = project.meshTopologies.find((entry) => entry.id === part.topologyId);
+  const from = project.meshKeyforms.find((entry) => entry.id === part.fromKeyformId);
+  const to = project.meshKeyforms.find((entry) => entry.id === part.toKeyformId);
+  const valid = topology && from && to &&
+    from.topologyId === topology.id && to.topologyId === topology.id &&
+    from.keyArtId === transition.fromKeyArtId &&
+    to.keyArtId === transition.toKeyArtId &&
+    from.semanticSlotId === slot.id && to.semanticSlotId === slot.id;
+  return valid ? {
+    topologyId: topology.id,
+    fromKeyformId: from.id,
+    toKeyformId: to.id,
+  } : null;
+}
+
+function modeAvailability(status, morphReferences) {
+  return {
+    morph: status === "mapped" && Boolean(morphReferences),
+    hold: ["mapped", "a-only", "b-only"].includes(status),
+    replace: status === "mapped",
+    appear: status === "b-only",
+    disappear: status === "a-only",
+    occlusion: status === "mapped",
+  };
+}
+
 function treeNode(
   project,
   nodeId,
@@ -150,6 +230,52 @@ export const projectQueries = {
       ...cloneProject(transition),
       durationTicks: temporalProgram(project, transition.temporalProgramId).durationTicks,
     })),
+  "transition.get_authoring": (project, input) => {
+    const transition = project.transitions.find((entry) => entry.id === input.transitionId);
+    if (!transition) throw new Error("Unknown Transition " + input.transitionId + ".");
+    const fromEndpoint = keyArtEndpoint(project, transition.fromKeyArtId);
+    const toEndpoint = keyArtEndpoint(project, transition.toKeyArtId);
+    const semanticSlots = [...project.semanticSlots]
+      .sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+      .map((slot) => {
+        const from = mappingProjection(
+          project,
+          fromEndpoint,
+          mappingFor(slot, transition.fromKeyArtId),
+        );
+        const to = mappingProjection(
+          project,
+          toEndpoint,
+          mappingFor(slot, transition.toKeyArtId),
+        );
+        const status = mappingStatus(from, to);
+        const partTransition = transition.partTransitions.find((part) =>
+          part.semanticSlotId === slot.id) || null;
+        const morphReferences = explicitMorphReferences(
+          project,
+          transition,
+          slot,
+          partTransition,
+        );
+        return {
+          ...cloneProject(slot),
+          from,
+          to,
+          status,
+          partTransition: cloneProject(partTransition),
+          morphReferences,
+          availableModes: modeAvailability(status, morphReferences),
+        };
+      });
+    return {
+      transition: {
+        ...cloneProject(transition),
+        durationTicks: temporalProgram(project, transition.temporalProgramId).durationTicks,
+      },
+      endpoints: { from: fromEndpoint, to: toEndpoint },
+      semanticSlots,
+    };
+  },
   "transition.evaluate": (project, input) =>
     evaluateTransition(project, input.transitionId, input.timeTicks),
   "transition.get_diagnostics": (project, input) =>

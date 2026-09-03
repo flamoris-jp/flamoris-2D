@@ -45,6 +45,7 @@ import { bindViewportInteractions } from "./ui/viewport-input-controller.js";
 import { queryAppElements } from "./ui/app-elements.js";
 import { createReimportReviewView } from "./ui/reimport-review-view.js";
 import { createMeshEditingController } from "./ui/mesh-editing-controller.js";
+import { createTransitionAuthoringView } from "./ui/transition-authoring-view.js";
 
 const desktopApi = window.flamorisDesktop || null;
 const appStorage = desktopApi?.storage || localStorage;
@@ -138,6 +139,12 @@ const sceneEditorView = createSceneEditorView({
 });
 
 const reimportReviewView = createReimportReviewView({
+  state,
+  elements,
+  setStatus,
+});
+
+const transitionAuthoringView = createTransitionAuthoringView({
   state,
   elements,
   setStatus,
@@ -406,6 +413,7 @@ function syncSelectedPsdPart() {
 
 function renderEditorUi() {
   sceneEditorView.render();
+  transitionAuthoringView.render();
 }
 
 function handleEditorChange(reason) {
