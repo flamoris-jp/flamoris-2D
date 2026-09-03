@@ -314,11 +314,13 @@ function setEditorMode(requestedMode) {
       return false;
     }
     if (requestedMode === EDITOR_MODES.TOPOLOGY &&
-      (!state.editor?.endpointMesh.getState().editingEnabled || !activeEndpointContext()?.topology)) {
+      (!state.editor?.endpointMesh.getState().editingEnabled ||
+        !activeEndpointContext()?.topology ||
+        !activeEndpointContext()?.keyform)) {
       state.editorMode = EDITOR_MODES.OBJECT;
       state.editTargetNodeId = null;
       updateEditorModeUi();
-      setStatus("Topology Edit Modeには、endpoint workflowで共有MeshTopologyを選択してください。");
+      setStatus("Topology Edit Modeには、endpoint workflowで共有MeshTopologyと表示用MeshKeyformを選択してください。");
       renderEditorUi();
       render();
       return false;

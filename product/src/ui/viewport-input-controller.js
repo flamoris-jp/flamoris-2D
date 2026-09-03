@@ -175,7 +175,7 @@ export function bindViewportInteractions({
     if (route !== "mesh") return;
 
     const vertexIndex = nearestVertex(screenPoint);
-    const tools = meshTools();
+    const tools = endpointMesh()?.getState().editingEnabled ? meshTools() : null;
     state.selected = updateVertexSelection(
       state.selected,
       vertexIndex,
