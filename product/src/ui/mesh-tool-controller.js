@@ -116,6 +116,7 @@ export class MeshToolController {
     if (!Object.values(MESH_AUTHORING_MODES).includes(mode)) {
       throw new Error(`Unknown mesh authoring mode ${mode}.`);
     }
+    if (this.mode === mode) return;
     this.mode = mode;
     this.activeToolId = mode === MESH_AUTHORING_MODES.DEFORM
       ? "deform.move"
