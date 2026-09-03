@@ -271,7 +271,8 @@ export class TransitionPreviewController {
         structuralReasons.push(entry.message ? `${entry.code}: ${entry.message}` : `${entry.code}`);
       }
     }
-    const rendererReasons = this.renderReport?.unsupportedReasons || [];
+    const rendererReasons = this.renderReport?.unsupportedReasons ||
+      (this.evaluation ? ["Renderer validation pending or unavailable."] : []);
     const reasons = [...new Set([...structuralReasons, ...rendererReasons])];
     return {
       viewMode: this.viewMode,

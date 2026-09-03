@@ -162,10 +162,17 @@ export function createEvaluatedRenderPlan(evaluatedTransition, {
       unsupportedReasons.push(`Composite group ${compositeGroupId} has no visible contribution.`);
       continue;
     }
+    const drawOrders = [...new Set(renderInstances.map((entry) => entry.drawOrder))].sort((left, right) => left - right);
+    if (drawOrders.length !== 1) {
+      unsupportedReasons.push(
+        `Composite group ${compositeGroupId} has inconsistent explicit draw order (${drawOrders.join(", ")}); renderer cannot infer a composite layer.`,
+      );
+      continue;
+    }
     batches.push({
       kind: "weighted-premultiplied",
       compositeGroupId,
-      drawOrder: Math.min(...renderInstances.map((entry) => entry.drawOrder)),
+      drawOrder: drawOrders[0],
       renderInstances: [...renderInstances].sort((left, right) =>
         left.drawOrder - right.drawOrder || compareText(left.renderInstanceId, right.renderInstanceId)),
     });
@@ -177,6 +184,6 @@ export function createEvaluatedRenderPlan(evaluatedTransition, {
   return {
     batches,
     unsupportedReasons: [...new Set(unsupportedReasons)],
-    renderInstanceCount: usable.length,
+    renderInstanceCount: batches.reduce((count, batch) => count + batch.renderInstances.length, 0),
   };
 }

@@ -31,7 +31,7 @@ function fixture() {
   }
   project.keyArts.push(
     { id: "keyart_a", displayName: "A", rootNodeId: project.scene.rootId, members: [member("node_a", "appearance_a", 1)], metadata: {} },
-    { id: "keyart_b", displayName: "B", rootNodeId: project.scene.rootId, members: [member("node_b", "appearance_b", 2)], metadata: {} },
+    { id: "keyart_b", displayName: "B", rootNodeId: project.scene.rootId, members: [member("node_b", "appearance_b", 1)], metadata: {} },
   );
   project.semanticSlots.push({
     id: "semantic_eye", displayName: "Eye", role: "eye", metadata: {},
@@ -227,8 +227,11 @@ test("renderer plan honors presence and explicit draw order without reading Part
 test("preview authority reports structural and renderer unsupported reasons explicitly", () => {
   const { preview } = fixture();
   preview.setTick(40000);
-  preview.setRenderReport({ unsupportedReasons: ["Clipping rasterization is unsupported."] });
   let state = preview.getState();
+  assert.equal(state.authoritative, false);
+  assert.deepEqual(state.authorityReasons, ["Renderer validation pending or unavailable."]);
+  preview.setRenderReport({ unsupportedReasons: ["Clipping rasterization is unsupported."] });
+  state = preview.getState();
   assert.equal(state.authoritative, false);
   assert.deepEqual(state.authorityReasons, ["Clipping rasterization is unsupported."]);
   preview.setRenderReport({ unsupportedReasons: [] });
@@ -237,6 +240,32 @@ test("preview authority reports structural and renderer unsupported reasons expl
   state = preview.getState();
   assert.equal(state.authoritative, false);
   assert.deepEqual(state.authorityReasons, ["STRUCTURAL_INVALID"]);
+});
+
+test("mixed draw-order composite groups are non-authoritative instead of choosing a hidden z position", () => {
+  const instance = (renderInstanceId, drawOrder, compositeGroupId = null) => ({
+    renderInstanceId,
+    sourceNodeId: "node_a",
+    transform: [1, 0, 0, 1, 0, 0],
+    mesh: { positions: [0, 0, 1, 0, 0, 1], indices: [0, 1, 2] },
+    appearanceSamples: [{ appearanceId: "appearance_a", sourceNodeId: "node_a", uvs: [0, 0, 1, 0, 0, 1], weight: 1 }],
+    opacity: 1,
+    drawOrder,
+    clipping: { sourceNodeId: null },
+    ...(compositeGroupId ? { compositeGroupId, compositeWeight: 0.5 } : {}),
+  });
+  const plan = createEvaluatedRenderPlan({
+    evaluatedParts: [
+      { semanticSlotId: "slot_group", presence: "present", renderInstances: [
+        instance("group_a", 1, "handoff"),
+        instance("group_b", 3, "handoff"),
+      ] },
+      { semanticSlotId: "slot_between", presence: "present", renderInstances: [instance("between", 2)] },
+    ],
+  }, { resolveArtwork: () => ({}) });
+  assert.deepEqual(plan.batches.map((batch) => batch.renderInstances.map((entry) => entry.renderInstanceId)), [["between"]]);
+  assert.equal(plan.renderInstanceCount, 1);
+  assert.match(plan.unsupportedReasons[0], /inconsistent explicit draw order \(1, 3\)/);
 });
 
 test("scrubber to evaluator to viewport consumer keeps simultaneous Replace instances", () => {
