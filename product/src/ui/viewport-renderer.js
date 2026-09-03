@@ -2,6 +2,21 @@ import { getDeformedVertices, imageToScreen } from "../mesh.js";
 import { sampleLoop } from "../animation.js";
 import { transformPoint } from "../core/transforms.js";
 import { EDITOR_MODES } from "./editor-modes.js";
+import { createEvaluatedRenderPlan } from "../core/evaluated-render.js";
+
+export function renderEvaluatedTransitionViewport({
+  evaluation,
+  view,
+  renderer,
+  resolveArtwork,
+}) {
+  const plan = createEvaluatedRenderPlan(evaluation, { resolveArtwork });
+  renderer.renderEvaluated(plan, view, resolveArtwork);
+  return {
+    unsupportedReasons: plan.unsupportedReasons,
+    renderInstanceCount: plan.renderInstanceCount,
+  };
+}
 
 export function clearLayerCanvas(canvas) {
   const context = canvas.getContext("2d");
@@ -39,6 +54,7 @@ export function createViewportRenderer({
   selectedPartIndex,
   selectedNodeDocumentBounds,
   endpointContext = () => null,
+  transitionPreviewContext = () => null,
 }) {
   function screenPointForPart(x, y) {
     const basePoint = {
@@ -195,6 +211,32 @@ export function createViewportRenderer({
   }
 
   function render() {
+    const transitionPreview = transitionPreviewContext();
+    if (transitionPreview?.viewMode === "preview") {
+      clearLayerCanvas(elements.backgroundBelowCanvas);
+      clearLayerCanvas(elements.foregroundCanvas);
+      clearLayerCanvas(elements.overlayCanvas);
+      if (!state.view || !transitionPreview.evaluation) {
+        state.editor?.transitionPreview.setRenderReport({
+          unsupportedReasons: [state.view
+            ? "Transition evaluation is unavailable."
+            : "Viewport transform is unavailable."],
+          renderInstanceCount: 0,
+        });
+        renderer.render(new Float32Array(), { originX: 0, originY: 0, scale: 1 });
+        return;
+      }
+      const resolveArtwork = (nodeId) =>
+        state.psdParts.find((part) => part.nodeId === nodeId)?.canvas || null;
+      const report = renderEvaluatedTransitionViewport({
+        evaluation: transitionPreview.evaluation,
+        view: state.view,
+        renderer,
+        resolveArtwork,
+      });
+      state.editor?.transitionPreview.setRenderReport(report);
+      return;
+    }
     drawPsdBackgrounds();
     if (!state.mesh || !state.view) {
       renderer.render(

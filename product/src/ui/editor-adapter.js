@@ -2,6 +2,7 @@ import { cloneProject } from "../model/project.js";
 import { worldTransformMatrix } from "../core/transforms.js";
 import { TransitionAuthoringController } from "./transition-authoring-controller.js";
 import { EndpointMeshController } from "./endpoint-mesh-controller.js";
+import { TransitionPreviewController } from "./transition-preview-controller.js";
 
 function filterTree(node, matches) {
   const children = node.children
@@ -33,9 +34,15 @@ export class EditorUiAdapter {
     this.activeTool = "translate";
     this.transformDrag = null;
     this.transitionAuthoring = new TransitionAuthoringController(session, {
-      onChange: (reason) => this.notify(reason),
+      onChange: (reason) => {
+        if (reason === "transition-selection") this.transitionPreview?.activeTransitionChanged();
+        this.notify(reason);
+      },
     });
     this.endpointMesh = new EndpointMeshController(session, this.transitionAuthoring, {
+      onChange: (reason) => this.notify(reason),
+    });
+    this.transitionPreview = new TransitionPreviewController(session, this.transitionAuthoring, {
       onChange: (reason) => this.notify(reason),
     });
     this.expandAllGroups();
@@ -43,6 +50,7 @@ export class EditorUiAdapter {
     const sessionOnChange = session.onChange;
     session.onChange = (...args) => {
       sessionOnChange?.(...args);
+      this.transitionPreview.projectChanged();
       this.notify("project");
     };
   }

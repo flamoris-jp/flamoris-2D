@@ -46,6 +46,7 @@ import { queryAppElements } from "./ui/app-elements.js";
 import { createReimportReviewView } from "./ui/reimport-review-view.js";
 import { createMeshEditingController } from "./ui/mesh-editing-controller.js";
 import { createTransitionAuthoringView } from "./ui/transition-authoring-view.js";
+import { createTransitionPreviewView } from "./ui/transition-preview-view.js";
 
 const desktopApi = window.flamorisDesktop || null;
 const appStorage = desktopApi?.storage || localStorage;
@@ -128,6 +129,7 @@ const viewportRenderer = createViewportRenderer({
   selectedPartIndex,
   selectedNodeDocumentBounds,
   endpointContext: activeEndpointContext,
+  transitionPreviewContext: () => state.editor?.transitionPreview.getState() || null,
 });
 
 const sceneEditorView = createSceneEditorView({
@@ -150,6 +152,21 @@ const transitionAuthoringView = createTransitionAuthoringView({
   elements,
   setStatus,
   onEndpointContextChange: () => syncEndpointMeshViewport(),
+});
+
+const transitionPreviewView = createTransitionPreviewView({
+  state,
+  elements,
+  setStatus,
+  onViewModeChange: (mode) => {
+    if (mode === "preview") {
+      state.editor?.endpointMesh.exitEditing();
+      render();
+      return;
+    }
+    state.editor?.endpointMesh.selectEndpoint(mode === "endpoint-a" ? "from" : "to");
+    syncEndpointMeshViewport();
+  },
 });
 
 function setStatus(message) {
@@ -480,6 +497,7 @@ function syncSelectedPsdPart() {
 function renderEditorUi() {
   sceneEditorView.render();
   transitionAuthoringView.render();
+  transitionPreviewView.render();
 }
 
 function handleEditorChange(reason) {
