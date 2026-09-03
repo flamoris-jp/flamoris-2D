@@ -174,6 +174,11 @@ export function bindViewportInteractions({
 
     if (route !== "mesh") return;
 
+    if (state.editor?.transitionPreview?.getState().viewMode === "preview") {
+      setStatus("Preview中間状態はread-onlyです。Key State markerを選んでendpointを編集してください。");
+      return;
+    }
+
     const vertexIndex = nearestVertex(screenPoint);
     const tools = endpointMesh()?.getState().editingEnabled ? meshTools() : null;
     state.selected = updateVertexSelection(

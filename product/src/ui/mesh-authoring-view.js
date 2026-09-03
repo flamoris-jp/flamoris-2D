@@ -46,6 +46,7 @@ export function createMeshAuthoringView({ state, elements, setStatus }) {
   function render() {
     const toolState = controller()?.getState() || null;
     const topologyMode = toolState?.mode === MESH_AUTHORING_MODES.TOPOLOGY;
+    const previewMode = state.editor?.transitionPreview.getState().viewMode === "preview";
     const selected = toolState?.selectedVertex || null;
     const selectedCount = toolState?.selectedVertexIds.length || 0;
     const previousTool = elements.meshToolSelect.value;
@@ -54,23 +55,25 @@ export function createMeshAuthoringView({ state, elements, setStatus }) {
       ...(toolState?.tools || []).map((tool) => option(tool.id, tool.label)),
     );
     elements.meshToolSelect.value = toolState?.activeToolId || previousTool || "";
-    elements.meshToolSelect.disabled = !toolState?.topology;
+    elements.meshToolSelect.disabled = !toolState?.topology || previewMode;
     elements.vertexIdOverlayInput.checked = Boolean(toolState?.vertexIdOverlayVisible);
-    elements.vertexIdOverlayInput.disabled = !toolState?.topology;
+    elements.vertexIdOverlayInput.disabled = !toolState?.topology || previewMode;
     elements.selectedVertexIdOutput.textContent = selected?.id || "—";
     elements.selectedVertexLabelOutput.textContent = selected?.semanticLabel || "—";
     if (document.activeElement !== elements.vertexSemanticLabelInput) {
       elements.vertexSemanticLabelInput.value = selected?.semanticLabel || "";
     }
-    elements.vertexSemanticLabelInput.disabled = !topologyMode || selectedCount !== 1;
-    elements.setVertexSemanticLabelButton.disabled = !topologyMode || selectedCount !== 1;
+    elements.vertexSemanticLabelInput.disabled = previewMode || !topologyMode || selectedCount !== 1;
+    elements.setVertexSemanticLabelButton.disabled = previewMode || !topologyMode || selectedCount !== 1;
     elements.clearVertexSemanticLabelButton.disabled =
-      !topologyMode || selectedCount !== 1 || !selected?.semanticLabel;
-    elements.removeVertexButton.disabled = !topologyMode || selectedCount !== 1;
-    elements.createTriangleButton.disabled = !topologyMode || selectedCount !== 3;
-    elements.subdivideEdgeButton.disabled = !topologyMode || selectedCount !== 2;
+      previewMode || !topologyMode || selectedCount !== 1 || !selected?.semanticLabel;
+    elements.removeVertexButton.disabled = previewMode || !topologyMode || selectedCount !== 1;
+    elements.createTriangleButton.disabled = previewMode || !topologyMode || selectedCount !== 3;
+    elements.subdivideEdgeButton.disabled = previewMode || !topologyMode || selectedCount !== 2;
     elements.meshTopologyImpact.dataset.mode = toolState?.mode || "none";
-    elements.meshTopologyImpact.textContent = topologyMode
+    elements.meshTopologyImpact.textContent = previewMode
+      ? "Preview is read-only — endpoint deformation and topology commands are blocked."
+      : topologyMode
       ? `Shared Topology change — affects ${toolState.affectedKeyformIds.length} MeshKeyform(s): ${toolState.affectedKeyformIds.join(", ") || "none"}`
       : "Deform Mode — changes only the active MeshKeyform; topology commands are blocked.";
   }

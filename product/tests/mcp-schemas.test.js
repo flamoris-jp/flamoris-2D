@@ -7,7 +7,7 @@ import {
 } from "../src/mcp/schemas.js";
 
 test("MCP schema module imports with wired query and command schemas", () => {
-  assert.equal(MCP_SCHEMA_VERSION, 4);
+  assert.equal(MCP_SCHEMA_VERSION, 5);
   assert.equal(
     querySchemas["scene.get_node"].properties.nodeId.type,
     "string",
@@ -22,5 +22,10 @@ test("MCP schema module imports with wired query and command schemas", () => {
     commandSchemas["mesh_topology.subdivide_edge"]
       .properties.vertexIds.minItems,
     2,
+  );
+  assert.equal(
+    commandSchemas["animation.temporal.set_duration"]
+      .properties.durationTicks.minimum,
+    1,
   );
 });

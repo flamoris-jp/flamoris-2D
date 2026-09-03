@@ -50,6 +50,7 @@ import { createTransitionAuthoringView } from "./ui/transition-authoring-view.js
 import { createTransitionPreviewView } from "./ui/transition-preview-view.js";
 import { createTransitionDiagnosticsView } from "./ui/transition-diagnostics-view.js";
 import { createMeshAuthoringView } from "./ui/mesh-authoring-view.js";
+import { createKeyStateStripView } from "./ui/key-state-strip-view.js";
 
 const desktopApi = window.flamorisDesktop || null;
 const appStorage = desktopApi?.storage || localStorage;
@@ -169,6 +170,23 @@ const transitionPreviewView = createTransitionPreviewView({
     }
     state.editor?.endpointMesh.selectEndpoint(mode === "endpoint-a" ? "from" : "to");
     syncEndpointMeshViewport();
+  },
+});
+
+const keyStateStripView = createKeyStateStripView({
+  state,
+  elements,
+  setStatus,
+  onEndpointEdit: () => {
+    state.editorMode = EDITOR_MODES.DEFORM;
+    state.editor?.meshTools.setMode(EDITOR_MODES.DEFORM);
+    syncEndpointMeshViewport();
+  },
+  onPreview: () => {
+    state.drag = null;
+    state.selected.clear();
+    renderEditorUi();
+    render();
   },
 });
 
@@ -487,6 +505,7 @@ async function loadImage(source, label) {
   image.src = source;
   await loaded;
 
+  state.editor?.keyStateStrip.pause();
   state.mode = "png";
   state.editorMode = EDITOR_MODES.DEFORM;
   state.editTargetNodeId = null;
@@ -534,6 +553,7 @@ function renderEditorUi() {
   sceneEditorView.render();
   transitionAuthoringView.render();
   transitionPreviewView.render();
+  keyStateStripView.render();
   transitionDiagnosticsView.render();
   meshAuthoringView.render();
 }
@@ -603,6 +623,7 @@ function attachProject(project, {
   saved = true,
   recovered = false,
 } = {}) {
+  state.editor?.keyStateStrip.pause();
   state.autosaveScheduler?.stop();
   const session = new EditorSession(project);
   if (!saved) session.savedRevision = -1;

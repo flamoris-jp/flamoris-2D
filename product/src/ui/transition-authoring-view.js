@@ -343,9 +343,14 @@ export function createTransitionAuthoringView({ state, elements, setStatus, onEn
     if (!meshAvailable) return;
     elements.editEndpointAButton.classList.toggle("selected", meshState.activeEndpoint === "from");
     elements.editEndpointBButton.classList.toggle("selected", meshState.activeEndpoint === "to");
-    elements.activeEndpointLabel.textContent = meshState.activeEndpoint === "from"
-      ? "Editing endpoint A — A artwork / world transform"
-      : "Editing endpoint B — B artwork / world transform";
+    const previewReadOnly = state.editor?.transitionPreview.getState().viewMode === "preview";
+    elements.activeEndpointLabel.textContent = previewReadOnly
+      ? "Preview is read-only — choose a Key State marker to edit"
+      : !meshState.editingEnabled
+        ? "Choose a Key State marker to edit an endpoint"
+      : meshState.activeEndpoint === "from"
+        ? "Editing endpoint A — A artwork / world transform"
+        : "Editing endpoint B — B artwork / world transform";
     const topologyOptions = [option("", "— Select topology —")];
     topologyOptions.push(...meshState.topologies.map((topology) =>
       option(topology.id, `${topology.id} · ${topology.vertexIds.length} vertices`)));

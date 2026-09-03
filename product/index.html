@@ -221,7 +221,7 @@
 
             <fieldset id="endpointMeshCard" class="part-transition-card">
               <legend>Endpoint Mesh / Keyform</legend>
-              <div class="endpoint-switch" role="group" aria-label="Endpoint edit context">
+              <div class="endpoint-switch" role="group" aria-label="Legacy endpoint edit context" hidden>
                 <button id="editEndpointAButton" type="button">Edit A</button>
                 <button id="editEndpointBButton" type="button">Edit B</button>
               </div>
@@ -272,18 +272,36 @@
             </fieldset>
 
             <fieldset id="transitionPreviewCard" class="transition-preview-card">
-              <legend>Preview / Temporal Controls</legend>
-              <div class="transition-view-switch" role="group" aria-label="Transition viewport mode">
+              <legend>Key State / Preview</legend>
+              <section id="keyStateStrip" class="key-state-strip" aria-label="Key State Strip">
+                <div class="key-state-scale" aria-hidden="true"><span>0%</span><span>100%</span></div>
+                <div class="key-state-track">
+                  <div id="keyStateMarkers" class="key-state-markers"></div>
+                  <input id="keyStatePlayheadInput" class="key-state-playhead" type="range" min="0" max="0" step="1" value="0" aria-label="Preview playhead" />
+                </div>
+                <output id="keyStateInteractionStatus" class="key-state-status" data-mode="edit">Editing: A</output>
+                <label class="key-state-duration">Duration
+                  <span><input id="keyStateDurationSecondsInput" type="number" min="0.001" step="0.001" value="1" /> sec</span>
+                </label>
+                <div class="key-state-playback">
+                  <label>Playback
+                    <select id="keyStatePlaybackModeSelect"><option value="once">Once</option><option value="loop">Loop</option></select>
+                  </label>
+                  <button id="keyStatePlayButton" type="button">Play</button>
+                  <button id="keyStatePauseButton" type="button" class="secondary" disabled>Pause</button>
+                </div>
+              </section>
+              <div class="transition-view-switch" role="group" aria-label="Legacy Transition viewport mode" hidden>
                 <button id="transitionViewAButton" type="button">Endpoint A</button>
                 <button id="transitionViewBButton" type="button">Endpoint B</button>
                 <button id="transitionViewPreviewButton" type="button">Transition Preview</button>
               </div>
-              <div class="scrubber-row">
+              <div class="scrubber-row" hidden>
                 <button id="transitionPreviewStartButton" type="button">Start</button>
                 <input id="transitionPreviewSlider" type="range" min="0" max="0" step="1" value="0" />
                 <button id="transitionPreviewEndButton" type="button">End</button>
               </div>
-              <label>Current tick<input id="transitionPreviewTickInput" type="number" min="0" max="0" step="1" value="0" /></label>
+              <label hidden>Current tick<input id="transitionPreviewTickInput" type="number" min="0" max="0" step="1" value="0" /></label>
               <output id="transitionPreviewProgress" class="authoring-status">Select an active Transition</output>
               <output id="transitionPreviewAuthority" class="preview-authority" data-authority="no">Non-authoritative preview</output>
               <ul id="transitionPreviewReasons" class="preview-reasons"></ul>

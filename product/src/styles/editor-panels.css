@@ -227,6 +227,27 @@ button:not(:disabled):hover, .file-button:hover { border-color: var(--mint); tra
   color: #dffbf5;
   background: rgba(129, 221, 205, .12);
 }
+.key-state-strip { display: grid; gap: 10px; padding: 4px 2px 8px; }
+.key-state-scale { display: flex; justify-content: space-between; color: #708985; font: 8px ui-monospace, monospace; }
+.key-state-track { position: relative; height: 52px; margin: 0 15px; }
+.key-state-track::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 15px; height: 2px;
+  background: linear-gradient(90deg, rgba(255, 202, 103, .75), rgba(129, 221, 205, .75));
+}
+.key-state-markers { position: absolute; inset: 0; pointer-events: none; }
+.key-state-marker {
+  position: absolute; z-index: 2; top: 3px; min-width: 26px; min-height: 26px; padding: 0;
+  border-radius: 50%; transform: translateX(-50%); pointer-events: auto;
+  color: #fff3cf; background: #334c49; border-color: rgba(255, 202, 103, .75);
+}
+.key-state-marker.selected { color: #1b2826; background: var(--gold); border-color: #ffe4a7; }
+.key-state-playhead { position: absolute; z-index: 1; left: 0; top: 27px; width: 100% !important; padding: 0 !important; accent-color: var(--mint); }
+.key-state-status { padding: 7px 9px; border-radius: 7px; color: #dffbf5; background: rgba(129, 221, 205, .09); font: 700 10px ui-monospace, monospace; }
+.key-state-status[data-mode="edit"] { color: #ffe4a7; background: rgba(255, 202, 103, .09); }
+.key-state-duration { grid-template-columns: 1fr auto !important; align-items: center; }
+.key-state-duration span { display: flex; align-items: center; gap: 5px; }
+.key-state-duration input { width: 86px; }
+.key-state-playback { display: grid; grid-template-columns: minmax(0, 1fr) 70px 70px; align-items: end; gap: 7px; }
 .scrubber-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 6px; }
 .scrubber-row button { min-width: 48px; }
 .scrubber-row input { padding: 0; accent-color: var(--mint); }
