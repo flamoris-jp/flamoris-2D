@@ -21,9 +21,10 @@ function setOptions(select, options, value = "") {
   select.value = value ?? "";
 }
 
-function memberLabel(member, project) {
-  const node = project.scene?.nodes?.[member.nodeId];
-  return node ? `${node.displayName} (${node.id})` : `[Missing node] ${member.nodeId}`;
+function memberLabel(member) {
+  return member.node
+    ? `${member.node.displayName} (${member.node.id})`
+    : `[Missing node] ${member.nodeId}`;
 }
 
 export function createTransitionAuthoringView({ state, elements, setStatus }) {
@@ -155,7 +156,7 @@ export function createTransitionAuthoringView({ state, elements, setStatus }) {
   function renderMapping(select, endpoint, mapping) {
     const options = [option("", "— Unmapped —")];
     for (const member of endpoint?.keyArt?.members || []) {
-      options.push(option(member.nodeId, memberLabel(member, state.editor.session.project)));
+      options.push(option(member.nodeId, memberLabel(member)));
     }
     if (mapping?.mapping && !options.some((entry) => entry.value === mapping.mapping.nodeId)) {
       options.push(option(mapping.mapping.nodeId, `[Missing / invalid] ${mapping.mapping.nodeId}`));

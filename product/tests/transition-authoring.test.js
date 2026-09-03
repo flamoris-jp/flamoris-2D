@@ -10,6 +10,7 @@ import {
 } from "../src/model/project.js";
 import { validateProject } from "../src/model/validation.js";
 import { serializeProject } from "../src/io/project-json.js";
+import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
 import {
   PART_TRANSITION_MODES,
   TransitionAuthoringController,
@@ -224,7 +225,7 @@ test("PartTransition mode changes use normal history and Undo/Redo", () => {
 test("all six persistent modes can be authored without convenience modes", () => {
   for (const mode of PART_TRANSITION_MODES) {
     const mapping = mode === "appear" ? "b" : mode === "disappear" ? "a" : "both";
-    const { session, controller } = fixture({ mapping });
+    const { session, controller } = fixture({ mapping, withPart: mode === "morph" });
     controller.selectTransition("transition_ab");
     controller.selectSemanticSlot("semantic_eye");
     controller.setPartMode(mode);
@@ -232,6 +233,41 @@ test("all six persistent modes can be authored without convenience modes", () =>
     assert.equal(part.mode, mode);
     assert.ok(PART_TRANSITION_MODES.includes(part.mode));
   }
+});
+
+test("mode changes never infer Morph topology/keyform references", () => {
+  const { session, controller } = fixture();
+  session.project.meshTopologies.push({
+    id: "topology_eye_alternate",
+    vertexIds: ["v4", "v5", "v6"],
+    indices: [0, 1, 2],
+  });
+  session.project.meshKeyforms.push(
+    {
+      ...structuredClone(session.project.meshKeyforms[0]),
+      id: "keyform_a_alternate",
+      topologyId: "topology_eye_alternate",
+    },
+    {
+      ...structuredClone(session.project.meshKeyforms[1]),
+      id: "keyform_b_alternate",
+      topologyId: "topology_eye_alternate",
+    },
+  );
+  controller.selectTransition("transition_ab");
+  controller.selectSemanticSlot("semantic_eye");
+
+  const slot = controller.getState().selectedSemanticSlot;
+  assert.equal(slot.morphReferences, null);
+  assert.equal(slot.availableModes.morph, false);
+  assert.throws(() => controller.setPartMode("morph"), /not valid/);
+
+  controller.setPartMode("replace");
+  const part = session.project.transitions[0].partTransitions[0];
+  assert.equal(part.topologyId, null);
+  assert.equal(part.fromKeyformId, null);
+  assert.equal(part.toKeyformId, null);
+  assert.deepEqual(session.history.at(-1).commandTypes, ["transition.set_part_mode"]);
 });
 
 test("invalid mode/state is rejected instead of silently repaired", () => {
@@ -307,9 +343,28 @@ test("authoring controller stays DOM-free and routes through headless Session AP
     "utf8",
   );
   assert.doesNotMatch(source, /\bdocument\b|\bwindow\b/);
+  assert.doesNotMatch(source, /session\.project/);
   assert.match(source, /session\.query\("transition\.list"\)/);
+  assert.match(source, /session\.query\("transition\.get_authoring"/);
   assert.match(source, /session\.executeTransaction\(commands/);
   assert.equal(typeof createTransitionAuthoringView, "function");
+});
+
+test("authoring view consumes query projections without reading Project directly", async () => {
+  const source = await readFile(
+    new URL("../src/ui/transition-authoring-view.js", import.meta.url),
+    "utf8",
+  );
+  assert.doesNotMatch(source, /session\.project/);
+  const { session, controller } = fixture({ withPart: true });
+  controller.selectTransition("transition_ab");
+  const headless = new HeadlessProductAdapter(session);
+  assert.ok(headless.capabilities().queries["transition.get_authoring"]);
+  const authoring = headless.query("transition.get_authoring", {
+    transitionId: "transition_ab",
+  });
+  assert.equal(authoring.endpoints.from.keyArt.members[0].node.displayName, "Eye A");
+  assert.equal(authoring.semanticSlots[0].morphReferences.topologyId, "topology_eye");
 });
 
 test("Transition authoring runtime modules remain in the production allowlist", async () => {

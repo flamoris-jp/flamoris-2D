@@ -21,67 +21,6 @@ function mappingFor(slot, keyArtId) {
     mapping.keyArtId === keyArtId) || null;
 }
 
-function mappingProjection(project, keyArt, mapping) {
-  if (!mapping) return { mapping: null, node: null, valid: false, missing: false };
-  const node = project.scene?.nodes?.[mapping.nodeId] || null;
-  const isMember = Boolean(keyArt?.members?.some((member) =>
-    member.nodeId === mapping.nodeId));
-  return {
-    mapping: cloneProject(mapping),
-    node: node ? cloneProject(node) : null,
-    valid: Boolean(keyArt && node && isMember),
-    missing: !keyArt || !node || !isMember,
-  };
-}
-
-function slotStatus(from, to) {
-  if (from.missing || to.missing) return "missing-invalid";
-  if (from.valid && to.valid) return "mapped";
-  if (from.valid) return "a-only";
-  if (to.valid) return "b-only";
-  return "unmapped";
-}
-
-function morphReferences(project, transition, slot, part) {
-  const existing = part?.topologyId && part?.fromKeyformId && part?.toKeyformId
-    ? {
-        topologyId: part.topologyId,
-        fromKeyformId: part.fromKeyformId,
-        toKeyformId: part.toKeyformId,
-      }
-    : null;
-  const candidates = existing ? [existing] : (project.meshTopologies || []).map((topology) => {
-    const from = (project.meshKeyforms || []).find((keyform) =>
-      keyform.topologyId === topology.id &&
-      keyform.keyArtId === transition.fromKeyArtId &&
-      keyform.semanticSlotId === slot.id);
-    const to = (project.meshKeyforms || []).find((keyform) =>
-      keyform.topologyId === topology.id &&
-      keyform.keyArtId === transition.toKeyArtId &&
-      keyform.semanticSlotId === slot.id);
-    return from && to
-      ? { topologyId: topology.id, fromKeyformId: from.id, toKeyformId: to.id }
-      : null;
-  }).filter(Boolean);
-  const refs = candidates[0] || null;
-  if (!refs) return null;
-  const topology = (project.meshTopologies || []).find((entry) => entry.id === refs.topologyId);
-  const from = (project.meshKeyforms || []).find((entry) => entry.id === refs.fromKeyformId);
-  const to = (project.meshKeyforms || []).find((entry) => entry.id === refs.toKeyformId);
-  return topology && from && to ? refs : null;
-}
-
-function modeAvailability(status, morphRefs) {
-  return {
-    morph: status === "mapped" && Boolean(morphRefs),
-    hold: ["mapped", "a-only", "b-only"].includes(status),
-    replace: status === "mapped",
-    appear: status === "b-only",
-    disappear: status === "a-only",
-    occlusion: status === "mapped",
-  };
-}
-
 function modeConfiguration(mode, configuration, previous = {}) {
   if (mode === "hold") {
     return { holdEndpoint: configuration.holdEndpoint || previous.holdEndpoint || "from" };
@@ -229,7 +168,7 @@ export class TransitionAuthoringController {
       if (slot.status === "a-only") requestedConfiguration.holdEndpoint = "from";
       if (slot.status === "b-only") requestedConfiguration.holdEndpoint = "to";
     }
-    const commands = [{
+    return this.session.execute({
       type: "transition.set_part_mode",
       payload: {
         transitionId: transition.id,
@@ -242,18 +181,7 @@ export class TransitionAuthoringController {
           previous?.configuration || {},
         ),
       },
-    }];
-    if (mode === "morph") {
-      commands.push({
-        type: "transition.set_part_topology",
-        payload: {
-          transitionId: transition.id,
-          semanticSlotId: slot.id,
-          ...slot.morphReferences,
-        },
-      });
-    }
-    return this.session.executeTransaction(commands, {
+    }, {
       label: "Set PartTransition mode",
     });
   }
@@ -271,37 +199,18 @@ export class TransitionAuthoringController {
   }
 
   getState() {
-    const project = this.session.project;
     const transitions = this.session.query("transition.list");
     const keyArts = this.session.query("keyart.list");
-    const semanticSlots = this.session.query("semantic_slot.list");
     const activeTransition = transitions.find((entry) =>
       entry.id === this.activeTransitionId) || null;
     const selectedKeyArt = keyArts.find((entry) =>
       entry.id === this.selectedKeyArtId) || null;
-    const fromKeyArt = activeTransition
-      ? keyArts.find((entry) => entry.id === activeTransition.fromKeyArtId) || null
+    const authoring = activeTransition
+      ? this.session.query("transition.get_authoring", {
+          transitionId: activeTransition.id,
+        })
       : null;
-    const toKeyArt = activeTransition
-      ? keyArts.find((entry) => entry.id === activeTransition.toKeyArtId) || null
-      : null;
-    const slots = activeTransition ? semanticSlots.map((slot) => {
-      const from = mappingProjection(project, fromKeyArt, mappingFor(slot, activeTransition.fromKeyArtId));
-      const to = mappingProjection(project, toKeyArt, mappingFor(slot, activeTransition.toKeyArtId));
-      const status = slotStatus(from, to);
-      const partTransition = activeTransition.partTransitions.find((part) =>
-        part.semanticSlotId === slot.id) || null;
-      const refs = morphReferences(project, activeTransition, slot, partTransition);
-      return {
-        ...cloneProject(slot),
-        from,
-        to,
-        status,
-        partTransition: cloneProject(partTransition),
-        morphReferences: cloneProject(refs),
-        availableModes: modeAvailability(status, refs),
-      };
-    }) : [];
+    const slots = authoring?.semanticSlots || [];
     const selectedSemanticSlot = slots.find((slot) =>
       slot.id === this.selectedSemanticSlotId) || null;
     return {
@@ -312,21 +221,10 @@ export class TransitionAuthoringController {
       transitions: cloneProject(transitions),
       keyArts: cloneProject(keyArts),
       semanticSlots: slots,
-      activeTransition: cloneProject(activeTransition),
+      activeTransition: cloneProject(authoring?.transition || activeTransition),
       selectedKeyArt: cloneProject(selectedKeyArt),
       selectedSemanticSlot: cloneProject(selectedSemanticSlot),
-      endpoints: activeTransition ? {
-        from: {
-          id: activeTransition.fromKeyArtId,
-          keyArt: cloneProject(fromKeyArt),
-          missing: !fromKeyArt,
-        },
-        to: {
-          id: activeTransition.toKeyArtId,
-          keyArt: cloneProject(toKeyArt),
-          missing: !toKeyArt,
-        },
-      } : null,
+      endpoints: cloneProject(authoring?.endpoints || null),
     };
   }
 }
