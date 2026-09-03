@@ -116,5 +116,9 @@ export function queryAppElements(root = document) {
   addTransitionKeyframeButton: root.querySelector("#addTransitionKeyframeButton"),
   updateTransitionKeyframeButton: root.querySelector("#updateTransitionKeyframeButton"),
   removeTransitionKeyframeButton: root.querySelector("#removeTransitionKeyframeButton"),
+  transitionDiagnosticsCard: root.querySelector("#transitionDiagnosticsCard"),
+  transitionDiagnosticsAuthority: root.querySelector("#transitionDiagnosticsAuthority"),
+  transitionDiagnosticsList: root.querySelector("#transitionDiagnosticsList"),
+  transitionDiagnosticFocusStatus: root.querySelector("#transitionDiagnosticFocusStatus"),
   };
 }

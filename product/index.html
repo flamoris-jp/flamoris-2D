@@ -173,7 +173,7 @@
           <section id="transitionAuthoringPanel" class="transition-authoring" aria-labelledby="transitionAuthoringTitle">
             <div class="panel-heading">
               <h2 id="transitionAuthoringTitle">Transition Authoring</h2>
-              <span>Phase 2C-3</span>
+              <span>Phase 2C-4</span>
             </div>
 
             <label class="authoring-field">Active Transition
@@ -281,6 +281,16 @@
                   <button id="removeTransitionKeyframeButton" type="button">Remove</button>
                 </div>
               </details>
+            </fieldset>
+
+            <fieldset id="transitionDiagnosticsCard" class="transition-diagnostics-card">
+              <legend>Transition Diagnostics</legend>
+              <output id="transitionDiagnosticsAuthority" class="preview-authority" data-authority="no">Non-authoritative preview</output>
+              <p class="authoring-status">Validation, evaluator, and renderer reports share the preview authority contract.</p>
+              <ul id="transitionDiagnosticsList" class="diagnostics-list">
+                <li class="panel-empty">Select an active Transition</li>
+              </ul>
+              <output id="transitionDiagnosticFocusStatus" class="authoring-status"></output>
             </fieldset>
           </section>
         </aside>

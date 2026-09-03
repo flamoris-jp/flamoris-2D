@@ -7,7 +7,9 @@ import { createEvaluatedRenderPlan } from "../src/core/evaluated-render.js";
 import { serializeProject } from "../src/io/project-json.js";
 import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
 import { TransitionAuthoringController } from "../src/ui/transition-authoring-controller.js";
+import { TransitionDiagnosticsController } from "../src/ui/transition-diagnostics-controller.js";
 import { TransitionPreviewController } from "../src/ui/transition-preview-controller.js";
+import { EndpointMeshController } from "../src/ui/endpoint-mesh-controller.js";
 import { renderEvaluatedTransitionViewport } from "../src/ui/viewport-renderer.js";
 
 function member(nodeId, appearanceId, drawOrder) {
@@ -134,14 +136,19 @@ test("invalid interpolation and duplicate/conflicting typed state are rejected w
   }), /outside the focused/);
 });
 
-test("preview controller is DOM-free and never writes session.project directly", async () => {
-  const [source, viewSource] = await Promise.all([
+test("preview and diagnostics controllers are DOM-free and views never access session.project", async () => {
+  const [source, viewSource, diagnosticsSource, diagnosticsViewSource] = await Promise.all([
     readFile(new URL("../src/ui/transition-preview-controller.js", import.meta.url), "utf8"),
     readFile(new URL("../src/ui/transition-preview-view.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/ui/transition-diagnostics-controller.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/ui/transition-diagnostics-view.js", import.meta.url), "utf8"),
   ]);
   assert.doesNotMatch(source, /\bdocument\b|\bwindow\b/);
+  assert.doesNotMatch(diagnosticsSource, /\bdocument\b|\bwindow\b/);
   assert.doesNotMatch(source, /session\.project/);
+  assert.doesNotMatch(diagnosticsSource, /session\.project/);
   assert.doesNotMatch(viewSource, /session\.project/);
+  assert.doesNotMatch(diagnosticsViewSource, /session\.project/);
   assert.match(source, /session\.query\("transition\.evaluate"/);
   assert.match(source, /animation\.temporal\.add_keyframe/);
   assert.match(source, /animation\.temporal\.update_keyframe/);
@@ -242,6 +249,165 @@ test("preview authority reports structural and renderer unsupported reasons expl
   assert.deepEqual(state.authorityReasons, ["STRUCTURAL_INVALID"]);
 });
 
+test("unevaluated and failed evaluation states have explicit non-authoritative diagnostics", () => {
+  const { session, preview } = fixture();
+  let state = preview.getState();
+  assert.equal(state.authoritative, false);
+  assert.equal(state.diagnostics.some((entry) => entry.code === "TRANSITION_EVALUATION_UNAVAILABLE"), true);
+  assert.deepEqual(state.authorityReasons, ["Transition evaluation is not available for the current preview state."]);
+
+  const originalQuery = session.query.bind(session);
+  session.query = (name, input) => {
+    if (name === "transition.evaluate") throw new Error("evaluation exploded");
+    return originalQuery(name, input);
+  };
+  preview.setTick(10);
+  state = preview.getState();
+  assert.equal(state.authoritative, false);
+  assert.equal(state.diagnostics.some((entry) =>
+    entry.code === "TRANSITION_EVALUATION_ERROR" && entry.severity === "error"), true);
+  assert.deepEqual(state.authorityReasons, ["evaluation exploded"]);
+});
+
+test("missing artwork and invalid composite groups flow through renderer diagnostics", () => {
+  const { session, preview } = fixture();
+  let evaluation = preview.setTick(60000);
+  let report = renderEvaluatedTransitionViewport({
+    evaluation,
+    view: { scale: 1, originX: 0, originY: 0 },
+    renderer: { renderEvaluated() {} },
+    resolveArtwork: () => null,
+  });
+  preview.setRenderReport(report);
+  let state = preview.getState();
+  assert.equal(state.authoritative, false);
+  assert.match(state.authorityReasons[0], /Source artwork is unavailable/);
+  assert.equal(state.diagnostics.some((entry) =>
+    entry.source === "renderer" && entry.code === "TRANSITION_RENDERER_UNSUPPORTED"), true);
+
+  session.execute({
+    type: "transition.set_part_mode",
+    payload: {
+      transitionId: "transition_ab", partTransitionId: "part_eye", semanticSlotId: "semantic_eye",
+      mode: "replace", configuration: { compositeGroupId: "eye_handoff" },
+    },
+  });
+  evaluation = preview.setTick(60000);
+  evaluation.evaluatedParts[0].renderInstances[1].drawOrder = 2;
+  report = renderEvaluatedTransitionViewport({
+    evaluation,
+    view: { scale: 1, originX: 0, originY: 0 },
+    renderer: { renderEvaluated() {} },
+    resolveArtwork: () => ({}),
+  });
+  preview.setRenderReport(report);
+  state = preview.getState();
+  assert.equal(state.authoritative, false);
+  assert.match(state.authorityReasons[0], /inconsistent explicit draw order/);
+});
+
+test("invalid evaluated render plans return a non-authoritative report instead of throwing", () => {
+  const report = renderEvaluatedTransitionViewport({
+    evaluation: { evaluatedParts: null },
+    view: { scale: 1, originX: 0, originY: 0 },
+    renderer: { renderEvaluated() { throw new Error("renderer must not be reached"); } },
+    resolveArtwork: () => ({}),
+  });
+  assert.equal(report.renderInstanceCount, 0);
+  assert.match(report.unsupportedReasons[0], /Evaluated render plan is invalid/);
+});
+
+test("diagnostic projection preserves severity and shares the preview authority contract", () => {
+  const { preview } = fixture();
+  preview.setTick(40000);
+  preview.evaluation = {
+    ...preview.evaluation,
+    diagnostics: [{
+      key: "warning_eye",
+      code: "TRANSITION_TRIANGLE_INVERSION",
+      severity: "warning",
+      message: "A mesh triangle changes winding between endpoints.",
+      transitionId: "transition_ab",
+      semanticSlotId: "semantic_eye",
+      details: { triangleIndex: 0 },
+    }],
+  };
+  preview.setRenderReport({ unsupportedReasons: [], renderInstanceCount: 1 });
+  const state = preview.getState();
+  assert.equal(state.authoritative, true);
+  assert.equal(state.diagnostics.find((entry) => entry.key === "warning_eye").severity, "warning");
+  assert.equal(state.diagnostics.find((entry) => entry.key === "warning_eye").authorityImpact, "advisory");
+});
+
+test("diagnostic focus navigates by stable IDs without mutating Project or history", () => {
+  const { session, authoring, preview } = fixture();
+  const endpointMesh = new EndpointMeshController(session, authoring);
+  const diagnostics = new TransitionDiagnosticsController(session, authoring, endpointMesh, preview);
+  preview.setTick(40000);
+  preview.evaluation = {
+    ...preview.evaluation,
+    diagnostics: [{
+      key: "endpoint_b",
+      code: "TRANSITION_MISSING_KEYFORM",
+      severity: "error",
+      message: "A required endpoint MeshKeyform is missing.",
+      transitionId: "transition_ab",
+      semanticSlotId: "semantic_eye",
+      details: { missingEndpoints: ["to"], toKeyformId: "keyform_b" },
+    }],
+  };
+  const before = JSON.stringify(session.project);
+  const historyLength = session.history.length;
+  const result = diagnostics.focusDiagnostic("endpoint_b");
+  assert.deepEqual(result, { focused: true, missing: false, diagnostic: result.diagnostic });
+  assert.equal(authoring.getState().selectedSemanticSlotId, "semantic_eye");
+  assert.equal(endpointMesh.getState().activeEndpoint, "to");
+  assert.equal(preview.getState().viewMode, "endpoint-b");
+  assert.equal(JSON.stringify(session.project), before);
+  assert.equal(session.history.length, historyLength);
+});
+
+test("diagnostic focus is safe for missing targets and can focus a restored track/keyframe", () => {
+  const { session, authoring, preview } = fixture();
+  const endpointMesh = new EndpointMeshController(session, authoring);
+  const diagnostics = new TransitionDiagnosticsController(session, authoring, endpointMesh, preview);
+  preview.addTrack({ kind: "OpacityTrack", target: { semanticSlotId: "semantic_eye" }, trackId: "track_focus" });
+  preview.addKeyframe("track_focus", "opacity", {
+    id: "key_focus", timeTicks: 0, value: 0.5, interpolationToNext: { kind: "linear" },
+  });
+  preview.evaluation = {
+    transitionId: "transition_ab",
+    diagnostics: [{
+      key: "track_key",
+      code: "ANIMATION_DIAGNOSTIC",
+      severity: "warning",
+      message: "Track needs attention.",
+      transitionId: "transition_ab",
+      details: { trackId: "track_focus", channel: "opacity", keyframeId: "key_focus" },
+    }],
+    evaluatedParts: [],
+  };
+  assert.equal(diagnostics.focusDiagnostic("track_key").missing, false);
+  assert.deepEqual(preview.getState().selectedKeyframe, {
+    trackId: "track_focus", channel: "opacity", keyframeId: "key_focus",
+  });
+  session.undo();
+  preview.projectChanged();
+  assert.equal(preview.getState().selectedKeyframe, null);
+  assert.equal(diagnostics.focusDiagnostic("track_key").missing, true);
+  session.redo();
+  preview.projectChanged();
+  assert.equal(diagnostics.focusDiagnostic("track_key").missing, false);
+
+  preview.evaluation.diagnostics[0] = {
+    ...preview.evaluation.diagnostics[0],
+    key: "missing_slot",
+    semanticSlotId: "slot_removed",
+  };
+  assert.equal(diagnostics.focusDiagnostic("missing_slot").missing, true);
+  assert.equal(diagnostics.getState().selectedDiagnosticMissing, false);
+});
+
 test("mixed draw-order composite groups are non-authoritative instead of choosing a hidden z position", () => {
   const instance = (renderInstanceId, drawOrder, compositeGroupId = null) => ({
     renderInstanceId,
@@ -266,6 +432,33 @@ test("mixed draw-order composite groups are non-authoritative instead of choosin
   assert.deepEqual(plan.batches.map((batch) => batch.renderInstances.map((entry) => entry.renderInstanceId)), [["between"]]);
   assert.equal(plan.renderInstanceCount, 1);
   assert.match(plan.unsupportedReasons[0], /inconsistent explicit draw order \(1, 3\)/);
+});
+
+test("separate batches with the same explicit draw order stay unsupported without an ID tie-break", () => {
+  const instance = (renderInstanceId) => ({
+    renderInstanceId,
+    sourceNodeId: "node_a",
+    transform: [1, 0, 0, 1, 0, 0],
+    mesh: { positions: [0, 0, 1, 0, 0, 1], indices: [0, 1, 2] },
+    appearanceSamples: [{
+      appearanceId: renderInstanceId,
+      sourceNodeId: "node_a",
+      uvs: [0, 0, 1, 0, 0, 1],
+      weight: 1,
+    }],
+    opacity: 1,
+    drawOrder: 4,
+    clipping: { sourceNodeId: null },
+  });
+  const plan = createEvaluatedRenderPlan({
+    evaluatedParts: [
+      { semanticSlotId: "slot_a", presence: "present", renderInstances: [instance("instance_z")] },
+      { semanticSlotId: "slot_b", presence: "present", renderInstances: [instance("instance_a")] },
+    ],
+  }, { resolveArtwork: () => ({}) });
+  assert.deepEqual(plan.batches, []);
+  assert.equal(plan.renderInstanceCount, 0);
+  assert.match(plan.unsupportedReasons[0], /cannot invent a z-order/);
 });
 
 test("scrubber to evaluator to viewport consumer keeps simultaneous Replace instances", () => {
@@ -306,6 +499,21 @@ test("actual renderer path uses evaluator opacity, appearance and composite weig
   assert.match(source, /renderInstance\.compositeWeight/);
   assert.match(source, /gl\.blendFunc\(gl\.ONE, gl\.ONE\)/);
   assert.doesNotMatch(source, /PartTransition|part\.mode|semanticSlotId/);
+});
+
+test("diagnostics runtime modules are packaged and keep the Query/controller boundary", async () => {
+  const [allowlist, projection, controller, view] = await Promise.all([
+    readFile(new URL("../production-files.txt", import.meta.url), "utf8"),
+    readFile(new URL("../src/ui/transition-diagnostics-projection.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/ui/transition-diagnostics-controller.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/ui/transition-diagnostics-view.js", import.meta.url), "utf8"),
+  ]);
+  assert.match(allowlist, /src\/ui\/transition-diagnostics-controller\.js/);
+  assert.match(allowlist, /src\/ui\/transition-diagnostics-projection\.js/);
+  assert.match(allowlist, /src\/ui\/transition-diagnostics-view\.js/);
+  assert.match(controller, /session\.query\("semantic_slot\.list"/);
+  assert.doesNotMatch(`${projection}\n${controller}\n${view}`, /session\.project/);
+  assert.doesNotMatch(projection, /PartTransition|part\.mode/);
 });
 
 test("renderer-supported endpoint evaluations are visually equivalent through the preview consumer", () => {

@@ -1,5 +1,6 @@
 import { TEMPORAL_TRACK_DEFINITIONS } from "../core/temporal.js";
 import { cloneProject } from "../model/project.js";
+import { projectTransitionPreviewDiagnostics } from "./transition-diagnostics-projection.js";
 
 export const TRANSITION_VIEW_MODES = Object.freeze([
   "endpoint-a",
@@ -142,6 +143,11 @@ export class TransitionPreviewController {
     if (!tracks.some((track) => track.trackId === this.selectedTrackId)) {
       this.selectedTrackId = null;
       this.selectedKeyframe = null;
+    } else if (this.selectedKeyframe) {
+      const selectedTrack = tracks.find((track) => track.trackId === this.selectedKeyframe.trackId);
+      const selectedKeyframe = selectedTrack?.channels?.[this.selectedKeyframe.channel]?.keyframes
+        .find((entry) => entry.id === this.selectedKeyframe.keyframeId);
+      if (!selectedKeyframe) this.selectedKeyframe = null;
     }
   }
 
@@ -264,16 +270,16 @@ export class TransitionPreviewController {
     const tracks = (program?.tracks || []).filter((track) =>
       TRANSITION_TRACK_KINDS.includes(track.kind));
     const selectedTrack = tracks.find((track) => track.trackId === this.selectedTrackId) || null;
-    const structuralReasons = [];
-    if (this.evaluationError) structuralReasons.push(this.evaluationError.message || String(this.evaluationError));
-    for (const entry of this.evaluation?.diagnostics || []) {
-      if (entry.severity === "error") {
-        structuralReasons.push(entry.message ? `${entry.code}: ${entry.message}` : `${entry.code}`);
-      }
-    }
-    const rendererReasons = this.renderReport?.unsupportedReasons ||
-      (this.evaluation ? ["Renderer validation pending or unavailable."] : []);
-    const reasons = [...new Set([...structuralReasons, ...rendererReasons])];
+    const validationDiagnostics = transition
+      ? this.session.query("transition.get_diagnostics", { transitionId: transition.id })
+      : [];
+    const diagnosticState = projectTransitionPreviewDiagnostics({
+      transitionId: transition?.id || null,
+      validationDiagnostics,
+      evaluation: this.evaluation,
+      evaluationError: this.evaluationError,
+      renderReport: this.renderReport,
+    });
     return {
       viewMode: this.viewMode,
       currentTick: program ? clampTick(this.currentTick, program.durationTicks) : 0,
@@ -291,8 +297,9 @@ export class TransitionPreviewController {
       selectedKeyframe: cloneProject(this.selectedKeyframe),
       evaluation: this.evaluation,
       evaluationError: this.evaluationError,
-      authoritative: Boolean(this.evaluation && reasons.length === 0),
-      authorityReasons: reasons,
+      diagnostics: diagnosticState.diagnostics,
+      authoritative: diagnosticState.authoritative,
+      authorityReasons: diagnosticState.authorityReasons,
     };
   }
 }

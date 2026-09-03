@@ -177,13 +177,26 @@ export function createEvaluatedRenderPlan(evaluatedTransition, {
         left.drawOrder - right.drawOrder || compareText(left.renderInstanceId, right.renderInstanceId)),
     });
   }
-  batches.sort((left, right) =>
-    left.drawOrder - right.drawOrder ||
-    compareText(left.compositeGroupId || left.renderInstances[0].renderInstanceId,
-      right.compositeGroupId || right.renderInstances[0].renderInstanceId));
+  const batchesByDrawOrder = new Map();
+  for (const batch of batches) {
+    const atOrder = batchesByDrawOrder.get(batch.drawOrder) || [];
+    atOrder.push(batch);
+    batchesByDrawOrder.set(batch.drawOrder, atOrder);
+  }
+  const conflictedDrawOrders = new Set();
+  for (const [drawOrder, atOrder] of batchesByDrawOrder) {
+    if (atOrder.length < 2) continue;
+    conflictedDrawOrders.add(drawOrder);
+    unsupportedReasons.push(
+      `Multiple render batches conflict at explicit draw order ${drawOrder}; renderer cannot invent a z-order.`,
+    );
+  }
+  const supportedBatches = batches
+    .filter((batch) => !conflictedDrawOrders.has(batch.drawOrder))
+    .sort((left, right) => left.drawOrder - right.drawOrder);
   return {
-    batches,
+    batches: supportedBatches,
     unsupportedReasons: [...new Set(unsupportedReasons)],
-    renderInstanceCount: batches.reduce((count, batch) => count + batch.renderInstances.length, 0),
+    renderInstanceCount: supportedBatches.reduce((count, batch) => count + batch.renderInstances.length, 0),
   };
 }
