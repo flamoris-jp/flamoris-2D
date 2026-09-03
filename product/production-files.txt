@@ -53,6 +53,8 @@ src/ui/scene-editor-view.js
 src/ui/transition-authoring-controller.js
 src/ui/transition-authoring-view.js
 src/ui/transition-preview-controller.js
+src/ui/key-state-strip-controller.js
+src/ui/key-state-strip-view.js
 src/ui/transition-diagnostics-controller.js
 src/ui/transition-diagnostics-projection.js
 src/ui/transition-diagnostics-view.js
