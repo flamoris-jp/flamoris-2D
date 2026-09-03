@@ -1,6 +1,6 @@
 export { commandSchemas } from "../commands/schemas.js";
 
-export const MCP_SCHEMA_VERSION = 3;
+export const MCP_SCHEMA_VERSION = 4;
 
 const nodeId = {
   type: "string",
@@ -24,6 +24,12 @@ export const querySchemas = {
     additionalProperties: false,
   },
   "mesh.get_topology": idQuery("topologyId", nodeId),
+  "mesh.get_vertex": {
+    type: "object",
+    required: ["topologyId", "vertexId"],
+    properties: { topologyId: nodeId, vertexId: nodeId },
+    additionalProperties: false,
+  },
   "mesh.list_topologies": emptyQuery(),
   "mesh.get_keyform": idQuery("keyformId", nodeId),
   "mesh.list_keyforms": {

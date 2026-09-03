@@ -25,6 +25,7 @@ import { transformPoint } from "./core/transforms.js";
 import {
   EDITOR_MODES,
   editModeAvailability,
+  isMeshAuthoringMode,
 } from "./ui/editor-modes.js";
 import { createBrowserProjectWriter } from "./ui/browser-project-files.js";
 import {
@@ -48,6 +49,7 @@ import { createMeshEditingController } from "./ui/mesh-editing-controller.js";
 import { createTransitionAuthoringView } from "./ui/transition-authoring-view.js";
 import { createTransitionPreviewView } from "./ui/transition-preview-view.js";
 import { createTransitionDiagnosticsView } from "./ui/transition-diagnostics-view.js";
+import { createMeshAuthoringView } from "./ui/mesh-authoring-view.js";
 
 const desktopApi = window.flamorisDesktop || null;
 const appStorage = desktopApi?.storage || localStorage;
@@ -176,6 +178,12 @@ const transitionDiagnosticsView = createTransitionDiagnosticsView({
   setStatus,
 });
 
+const meshAuthoringView = createMeshAuthoringView({
+  state,
+  elements,
+  setStatus,
+});
+
 function setStatus(message) {
   elements.status.textContent = message;
 }
@@ -183,7 +191,7 @@ function setStatus(message) {
 function selectedPartIndex() {
   const endpoint = activeEndpointContext();
   if (endpoint) return state.psdParts.findIndex((part) => part.nodeId === endpoint.nodeId);
-  const targetNodeId = state.editorMode === EDITOR_MODES.EDIT
+  const targetNodeId = isMeshAuthoringMode(state.editorMode)
     ? state.editTargetNodeId
     : state.editor?.selectedNodeId;
   if (!targetNodeId) return -1;
@@ -206,7 +214,7 @@ function activeEndpointContext() {
     keyArt,
     keyform: endpointState.activeKeyform,
     topology: endpointState.topologies.find((entry) =>
-      entry.id === endpointState.activeKeyform?.topologyId) || null,
+      entry.id === endpointState.selectedTopologyId) || null,
     worldTransform: controller.activeEndpointWorldTransform(),
   };
 }
@@ -245,9 +253,13 @@ function syncEndpointMeshViewport() {
     };
     renderer.setMesh(state.mesh);
   } else createMesh();
-  state.editorMode = EDITOR_MODES.EDIT;
+  if (!isMeshAuthoringMode(state.editorMode)) state.editorMode = EDITOR_MODES.DEFORM;
+  state.editor?.meshTools.setMode(state.editorMode);
   state.editTargetNodeId = context.nodeId;
-  state.selected.clear();
+  const selectedIds = new Set(state.editor?.meshTools.getState().selectedVertexIds || []);
+  state.selected = new Set((context.topology?.vertexIds || [])
+    .map((vertexId, index) => selectedIds.has(vertexId) ? index : -1)
+    .filter((index) => index >= 0));
   elements.partInfo.textContent = `${context.endpoint === "from" ? "A" : "B"} · ${part.name} · endpoint mesh`;
   updateEditorModeUi();
   renderEditorUi();
@@ -260,10 +272,12 @@ function selectedPart() {
 }
 
 function currentEditModeAvailability() {
-  const selectedNode = state.editor?.selectedNode() || null;
+  const endpoint = activeEndpointContext();
+  const selectedNodeId = endpoint?.nodeId || state.editor?.selectedNodeId || null;
+  const selectedNode = selectedNodeId ? state.editor?.getNode(selectedNodeId) : null;
   return editModeAvailability({
     contentMode: state.mode,
-    selectedNodeId: state.editor?.selectedNodeId || null,
+    selectedNodeId,
     selectedPart: selectedPart(),
     selectedNode,
     mesh: state.mesh,
@@ -275,8 +289,8 @@ function updateEditorModeUi() {
   elements.editorModeSelect.disabled = state.mode !== "psd";
   elements.editorModeSelect.title = state.mode === "png"
     ? "単一PNGは既存のmesh editingを使用します"
-    : "TabでObject/Edit Modeを切り替え";
-  const editing = state.editorMode === EDITOR_MODES.EDIT;
+    : "TabでObject/Deform Modeを切り替え。Topology EditはModeメニューから選択";
+  const editing = isMeshAuthoringMode(state.editorMode);
   elements.viewportWrap.classList.toggle("edit-mode", editing);
   const transformToolbar = elements.transformTools[0]?.parentElement;
   if (transformToolbar) transformToolbar.hidden = editing;
@@ -284,12 +298,12 @@ function updateEditorModeUi() {
 
 function setEditorMode(requestedMode) {
   if (state.mode === "png") {
-    state.editorMode = EDITOR_MODES.EDIT;
+    state.editorMode = EDITOR_MODES.DEFORM;
     state.editTargetNodeId = null;
     updateEditorModeUi();
     return true;
   }
-  if (requestedMode === EDITOR_MODES.EDIT) {
+  if (isMeshAuthoringMode(requestedMode)) {
     const availability = currentEditModeAvailability();
     if (!availability.allowed) {
       state.editorMode = EDITOR_MODES.OBJECT;
@@ -299,11 +313,26 @@ function setEditorMode(requestedMode) {
       render();
       return false;
     }
-    state.editorMode = EDITOR_MODES.EDIT;
-    state.editTargetNodeId = state.editor.selectedNodeId;
+    if (requestedMode === EDITOR_MODES.TOPOLOGY &&
+      (!state.editor?.endpointMesh.getState().editingEnabled ||
+        !activeEndpointContext()?.topology ||
+        !activeEndpointContext()?.keyform)) {
+      state.editorMode = EDITOR_MODES.OBJECT;
+      state.editTargetNodeId = null;
+      updateEditorModeUi();
+      setStatus("Topology Edit Modeには、endpoint workflowで共有MeshTopologyと表示用MeshKeyformを選択してください。");
+      renderEditorUi();
+      render();
+      return false;
+    }
+    state.editorMode = requestedMode === EDITOR_MODES.TOPOLOGY
+      ? EDITOR_MODES.TOPOLOGY
+      : EDITOR_MODES.DEFORM;
+    state.editor.meshTools.setMode(state.editorMode);
+    state.editTargetNodeId = activeEndpointContext()?.nodeId || state.editor.selectedNodeId;
     state.transformGesture = null;
     state.editor.cancelTransformDrag();
-    setStatus(`${state.editor.selectedNode().displayName}・Edit Mode`);
+    setStatus(`${state.editor.getNode(state.editTargetNodeId).displayName}・${state.editorMode === EDITOR_MODES.TOPOLOGY ? "Topology Edit" : "Deform"} Mode`);
   } else {
     state.editorMode = EDITOR_MODES.OBJECT;
     state.editTargetNodeId = null;
@@ -459,7 +488,7 @@ async function loadImage(source, label) {
   await loaded;
 
   state.mode = "png";
-  state.editorMode = EDITOR_MODES.EDIT;
+  state.editorMode = EDITOR_MODES.DEFORM;
   state.editTargetNodeId = null;
   state.psdParts = [];
   state.autosaveScheduler?.stop();
@@ -506,9 +535,24 @@ function renderEditorUi() {
   transitionAuthoringView.render();
   transitionPreviewView.render();
   transitionDiagnosticsView.render();
+  meshAuthoringView.render();
 }
 
 function handleEditorChange(reason) {
+  if (["mesh-mode", "mesh-tool", "mesh-selection", "mesh-overlay"].includes(reason)) {
+    const context = activeEndpointContext();
+    const selectedIds = new Set(state.editor?.meshTools.getState().selectedVertexIds || []);
+    state.selected = new Set((context?.topology?.vertexIds || [])
+      .map((vertexId, index) => selectedIds.has(vertexId) ? index : -1)
+      .filter((index) => index >= 0));
+    renderEditorUi();
+    render();
+    return;
+  }
+  if (reason === "mesh-topology") {
+    syncEndpointMeshViewport();
+    return;
+  }
   if (reason === "endpoint-exit") {
     syncSelectedPsdPart();
     renderEditorUi();
@@ -525,7 +569,7 @@ function handleEditorChange(reason) {
     return;
   }
   if (
-    state.editorMode === EDITOR_MODES.EDIT &&
+    isMeshAuthoringMode(state.editorMode) &&
     state.editTargetNodeId &&
     !state.editor?.session.project.scene.nodes[state.editTargetNodeId]
   ) {
@@ -535,7 +579,7 @@ function handleEditorChange(reason) {
   }
   if (
     reason === "selection" &&
-    state.editorMode === EDITOR_MODES.EDIT &&
+    isMeshAuthoringMode(state.editorMode) &&
     state.editTargetNodeId &&
     state.editor.selectedNodeId !== state.editTargetNodeId
   ) {
@@ -915,7 +959,8 @@ function applyReviewedReimport() {
 
 function undoProject() {
   const result = state.renderAssetHistory?.undo() || state.editor?.undo();
-  if (result && state.editor?.selectedNodeId) syncSelectedPsdPart();
+  if (result && state.editor?.endpointMesh.getState().editingEnabled) syncEndpointMeshViewport();
+  else if (result && state.editor?.selectedNodeId) syncSelectedPsdPart();
   if (result) {
     renderEditorUi();
     render();
@@ -925,7 +970,8 @@ function undoProject() {
 
 function redoProject() {
   const result = state.renderAssetHistory?.redo() || state.editor?.redo();
-  if (result && state.editor?.selectedNodeId) syncSelectedPsdPart();
+  if (result && state.editor?.endpointMesh.getState().editingEnabled) syncEndpointMeshViewport();
+  else if (result && state.editor?.selectedNodeId) syncSelectedPsdPart();
   if (result) {
     renderEditorUi();
     render();
@@ -1097,6 +1143,7 @@ bindViewportInteractions({
   setStatus,
   selectedPart,
   endpointMesh: () => state.editor?.endpointMesh || null,
+  meshTools: () => state.editor?.meshTools || null,
   loadFile,
 });
 

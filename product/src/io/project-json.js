@@ -64,7 +64,17 @@ export function createFl2dDocument(
       a.keyArtId < b.keyArtId ? -1 : a.keyArtId > b.keyArtId ? 1 :
         a.nodeId < b.nodeId ? -1 : a.nodeId > b.nodeId ? 1 : 0),
   }));
-  body.meshTopologies = [...body.meshTopologies].sort(byId);
+  body.meshTopologies = [...body.meshTopologies].sort(byId).map((topology) => {
+    if (!Object.hasOwn(topology, "vertexMetadata")) return topology;
+    return {
+      ...topology,
+      vertexMetadata: Object.fromEntries(
+        (topology.vertexIds || [])
+          .filter((vertexId) => topology.vertexMetadata?.[vertexId])
+          .map((vertexId) => [vertexId, topology.vertexMetadata[vertexId]]),
+      ),
+    };
+  });
   body.meshKeyforms = [...body.meshKeyforms].sort(byId);
   body.transitions = [...body.transitions].sort(byId).map((transition) => ({
     ...transition,
@@ -134,6 +144,21 @@ export function migrateProjectSchema(value) {
       ? project.transitions
       : [];
     project.schemaVersion = 3;
+  }
+  if (project?.schemaVersion === 3) {
+    project.meshTopologies = (project.meshTopologies || []).map((topology) => ({
+      ...topology,
+      vertexMetadata: topology.vertexMetadata &&
+        typeof topology.vertexMetadata === "object" &&
+        !Array.isArray(topology.vertexMetadata)
+        ? topology.vertexMetadata
+        : {},
+      nextVertexSequence: Math.max(0, ...(topology.vertexIds || []).map((vertexId) => {
+        const match = /^vtx_(\d+)$/.exec(vertexId);
+        return match ? Number(match[1]) : 0;
+      })) + 1,
+    }));
+    project.schemaVersion = 4;
   }
   if (project?.schemaVersion !== PROJECT_SCHEMA_VERSION) {
     throw new ProjectFormatError(

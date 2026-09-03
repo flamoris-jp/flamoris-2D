@@ -181,6 +181,38 @@ test("endpoint vertex drag previews transiently and commits one keyform position
   assert.deepEqual(committed[0].slice(0, 2), [7, 4]);
 });
 
+test("Topology Edit selects through the stable-ID controller and Add never starts a deform drag", () => {
+  const mesh = generateGridMesh(
+    { minX: 0, minY: 0, maxX: 100, maxY: 100 }, 100, 100, 1, 1,
+  );
+  const calls = [];
+  const tools = {
+    activeToolId: "topology.add",
+    selectVertexByIndex: (index, additive) => calls.push(["select", index, additive]),
+    execute: (toolId, payload) => calls.push([toolId, payload]),
+  };
+  const state = {
+    mode: "psd", editorMode: "topology", editor: null, previewMode: false,
+    spacePressed: false, view: { scale: 1, originX: 0, originY: 0 },
+    mesh, selected: new Set(), partOffset: { x: 0, y: 0 }, drag: null,
+  };
+  const elements = viewportElements();
+  bindViewport(state, elements, {
+    endpointMesh: () => ({ getState: () => ({ editingEnabled: true }) }),
+    meshTools: () => tools,
+    selectedPart: () => ({ left: 0, top: 0, width: 100, height: 100 }),
+  });
+  elements.overlayCanvas.dispatch("pointerdown", {
+    button: 0, pointerId: 11, clientX: 50, clientY: 50, shiftKey: false,
+  });
+  assert.equal(state.drag, null);
+  assert.deepEqual(calls[0], ["select", -1, false]);
+  assert.deepEqual(calls[1], ["topology.add", {
+    position: { x: 50, y: 50 },
+    uv: { x: 0.5, y: 0.5 },
+  }]);
+});
+
 test("endpoint viewport drag uses the rendered endpoint world transform at any zoom", () => {
   // The resolved matrix includes a parent/group transform and the endpoint's
   // own Translate + Rotate + Scale transform. This is the same matrix supplied

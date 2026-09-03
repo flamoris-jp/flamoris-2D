@@ -111,7 +111,8 @@
             <span>Mode</span>
             <select id="editorModeSelect" aria-label="Editor mode">
               <option value="object">Object Mode</option>
-              <option value="edit">Edit Mode</option>
+              <option value="deform">Deform Mode</option>
+              <option value="topology">Topology Edit Mode</option>
             </select>
           </label>
           <div class="transform-toolbar" aria-label="変形ツール">
@@ -237,6 +238,36 @@
                 <select id="endpointBKeyformSelect" disabled><option value="">— Select keyform —</option></select>
               </label>
               <button id="createEndpointBKeyformButton" type="button" disabled>Create B keyform</button>
+              <div class="mesh-authoring-tools">
+                <label class="authoring-field">Mesh tool
+                  <select id="meshToolSelect" disabled><option value="">— Select tool —</option></select>
+                </label>
+                <label class="mesh-overlay-toggle">
+                  <input id="vertexIdOverlayInput" type="checkbox" />
+                  Viewport Vertex ID overlay
+                </label>
+                <section class="selected-vertex-card" aria-label="Selected vertex identity">
+                  <strong>Vertex</strong>
+                  <dl>
+                    <dt>ID</dt><dd><output id="selectedVertexIdOutput">—</output></dd>
+                    <dt>Label</dt><dd><output id="selectedVertexLabelOutput">—</output></dd>
+                  </dl>
+                  <label>Semantic Label
+                    <input id="vertexSemanticLabelInput" type="text" autocomplete="off" placeholder="chin_tip" />
+                  </label>
+                  <div class="preview-buttons">
+                    <button id="setVertexSemanticLabelButton" type="button">Set label</button>
+                    <button id="clearVertexSemanticLabelButton" type="button" class="secondary">Clear</button>
+                  </div>
+                </section>
+                <div class="topology-actions" role="group" aria-label="Topology mutation commands">
+                  <button id="removeVertexButton" type="button">Remove selected</button>
+                  <button id="createTriangleButton" type="button">Create triangle (3)</button>
+                  <button id="subdivideEdgeButton" type="button">Subdivide edge (2)</button>
+                </div>
+                <output id="meshTopologyImpact" class="topology-impact">Deform Mode changes only the active MeshKeyform.</output>
+              </div>
+              <p class="authoring-status">Deform edits the active MeshKeyform. Topology Edit changes the shared topology and every attached keyform through ordinary commands.</p>
               <p class="authoring-status">Topology/keyform creation uses the existing command API. Vertex movement is endpoint-local.</p>
             </fieldset>
 
