@@ -47,6 +47,7 @@ import { createReimportReviewView } from "./ui/reimport-review-view.js";
 import { createMeshEditingController } from "./ui/mesh-editing-controller.js";
 import { createTransitionAuthoringView } from "./ui/transition-authoring-view.js";
 import { createTransitionPreviewView } from "./ui/transition-preview-view.js";
+import { createTransitionDiagnosticsView } from "./ui/transition-diagnostics-view.js";
 
 const desktopApi = window.flamorisDesktop || null;
 const appStorage = desktopApi?.storage || localStorage;
@@ -167,6 +168,12 @@ const transitionPreviewView = createTransitionPreviewView({
     state.editor?.endpointMesh.selectEndpoint(mode === "endpoint-a" ? "from" : "to");
     syncEndpointMeshViewport();
   },
+});
+
+const transitionDiagnosticsView = createTransitionDiagnosticsView({
+  state,
+  elements,
+  setStatus,
 });
 
 function setStatus(message) {
@@ -498,6 +505,7 @@ function renderEditorUi() {
   sceneEditorView.render();
   transitionAuthoringView.render();
   transitionPreviewView.render();
+  transitionDiagnosticsView.render();
 }
 
 function handleEditorChange(reason) {

@@ -345,12 +345,32 @@ function stableFingerprint(value) {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
+const DIAGNOSTIC_MESSAGES = Object.freeze({
+  TRANSITION_MISSING_CORRESPONDENCE: "SemanticSlot correspondence is incomplete for this Transition.",
+  TRANSITION_INVALID_MODE_FOR_MAPPING: "PartTransition mode is incompatible with the available endpoint mappings.",
+  TRANSITION_TOPOLOGY_INCOMPATIBLE: "Morph endpoints do not share a compatible MeshTopology.",
+  TRANSITION_MISSING_KEYFORM: "A required endpoint MeshKeyform is missing.",
+  TRANSITION_TRIANGLE_DEGENERATE: "An endpoint mesh triangle has zero area.",
+  TRANSITION_TRIANGLE_INVERSION: "A mesh triangle changes winding between endpoints.",
+  TRANSITION_GEOMETRY_STRETCH_HIGH: "Mesh geometry stretches substantially between endpoints.",
+  TRANSITION_GEOMETRY_COMPRESSION_HIGH: "Mesh geometry compresses substantially between endpoints.",
+  TRANSITION_UV_DISTORTION_HIGH: "Per-Key-Art UV geometry changes substantially between endpoints.",
+  TRANSITION_TEXTURE_GHOSTING_RISK: "Weighted endpoint appearances may produce visible ghosting.",
+  TRANSITION_INTERMEDIATE_KEYART_RECOMMENDED: "An intermediate Key Art may improve this Transition.",
+  TRANSITION_DRAW_ORDER_CROSSING: "Endpoint draw order changes across this Transition.",
+  TRANSITION_PART_PRESENCE_MISMATCH: "Endpoint presence states differ for this SemanticSlot.",
+  TRANSITION_CLIPPING_REFERENCE_INVALID: "A clipping reference does not resolve to a scene node.",
+  TRANSITION_CLIPPING_RENDER_UNSUPPORTED: "The evaluator produced clipping state that the current renderer cannot rasterize.",
+  TRANSITION_DRAW_ORDER_CONFLICT: "Multiple visible render instances conflict at the same explicit draw order.",
+});
+
 function diagnostic(transitionId, code, severity, semanticSlotId = null, timeTicks = null, details = {}) {
   const evidenceFingerprint = stableFingerprint({ transitionId, code, semanticSlotId, timeTicks, details });
   return {
     key: [code, transitionId, semanticSlotId || "-", timeTicks ?? "-", evidenceFingerprint].join("|"),
     code,
     severity,
+    message: DIAGNOSTIC_MESSAGES[code] || code,
     transitionId,
     ...(semanticSlotId ? { semanticSlotId } : {}),
     ...(timeTicks !== null ? { timeTicks } : {}),
@@ -386,8 +406,27 @@ function structuralDiagnostics(project, transition, fromKeyArt, toKeyArt, slots,
       const fromKeyform = (project.meshKeyforms || []).find((entry) => entry.id === part.fromKeyformId);
       const toKeyform = (project.meshKeyforms || []).find((entry) => entry.id === part.toKeyformId);
       if (!topology || !fromKeyform || !toKeyform || fromKeyform.topologyId !== topology?.id || toKeyform.topologyId !== topology?.id) {
-        diagnostics.push(diagnostic(transition.id, "TRANSITION_TOPOLOGY_INCOMPATIBLE", "error", slot.id));
-        if (!fromKeyform || !toKeyform) diagnostics.push(diagnostic(transition.id, "TRANSITION_MISSING_KEYFORM", "error", slot.id));
+        const referenceDetails = {
+          partTransitionId: part.id,
+          topologyId: part.topologyId,
+          fromKeyformId: part.fromKeyformId,
+          toKeyformId: part.toKeyformId,
+        };
+        diagnostics.push(diagnostic(transition.id, "TRANSITION_TOPOLOGY_INCOMPATIBLE", "error", slot.id, null, referenceDetails));
+        if (!fromKeyform || !toKeyform) diagnostics.push(diagnostic(
+          transition.id,
+          "TRANSITION_MISSING_KEYFORM",
+          "error",
+          slot.id,
+          null,
+          {
+            ...referenceDetails,
+            missingEndpoints: [
+              ...(!fromKeyform ? ["from"] : []),
+              ...(!toKeyform ? ["to"] : []),
+            ],
+          },
+        ));
       } else {
         let intermediateRecommended = false;
         let ghostingRisk = false;

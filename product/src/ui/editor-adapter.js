@@ -3,6 +3,7 @@ import { worldTransformMatrix } from "../core/transforms.js";
 import { TransitionAuthoringController } from "./transition-authoring-controller.js";
 import { EndpointMeshController } from "./endpoint-mesh-controller.js";
 import { TransitionPreviewController } from "./transition-preview-controller.js";
+import { TransitionDiagnosticsController } from "./transition-diagnostics-controller.js";
 
 function filterTree(node, matches) {
   const children = node.children
@@ -35,7 +36,10 @@ export class EditorUiAdapter {
     this.transformDrag = null;
     this.transitionAuthoring = new TransitionAuthoringController(session, {
       onChange: (reason) => {
-        if (reason === "transition-selection") this.transitionPreview?.activeTransitionChanged();
+        if (reason === "transition-selection") {
+          this.transitionPreview?.activeTransitionChanged();
+          this.transitionDiagnostics?.activeTransitionChanged();
+        }
         this.notify(reason);
       },
     });
@@ -45,6 +49,13 @@ export class EditorUiAdapter {
     this.transitionPreview = new TransitionPreviewController(session, this.transitionAuthoring, {
       onChange: (reason) => this.notify(reason),
     });
+    this.transitionDiagnostics = new TransitionDiagnosticsController(
+      session,
+      this.transitionAuthoring,
+      this.endpointMesh,
+      this.transitionPreview,
+      { onChange: (reason) => this.notify(reason) },
+    );
     this.expandAllGroups();
 
     const sessionOnChange = session.onChange;

@@ -10,12 +10,19 @@ export function renderEvaluatedTransitionViewport({
   renderer,
   resolveArtwork,
 }) {
-  const plan = createEvaluatedRenderPlan(evaluation, { resolveArtwork });
-  renderer.renderEvaluated(plan, view, resolveArtwork);
-  return {
-    unsupportedReasons: plan.unsupportedReasons,
-    renderInstanceCount: plan.renderInstanceCount,
-  };
+  try {
+    const plan = createEvaluatedRenderPlan(evaluation, { resolveArtwork });
+    renderer.renderEvaluated(plan, view, resolveArtwork);
+    return {
+      unsupportedReasons: plan.unsupportedReasons,
+      renderInstanceCount: plan.renderInstanceCount,
+    };
+  } catch (error) {
+    return {
+      unsupportedReasons: [`Evaluated render plan is invalid: ${error.message || String(error)}`],
+      renderInstanceCount: 0,
+    };
+  }
 }
 
 export function clearLayerCanvas(canvas) {
