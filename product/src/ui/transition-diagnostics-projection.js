@@ -22,7 +22,12 @@ function diagnosticTarget(entry) {
   return {
     transitionId: entry.transitionId || null,
     semanticSlotId: entry.semanticSlotId || details.semanticSlotId || null,
-    endpoint: details.endpoint || (missingEndpoints.length === 1 ? missingEndpoints[0] : null),
+    endpoint: ["from", "to"].includes(details.endpoint)
+      ? details.endpoint : (missingEndpoints.length === 1 ? missingEndpoints[0] : null),
+    partTransitionId: details.partTransitionId || null,
+    nodeId: details.nodeId || details.sourceNodeId || null,
+    fromNodeId: details.fromNodeId || null,
+    toNodeId: details.toNodeId || null,
     topologyId: details.topologyId || null,
     keyformId: details.keyformId || null,
     fromKeyformId: details.fromKeyformId || null,

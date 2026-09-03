@@ -434,6 +434,33 @@ test("mixed draw-order composite groups are non-authoritative instead of choosin
   assert.match(plan.unsupportedReasons[0], /inconsistent explicit draw order \(1, 3\)/);
 });
 
+test("separate batches with the same explicit draw order stay unsupported without an ID tie-break", () => {
+  const instance = (renderInstanceId) => ({
+    renderInstanceId,
+    sourceNodeId: "node_a",
+    transform: [1, 0, 0, 1, 0, 0],
+    mesh: { positions: [0, 0, 1, 0, 0, 1], indices: [0, 1, 2] },
+    appearanceSamples: [{
+      appearanceId: renderInstanceId,
+      sourceNodeId: "node_a",
+      uvs: [0, 0, 1, 0, 0, 1],
+      weight: 1,
+    }],
+    opacity: 1,
+    drawOrder: 4,
+    clipping: { sourceNodeId: null },
+  });
+  const plan = createEvaluatedRenderPlan({
+    evaluatedParts: [
+      { semanticSlotId: "slot_a", presence: "present", renderInstances: [instance("instance_z")] },
+      { semanticSlotId: "slot_b", presence: "present", renderInstances: [instance("instance_a")] },
+    ],
+  }, { resolveArtwork: () => ({}) });
+  assert.deepEqual(plan.batches, []);
+  assert.equal(plan.renderInstanceCount, 0);
+  assert.match(plan.unsupportedReasons[0], /cannot invent a z-order/);
+});
+
 test("scrubber to evaluator to viewport consumer keeps simultaneous Replace instances", () => {
   const { session, preview } = fixture();
   session.execute({
@@ -472,6 +499,21 @@ test("actual renderer path uses evaluator opacity, appearance and composite weig
   assert.match(source, /renderInstance\.compositeWeight/);
   assert.match(source, /gl\.blendFunc\(gl\.ONE, gl\.ONE\)/);
   assert.doesNotMatch(source, /PartTransition|part\.mode|semanticSlotId/);
+});
+
+test("diagnostics runtime modules are packaged and keep the Query/controller boundary", async () => {
+  const [allowlist, projection, controller, view] = await Promise.all([
+    readFile(new URL("../production-files.txt", import.meta.url), "utf8"),
+    readFile(new URL("../src/ui/transition-diagnostics-projection.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/ui/transition-diagnostics-controller.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/ui/transition-diagnostics-view.js", import.meta.url), "utf8"),
+  ]);
+  assert.match(allowlist, /src\/ui\/transition-diagnostics-controller\.js/);
+  assert.match(allowlist, /src\/ui\/transition-diagnostics-projection\.js/);
+  assert.match(allowlist, /src\/ui\/transition-diagnostics-view\.js/);
+  assert.match(controller, /session\.query\("semantic_slot\.list"/);
+  assert.doesNotMatch(`${projection}\n${controller}\n${view}`, /session\.project/);
+  assert.doesNotMatch(projection, /PartTransition|part\.mode/);
 });
 
 test("renderer-supported endpoint evaluations are visually equivalent through the preview consumer", () => {

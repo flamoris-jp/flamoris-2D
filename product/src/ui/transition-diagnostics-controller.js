@@ -24,6 +24,10 @@ export class TransitionDiagnosticsController {
     this.onChange?.(reason, this);
   }
 
+  activeTransitionChanged() {
+    this.selectedDiagnosticKey = null;
+  }
+
   getState() {
     const previewState = this.transitionPreview.getState();
     const selectedDiagnostic = this.selectedDiagnosticKey

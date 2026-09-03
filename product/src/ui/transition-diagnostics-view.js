@@ -2,6 +2,10 @@ function targetText(target = {}) {
   return [
     target.semanticSlotId && `SemanticSlot ${target.semanticSlotId}`,
     target.endpoint && `Endpoint ${target.endpoint === "from" ? "A" : "B"}`,
+    target.partTransitionId && `PartTransition ${target.partTransitionId}`,
+    target.nodeId && `Node ${target.nodeId}`,
+    target.fromNodeId && `A node ${target.fromNodeId}`,
+    target.toNodeId && `B node ${target.toNodeId}`,
     target.topologyId && `Topology ${target.topologyId}`,
     (target.keyformId || target.fromKeyformId || target.toKeyformId) &&
       `Keyform ${target.keyformId || target.fromKeyformId || target.toKeyformId}`,
@@ -31,6 +35,7 @@ function diagnosticItem(diagnostic, selected) {
   context.className = "diagnostic-context";
   context.textContent = [
     diagnostic.source,
+    diagnostic.authorityImpact === "blocks" ? "Blocks preview authority" : "Advisory",
     `Transition ${diagnostic.transitionId || "missing"}`,
     targetText(diagnostic.target),
     diagnostic.timeTicks != null && `Tick ${diagnostic.timeTicks}`,

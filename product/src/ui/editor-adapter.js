@@ -36,7 +36,10 @@ export class EditorUiAdapter {
     this.transformDrag = null;
     this.transitionAuthoring = new TransitionAuthoringController(session, {
       onChange: (reason) => {
-        if (reason === "transition-selection") this.transitionPreview?.activeTransitionChanged();
+        if (reason === "transition-selection") {
+          this.transitionPreview?.activeTransitionChanged();
+          this.transitionDiagnostics?.activeTransitionChanged();
+        }
         this.notify(reason);
       },
     });
