@@ -288,7 +288,7 @@ test("re-import view actions call only the existing review API", () => {
     ["add", "row_a"],
     ["keep", "row_a"],
     ["remove", "row_a"],
-    ["ignore", "ignore"],
+    ["ignore", "row_a"],
     ["reset", "row_a"],
     ["update", "row_a", "part_new"],
   ]);
