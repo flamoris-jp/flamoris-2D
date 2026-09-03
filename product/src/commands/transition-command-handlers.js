@@ -57,6 +57,15 @@ function normalizedTransition(transition) {
   };
 }
 
+function normalizedTopology(topology) {
+  return {
+    ...cloneProject(topology),
+    vertexIds: cloneProject(topology.vertexIds || []),
+    indices: cloneProject(topology.indices || []),
+    vertexMetadata: cloneProject(topology.vertexMetadata || {}),
+  };
+}
+
 function createEntity(collection, normalizer, notFoundCode) {
   return (project, payload) => {
     const value = normalizer(payload.entity);
@@ -171,11 +180,34 @@ export const transitionCommandHandlers = {
     };
   },
 
-  "mesh_topology.create": (project, payload) => createEntity("meshTopologies", identity)(project, { entity: payload.topology }),
-  "mesh_topology.update": (project, payload) => updateEntity("meshTopologies", identity, "mesh_topology.not_found", "mesh_topology.update", "topologyId", "topology")(project, {
-    id: payload.topologyId,
-    entity: payload.topology,
-  }),
+  "mesh_topology.create": (project, payload) => createEntity("meshTopologies", normalizedTopology)(project, { entity: payload.topology }),
+  "mesh_topology.update": (project, payload) => {
+    const current = entityFor(project, "meshTopologies", payload.topologyId, "mesh_topology.not_found");
+    const next = normalizedTopology(payload.topology);
+    if (next.id !== current.id) {
+      throw new CommandError("Updates must preserve stable identity.", "identity.changed");
+    }
+    const hasKeyforms = (project.meshKeyforms || []).some((keyform) =>
+      keyform.topologyId === current.id);
+    const changesStructure =
+      JSON.stringify(current.vertexIds) !== JSON.stringify(next.vertexIds) ||
+      JSON.stringify(current.indices) !== JSON.stringify(next.indices);
+    if (hasKeyforms && changesStructure) {
+      throw new CommandError(
+        "Topology with MeshKeyforms must use an atomic topology mutation command.",
+        "MESH_TOPOLOGY_MUTATION_REQUIRES_CONTRACT",
+      );
+    }
+    const previous = cloneProject(current);
+    Object.assign(current, next);
+    return {
+      inverse: {
+        type: "mesh_topology.update",
+        payload: { topologyId: previous.id, topology: previous },
+      },
+      affectedIds: [current.id],
+    };
+  },
   "mesh_topology.remove": (project, payload) => removeEntity("meshTopologies", "mesh_topology.restore", "mesh_topology.not_found")(project, { id: payload.topologyId }),
   "meshTopologies.remove_internal": removeEntity("meshTopologies", "mesh_topology.restore", "mesh_topology.not_found"),
   "mesh_topology.restore": restoreEntity("meshTopologies", "meshTopologies.remove_internal"),

@@ -200,7 +200,13 @@ export class MeshToolController {
     const allocatedId = vertexId || topology.nextVertexId;
     const result = this.session.execute({
       type: "mesh_topology.add_vertex",
-      payload: { topologyId: topology.id, vertexId: allocatedId, position, uv, semanticLabel },
+      payload: {
+        topologyId: topology.id,
+        vertexId: allocatedId,
+        position,
+        uv,
+        ...(semanticLabel ? { semanticLabel } : {}),
+      },
     }, { label: "Add MeshTopology vertex" });
     this.selectedVertexIds = new Set([allocatedId]);
     this.notify("mesh-topology");

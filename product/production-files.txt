@@ -27,6 +27,7 @@ src/commands/errors.js
 src/commands/scene-command-handlers.js
 src/commands/temporal-command-handlers.js
 src/commands/transition-command-handlers.js
+src/commands/mesh-topology-command-handlers.js
 src/commands/schemas.js
 src/io/project-json.js
 src/io/project-files.js

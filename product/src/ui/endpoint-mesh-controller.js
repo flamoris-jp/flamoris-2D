@@ -92,7 +92,7 @@ export class EndpointMeshController {
   }) {
     const result = this.session.execute({
       type: "mesh_topology.create",
-      payload: { topology: { id: topologyId, vertexIds: [...vertexIds], indices: [...indices] } },
+      payload: { topology: { id: topologyId, vertexIds: [...vertexIds], indices: [...indices], vertexMetadata: {} } },
     }, { label: "Create MeshTopology" });
     this.selectTopology(topologyId);
     return result;
@@ -101,7 +101,7 @@ export class EndpointMeshController {
   updateTopology(topologyId, { vertexIds, indices }) {
     return this.session.execute({
       type: "mesh_topology.update",
-      payload: { topologyId, topology: { id: topologyId, vertexIds: [...vertexIds], indices: [...indices] } },
+      payload: { topologyId, topology: { id: topologyId, vertexIds: [...vertexIds], indices: [...indices], vertexMetadata: {} } },
     }, { label: "Update MeshTopology" });
   }
 
@@ -147,7 +147,7 @@ export class EndpointMeshController {
     const expected = vertexIds.length * 2;
     const part = state.selectedSemanticSlot.partTransition;
     const commands = [
-      { type: "mesh_topology.create", payload: { topology: { id: topologyId, vertexIds: [...vertexIds], indices: [...indices] } } },
+      { type: "mesh_topology.create", payload: { topology: { id: topologyId, vertexIds: [...vertexIds], indices: [...indices], vertexMetadata: {} } } },
       { type: "mesh_keyform.create", payload: { keyform: {
         id: fromKeyformId, topologyId, keyArtId: state.activeTransition.fromKeyArtId,
         semanticSlotId: state.selectedSemanticSlot.id, positions: fromPositions ? [...fromPositions] : Array(expected).fill(0), uvs: fromUvs ? [...fromUvs] : Array(expected).fill(0),
@@ -241,8 +241,8 @@ export class EndpointMeshController {
       throw new Error("MeshKeyform positions must contain two finite values per topology vertex.");
     }
     return this.session.execute({
-      type: "mesh_keyform.update",
-      payload: { keyformId, keyform: { ...keyform, positions: [...positions] } },
+      type: "mesh_keyform.move_vertices",
+      payload: { keyformId, positions: [...positions] },
     }, { label: "Move MeshKeyform vertices" });
   }
 

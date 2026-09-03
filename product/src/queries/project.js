@@ -65,6 +65,38 @@ function mappingStatus(from, to) {
   return "unmapped";
 }
 
+function nextStableVertexId(project) {
+  let maximum = 0;
+  const used = new Set();
+  for (const topology of project.meshTopologies || []) {
+    for (const vertexId of topology.vertexIds || []) {
+      used.add(vertexId);
+      const match = /^vtx_(\d+)$/.exec(vertexId);
+      if (match) maximum = Math.max(maximum, Number(match[1]));
+    }
+  }
+  let sequence = maximum + 1;
+  let candidate;
+  do {
+    candidate = `vtx_${String(sequence++).padStart(4, "0")}`;
+  } while (used.has(candidate));
+  return candidate;
+}
+
+function topologyProjection(project, topology) {
+  const vertexMetadata = cloneProject(topology.vertexMetadata || {});
+  return {
+    ...cloneProject(topology),
+    vertexMetadata,
+    vertices: topology.vertexIds.map((id, index) => ({
+      id,
+      index,
+      semanticLabel: vertexMetadata[id]?.semanticLabel || null,
+    })),
+    nextVertexId: nextStableVertexId(project),
+  };
+}
+
 function explicitMorphReferences(project, transition, slot, part) {
   if (!part?.topologyId || !part.fromKeyformId || !part.toKeyformId) return null;
   const topology = project.meshTopologies.find((entry) => entry.id === part.topologyId);
@@ -211,11 +243,18 @@ export const projectQueries = {
   "mesh.get_topology": (project, input) => {
     const topology = project.meshTopologies.find((entry) => entry.id === input.topologyId);
     if (!topology) throw new Error("Unknown MeshTopology " + input.topologyId + ".");
-    return cloneProject(topology);
+    return topologyProjection(project, topology);
   },
   "mesh.list_topologies": (project) => [...project.meshTopologies]
     .sort((a, b) => a.id.localeCompare(b.id))
-    .map(cloneProject),
+    .map((topology) => topologyProjection(project, topology)),
+  "mesh.get_vertex": (project, input) => {
+    const topology = project.meshTopologies.find((entry) => entry.id === input.topologyId);
+    if (!topology) throw new Error("Unknown MeshTopology " + input.topologyId + ".");
+    const index = topology.vertexIds.indexOf(input.vertexId);
+    if (index < 0) throw new Error("Unknown stable vertex " + input.vertexId + ".");
+    return topologyProjection(project, topology).vertices[index];
+  },
   "mesh.get_keyform": (project, input) => {
     const keyform = project.meshKeyforms.find((entry) => entry.id === input.keyformId);
     if (!keyform) throw new Error("Unknown MeshKeyform " + input.keyformId + ".");

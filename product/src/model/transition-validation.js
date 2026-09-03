@@ -222,7 +222,7 @@ export function validateTransitionDomain(project, register = () => {}) {
       issues.push(problem("MESH_TOPOLOGY_INVALID", path, "MeshTopology requires vertexIds and indices arrays.", topology?.id));
       continue;
     }
-    if (unknownKeys(topology, ["id", "vertexIds", "indices"]).length) {
+    if (unknownKeys(topology, ["id", "vertexIds", "indices", "vertexMetadata"]).length) {
       issues.push(problem("MESH_TOPOLOGY_INVALID", path, "MeshTopology contains unsupported persistent fields.", topology.id));
     }
     if (topology.vertexIds.length < 3 || topology.vertexIds.some((id) => !nonEmpty(id))) {
@@ -234,15 +234,44 @@ export function validateTransitionDomain(project, register = () => {}) {
     if (new Set(topology.vertexIds).size !== topology.vertexIds.length) {
       issues.push(problem("MESH_TOPOLOGY_DUPLICATE_VERTEX", path + ".vertexIds", "MeshTopology vertex IDs must be unique.", topology.id));
     }
+    const vertexMetadata = topology.vertexMetadata || {};
+    if (!object(vertexMetadata)) {
+      issues.push(problem("MESH_TOPOLOGY_VERTEX_METADATA_INVALID", path + ".vertexMetadata", "MeshTopology vertexMetadata must be an object.", topology.id));
+    } else {
+      const labels = new Map();
+      for (const [vertexId, metadata] of Object.entries(vertexMetadata)) {
+        const metadataPath = path + ".vertexMetadata." + vertexId;
+        if (!topology.vertexIds.includes(vertexId)) {
+          issues.push(problem("MESH_TOPOLOGY_MISSING_VERTEX_REFERENCE", metadataPath, "Vertex metadata references a missing or removed stable vertex ID.", topology.id));
+          continue;
+        }
+        if (!object(metadata) || unknownKeys(metadata, ["semanticLabel"]).length ||
+          !nonEmpty(metadata.semanticLabel)) {
+          issues.push(problem("MESH_TOPOLOGY_VERTEX_METADATA_INVALID", metadataPath, "Vertex metadata requires one non-empty semanticLabel.", vertexId));
+          continue;
+        }
+        const previous = labels.get(metadata.semanticLabel);
+        if (previous) {
+          issues.push(problem(
+            "MESH_TOPOLOGY_DUPLICATE_SEMANTIC_LABEL",
+            metadataPath + ".semanticLabel",
+            "Non-empty semantic labels must be unique within one MeshTopology.",
+            vertexId,
+            "error",
+            { semanticLabel: metadata.semanticLabel, vertexIds: [previous, vertexId].sort() },
+          ));
+        } else labels.set(metadata.semanticLabel, vertexId);
+      }
+    }
     if (topology.indices.length === 0 || topology.indices.length % 3 !== 0) {
-      issues.push(problem("MESH_TOPOLOGY_INVALID", path + ".indices", "MeshTopology indices must contain complete triangles.", topology.id));
+      issues.push(problem("MESH_TOPOLOGY_INVALID_TRIANGLES", path + ".indices", "MeshTopology indices must contain complete triangles.", topology.id));
     }
     for (let offset = 0; offset < topology.indices.length; offset += 3) {
       const triangle = topology.indices.slice(offset, offset + 3);
       if (triangle.some((value) => !Number.isSafeInteger(value) || value < 0 || value >= topology.vertexIds.length)) {
-        issues.push(problem("MESH_TOPOLOGY_INVALID_INDEX", path + ".indices." + offset, "MeshTopology index is outside vertexIds.", topology.id));
+        issues.push(problem("MESH_TOPOLOGY_INVALID_VERTEX_REFERENCE", path + ".indices." + offset, "Triangle references a missing topology vertex.", topology.id));
       } else if (new Set(triangle).size !== 3) {
-        issues.push(problem("TRANSITION_TRIANGLE_DEGENERATE", path + ".indices." + offset, "Triangle contains duplicate vertex indices.", topology.id));
+        issues.push(problem("MESH_TOPOLOGY_TRIANGLE_REPEATED_VERTEX", path + ".indices." + offset, "Triangle contains a repeated vertex.", topology.id));
       }
     }
   }
@@ -262,13 +291,36 @@ export function validateTransitionDomain(project, register = () => {}) {
     if (!keyArtById.has(keyform.keyArtId)) issues.push(problem("MESH_KEYFORM_UNKNOWN_KEYART", path + ".keyArtId", "MeshKeyform KeyArt does not exist.", keyform.id));
     if (!slotById.has(keyform.semanticSlotId)) issues.push(problem("MESH_KEYFORM_UNKNOWN_SLOT", path + ".semanticSlotId", "MeshKeyform SemanticSlot does not exist.", keyform.id));
     const expected = topology ? topology.vertexIds.length * 2 : null;
-    if (!Array.isArray(keyform.positions) || keyform.positions.some((value) => !finite(value)) ||
-      (expected !== null && keyform.positions.length !== expected)) {
-      issues.push(problem("MESH_KEYFORM_INVALID", path + ".positions", "MeshKeyform positions must contain two finite values per topology vertex.", keyform.id));
+    if (!Array.isArray(keyform.positions) || keyform.positions.some((value) => !finite(value))) {
+      issues.push(problem("MESH_KEYFORM_POSITIONS_INVALID", path + ".positions", "MeshKeyform positions must contain finite coordinate values.", keyform.id));
+    } else if (expected !== null && keyform.positions.length !== expected) {
+      issues.push(problem("MESH_KEYFORM_POSITION_COUNT_MISMATCH", path + ".positions", "MeshKeyform position count does not match its MeshTopology.", keyform.id));
     }
-    if (!Array.isArray(keyform.uvs) || keyform.uvs.some((value) => !finite(value)) ||
-      (expected !== null && keyform.uvs.length !== expected)) {
-      issues.push(problem("MESH_KEYFORM_INVALID", path + ".uvs", "MeshKeyform UVs must contain two finite values per topology vertex.", keyform.id));
+    if (!Array.isArray(keyform.uvs) || keyform.uvs.some((value) => !finite(value))) {
+      issues.push(problem("MESH_KEYFORM_UVS_INVALID", path + ".uvs", "MeshKeyform UVs must contain finite coordinate values.", keyform.id));
+    } else if (expected !== null && keyform.uvs.length !== expected) {
+      issues.push(problem("MESH_KEYFORM_UV_COUNT_MISMATCH", path + ".uvs", "MeshKeyform UV count does not match its MeshTopology.", keyform.id));
+    }
+    if (topology && Array.isArray(keyform.positions) &&
+      keyform.positions.length === expected && topology.indices.length % 3 === 0) {
+      for (let offset = 0; offset < topology.indices.length; offset += 3) {
+        const [a, b, c] = topology.indices.slice(offset, offset + 3);
+        if ([a, b, c].some((vertexIndex) =>
+          !Number.isSafeInteger(vertexIndex) ||
+          vertexIndex < 0 ||
+          vertexIndex >= topology.vertexIds.length)) continue;
+        const area = Math.abs(
+          (keyform.positions[b * 2] - keyform.positions[a * 2]) *
+            (keyform.positions[c * 2 + 1] - keyform.positions[a * 2 + 1]) -
+          (keyform.positions[b * 2 + 1] - keyform.positions[a * 2 + 1]) *
+            (keyform.positions[c * 2] - keyform.positions[a * 2]),
+        ) / 2;
+        if (area <= 1e-8) {
+          issues.push(problem("MESH_TOPOLOGY_TRIANGLE_ZERO_AREA", path + ".positions", "MeshKeyform contains a zero-area triangle.", keyform.id, "warning", { triangleOffset: offset }));
+        } else if (area < 1e-4) {
+          issues.push(problem("MESH_TOPOLOGY_TRIANGLE_NEAR_DEGENERATE", path + ".positions", "MeshKeyform contains a near-degenerate triangle.", keyform.id, "warning", { triangleOffset: offset, area }));
+        }
+      }
     }
     const key = keyform.topologyId + "\u0000" + keyform.keyArtId + "\u0000" + keyform.semanticSlotId;
     if (keyformKeys.has(key)) {
