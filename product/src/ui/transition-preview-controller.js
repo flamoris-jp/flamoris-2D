@@ -267,7 +267,9 @@ export class TransitionPreviewController {
     const structuralReasons = [];
     if (this.evaluationError) structuralReasons.push(this.evaluationError.message || String(this.evaluationError));
     for (const entry of this.evaluation?.diagnostics || []) {
-      if (entry.severity === "error") structuralReasons.push(`${entry.code}`);
+      if (entry.severity === "error") {
+        structuralReasons.push(entry.message ? `${entry.code}: ${entry.message}` : `${entry.code}`);
+      }
     }
     const rendererReasons = this.renderReport?.unsupportedReasons || [];
     const reasons = [...new Set([...structuralReasons, ...rendererReasons])];

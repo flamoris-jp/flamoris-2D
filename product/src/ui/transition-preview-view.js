@@ -18,6 +18,7 @@ function keyframeValueText(value) {
 }
 
 function parseKeyframeValue(text, valueType) {
+  if (!text.trim()) throw new Error("Keyframe value is required.");
   if (["unit-number", "number", "integer"].includes(valueType)) {
     const value = Number(text);
     if (!Number.isFinite(value)) throw new Error("Keyframe value must be a finite number.");
