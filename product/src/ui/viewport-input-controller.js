@@ -87,7 +87,7 @@ export function bindViewportInteractions({
     if (editorModeShortcutAction(event) && state.mode === "psd") {
       event.preventDefault();
       setEditorMode(state.editorMode === EDITOR_MODES.OBJECT
-        ? EDITOR_MODES.EDIT
+        ? EDITOR_MODES.DEFORM
         : EDITOR_MODES.OBJECT);
       return;
     }

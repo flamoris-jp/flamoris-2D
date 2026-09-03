@@ -1,7 +1,7 @@
 import { getDeformedVertices, imageToScreen } from "../mesh.js";
 import { sampleLoop } from "../animation.js";
 import { transformPoint } from "../core/transforms.js";
-import { EDITOR_MODES } from "./editor-modes.js";
+import { EDITOR_MODES, isMeshAuthoringMode } from "./editor-modes.js";
 import { createEvaluatedRenderPlan } from "../core/evaluated-render.js";
 
 export function renderEvaluatedTransitionViewport({
@@ -82,10 +82,10 @@ export function createViewportRenderer({
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     if (!state.mesh || !state.view || vertices.length === 0) return;
-    if (state.mode === "psd" && state.editorMode !== EDITOR_MODES.EDIT) return;
+    if (state.mode === "psd" && !isMeshAuthoringMode(state.editorMode)) return;
 
-    context.lineWidth = state.editorMode === EDITOR_MODES.EDIT ? 1.5 : 1;
-    context.strokeStyle = state.editorMode === EDITOR_MODES.EDIT
+    context.lineWidth = isMeshAuthoringMode(state.editorMode) ? 1.5 : 1;
+    context.strokeStyle = isMeshAuthoringMode(state.editorMode)
       ? "rgba(255, 202, 103, 0.72)"
       : "rgba(129, 221, 205, 0.48)";
     context.beginPath();

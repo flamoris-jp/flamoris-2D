@@ -25,6 +25,7 @@ import { transformPoint } from "./core/transforms.js";
 import {
   EDITOR_MODES,
   editModeAvailability,
+  isMeshAuthoringMode,
 } from "./ui/editor-modes.js";
 import { createBrowserProjectWriter } from "./ui/browser-project-files.js";
 import {
@@ -183,7 +184,7 @@ function setStatus(message) {
 function selectedPartIndex() {
   const endpoint = activeEndpointContext();
   if (endpoint) return state.psdParts.findIndex((part) => part.nodeId === endpoint.nodeId);
-  const targetNodeId = state.editorMode === EDITOR_MODES.EDIT
+  const targetNodeId = isMeshAuthoringMode(state.editorMode)
     ? state.editTargetNodeId
     : state.editor?.selectedNodeId;
   if (!targetNodeId) return -1;
@@ -245,7 +246,8 @@ function syncEndpointMeshViewport() {
     };
     renderer.setMesh(state.mesh);
   } else createMesh();
-  state.editorMode = EDITOR_MODES.EDIT;
+  state.editorMode = EDITOR_MODES.DEFORM;
+  state.editor?.meshTools.setMode(EDITOR_MODES.DEFORM);
   state.editTargetNodeId = context.nodeId;
   state.selected.clear();
   elements.partInfo.textContent = `${context.endpoint === "from" ? "A" : "B"} · ${part.name} · endpoint mesh`;
@@ -275,8 +277,8 @@ function updateEditorModeUi() {
   elements.editorModeSelect.disabled = state.mode !== "psd";
   elements.editorModeSelect.title = state.mode === "png"
     ? "単一PNGは既存のmesh editingを使用します"
-    : "TabでObject/Edit Modeを切り替え";
-  const editing = state.editorMode === EDITOR_MODES.EDIT;
+    : "TabでObject/Deform Modeを切り替え。Topology EditはModeメニューから選択";
+  const editing = isMeshAuthoringMode(state.editorMode);
   elements.viewportWrap.classList.toggle("edit-mode", editing);
   const transformToolbar = elements.transformTools[0]?.parentElement;
   if (transformToolbar) transformToolbar.hidden = editing;
@@ -284,12 +286,12 @@ function updateEditorModeUi() {
 
 function setEditorMode(requestedMode) {
   if (state.mode === "png") {
-    state.editorMode = EDITOR_MODES.EDIT;
+    state.editorMode = EDITOR_MODES.DEFORM;
     state.editTargetNodeId = null;
     updateEditorModeUi();
     return true;
   }
-  if (requestedMode === EDITOR_MODES.EDIT) {
+  if (isMeshAuthoringMode(requestedMode)) {
     const availability = currentEditModeAvailability();
     if (!availability.allowed) {
       state.editorMode = EDITOR_MODES.OBJECT;
@@ -299,11 +301,14 @@ function setEditorMode(requestedMode) {
       render();
       return false;
     }
-    state.editorMode = EDITOR_MODES.EDIT;
+    state.editorMode = requestedMode === EDITOR_MODES.TOPOLOGY
+      ? EDITOR_MODES.TOPOLOGY
+      : EDITOR_MODES.DEFORM;
+    state.editor.meshTools.setMode(state.editorMode);
     state.editTargetNodeId = state.editor.selectedNodeId;
     state.transformGesture = null;
     state.editor.cancelTransformDrag();
-    setStatus(`${state.editor.selectedNode().displayName}・Edit Mode`);
+    setStatus(`${state.editor.selectedNode().displayName}・${state.editorMode === EDITOR_MODES.TOPOLOGY ? "Topology Edit" : "Deform"} Mode`);
   } else {
     state.editorMode = EDITOR_MODES.OBJECT;
     state.editTargetNodeId = null;
@@ -459,7 +464,7 @@ async function loadImage(source, label) {
   await loaded;
 
   state.mode = "png";
-  state.editorMode = EDITOR_MODES.EDIT;
+  state.editorMode = EDITOR_MODES.DEFORM;
   state.editTargetNodeId = null;
   state.psdParts = [];
   state.autosaveScheduler?.stop();
@@ -525,7 +530,7 @@ function handleEditorChange(reason) {
     return;
   }
   if (
-    state.editorMode === EDITOR_MODES.EDIT &&
+    isMeshAuthoringMode(state.editorMode) &&
     state.editTargetNodeId &&
     !state.editor?.session.project.scene.nodes[state.editTargetNodeId]
   ) {
@@ -535,7 +540,7 @@ function handleEditorChange(reason) {
   }
   if (
     reason === "selection" &&
-    state.editorMode === EDITOR_MODES.EDIT &&
+    isMeshAuthoringMode(state.editorMode) &&
     state.editTargetNodeId &&
     state.editor.selectedNodeId !== state.editTargetNodeId
   ) {

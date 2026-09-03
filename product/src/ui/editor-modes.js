@@ -2,8 +2,15 @@ import { moveVertices } from "../mesh.js";
 
 export const EDITOR_MODES = Object.freeze({
   OBJECT: "object",
-  EDIT: "edit",
+  DEFORM: "deform",
+  TOPOLOGY: "topology",
+  // Compatibility alias for callers from the Phase 1/2 Edit Mode surface.
+  EDIT: "deform",
 });
+
+export function isMeshAuthoringMode(editorMode) {
+  return [EDITOR_MODES.DEFORM, EDITOR_MODES.TOPOLOGY, "edit"].includes(editorMode);
+}
 
 export function canvasInteractionRoute({
   input = "pointerdown",
@@ -18,7 +25,7 @@ export function canvasInteractionRoute({
   if (button !== 0) return "none";
   if (contentMode === "png") return "mesh";
   if (contentMode !== "psd") return "none";
-  return editorMode === EDITOR_MODES.EDIT ? "mesh" : "object";
+  return isMeshAuthoringMode(editorMode) ? "mesh" : "object";
 }
 
 export function editModeAvailability({
@@ -29,10 +36,10 @@ export function editModeAvailability({
   mesh,
 } = {}) {
   if (contentMode !== "psd") {
-    return { allowed: false, reason: "Edit ModeはPSD render partで使用できます" };
+    return { allowed: false, reason: "Mesh authoring modeはPSD render partで使用できます" };
   }
   if (!selectedNodeId || !selectedNode) {
-    return { allowed: false, reason: "Edit Modeへ入るにはPSD partを選択してください" };
+    return { allowed: false, reason: "Mesh authoring modeへ入るにはPSD partを選択してください" };
   }
   if (selectedNode.kind === "group") {
     return { allowed: false, reason: "Groupはmesh編集できません。render partを選択してください" };
@@ -53,7 +60,7 @@ export function editModeAvailability({
 }
 
 export function objectSelectionForMode(editorMode, currentNodeId, pickedNodeId) {
-  return editorMode === EDITOR_MODES.EDIT ? currentNodeId : pickedNodeId;
+  return isMeshAuthoringMode(editorMode) ? currentNodeId : pickedNodeId;
 }
 
 export function updateVertexSelection(currentSelection, vertexIndex, shiftKey) {

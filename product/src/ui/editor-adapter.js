@@ -4,6 +4,7 @@ import { TransitionAuthoringController } from "./transition-authoring-controller
 import { EndpointMeshController } from "./endpoint-mesh-controller.js";
 import { TransitionPreviewController } from "./transition-preview-controller.js";
 import { TransitionDiagnosticsController } from "./transition-diagnostics-controller.js";
+import { MeshToolController } from "./mesh-tool-controller.js";
 
 function filterTree(node, matches) {
   const children = node.children
@@ -44,6 +45,9 @@ export class EditorUiAdapter {
       },
     });
     this.endpointMesh = new EndpointMeshController(session, this.transitionAuthoring, {
+      onChange: (reason) => this.notify(reason),
+    });
+    this.meshTools = new MeshToolController(session, this.endpointMesh, {
       onChange: (reason) => this.notify(reason),
     });
     this.transitionPreview = new TransitionPreviewController(session, this.transitionAuthoring, {
