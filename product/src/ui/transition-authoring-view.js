@@ -130,11 +130,13 @@ export function createTransitionAuthoringView({ state, elements, setStatus, onEn
   });
 
   elements.editEndpointAButton.addEventListener("click", () => act(() => {
+    state.editor?.transitionPreview.selectViewMode("endpoint-a");
     const result = endpointMesh()?.selectEndpoint("from");
     onEndpointContextChange?.();
     return result;
   }));
   elements.editEndpointBButton.addEventListener("click", () => act(() => {
+    state.editor?.transitionPreview.selectViewMode("endpoint-b");
     const result = endpointMesh()?.selectEndpoint("to");
     onEndpointContextChange?.();
     return result;
