@@ -34,7 +34,10 @@ export class EditorUiAdapter {
     this.activeTool = "translate";
     this.transformDrag = null;
     this.transitionAuthoring = new TransitionAuthoringController(session, {
-      onChange: (reason) => this.notify(reason),
+      onChange: (reason) => {
+        if (reason === "transition-selection") this.transitionPreview?.activeTransitionChanged();
+        this.notify(reason);
+      },
     });
     this.endpointMesh = new EndpointMeshController(session, this.transitionAuthoring, {
       onChange: (reason) => this.notify(reason),

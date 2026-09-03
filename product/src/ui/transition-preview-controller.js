@@ -145,8 +145,21 @@ export class TransitionPreviewController {
     }
   }
 
+  activeTransitionChanged() {
+    this.viewMode = "endpoint-a";
+    this.currentTick = 0;
+    this.selectedTrackId = null;
+    this.selectedKeyframe = null;
+    this.evaluation = null;
+    this.evaluationError = null;
+    this.renderReport = null;
+  }
+
   setRenderReport(report) {
-    this.renderReport = report ? cloneProject(report) : null;
+    const next = report ? cloneProject(report) : null;
+    if (JSON.stringify(next) === JSON.stringify(this.renderReport)) return;
+    this.renderReport = next;
+    this.notify("preview-render-report");
   }
 
   selectTrack(trackId) {
@@ -160,6 +173,11 @@ export class TransitionPreviewController {
   }
 
   selectKeyframe(trackId, channel, keyframeId) {
+    if (keyframeId === null) {
+      this.selectedKeyframe = null;
+      this.notify("preview-keyframe-selection");
+      return;
+    }
     const track = this.activeProgram()?.tracks.find((entry) => entry.trackId === trackId);
     const keyframe = track?.channels?.[channel]?.keyframes.find((entry) => entry.id === keyframeId);
     if (!keyframe) throw new Error(`Unknown Transition keyframe ${keyframeId}.`);
@@ -262,7 +280,8 @@ export class TransitionPreviewController {
       tracks: cloneProject(tracks.map((track) => ({
         ...track,
         targetLabel: targetLabel(track.target),
-        targetKind: track.target?.transitionDefault === true ? "default" : "override",
+        targetKind: track.target?.transitionDefault === true
+          ? "default" : track.target?.semanticSlotId ? "semantic-override" : "node-override",
       }))),
       selectedTrack: cloneProject(selectedTrack),
       selectedTrackId: selectedTrack?.trackId || null,

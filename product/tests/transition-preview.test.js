@@ -101,7 +101,7 @@ test("focused tracks distinguish default/override and keyframe edits use normal 
   const { session, preview } = fixture();
   preview.addTrack({ kind: "OpacityTrack", target: { transitionDefault: true }, trackId: "track_default" });
   preview.addTrack({ kind: "OpacityTrack", target: { semanticSlotId: "semantic_eye" }, trackId: "track_eye" });
-  assert.deepEqual(preview.getState().tracks.map((track) => track.targetKind), ["default", "override"]);
+  assert.deepEqual(preview.getState().tracks.map((track) => track.targetKind), ["default", "semantic-override"]);
 
   preview.addKeyframe("track_eye", "opacity", {
     id: "key_eye", timeTicks: 0, value: 0.25, interpolationToNext: { kind: "linear" },
@@ -273,4 +273,55 @@ test("actual renderer path uses evaluator opacity, appearance and composite weig
   assert.match(source, /renderInstance\.compositeWeight/);
   assert.match(source, /gl\.blendFunc\(gl\.ONE, gl\.ONE\)/);
   assert.doesNotMatch(source, /PartTransition|part\.mode|semanticSlotId/);
+});
+
+test("renderer-supported endpoint evaluations are visually equivalent through the preview consumer", () => {
+  const { preview } = fixture();
+  const captured = [];
+  const renderer = { renderEvaluated: (plan) => captured.push(plan) };
+  const resolveArtwork = (nodeId) => ({ nodeId });
+  for (const evaluation of [preview.jumpToStart(), preview.jumpToEnd()]) {
+    const report = renderEvaluatedTransitionViewport({
+      evaluation,
+      view: { scale: 1, originX: 0, originY: 0 },
+      renderer,
+      resolveArtwork,
+    });
+    assert.deepEqual(report.unsupportedReasons, []);
+  }
+  assert.deepEqual(captured[0].batches[0].renderInstances[0].mesh.positions, [0, 0, 10, 0, 0, 10]);
+  assert.deepEqual(captured[1].batches[0].renderInstances[0].mesh.positions, [5, 5, 15, 5, 5, 15]);
+  assert.equal(captured[0].batches[0].renderInstances[0].appearanceSamples[0].sourceNodeId, "node_a");
+  assert.equal(captured[1].batches[0].renderInstances[0].appearanceSamples[0].sourceNodeId, "node_b");
+});
+
+test("renderer-unsupported evaluated clipping marks the controller non-authoritative", () => {
+  const { preview } = fixture();
+  preview.addTrack({ kind: "ClippingTrack", target: { semanticSlotId: "semantic_eye" }, trackId: "clipping" });
+  preview.addKeyframe("clipping", "clipping", {
+    id: "clip_key", timeTicks: 0, value: { sourceNodeId: "node_a" }, interpolationToNext: { kind: "step" },
+  });
+  const evaluation = preview.setTick(60000);
+  const report = renderEvaluatedTransitionViewport({
+    evaluation,
+    view: { scale: 1, originX: 0, originY: 0 },
+    renderer: { renderEvaluated() {} },
+    resolveArtwork: (nodeId) => ({ nodeId }),
+  });
+  preview.setRenderReport(report);
+  assert.equal(preview.getState().authoritative, false);
+  assert.match(preview.getState().authorityReasons[0], /Clipping rasterization is unsupported/);
+});
+
+test("transition-default track and SemanticSlot override use the existing evaluator precedence", () => {
+  const { preview } = fixture();
+  preview.addTrack({ kind: "OpacityTrack", target: { transitionDefault: true }, trackId: "opacity_default" });
+  preview.addKeyframe("opacity_default", "opacity", {
+    id: "opacity_default_key", timeTicks: 0, value: 0.2, interpolationToNext: { kind: "linear" },
+  });
+  preview.addTrack({ kind: "OpacityTrack", target: { semanticSlotId: "semantic_eye" }, trackId: "opacity_override" });
+  preview.addKeyframe("opacity_override", "opacity", {
+    id: "opacity_override_key", timeTicks: 0, value: 0.7, interpolationToNext: { kind: "linear" },
+  });
+  assert.equal(preview.setTick(60000).evaluatedParts[0].renderInstances[0].opacity, 0.7);
 });
