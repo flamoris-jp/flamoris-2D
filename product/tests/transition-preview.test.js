@@ -249,6 +249,74 @@ test("preview authority reports structural and renderer unsupported reasons expl
   assert.deepEqual(state.authorityReasons, ["STRUCTURAL_INVALID"]);
 });
 
+test("unevaluated and failed evaluation states have explicit non-authoritative diagnostics", () => {
+  const { session, preview } = fixture();
+  let state = preview.getState();
+  assert.equal(state.authoritative, false);
+  assert.equal(state.diagnostics.some((entry) => entry.code === "TRANSITION_EVALUATION_UNAVAILABLE"), true);
+  assert.deepEqual(state.authorityReasons, ["Transition evaluation is not available for the current preview state."]);
+
+  const originalQuery = session.query.bind(session);
+  session.query = (name, input) => {
+    if (name === "transition.evaluate") throw new Error("evaluation exploded");
+    return originalQuery(name, input);
+  };
+  preview.setTick(10);
+  state = preview.getState();
+  assert.equal(state.authoritative, false);
+  assert.equal(state.diagnostics.some((entry) =>
+    entry.code === "TRANSITION_EVALUATION_ERROR" && entry.severity === "error"), true);
+  assert.deepEqual(state.authorityReasons, ["evaluation exploded"]);
+});
+
+test("missing artwork and invalid composite groups flow through renderer diagnostics", () => {
+  const { session, preview } = fixture();
+  let evaluation = preview.setTick(60000);
+  let report = renderEvaluatedTransitionViewport({
+    evaluation,
+    view: { scale: 1, originX: 0, originY: 0 },
+    renderer: { renderEvaluated() {} },
+    resolveArtwork: () => null,
+  });
+  preview.setRenderReport(report);
+  let state = preview.getState();
+  assert.equal(state.authoritative, false);
+  assert.match(state.authorityReasons[0], /Source artwork is unavailable/);
+  assert.equal(state.diagnostics.some((entry) =>
+    entry.source === "renderer" && entry.code === "TRANSITION_RENDERER_UNSUPPORTED"), true);
+
+  session.execute({
+    type: "transition.set_part_mode",
+    payload: {
+      transitionId: "transition_ab", partTransitionId: "part_eye", semanticSlotId: "semantic_eye",
+      mode: "replace", configuration: { compositeGroupId: "eye_handoff" },
+    },
+  });
+  evaluation = preview.setTick(60000);
+  evaluation.evaluatedParts[0].renderInstances[1].drawOrder = 2;
+  report = renderEvaluatedTransitionViewport({
+    evaluation,
+    view: { scale: 1, originX: 0, originY: 0 },
+    renderer: { renderEvaluated() {} },
+    resolveArtwork: () => ({}),
+  });
+  preview.setRenderReport(report);
+  state = preview.getState();
+  assert.equal(state.authoritative, false);
+  assert.match(state.authorityReasons[0], /inconsistent explicit draw order/);
+});
+
+test("invalid evaluated render plans return a non-authoritative report instead of throwing", () => {
+  const report = renderEvaluatedTransitionViewport({
+    evaluation: { evaluatedParts: null },
+    view: { scale: 1, originX: 0, originY: 0 },
+    renderer: { renderEvaluated() { throw new Error("renderer must not be reached"); } },
+    resolveArtwork: () => ({}),
+  });
+  assert.equal(report.renderInstanceCount, 0);
+  assert.match(report.unsupportedReasons[0], /Evaluated render plan is invalid/);
+});
+
 test("diagnostic projection preserves severity and shares the preview authority contract", () => {
   const { preview } = fixture();
   preview.setTick(40000);

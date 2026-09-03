@@ -88,6 +88,19 @@ export function projectTransitionPreviewDiagnostics({
     });
   }
 
+  if (transitionId && !evaluation && !evaluationError) {
+    diagnostics.push({
+      key: `evaluation-unavailable|${transitionId}`,
+      code: "TRANSITION_EVALUATION_UNAVAILABLE",
+      severity: "info",
+      message: "Transition evaluation is not available for the current preview state.",
+      transitionId,
+      source: "evaluation",
+      authorityImpact: "blocks",
+      target: { transitionId, preview: true },
+    });
+  }
+
   if (evaluation && !renderReport) {
     diagnostics.push({
       key: `renderer-pending|${transitionId}`,
