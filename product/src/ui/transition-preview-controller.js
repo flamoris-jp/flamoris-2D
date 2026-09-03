@@ -96,6 +96,18 @@ export class TransitionPreviewController {
     return this.evaluation;
   }
 
+  setDurationTicks(durationTicks) {
+    const program = this.activeProgram();
+    if (!program) throw new Error("No active Transition TemporalProgram.");
+    if (!Number.isSafeInteger(durationTicks) || durationTicks <= 0) {
+      throw new RangeError("Duration must be a positive safe integer tick value.");
+    }
+    return this.session.execute({
+      type: "animation.temporal.set_duration",
+      payload: { programId: program.id, durationTicks },
+    }, { label: "Set Transition duration" });
+  }
+
   jumpToStart() {
     return this.setTick(0);
   }
