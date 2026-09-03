@@ -8,6 +8,7 @@ import { serializeProject } from "../src/io/project-json.js";
 import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
 import { TransitionAuthoringController } from "../src/ui/transition-authoring-controller.js";
 import { TransitionPreviewController } from "../src/ui/transition-preview-controller.js";
+import { renderEvaluatedTransitionViewport } from "../src/ui/viewport-renderer.js";
 
 function member(nodeId, appearanceId, drawOrder) {
   return {
@@ -232,4 +233,44 @@ test("preview authority reports structural and renderer unsupported reasons expl
   state = preview.getState();
   assert.equal(state.authoritative, false);
   assert.deepEqual(state.authorityReasons, ["STRUCTURAL_INVALID"]);
+});
+
+test("scrubber to evaluator to viewport consumer keeps simultaneous Replace instances", () => {
+  const { session, preview } = fixture();
+  session.execute({
+    type: "transition.set_part_mode",
+    payload: {
+      transitionId: "transition_ab", partTransitionId: "part_eye", semanticSlotId: "semantic_eye",
+      mode: "replace", configuration: { compositeGroupId: "eye_handoff" },
+    },
+  });
+  const consumed = [];
+  const evaluation = preview.setTick(60000);
+  const report = renderEvaluatedTransitionViewport({
+    evaluation,
+    view: { scale: 2, originX: 3, originY: 4 },
+    resolveArtwork: (nodeId) => ({ nodeId }),
+    renderer: {
+      renderEvaluated(plan, view, resolveArtwork) {
+        consumed.push({ plan, view, artwork: plan.batches[0].renderInstances.map((entry) =>
+          resolveArtwork(entry.appearanceSamples[0].sourceNodeId)) });
+      },
+    },
+  });
+  preview.setRenderReport(report);
+  assert.equal(consumed.length, 1);
+  assert.equal(consumed[0].plan.batches[0].kind, "weighted-premultiplied");
+  assert.equal(consumed[0].plan.batches[0].renderInstances.length, 2);
+  assert.deepEqual(consumed[0].artwork, [{ nodeId: "node_a" }, { nodeId: "node_b" }]);
+  assert.deepEqual(consumed[0].view, { scale: 2, originX: 3, originY: 4 });
+  assert.equal(preview.getState().authoritative, true);
+});
+
+test("actual renderer path uses evaluator opacity, appearance and composite weights", async () => {
+  const source = await readFile(new URL("../src/renderer.js", import.meta.url), "utf8");
+  assert.match(source, /renderInstance\.opacity/);
+  assert.match(source, /sample\.weight/);
+  assert.match(source, /renderInstance\.compositeWeight/);
+  assert.match(source, /gl\.blendFunc\(gl\.ONE, gl\.ONE\)/);
+  assert.doesNotMatch(source, /PartTransition|part\.mode|semanticSlotId/);
 });

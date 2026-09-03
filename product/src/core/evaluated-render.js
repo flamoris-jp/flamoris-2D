@@ -57,7 +57,13 @@ function rendererInstances(evaluatedTransition) {
   const instances = [];
   const unsupportedReasons = [];
   for (const part of evaluatedTransition.evaluatedParts) {
-    if (part.presence === "absent" || part.presence === "occluded") continue;
+    if (part.presence === "absent") continue;
+    if (part.presence === "occluded") {
+      if (part.renderInstances.length) {
+        unsupportedReasons.push(`Occluded part ${part.semanticSlotId} still requires visible render instances.`);
+      }
+      continue;
+    }
     if (part.presence !== "present") {
       unsupportedReasons.push(`Unsupported presence state ${part.presence} for ${part.semanticSlotId}.`);
       continue;
@@ -86,6 +92,15 @@ export function createEvaluatedRenderPlan(evaluatedTransition, {
       unsupportedReasons.push(`Render instance ${label} has no supported explicit draw order.`);
       continue;
     }
+    if (!Array.isArray(renderInstance.transform) || renderInstance.transform.length !== 6 ||
+      renderInstance.transform.some((value) => !Number.isFinite(value))) {
+      unsupportedReasons.push(`Render instance ${label} has an unsupported transform.`);
+      continue;
+    }
+    if (!Number.isFinite(renderInstance.opacity) || renderInstance.opacity < 0 || renderInstance.opacity > 1) {
+      unsupportedReasons.push(`Render instance ${label} has an unsupported opacity.`);
+      continue;
+    }
     if (!renderInstance.mesh || renderInstance.mesh.positions.length % 2 !== 0 ||
       renderInstance.mesh.indices.length % 3 !== 0) {
       unsupportedReasons.push(`Render instance ${label} has unsupported mesh geometry.`);
@@ -100,6 +115,7 @@ export function createEvaluatedRenderPlan(evaluatedTransition, {
       continue;
     }
     let appearanceSupported = true;
+    let appearanceWeightSum = 0;
     for (const sample of samples) {
       if (!sample.sourceNodeId || !resolveArtwork(sample.sourceNodeId)) {
         unsupportedReasons.push(`Source artwork is unavailable for appearance ${sample.appearanceId}.`);
@@ -112,7 +128,11 @@ export function createEvaluatedRenderPlan(evaluatedTransition, {
       if (!Number.isFinite(sample.weight) || sample.weight < 0) {
         unsupportedReasons.push(`Appearance weight is invalid for ${sample.appearanceId}.`);
         appearanceSupported = false;
-      }
+      } else appearanceWeightSum += sample.weight;
+    }
+    if (!(appearanceWeightSum > 0)) {
+      unsupportedReasons.push(`Appearance weights have no visible contribution for ${label}.`);
+      appearanceSupported = false;
     }
     if (appearanceSupported) usable.push(renderInstance);
   }
@@ -135,6 +155,11 @@ export function createEvaluatedRenderPlan(evaluatedTransition, {
   for (const [compositeGroupId, renderInstances] of grouped) {
     if (renderInstances.some((entry) => !Number.isFinite(entry.compositeWeight) || entry.compositeWeight < 0)) {
       unsupportedReasons.push(`Composite group ${compositeGroupId} has invalid weights.`);
+      continue;
+    }
+    const compositeWeightSum = renderInstances.reduce((sum, entry) => sum + entry.compositeWeight, 0);
+    if (!(compositeWeightSum > 0)) {
+      unsupportedReasons.push(`Composite group ${compositeGroupId} has no visible contribution.`);
       continue;
     }
     batches.push({
