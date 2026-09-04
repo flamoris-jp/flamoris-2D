@@ -63,6 +63,7 @@ export function createViewportRenderer({
   endpointContext = () => null,
   transitionPreviewContext = () => null,
   autoMeshPreviewContext = () => null,
+  correspondencePreviewContext = () => null,
 }) {
   function screenPointForPart(x, y) {
     const basePoint = {
@@ -150,6 +151,40 @@ export function createViewportRenderer({
       context.fillText(mode, 24, 33);
     }
     drawAutoMeshPreview(context);
+    drawCorrespondencePreview(context, endpoint, vertices);
+  }
+
+  function drawCorrespondencePreview(context, endpoint, vertices) {
+    const correspondence = correspondencePreviewContext();
+    if (!endpoint || (!correspondence?.previewActive && !correspondence?.pendingVertexId)) return;
+    const indexById = new Map((endpoint.topology?.vertexIds || [])
+      .map((vertexId, index) => [vertexId, index]));
+    context.save();
+    context.font = "700 10px ui-monospace, monospace";
+    context.textBaseline = "middle";
+    for (const pin of correspondence.pins || []) {
+      const index = indexById.get(pin.vertexId);
+      if (!Number.isSafeInteger(index) || index * 2 + 1 >= vertices.length) continue;
+      const point = screenPointForPart(vertices[index * 2], vertices[index * 2 + 1]);
+      context.beginPath();
+      context.arc(point.x, point.y, pin.vertexId === correspondence.selectedPinId ? 8 : 6, 0, Math.PI * 2);
+      context.fillStyle = pin.vertexId === correspondence.selectedPinId
+        ? "rgba(255, 202, 103, .34)" : "rgba(125, 168, 255, .32)";
+      context.fill();
+      context.strokeStyle = pin.vertexId === correspondence.selectedPinId ? "#ffca67" : "#7da8ff";
+      context.lineWidth = 2;
+      context.stroke();
+      context.fillStyle = "#e5ebff";
+      context.fillText(pin.vertexId, point.x + 10, point.y);
+    }
+    context.fillStyle = "rgba(12, 26, 25, .9)";
+    context.fillRect(14, 48, 290, 25);
+    context.fillStyle = correspondence.previewActive ? "#ffca67" : "#7da8ff";
+    context.fillText(correspondence.previewActive
+      ? `CORRESPONDENCE PREVIEW · ${correspondence.pinCount} PINS · READ ONLY`
+      : `PLACE TARGET ANCHOR · ${correspondence.pendingVertexId}`,
+    23, 60.5);
+    context.restore();
   }
 
   function drawAutoMeshPreview(context) {
@@ -324,7 +359,10 @@ export function createViewportRenderer({
     const previewOffsets = state.previewMode && state.keyframes.a && state.keyframes.b
       ? sampleLoop(state.keyframes.a, state.keyframes.b, state.currentTime, duration())
       : state.mesh.vertexOffsets;
-    const vertices = getDeformedVertices(state.mesh, previewOffsets);
+    const correspondence = correspondencePreviewContext();
+    const vertices = correspondence?.previewActive
+      ? new Float32Array(correspondence.candidatePositions)
+      : getDeformedVertices(state.mesh, previewOffsets);
     const part = selectedPart();
     const world = part?.nodeId && state.editor
       ? state.editor.worldTransform(part.nodeId)

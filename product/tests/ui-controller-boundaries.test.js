@@ -213,6 +213,40 @@ test("Topology Edit selects through the stable-ID controller and Add never start
   }]);
 });
 
+test("pending correspondence pin consumes one viewport click in target mesh-local coordinates", () => {
+  const mesh = generateGridMesh(
+    { minX: 0, minY: 0, maxX: 10, maxY: 10 }, 10, 10, 1, 1,
+  );
+  const placed = [];
+  const correspondence = {
+    getState: () => ({ pendingVertexId: "vtx_0002", targetEndpoint: "to", previewActive: false }),
+    placePendingPin: (point) => placed.push(point),
+  };
+  const endpoint = {
+    screenToEndpointKeyformLocal(endpointName, screenPoint, view) {
+      assert.equal(endpointName, "to");
+      assert.deepEqual(view, { scale: 3, originX: 40, originY: -20 });
+      return { x: (screenPoint.x - 40) / 3, y: (screenPoint.y + 20) / 3 };
+    },
+  };
+  const state = {
+    mode: "psd", editorMode: "edit", editor: null, previewMode: false,
+    spacePressed: false, view: { scale: 3, originX: 40, originY: -20 },
+    mesh, selected: new Set(), partOffset: { x: 0, y: 0 }, drag: null,
+  };
+  const elements = viewportElements();
+  bindViewport(state, elements, {
+    endpointMesh: () => endpoint,
+    correspondencePreview: () => correspondence,
+  });
+  elements.overlayCanvas.dispatch("pointerdown", {
+    button: 0, pointerId: 17, clientX: 61, clientY: 13, shiftKey: false,
+  });
+  assert.deepEqual(placed, [{ x: 7, y: 11 }]);
+  assert.equal(state.drag, null);
+  assert.equal(state.selected.size, 0);
+});
+
 test("endpoint viewport drag uses the rendered endpoint world transform at any zoom", () => {
   // The resolved matrix includes a parent/group transform and the endpoint's
   // own Translate + Rotate + Scale transform. This is the same matrix supplied

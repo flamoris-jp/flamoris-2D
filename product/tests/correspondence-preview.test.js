@@ -176,11 +176,14 @@ test("target anchor screen conversion is endpoint-local and independent of zoom/
 });
 
 test("correspondence controller is DOM-independent and production allowlisted", async () => {
-  const [source, allowlist] = await Promise.all([
+  const [source, rendererSource, allowlist] = await Promise.all([
     readFile(new URL("../src/ui/correspondence-preview-controller.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/ui/viewport-renderer.js", import.meta.url), "utf8"),
     readFile(new URL("../production-files.txt", import.meta.url), "utf8"),
   ]);
   assert.doesNotMatch(source, /\bdocument\b|\bwindow\b|session\.project/);
   assert.match(source, /mesh_keyform\.move_vertices/);
+  assert.match(rendererSource, /new Float32Array\(correspondence\.candidatePositions\)/);
+  assert.match(rendererSource, /CORRESPONDENCE PREVIEW/);
   assert.match(allowlist, /^src\/ui\/correspondence-preview-controller\.js$/m);
 });

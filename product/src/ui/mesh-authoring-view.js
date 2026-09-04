@@ -91,7 +91,8 @@ export function createMeshAuthoringView({
   function render() {
     const toolState = controller()?.getState() || null;
     const topologyMode = toolState?.mode === MESH_AUTHORING_MODES.TOPOLOGY;
-    const previewMode = state.editor?.transitionPreview.getState().viewMode === "preview";
+    const previewMode = state.editor?.transitionPreview.getState().viewMode === "preview" ||
+      state.editor?.correspondencePreview.getState().previewActive;
     const selected = toolState?.selectedVertex || null;
     const selectedCount = toolState?.selectedVertexIds.length || 0;
     const generator = elements.meshGeneratorSelect.value;
