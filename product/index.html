@@ -265,6 +265,28 @@
                   <button id="createTriangleButton" type="button">Create triangle (3)</button>
                   <button id="subdivideEdgeButton" type="button">Subdivide edge (2)</button>
                 </div>
+                <section id="autoMeshPanel" class="automesh-panel" aria-label="Mesh generator">
+                  <label>Generator
+                    <select id="meshGeneratorSelect">
+                      <option value="contour">Contour</option>
+                      <option value="grid">Grid (existing)</option>
+                    </select>
+                  </label>
+                  <div id="contourAutoMeshSettings" class="automesh-settings">
+                    <label>Alpha threshold <input id="autoMeshAlphaThresholdInput" type="range" min="0" max="1" step="0.01" value="0.1" /></label>
+                    <label>Density <input id="autoMeshDensityInput" type="range" min="0" max="1" step="0.05" value="0.45" /></label>
+                    <label>Corner sensitivity <input id="autoMeshCornerSensitivityInput" type="range" min="0" max="1" step="0.05" value="0.65" /></label>
+                    <label>Interior density <input id="autoMeshInteriorDensityInput" type="range" min="0" max="1" step="0.05" value="0.3" /></label>
+                    <label class="automesh-destructive"><input id="autoMeshReplaceExistingInput" type="checkbox" /> Replace existing topology/keyforms</label>
+                    <div class="preview-buttons">
+                      <button id="autoMeshPreviewButton" type="button">Preview</button>
+                      <button id="autoMeshApplyButton" type="button" class="secondary" disabled>Apply</button>
+                    </div>
+                    <output id="autoMeshSummary" class="authoring-status">No candidate preview</output>
+                    <ul id="autoMeshDiagnostics" class="automesh-diagnostics"></ul>
+                  </div>
+                  <p id="gridGeneratorHint" class="authoring-status" hidden>Grid generatorは既存のrows/columnsと「Create shared topology + A/B keyforms」を使用します。</p>
+                </section>
                 <output id="meshTopologyImpact" class="topology-impact">Deform Mode changes only the active MeshKeyform.</output>
               </div>
               <p class="authoring-status">Deform edits the active MeshKeyform. Topology Edit changes the shared topology and every attached keyform through ordinary commands.</p>

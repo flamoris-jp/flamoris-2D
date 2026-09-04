@@ -135,6 +135,57 @@ function affectedIds(topology, keyforms, extra = []) {
   return [topology.id, ...keyforms.map((keyform) => keyform.id), ...extra];
 }
 
+function assertGeneratedMesh(project, topology, payload) {
+  if (!payload.replaceExisting) {
+    throw new CommandError(
+      "Replacing an existing topology requires explicit destructive consent.",
+      "AUTOMESH_DESTRUCTIVE_REPLACEMENT_REQUIRED",
+      { topologyId: topology.id, affectedKeyformIds: keyformsFor(project, topology.id).map(({ id }) => id) },
+    );
+  }
+  if (payload.vertexIds.length < 3 || new Set(payload.vertexIds).size !== payload.vertexIds.length) {
+    throw new CommandError("Generated mesh requires at least three unique stable vertex IDs.",
+      "AUTOMESH_DUPLICATE_CANDIDATE_VERTEX");
+  }
+  const owners = new Set(project.meshTopologies
+    .filter((entry) => entry.id !== topology.id)
+    .flatMap((entry) => entry.vertexIds || []));
+  const duplicate = payload.vertexIds.find((vertexId) => owners.has(vertexId));
+  if (duplicate) throw new CommandError("Generated stable vertex ID belongs to another topology.",
+    "MESH_TOPOLOGY_DUPLICATE_VERTEX_ACROSS_TOPOLOGIES", { vertexId: duplicate });
+  const expected = payload.vertexIds.length * 2;
+  if (payload.positions.length !== expected || payload.positions.some((value) => !Number.isFinite(value))) {
+    throw new CommandError("Generated positions must contain two finite values per vertex.",
+      "MESH_KEYFORM_POSITION_COUNT_MISMATCH");
+  }
+  if (payload.uvs.length !== expected || payload.uvs.some((value) => !Number.isFinite(value))) {
+    throw new CommandError("Generated UVs must contain two finite values per vertex.",
+      "MESH_KEYFORM_UV_COUNT_MISMATCH");
+  }
+  if (payload.indices.length < 3 || payload.indices.length % 3 !== 0) {
+    throw new CommandError("Generated topology requires complete triangles.",
+      "AUTOMESH_TRIANGULATION_FAILURE");
+  }
+  const signatures = new Set();
+  for (let offset = 0; offset < payload.indices.length; offset += 3) {
+    const triangle = payload.indices.slice(offset, offset + 3);
+    if (triangle.some((index) => !Number.isSafeInteger(index) || index < 0 || index >= payload.vertexIds.length)) {
+      throw new CommandError("Generated triangle references an unknown vertex.",
+        "MESH_TOPOLOGY_INVALID_VERTEX_REFERENCE", { triangle });
+    }
+    if (new Set(triangle).size !== 3) throw new CommandError("Generated triangle repeats a vertex.",
+      "MESH_TOPOLOGY_TRIANGLE_REPEATED_VERTEX", { triangle });
+    const signature = [...triangle].sort((a, b) => a - b).join(":");
+    if (signatures.has(signature)) throw new CommandError("Generated topology contains a duplicate triangle.",
+      "MESH_TOPOLOGY_TRIANGLE_DUPLICATE", { triangle });
+    signatures.add(signature);
+    if (Math.abs(twiceArea(payload.positions, triangle)) <= TRIANGLE_AREA_EPSILON) {
+      throw new CommandError("Generated triangle is zero-area or near-degenerate.",
+        "MESH_TOPOLOGY_TRIANGLE_DEGENERATE", { triangle });
+    }
+  }
+}
+
 export const meshTopologyCommandHandlers = {
   "mesh_keyform.move_vertices": (project, payload) => {
     const keyform = keyformFor(project, payload.keyformId);
@@ -336,6 +387,29 @@ export const meshTopologyCommandHandlers = {
         ...payload.vertexIds,
         payload.newVertexId,
       ]),
+    };
+  },
+
+  "mesh_topology.apply_generated_mesh": (project, payload) => {
+    const topology = topologyFor(project, payload.topologyId);
+    assertGeneratedMesh(project, topology, payload);
+    const inverse = snapshotInverse(project, topology);
+    const keyforms = keyformsFor(project, topology.id);
+    const previousSequence = Number.isSafeInteger(topology.nextVertexSequence)
+      ? topology.nextVertexSequence
+      : 1;
+    topology.vertexIds = [...payload.vertexIds];
+    topology.indices = [...payload.indices];
+    topology.vertexMetadata = {};
+    topology.nextVertexSequence = previousSequence;
+    for (const vertexId of payload.vertexIds) advanceVertexSequence(topology, vertexId);
+    for (const keyform of keyforms) {
+      keyform.positions = [...payload.positions];
+      keyform.uvs = [...payload.uvs];
+    }
+    return {
+      inverse,
+      affectedIds: affectedIds(topology, keyforms, payload.vertexIds),
     };
   },
 
