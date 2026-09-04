@@ -6,6 +6,10 @@ import {
   evaluateTransition,
   getTransitionDiagnostics,
 } from "../core/transition-evaluator.js";
+import {
+  evaluateTransitionExportFrame,
+  planTransitionExportFrames,
+} from "../core/export-frame-evaluator.js";
 
 function temporalProgram(project, programId) {
   const program = project.temporalPrograms.find((entry) => entry.id === programId);
@@ -333,6 +337,10 @@ export const projectQueries = {
     evaluateTransition(project, input.transitionId, input.timeTicks),
   "transition.get_diagnostics": (project, input) =>
     getTransitionDiagnostics(project, input.transitionId),
+  "export.get_frame_plan": (project, input) =>
+    planTransitionExportFrames(project, input.transitionId, input.frameRate).describe(),
+  "export.evaluate_frame": (project, input) =>
+    evaluateTransitionExportFrame(project, input),
 };
 
 export function queryProject(project, name, input = {}) {
