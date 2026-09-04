@@ -24,10 +24,11 @@ function ceilDivide(numerator, denominator) {
 /**
  * Maps a finite TemporalProgram duration to the canonical frame grid.
  *
- * Export samples the half-open interval [0, durationTicks). Frame zero is
- * always tick zero, while a frame whose rational timestamp is exactly the
- * duration boundary is not emitted. Tick projection delegates to frameToTicks
- * so export shares the established non-negative round-half-up convention.
+ * Export samples the half-open tick interval [0, durationTicks). Frame zero is
+ * always tick zero. Candidate frame count is derived from rational timestamps,
+ * then trailing frames that round onto the end boundary are excluded. Tick
+ * projection delegates to frameToTicks so export shares the established
+ * non-negative round-half-up convention.
  */
 export class ExportFramePlanner {
   constructor({ durationTicks, frameRate }) {
@@ -35,10 +36,14 @@ export class ExportFramePlanner {
       throw new RangeError("Export durationTicks must be a positive safe integer.");
     }
     const normalizedRate = normalizeFrameRate(frameRate);
-    const frameCount = safeNumber(ceilDivide(
+    let frameCount = safeNumber(ceilDivide(
       BigInt(durationTicks) * BigInt(normalizedRate.numerator),
       BigInt(TIMEBASE_TICKS_PER_SECOND) * BigInt(normalizedRate.denominator),
     ), "Export frame count");
+    while (frameCount > 0 &&
+      frameToTicks(frameCount - 1, normalizedRate).ticks >= durationTicks) {
+      frameCount -= 1;
+    }
 
     this.durationTicks = durationTicks;
     this.frameRate = Object.freeze(normalizedRate);

@@ -44,6 +44,38 @@ test("duration boundary never adds an extra frame and a partial frame is retaine
   assert.deepEqual(shorterThanOneFrame.lastFrame(), shorterThanOneFrame.firstFrame());
 });
 
+test("tick-domain exclusivity removes a frame that round-half-up projects onto duration", () => {
+  const planner = new ExportFramePlanner({
+    durationTicks: 17143,
+    frameRate: { numerator: 7, denominator: 1 },
+  });
+
+  assert.equal(frameToTicks(1, planner.frameRate).ticks, 17143);
+  assert.equal(planner.frameCount, 1);
+  assert.deepEqual([...planner.frames()], [
+    { frameIndex: 0, timeTicks: 0, exact: true },
+  ]);
+  assert.throws(() => planner.frameAt(1), /planned frame range/);
+});
+
+test("every planned frame remains strictly inside the tick-domain duration", () => {
+  const cases = [
+    { durationTicks: 17143, frameRate: { numerator: 7, denominator: 1 }, frameCount: 1 },
+    { durationTicks: 120000, frameRate: { numerator: 24, denominator: 1 }, frameCount: 24 },
+    { durationTicks: 120000, frameRate: { numerator: 30, denominator: 1 }, frameCount: 30 },
+    { durationTicks: 120000, frameRate: { numerator: 60, denominator: 1 }, frameCount: 60 },
+    { durationTicks: 120000, frameRate: { numerator: 30000, denominator: 1001 }, frameCount: 30 },
+    { durationTicks: 120000, frameRate: { numerator: 60000, denominator: 1001 }, frameCount: 60 },
+  ];
+
+  for (const input of cases) {
+    const planner = new ExportFramePlanner(input);
+    assert.equal(planner.frameCount, input.frameCount);
+    assert.ok([...planner.frames()].every((frame) =>
+      frame.timeTicks >= 0 && frame.timeTicks < input.durationTicks));
+  }
+});
+
 test("rational FPS planning is repeatable and uses direct canonical tick projection", () => {
   const input = {
     durationTicks: 10 * 60 * 60 * TIMEBASE_TICKS_PER_SECOND,
@@ -62,6 +94,7 @@ test("rational FPS planning is repeatable and uses direct canonical tick project
       exact: expected.exact,
     });
   }
+  assert.ok(first.lastFrame().timeTicks < input.durationTicks);
 });
 
 test("arbitrary rational FPS keeps round-half-up metadata without accumulation", () => {
