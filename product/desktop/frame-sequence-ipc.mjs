@@ -1,4 +1,7 @@
+import { resolve } from "node:path";
+
 import { DesktopFrameSequenceSessionRegistry } from "../src/desktop/frame-sequence-files.js";
+import { registerVideoEncoderIpc } from "./video-encoder-ipc.mjs";
 
 const maximumFrameBytes = 256 * 1024 * 1024;
 
@@ -14,7 +17,20 @@ export function registerFrameSequenceIpc({
   associatedDirectory,
   registry = new DesktopFrameSequenceSessionRegistry(),
   onSessionEnded = null,
+  registerVideoEncoder = registerVideoEncoderIpc,
+  videoEncoderOptions = {},
 }) {
+  const approvedFrameDirectories = new Set();
+  registerVideoEncoder({
+    ipcMain,
+    dialog,
+    mainWindow,
+    assertTrusted,
+    associatedDirectory,
+    isApprovedFrameDirectory: (path) => approvedFrameDirectories.has(resolve(path)),
+    ...videoEncoderOptions,
+  });
+
   ipcMain.handle("desktop:begin-frame-sequence-export", async (event, request = {}) => {
     assertTrusted(event);
     const result = await dialog.showOpenDialog(mainWindow(), {
@@ -58,6 +74,9 @@ export function registerFrameSequenceIpc({
     assertTrusted(event);
     const status = request.status || "unknown";
     const result = registry.end(String(request.sessionId || ""));
+    if (result && status === "completed" && result.writtenFrames > 0) {
+      approvedFrameDirectories.add(resolve(result.destination));
+    }
     if (result && typeof onSessionEnded === "function") {
       onSessionEnded(Object.freeze({ ...result, status }));
     }
@@ -66,5 +85,11 @@ export function registerFrameSequenceIpc({
       status,
       ...(result || {}),
     };
+  });
+
+  return Object.freeze({
+    isApprovedFrameDirectory(path) {
+      return approvedFrameDirectories.has(resolve(path));
+    },
   });
 }

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { registerFrameSequenceIpc } from "../desktop/frame-sequence-ipc.mjs";
 import { registerVideoEncoderIpc } from "../desktop/video-encoder-ipc.mjs";
 
 function harness(overrides = {}) {
@@ -104,4 +105,62 @@ test("cancel aborts the active encoder process through the Desktop session", asy
   assert.equal(activeSignal.aborted, true);
   const result = await encoding;
   assert.equal(result.desktopError.code, "VIDEO_ENCODER_CANCELLED");
+});
+
+test("completed Desktop PNG sequence becomes the only approved video input path", async () => {
+  const handlers = new Map();
+  const encodeCalls = [];
+  const registry = {
+    async begin() {
+      return { sessionId: "frames-1", destination: "/frames/shot" };
+    },
+    async write() {
+      return { writtenFrames: 1 };
+    },
+    end() {
+      return { destination: "/frames/shot", writtenFrames: 24 };
+    },
+  };
+  registerFrameSequenceIpc({
+    ipcMain: { handle(channel, handler) { handlers.set(channel, handler); } },
+    dialog: {
+      async showOpenDialog() { return { canceled: false, filePaths: ["/frames"] }; },
+      async showSaveDialog() { return { canceled: false, filePath: "/exports/shot.mp4" }; },
+    },
+    mainWindow: () => ({ id: "window" }),
+    assertTrusted: () => {},
+    associatedDirectory: () => "/exports",
+    registry,
+    videoEncoderOptions: {
+      pathExists: () => false,
+      probeEncoder: async () => ({ capability: { distributionSafe: true, h264Mf: true } }),
+      encodeSequence: async (request) => {
+        encodeCalls.push(request);
+        return { ok: true, frameCount: request.frameCount };
+      },
+    },
+  });
+
+  const before = await handlers.get("desktop:begin-video-export")({}, {});
+  const rejected = await handlers.get("desktop:encode-video")({}, {
+    sessionId: before.sessionId,
+    frameDirectory: "/frames/shot",
+    frameRate: { numerator: 24, denominator: 1 },
+    frameCount: 24,
+  });
+  assert.equal(rejected.desktopError.code, "VIDEO_FRAME_SOURCE_NOT_APPROVED");
+
+  await handlers.get("desktop:end-frame-sequence-export")({}, {
+    sessionId: "frames-1",
+    status: "completed",
+  });
+  const after = await handlers.get("desktop:begin-video-export")({}, {});
+  const encoded = await handlers.get("desktop:encode-video")({}, {
+    sessionId: after.sessionId,
+    frameDirectory: "/frames/shot",
+    frameRate: { numerator: 24, denominator: 1 },
+    frameCount: 24,
+  });
+  assert.equal(encoded.ok, true);
+  assert.equal(encodeCalls.length, 1);
 });
