@@ -12,6 +12,16 @@ export function prepareEvaluatedTransition(evaluatedTransition) {
 
 export { createEvaluatedRenderPlan };
 
+function renderTargetSize(canvas, renderTarget) {
+  const width = renderTarget?.viewportWidth ?? canvas.clientWidth ?? canvas.width;
+  const height = renderTarget?.viewportHeight ?? canvas.clientHeight ?? canvas.height;
+  if (!Number.isFinite(width) || width <= 0 ||
+    !Number.isFinite(height) || height <= 0) {
+    throw new RangeError("Composition render target dimensions must be positive and finite.");
+  }
+  return { width, height };
+}
+
 const VERTEX_SHADER = `#version 300 es
 in vec2 a_position;
 in vec2 a_uv0;
@@ -224,7 +234,8 @@ export class MeshRenderer {
     }
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(renderInstance.mesh.indices), gl.DYNAMIC_DRAW);
-    gl.uniform2f(this.locations.viewport, this.canvas.clientWidth, this.canvas.clientHeight);
+    const targetSize = renderTargetSize(this.canvas, view);
+    gl.uniform2f(this.locations.viewport, targetSize.width, targetSize.height);
     gl.uniform2f(this.locations.origin, view.originX, view.originY);
     gl.uniform2f(this.locations.partOffset, 0, 0);
     gl.uniform1f(this.locations.scale, view.scale);
