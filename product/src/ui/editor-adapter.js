@@ -6,6 +6,7 @@ import { TransitionPreviewController } from "./transition-preview-controller.js"
 import { TransitionDiagnosticsController } from "./transition-diagnostics-controller.js";
 import { MeshToolController } from "./mesh-tool-controller.js";
 import { KeyStateStripController } from "./key-state-strip-controller.js";
+import { CorrespondencePreviewController } from "./correspondence-preview-controller.js";
 
 function filterTree(node, matches) {
   const children = node.children
@@ -42,6 +43,7 @@ export class EditorUiAdapter {
           this.keyStateStrip?.pause();
           this.transitionPreview?.activeTransitionChanged();
           this.transitionDiagnostics?.activeTransitionChanged();
+          this.correspondencePreview?.clearWorkspace(false);
         }
         this.notify(reason);
       },
@@ -52,9 +54,13 @@ export class EditorUiAdapter {
     this.transitionPreview = new TransitionPreviewController(session, this.transitionAuthoring, {
       onChange: (reason) => this.notify(reason),
     });
+    this.correspondencePreview = new CorrespondencePreviewController(session, this.endpointMesh, {
+      onChange: (reason) => this.notify(reason),
+    });
     this.meshTools = new MeshToolController(session, this.endpointMesh, {
       onChange: (reason) => this.notify(reason),
-      isPreviewReadOnly: () => this.transitionPreview.getState().viewMode === "preview",
+      isPreviewReadOnly: () => this.transitionPreview.getState().viewMode === "preview" ||
+        this.correspondencePreview.getState().previewActive,
     });
     this.keyStateStrip = new KeyStateStripController(this.transitionPreview, this.endpointMesh, {
       onChange: (reason) => this.notify(reason),
@@ -73,6 +79,7 @@ export class EditorUiAdapter {
     session.onChange = (...args) => {
       sessionOnChange?.(...args);
       this.transitionPreview.projectChanged();
+      this.correspondencePreview.projectChanged();
       this.notify("project");
     };
   }

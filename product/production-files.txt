@@ -47,7 +47,10 @@ src/ui/endpoint-mesh-controller.js
 src/ui/mesh-editing-controller.js
 src/ui/mesh-tool-controller.js
 src/ui/automesh-preview-controller.js
+src/ui/correspondence-preview-controller.js
+src/ui/correspondence-view.js
 src/core/contour-automesh.js
+src/core/correspondence-solver.js
 src/ui/mesh-authoring-view.js
 src/ui/reimport-render-history.js
 src/ui/reimport-review-view.js

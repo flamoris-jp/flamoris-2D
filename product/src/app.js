@@ -52,6 +52,7 @@ import { createTransitionDiagnosticsView } from "./ui/transition-diagnostics-vie
 import { createMeshAuthoringView } from "./ui/mesh-authoring-view.js";
 import { createKeyStateStripView } from "./ui/key-state-strip-view.js";
 import { AutoMeshPreviewController } from "./ui/automesh-preview-controller.js";
+import { createCorrespondenceView } from "./ui/correspondence-view.js";
 
 const desktopApi = window.flamorisDesktop || null;
 const appStorage = desktopApi?.storage || localStorage;
@@ -143,6 +144,7 @@ const viewportRenderer = createViewportRenderer({
   endpointContext: activeEndpointContext,
   transitionPreviewContext: () => state.editor?.transitionPreview.getState() || null,
   autoMeshPreviewContext: () => autoMeshPreview.getState(),
+  correspondencePreviewContext: () => state.editor?.correspondencePreview.getState() || null,
 });
 
 const sceneEditorView = createSceneEditorView({
@@ -214,6 +216,13 @@ const meshAuthoringView = createMeshAuthoringView({
   onAutoMeshApplied: () => syncEndpointMeshViewport(),
 });
 
+const correspondenceView = createCorrespondenceView({
+  state,
+  elements,
+  setStatus,
+  onEndpointChange: () => syncEndpointMeshViewport(),
+});
+
 function setStatus(message) {
   elements.status.textContent = message;
 }
@@ -233,7 +242,11 @@ function selectedPartIndex() {
 function activeEndpointContext() {
   const controller = state.editor?.endpointMesh;
   const endpointState = controller?.getState();
-  if (!controller || !endpointState?.editingEnabled || !endpointState.selectedSemanticSlot) return null;
+  const correspondenceState = state.editor?.correspondencePreview.getState();
+  const correspondenceVisible = Boolean(correspondenceState?.previewActive ||
+    correspondenceState?.pendingVertexId);
+  if (!controller || (!endpointState?.editingEnabled && !correspondenceVisible) ||
+    !endpointState.selectedSemanticSlot) return null;
   const endpoint = endpointState.activeEndpoint;
   const mapping = endpointState.selectedSemanticSlot[endpoint]?.mapping;
   const keyArt = endpointState.endpoints?.[endpoint]?.keyArt;
@@ -567,6 +580,7 @@ function renderEditorUi() {
   keyStateStripView.render();
   transitionDiagnosticsView.render();
   meshAuthoringView.render();
+  correspondenceView.render();
 }
 
 function handleEditorChange(reason) {
@@ -576,6 +590,16 @@ function handleEditorChange(reason) {
     state.selected = new Set((context?.topology?.vertexIds || [])
       .map((vertexId, index) => selectedIds.has(vertexId) ? index : -1)
       .filter((index) => index >= 0));
+    renderEditorUi();
+    render();
+    return;
+  }
+  if (reason.startsWith("correspondence-")) {
+    if (["correspondence-direction", "correspondence-pin-placement",
+      "correspondence-preview", "correspondence-applied"].includes(reason)) {
+      syncEndpointMeshViewport();
+      return;
+    }
     renderEditorUi();
     render();
     return;
@@ -1176,6 +1200,7 @@ bindViewportInteractions({
   selectedPart,
   endpointMesh: () => state.editor?.endpointMesh || null,
   meshTools: () => state.editor?.meshTools || null,
+  correspondencePreview: () => state.editor?.correspondencePreview || null,
   loadFile,
 });
 

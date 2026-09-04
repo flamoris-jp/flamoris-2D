@@ -289,6 +289,43 @@
                 </section>
                 <output id="meshTopologyImpact" class="topology-impact">Deform Mode changes only the active MeshKeyform.</output>
               </div>
+              <section id="correspondencePanel" class="correspondence-panel" aria-label="Correspondence assistance" hidden>
+                <h3>Correspondence Assistance</h3>
+                <label>Direction
+                  <select id="correspondenceDirectionSelect">
+                    <option value="from-to">A → B</option>
+                    <option value="to-from">B → A</option>
+                  </select>
+                </label>
+                <button id="correspondenceEditSourceButton" type="button" class="secondary">Edit source A</button>
+                <dl class="correspondence-summary">
+                  <dt>Source vertex</dt><dd><output id="correspondenceSelectedVertexOutput">—</output></dd>
+                  <dt>Pin count</dt><dd><output id="correspondencePinCountOutput">0</output></dd>
+                </dl>
+                <div class="preview-buttons">
+                  <button id="correspondencePlacePinButton" type="button" disabled>Place target anchor</button>
+                  <button id="correspondenceMovePinButton" type="button" class="secondary" disabled>Move selected anchor</button>
+                </div>
+                <ul id="correspondencePins" class="correspondence-pins"></ul>
+                <div class="preview-buttons">
+                  <button id="correspondenceRemovePinButton" type="button" class="secondary" disabled>Delete pin</button>
+                  <button id="correspondenceClearPinsButton" type="button" class="secondary" disabled>Clear all</button>
+                </div>
+                <label>Solver preset
+                  <select id="correspondencePresetSelect">
+                    <option value="soft">Soft</option>
+                    <option value="normal" selected>Normal</option>
+                    <option value="firm">Firm</option>
+                  </select>
+                </label>
+                <div class="preview-buttons">
+                  <button id="correspondenceSolveButton" type="button" disabled>Solve Preview</button>
+                  <button id="correspondenceApplyButton" type="button" class="secondary" disabled>Apply</button>
+                </div>
+                <button id="correspondenceCancelPreviewButton" type="button" class="secondary" disabled>Cancel preview / return to source</button>
+                <output id="correspondenceStatus" class="correspondence-status" data-mode="edit">Pins: A → B</output>
+                <ul id="correspondenceDiagnostics" class="automesh-diagnostics"></ul>
+              </section>
               <p class="authoring-status">Deform edits the active MeshKeyform. Topology Edit changes the shared topology and every attached keyform through ordinary commands.</p>
               <p class="authoring-status">Topology/keyform creation uses the existing command API. Vertex movement is endpoint-local.</p>
             </fieldset>

@@ -263,21 +263,35 @@ export class EndpointMeshController {
   /** Resolve the endpoint node from the SemanticSlot mapping, then use the
    * exact same world transform used by viewport rendering. */
   screenToActiveKeyformLocal(screenPoint, view) {
+    return this.screenToEndpointKeyformLocal(this.activeEndpoint, screenPoint, view);
+  }
+
+  screenToEndpointKeyformLocal(endpoint, screenPoint, view) {
+    if (!ENDPOINTS.includes(endpoint)) throw new Error(`Unknown endpoint ${endpoint}.`);
     return screenToMeshLocal(screenPoint, view, {
-      worldTransform: this.activeEndpointWorldTransform(),
+      worldTransform: this.endpointWorldTransform(endpoint),
     });
   }
 
   activeEndpointNodeId() {
-    const mapping = this.getState().selectedSemanticSlot?.[this.activeEndpoint]?.mapping;
-    if (!mapping) throw new Error("Active endpoint has no mapped PartNode.");
+    return this.endpointNodeId(this.activeEndpoint);
+  }
+
+  endpointNodeId(endpoint) {
+    if (!ENDPOINTS.includes(endpoint)) throw new Error(`Unknown endpoint ${endpoint}.`);
+    const mapping = this.getState().selectedSemanticSlot?.[endpoint]?.mapping;
+    if (!mapping) throw new Error(`${endpoint} endpoint has no mapped PartNode.`);
     return mapping.nodeId;
   }
 
   // Viewport callers use this same resolved matrix for artwork/mesh rendering.
   activeEndpointWorldTransform() {
+    return this.endpointWorldTransform(this.activeEndpoint);
+  }
+
+  endpointWorldTransform(endpoint) {
     return this.session.query("scene.get_node", {
-      nodeId: this.activeEndpointNodeId(),
+      nodeId: this.endpointNodeId(endpoint),
     }).worldTransform;
   }
 
