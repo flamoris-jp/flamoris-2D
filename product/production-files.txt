@@ -1,6 +1,7 @@
 package.json
 index.html
 desktop/main.mjs
+desktop/frame-sequence-ipc.mjs
 desktop/preload.cjs
 scripts/serve.mjs
 src/animation.js
@@ -25,6 +26,8 @@ src/core/shared-composition-renderer.js
 src/core/composition-render-target.js
 src/core/export-frame-renderer.js
 src/core/export-offscreen-renderer.js
+src/core/png-frame-encoder.js
+src/core/frame-sequence-export.js
 src/queries/project.js
 src/commands/editor.js
 src/commands/errors.js
@@ -71,6 +74,8 @@ src/ui/transition-preview-view.js
 src/ui/viewport-input-controller.js
 src/ui/viewport-renderer.js
 src/ui/desktop-project-files.js
+src/ui/desktop-frame-sequence-sink.js
 src/ui/psd-render-assets.js
 src/desktop/shell-logic.js
 src/desktop/atomic-write.js
+src/desktop/frame-sequence-files.js

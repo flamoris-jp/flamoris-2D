@@ -36,6 +36,7 @@ import {
   atomicWriteFileSync,
   exclusiveWriteFile,
 } from "../src/desktop/atomic-write.js";
+import { registerFrameSequenceIpc } from "./frame-sequence-ipc.mjs";
 
 protocol.registerSchemesAsPrivileged([{
   scheme: "flamoris",
@@ -425,6 +426,14 @@ function queueExternalProject(filePath) {
 }
 
 function registerIpc() {
+  registerFrameSequenceIpc({
+    ipcMain,
+    dialog,
+    mainWindow: () => mainWindow,
+    assertTrusted,
+    associatedDirectory,
+  });
+
   ipcMain.handle("desktop:open-file", async (event, options) => {
     assertTrusted(event);
     const purpose = ["open", "import-psd", "reimport-psd"].includes(options?.purpose)
