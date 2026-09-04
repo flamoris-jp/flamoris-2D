@@ -24,6 +24,7 @@ src/core/evaluated-render.js
 src/core/shared-composition-renderer.js
 src/core/composition-render-target.js
 src/core/export-frame-renderer.js
+src/core/export-offscreen-renderer.js
 src/queries/project.js
 src/commands/editor.js
 src/commands/errors.js

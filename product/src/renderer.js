@@ -298,6 +298,28 @@ export class MeshRenderer {
     }
   }
 
+  /**
+   * Returns an RGBA8 snapshot in top-to-bottom row order.  WebGL's native
+   * readback is bottom-to-top, so normalize it here at the renderer boundary
+   * for the future image encoder without changing composition semantics.
+   */
+  readRgbaPixels() {
+    const gl = this.gl;
+    const width = this.canvas.width;
+    const height = this.canvas.height;
+    const source = new Uint8Array(width * height * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, source);
+    const rgba = new Uint8Array(source.length);
+    const rowLength = width * 4;
+    for (let row = 0; row < height; row += 1) {
+      const sourceOffset = row * rowLength;
+      const targetOffset = (height - row - 1) * rowLength;
+      rgba.set(source.subarray(sourceOffset, sourceOffset + rowLength), targetOffset);
+    }
+    return rgba;
+  }
+
   render(
     vertices,
     view,

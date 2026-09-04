@@ -1,5 +1,6 @@
 import { createProjectCanvasRenderTarget } from "./composition-render-target.js";
 import { evaluateTransitionExportFrame } from "./export-frame-evaluator.js";
+import { createExportOffscreenRenderer } from "./export-offscreen-renderer.js";
 import { renderEvaluatedComposition } from "./shared-composition-renderer.js";
 
 function diagnostic(code, message, details = {}) {
@@ -53,7 +54,7 @@ function invalidTransformDiagnostics(evaluation) {
 }
 
 export class ExportFrameRenderer {
-  constructor({ createOffscreenRenderer }) {
+  constructor({ createOffscreenRenderer = createExportOffscreenRenderer } = {}) {
     if (typeof createOffscreenRenderer !== "function") {
       throw new TypeError("An offscreen renderer factory is required.");
     }

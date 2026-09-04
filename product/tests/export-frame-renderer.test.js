@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 
 import { EditorSession } from "../src/commands/editor.js";
 import { ExportFrameRenderer } from "../src/core/export-frame-renderer.js";
+import { createExportOffscreenRenderer } from "../src/core/export-offscreen-renderer.js";
 import { evaluateTransition } from "../src/core/transition-evaluator.js";
 import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
 
@@ -164,6 +165,52 @@ function renderInput(project, renderAssets, overrides = {}) {
   };
 }
 
+function createHeadlessWebGl2() {
+  const constants = new Set([
+    "VERTEX_SHADER", "FRAGMENT_SHADER", "COMPILE_STATUS", "LINK_STATUS",
+    "ARRAY_BUFFER", "ELEMENT_ARRAY_BUFFER", "FLOAT", "STATIC_DRAW", "DYNAMIC_DRAW",
+    "TEXTURE_2D", "TEXTURE_MIN_FILTER", "TEXTURE_MAG_FILTER", "TEXTURE_WRAP_S",
+    "TEXTURE_WRAP_T", "LINEAR", "CLAMP_TO_EDGE", "BLEND", "ONE", "ONE_MINUS_SRC_ALPHA",
+    "TEXTURE0", "UNPACK_FLIP_Y_WEBGL", "UNPACK_PREMULTIPLY_ALPHA_WEBGL", "RGBA",
+    "UNSIGNED_BYTE", "FRAMEBUFFER", "COLOR_ATTACHMENT0", "FRAMEBUFFER_COMPLETE",
+    "COLOR_BUFFER_BIT", "TRIANGLES", "UNSIGNED_INT",
+  ]);
+  const api = {
+    getShaderParameter: () => true,
+    getProgramParameter: () => true,
+    getAttribLocation: () => 0,
+    getUniformLocation: () => ({}),
+    checkFramebufferStatus: () => 1,
+    readPixels(_x, _y, width, height, _format, _type, pixels) {
+      for (let row = 0; row < height; row += 1) {
+        pixels.fill(row + 1, row * width * 4, (row + 1) * width * 4);
+      }
+    },
+  };
+  return new Proxy(api, {
+    get(target, property) {
+      if (property in target) return target[property];
+      if (constants.has(property)) return 1;
+      return () => ({});
+    },
+  });
+}
+
+class HeadlessOffscreenCanvas {
+  static surfaces = [];
+
+  constructor(width, height) {
+    this.width = width;
+    this.height = height;
+    this.gl = createHeadlessWebGl2();
+    HeadlessOffscreenCanvas.surfaces.push(this);
+  }
+
+  getContext(kind) {
+    return kind === "webgl2" ? this.gl : null;
+  }
+}
+
 test("same frame produces an identical offscreen projection from the canonical evaluation", () => {
   const { project, fromNodeId, toNodeId } = fixture();
   const input = renderInput(project, assets(fromNodeId, toNodeId));
@@ -176,6 +223,31 @@ test("same frame produces an identical offscreen projection from the canonical e
     first.evaluatedTransition,
     evaluateTransition(project, "transition_eye", first.frame.timeTicks),
   );
+});
+
+test("production offscreen adapter allocates the requested surface and returns RGBA8 pixels", () => {
+  HeadlessOffscreenCanvas.surfaces = [];
+  const { project, fromNodeId, toNodeId } = fixture();
+  const production = new ExportFrameRenderer({
+    createOffscreenRenderer: (target) => createExportOffscreenRenderer(target, {
+      OffscreenCanvasCtor: HeadlessOffscreenCanvas,
+    }),
+  });
+  const result = production.render(renderInput(project, assets(fromNodeId, toNodeId)));
+
+  assert.equal(result.ok, true);
+  assert.equal(HeadlessOffscreenCanvas.surfaces.length, 1);
+  assert.deepEqual(
+    [HeadlessOffscreenCanvas.surfaces[0].width, HeadlessOffscreenCanvas.surfaces[0].height],
+    [200, 200],
+  );
+  assert.equal(result.offscreenResult.kind, "rgba8");
+  assert.equal(result.offscreenResult.rowOrder, "top-to-bottom");
+  assert.equal(result.offscreenResult.data.length, 200 * 200 * 4);
+  // The headless WebGL readback writes bottom-to-top rows 1..N. The real
+  // MeshRenderer path is exercised and ExportFrameRenderer receives normalized pixels.
+  assert.equal(result.offscreenResult.data[0], 200);
+  assert.equal(result.offscreenResult.data.at(-1), 1);
 });
 
 test("viewport and authoring transients cannot affect export rendering", () => {
