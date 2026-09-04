@@ -31,6 +31,7 @@ export function bindViewportInteractions({
   selectedPart,
   endpointMesh = () => null,
   meshTools = () => null,
+  correspondencePreview = () => null,
   loadFile,
   windowTarget = window,
 }) {
@@ -174,8 +175,29 @@ export function bindViewportInteractions({
 
     if (route !== "mesh") return;
 
-    if (state.editor?.transitionPreview?.getState().viewMode === "preview") {
-      setStatus("Preview中間状態はread-onlyです。Key State markerを選んでendpointを編集してください。");
+    const correspondence = correspondencePreview();
+    const correspondenceState = correspondence?.getState();
+    if (correspondenceState?.pendingVertexId) {
+      try {
+        const local = endpointMesh().screenToEndpointKeyformLocal(
+          correspondenceState.targetEndpoint,
+          screenPoint,
+          state.view,
+        );
+        correspondence.placePendingPin(local);
+        setStatus(`${correspondenceState.pendingVertexId} のtarget anchorを追加しました`);
+      } catch (error) {
+        setStatus(`${error.code ? `${error.code}: ` : ""}${error.message || String(error)}`);
+      }
+      render();
+      return;
+    }
+
+    if (state.editor?.transitionPreview?.getState().viewMode === "preview" ||
+      correspondenceState?.previewActive) {
+      setStatus(correspondenceState?.previewActive
+        ? "Correspondence Previewはread-onlyです。ApplyまたはCancelしてください。"
+        : "Preview中間状態はread-onlyです。Key State markerを選んでendpointを編集してください。");
       return;
     }
 

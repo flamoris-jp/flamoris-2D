@@ -225,6 +225,17 @@ button:not(:disabled):hover, .file-button:hover { border-color: var(--mint); tra
 .automesh-diagnostics { margin: 0; padding-left: 17px; color: #ff9d91; font-size: 9px; }
 .topology-impact { padding: 7px 8px; border-radius: 7px; color: #9fb8b4; background: rgba(129, 221, 205, .05); font: 9px/1.5 ui-monospace, monospace; overflow-wrap: anywhere; }
 .topology-impact[data-mode="topology"] { color: #ffe4a7; background: rgba(255, 202, 103, .09); }
+.correspondence-panel { display: grid; gap: 8px; padding: 10px; border: 1px solid rgba(125, 168, 255, .24); border-radius: 8px; background: rgba(64, 91, 150, .08); }
+.correspondence-panel[hidden] { display: none; }
+.correspondence-panel h3 { margin: 0; color: #cddaff; font: 700 10px ui-monospace, monospace; }
+.correspondence-summary { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 4px 7px; margin: 0; }
+.correspondence-summary dt { color: #708985; font-size: 9px; }
+.correspondence-summary dd { margin: 0; color: #cddaff; font: 9px/1.4 ui-monospace, monospace; overflow-wrap: anywhere; }
+.correspondence-pins { display: grid; gap: 5px; max-height: 120px; margin: 0; padding: 0; overflow: auto; list-style: none; }
+.correspondence-pins button { width: 100%; min-height: 29px; padding: 5px 7px; justify-content: start; font: 9px/1.4 ui-monospace, monospace; overflow-wrap: anywhere; }
+.correspondence-pins button.selected { border-color: #7da8ff; color: #e5ebff; background: rgba(125, 168, 255, .16); }
+.correspondence-status { padding: 7px 8px; border-radius: 7px; color: #cddaff; background: rgba(125, 168, 255, .09); font: 9px/1.5 ui-monospace, monospace; }
+.correspondence-status[data-mode="preview"] { color: #ffe4a7; background: rgba(255, 202, 103, .09); }
 .transition-view-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
 .transition-view-switch button:last-child { grid-column: 1 / -1; }
 .transition-view-switch button.selected {
