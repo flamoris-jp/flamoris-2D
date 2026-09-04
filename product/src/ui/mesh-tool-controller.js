@@ -90,7 +90,34 @@ export function createDefaultMeshToolRegistry() {
       mode: MESH_AUTHORING_MODES.TOPOLOGY,
       label: "Clear Label",
       execute: (controller, input) => controller.clearSemanticLabel(input),
+    })
+    .register({
+      id: "topology.automesh",
+      mode: MESH_AUTHORING_MODES.TOPOLOGY,
+      label: "Contour AutoMesh",
+      execute: (controller, input) => controller.applyGeneratedMesh(input),
     });
+}
+
+function allocateStableVertexIds(topologies, count, topology = null) {
+  const used = new Set(topologies.flatMap((entry) => entry.vertexIds || []));
+  let sequence = Math.max(
+    1,
+    Number.isSafeInteger(topology?.nextVertexSequence) ? topology.nextVertexSequence : 1,
+    ...[...used].map((vertexId) => {
+      const match = /^vtx_(\d+)$/.exec(vertexId);
+      return match ? Number(match[1]) + 1 : 1;
+    }),
+  );
+  const result = [];
+  while (result.length < count) {
+    const candidate = `vtx_${String(sequence++).padStart(4, "0")}`;
+    if (!used.has(candidate)) {
+      used.add(candidate);
+      result.push(candidate);
+    }
+  }
+  return result;
 }
 
 /**
@@ -281,6 +308,49 @@ export class MeshToolController {
       type: "mesh_topology.clear_vertex_label",
       payload: { topologyId: topology.id, vertexId: targetId },
     }, { label: "Clear vertex semantic label" });
+  }
+
+  applyGeneratedMesh({ candidate, replaceExisting = false }) {
+    if (this.isPreviewReadOnly()) {
+      throw new Error("Preview is read-only. Select a Key State marker before editing.");
+    }
+    if (this.mode !== MESH_AUTHORING_MODES.TOPOLOGY) {
+      throw new Error("Contour AutoMesh is available only in Topology Edit Mode.");
+    }
+    if (!candidate || !Array.isArray(candidate.positions) || !Array.isArray(candidate.indices) ||
+      !Array.isArray(candidate.uvs)) throw new Error("Generate a valid AutoMesh preview before Apply.");
+    const topology = this.activeTopology();
+    const vertexIds = allocateStableVertexIds(
+      this.session.query("mesh.list_topologies"),
+      candidate.positions.length / 2,
+      topology,
+    );
+    let result;
+    if (!topology) {
+      result = this.endpointMesh.createSharedTopologyAndKeyforms({
+        vertexIds,
+        indices: candidate.indices,
+        fromPositions: candidate.positions,
+        fromUvs: candidate.uvs,
+        toPositions: candidate.positions,
+        toUvs: candidate.uvs,
+      });
+    } else {
+      result = this.session.execute({
+        type: "mesh_topology.apply_generated_mesh",
+        payload: {
+          topologyId: topology.id,
+          vertexIds,
+          indices: [...candidate.indices],
+          positions: [...candidate.positions],
+          uvs: [...candidate.uvs],
+          replaceExisting: Boolean(replaceExisting),
+        },
+      }, { label: "Apply Contour AutoMesh" });
+    }
+    this.selectedVertexIds.clear();
+    this.notify("mesh-automesh-applied");
+    return { ...result, vertexIds };
   }
 
   getState() {

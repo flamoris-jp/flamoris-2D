@@ -7,7 +7,14 @@ function option(value, label) {
   return element;
 }
 
-export function createMeshAuthoringView({ state, elements, setStatus }) {
+export function createMeshAuthoringView({
+  state,
+  elements,
+  setStatus,
+  autoMeshPreview,
+  selectedPart,
+  onAutoMeshApplied = null,
+}) {
   const controller = () => state.editor?.meshTools || null;
 
   function act(action) {
@@ -42,6 +49,44 @@ export function createMeshAuthoringView({ state, elements, setStatus }) {
     controller()?.execute("topology.connect")));
   elements.subdivideEdgeButton.addEventListener("click", () => act(() =>
     controller()?.execute("topology.subdivide")));
+  function generateAutoMeshPreview() {
+    const part = selectedPart();
+    if (!part?.canvas) throw new Error("Select a PSD render part with alpha data first.");
+    const context = part.canvas.getContext("2d", { willReadFrequently: true });
+    const imageData = context.getImageData(0, 0, part.canvas.width, part.canvas.height);
+    const preview = autoMeshPreview.generate(imageData, {
+      settings: {
+        alphaThreshold: Number(elements.autoMeshAlphaThresholdInput.value),
+        density: Number(elements.autoMeshDensityInput.value),
+        cornerSensitivity: Number(elements.autoMeshCornerSensitivityInput.value),
+        interiorDensity: Number(elements.autoMeshInteriorDensityInput.value),
+      },
+      localBounds: { left: part.left, top: part.top, width: part.width, height: part.height },
+    });
+    setStatus(preview.candidate
+      ? `Contour AutoMesh preview: ${preview.vertexCount} vertices / ${preview.triangleCount} triangles`
+      : preview.diagnostics[0]?.message || "AutoMesh preview failed.");
+    return preview;
+  }
+
+  elements.meshGeneratorSelect.addEventListener("change", () => render());
+  elements.autoMeshPreviewButton.addEventListener("click", () => act(generateAutoMeshPreview));
+  for (const input of [
+    elements.autoMeshAlphaThresholdInput,
+    elements.autoMeshDensityInput,
+    elements.autoMeshCornerSensitivityInput,
+    elements.autoMeshInteriorDensityInput,
+  ]) input.addEventListener("input", () => {
+    if (autoMeshPreview.getState().candidate) act(generateAutoMeshPreview);
+  });
+  elements.autoMeshApplyButton.addEventListener("click", () => act(() => {
+    const result = autoMeshPreview.apply(controller(), {
+      replaceExisting: elements.autoMeshReplaceExistingInput.checked,
+    });
+    onAutoMeshApplied?.();
+    setStatus("Contour AutoMeshを1件のUndo操作として適用しました");
+    return result;
+  }));
 
   function render() {
     const toolState = controller()?.getState() || null;
@@ -49,6 +94,8 @@ export function createMeshAuthoringView({ state, elements, setStatus }) {
     const previewMode = state.editor?.transitionPreview.getState().viewMode === "preview";
     const selected = toolState?.selectedVertex || null;
     const selectedCount = toolState?.selectedVertexIds.length || 0;
+    const generator = elements.meshGeneratorSelect.value;
+    const autoMeshState = autoMeshPreview.getState();
     const previousTool = elements.meshToolSelect.value;
     elements.meshToolSelect.replaceChildren(
       option("", "— Select tool —"),
@@ -70,6 +117,24 @@ export function createMeshAuthoringView({ state, elements, setStatus }) {
     elements.removeVertexButton.disabled = previewMode || !topologyMode || selectedCount !== 1;
     elements.createTriangleButton.disabled = previewMode || !topologyMode || selectedCount !== 3;
     elements.subdivideEdgeButton.disabled = previewMode || !topologyMode || selectedCount !== 2;
+    elements.autoMeshPanel.hidden = !topologyMode;
+    elements.contourAutoMeshSettings.hidden = generator !== "contour";
+    elements.gridGeneratorHint.hidden = generator !== "grid";
+    elements.autoMeshPreviewButton.disabled = previewMode || !topologyMode || !selectedPart()?.canvas;
+    elements.autoMeshApplyButton.disabled = previewMode || !topologyMode || !autoMeshState.candidate;
+    elements.autoMeshSummary.textContent = autoMeshState.candidate
+      ? `${autoMeshState.vertexCount} vertices · ${autoMeshState.triangleCount} triangles · transient preview`
+      : "No candidate preview";
+    const autoMeshDiagnostics = [...autoMeshState.diagnostics];
+    if (autoMeshState.candidate && toolState?.topology) autoMeshDiagnostics.push({
+      code: "AUTOMESH_EXISTING_AUTHORED_TOPOLOGY",
+      message: `Apply replaces this topology and ${toolState.affectedKeyformIds.length} attached MeshKeyform(s). Explicit consent is required.`,
+    });
+    elements.autoMeshDiagnostics.replaceChildren(...autoMeshDiagnostics.map((entry) => {
+      const item = document.createElement("li");
+      item.textContent = `${entry.code}: ${entry.message}`;
+      return item;
+    }));
     elements.meshTopologyImpact.dataset.mode = toolState?.mode || "none";
     elements.meshTopologyImpact.textContent = previewMode
       ? "Preview is read-only — endpoint deformation and topology commands are blocked."

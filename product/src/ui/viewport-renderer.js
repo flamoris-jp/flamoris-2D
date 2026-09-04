@@ -62,6 +62,7 @@ export function createViewportRenderer({
   selectedNodeDocumentBounds,
   endpointContext = () => null,
   transitionPreviewContext = () => null,
+  autoMeshPreviewContext = () => null,
 }) {
   function screenPointForPart(x, y) {
     const basePoint = {
@@ -148,6 +149,48 @@ export function createViewportRenderer({
         : `DEFORM ENDPOINT ${endpoint.endpoint === "from" ? "A" : "B"}`;
       context.fillText(mode, 24, 33);
     }
+    drawAutoMeshPreview(context);
+  }
+
+  function drawAutoMeshPreview(context) {
+    const candidate = autoMeshPreviewContext()?.candidate;
+    if (!candidate || !state.view || state.editorMode !== EDITOR_MODES.TOPOLOGY) return;
+    const part = selectedPart();
+    const world = part?.nodeId && state.editor
+      ? state.editor.worldTransform(part.nodeId)
+      : [1, 0, 0, 1, 0, 0];
+    const screen = (index) => {
+      const local = { x: candidate.positions[index * 2], y: candidate.positions[index * 2 + 1] };
+      const point = transformPoint(world, local);
+      return imageToScreen(point.x, point.y, state.view);
+    };
+    context.save();
+    context.strokeStyle = "rgba(91, 224, 255, .88)";
+    context.lineWidth = 1.5;
+    context.setLineDash([4, 3]);
+    context.beginPath();
+    for (let offset = 0; offset < candidate.indices.length; offset += 3) {
+      const triangle = candidate.indices.slice(offset, offset + 3);
+      triangle.forEach((vertexIndex, index) => {
+        const point = screen(vertexIndex);
+        if (index === 0) context.moveTo(point.x, point.y);
+        else context.lineTo(point.x, point.y);
+      });
+      const first = screen(triangle[0]);
+      context.lineTo(first.x, first.y);
+    }
+    context.stroke();
+    context.setLineDash([]);
+    for (let index = 0; index < candidate.positions.length / 2; index += 1) {
+      const point = screen(index);
+      context.beginPath();
+      context.arc(point.x, point.y, candidate.vertexKinds[index] === "corner" ? 4.5 : 3, 0, Math.PI * 2);
+      context.fillStyle = candidate.vertexKinds[index] === "corner"
+        ? "#ffca67"
+        : candidate.vertexKinds[index] === "interior" ? "#7da8ff" : "#5be0ff";
+      context.fill();
+    }
+    context.restore();
   }
 
   function drawTransformGizmo() {

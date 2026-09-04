@@ -138,6 +138,10 @@ Work:
 - Smooth target-mesh solve from sparse anchors.
 - Evaluate piecewise affine, barycentric propagation, TPS, and ARAP-style helpers.
 
+Phase 3-3 delivers the deterministic sparse Contour AutoMesh path described in
+`phase3-contour-automesh.md`. The existing grid generator remains available.
+Correspondence assistance and deformation helpers remain later Phase 3 work.
+
 Acceptance criteria:
 
 - Front hair can be edited naturally without point-by-point drudgery.

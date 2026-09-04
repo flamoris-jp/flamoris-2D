@@ -158,6 +158,19 @@ export const commandSchemas = {
     properties: { topologyId: nonEmptyString, vertexId: nonEmptyString },
     additionalProperties: false,
   },
+  "mesh_topology.apply_generated_mesh": {
+    type: "object",
+    required: ["topologyId", "vertexIds", "indices", "positions", "uvs", "replaceExisting"],
+    properties: {
+      topologyId: nonEmptyString,
+      vertexIds: { ...vertexIdArray, minItems: 3 },
+      indices: numberArray,
+      positions: numberArray,
+      uvs: numberArray,
+      replaceExisting: { type: "boolean" },
+    },
+    additionalProperties: false,
+  },
   "mesh_keyform.create": {
     type: "object",
     required: ["keyform"],

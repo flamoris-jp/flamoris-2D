@@ -18,6 +18,8 @@ import {
   MeshToolRegistry,
   MESH_AUTHORING_MODES,
 } from "../src/ui/mesh-tool-controller.js";
+import { AutoMeshPreviewController } from "../src/ui/automesh-preview-controller.js";
+import { generateContourAutoMesh } from "../src/core/contour-automesh.js";
 
 function member(nodeId, appearanceId, drawOrder) {
   return {
@@ -107,6 +109,18 @@ function setup() {
   endpoint.selectEndpoint("from");
   const meshTools = new MeshToolController(session, endpoint);
   return { project, session, endpoint, meshTools };
+}
+
+function automeshCandidate() {
+  const width = 8;
+  const height = 8;
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 1; y < 7; y += 1) for (let x = 1; x < 7; x += 1) {
+    data[(y * width + x) * 4 + 3] = 255;
+  }
+  return generateContourAutoMesh({ data, width, height }, {
+    density: 0.4, interiorDensity: 0.4,
+  }).candidate;
 }
 
 test("Deform Mode cannot dispatch topology mutation and commits one keyform command", () => {
@@ -470,4 +484,93 @@ test("generic topology replacement and incompatible keyform count are rejected",
     }),
     TransactionError,
   );
+});
+
+test("Contour AutoMesh preview is transient and Apply is one explicit semantic command", () => {
+  const { session, meshTools } = setup();
+  const preview = new AutoMeshPreviewController();
+  const candidate = automeshCandidate();
+  const image = { data: new Uint8ClampedArray(8 * 8 * 4), width: 8, height: 8 };
+  for (let index = 0; index < image.data.length / 4; index += 1) image.data[index * 4 + 3] = 255;
+  const beforeProject = structuredClone(session.project);
+  const beforeHistory = session.history.length;
+  preview.generate(image);
+  assert.deepEqual(session.project, beforeProject);
+  assert.equal(session.history.length, beforeHistory);
+
+  meshTools.setMode(MESH_AUTHORING_MODES.TOPOLOGY);
+  assert.throws(
+    () => meshTools.execute("topology.automesh", { candidate }),
+    (error) => error.code === "AUTOMESH_DESTRUCTIVE_REPLACEMENT_REQUIRED",
+  );
+  const previousTopology = session.query("mesh.get_topology", { topologyId: "topology" });
+  const previousKeyforms = session.query("mesh.list_keyforms", { topologyId: "topology" });
+  const result = meshTools.execute("topology.automesh", { candidate, replaceExisting: true });
+  assert.equal(session.history.length, beforeHistory + 1);
+  assert.deepEqual(session.history.at(-1).commandTypes, ["mesh_topology.apply_generated_mesh"]);
+  assert.ok(result.vertexIds.every((id) => /^vtx_\d+$/.test(id)));
+  const generatedTopology = session.query("mesh.get_topology", { topologyId: "topology" });
+  const generatedKeyforms = session.query("mesh.list_keyforms", { topologyId: "topology" });
+  assert.deepEqual(generatedTopology.vertexIds, result.vertexIds);
+  assert.deepEqual(generatedTopology.indices, candidate.indices);
+  assert.ok(generatedKeyforms.every((keyform) =>
+    JSON.stringify(keyform.positions) === JSON.stringify(candidate.positions) &&
+    JSON.stringify(keyform.uvs) === JSON.stringify(candidate.uvs)));
+  session.undo();
+  assert.deepEqual(session.query("mesh.get_topology", { topologyId: "topology" }), previousTopology);
+  assert.deepEqual(session.query("mesh.list_keyforms", { topologyId: "topology" }), previousKeyforms);
+  session.redo();
+  assert.deepEqual(session.query("mesh.get_topology", { topologyId: "topology" }), generatedTopology);
+  assert.deepEqual(session.query("mesh.list_keyforms", { topologyId: "topology" }), generatedKeyforms);
+  const opened = deserializeProject(serializeProject(session.project));
+  const openedSession = new EditorSession(opened);
+  assert.deepEqual(openedSession.query("mesh.get_topology", { topologyId: "topology" }), generatedTopology);
+  assert.deepEqual(openedSession.query("mesh.list_keyforms", { topologyId: "topology" }), generatedKeyforms);
+});
+
+test("Contour AutoMesh cannot apply in Deform Mode and preview state never serializes", () => {
+  const { session, meshTools } = setup();
+  const preview = new AutoMeshPreviewController();
+  preview.candidate = automeshCandidate();
+  assert.throws(
+    () => meshTools.execute("topology.automesh", { candidate: preview.candidate, replaceExisting: true }),
+    /unavailable in deform mode/,
+  );
+  const serialized = serializeProject(session.project);
+  assert.doesNotMatch(serialized, /candidate_|alphaThreshold|interiorDensity|vertexKinds/);
+});
+
+test("Contour AutoMesh creates an absent endpoint topology through one existing semantic transaction", () => {
+  const { project } = setup();
+  project.meshTopologies = [];
+  project.meshKeyforms = [];
+  project.transitions[0].partTransitions = [];
+  const session = new EditorSession(project);
+  const authoring = new TransitionAuthoringController(session);
+  authoring.selectTransition("transition");
+  authoring.selectSemanticSlot("slot");
+  let nextId = 0;
+  const endpoint = new EndpointMeshController(session, authoring, {
+    idFactory: (kind) => `${kind}_automesh_${++nextId}`,
+  });
+  endpoint.selectEndpoint("from");
+  const meshTools = new MeshToolController(session, endpoint);
+  meshTools.setMode(MESH_AUTHORING_MODES.TOPOLOGY);
+  const result = meshTools.execute("topology.automesh", { candidate: automeshCandidate() });
+  assert.equal(session.undoStack.length, 1);
+  assert.deepEqual(session.history.at(-1).commandTypes, [
+    "mesh_topology.create",
+    "mesh_keyform.create",
+    "mesh_keyform.create",
+    "transition.set_part_mode",
+    "transition.set_part_topology",
+  ]);
+  assert.ok(result.vertexIds.every((id) => /^vtx_\d+$/.test(id)));
+  assert.equal(session.project.meshTopologies.length, 1);
+  assert.equal(session.project.meshKeyforms.length, 2);
+  session.undo();
+  assert.equal(session.project.meshTopologies.length, 0);
+  assert.equal(session.project.meshKeyforms.length, 0);
+  session.redo();
+  assert.deepEqual(session.project.meshTopologies[0].vertexIds, result.vertexIds);
 });
