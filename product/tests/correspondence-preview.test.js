@@ -43,11 +43,18 @@ function fixture() {
       { keyArtId: "keyart_b", nodeId: "node_b" },
     ],
   });
+  project.semanticSlots.push({
+    id: "slot_alternate", displayName: "Alternate face", metadata: {}, mappings: [],
+  });
   project.meshTopologies.push({
     id: "topology", vertexIds: ["vtx_0001", "vtx_0002", "vtx_0003"],
     indices: [0, 1, 2], vertexMetadata: {
       vtx_0001: { semanticLabel: "chin_tip" },
     }, nextVertexSequence: 4,
+  });
+  project.meshTopologies.push({
+    id: "topology_other", vertexIds: ["vtx_0101", "vtx_0102", "vtx_0103"],
+    indices: [0, 1, 2], vertexMetadata: {}, nextVertexSequence: 104,
   });
   project.meshKeyforms.push(
     { id: "keyform_a", topologyId: "topology", keyArtId: "keyart_a",
@@ -55,6 +62,9 @@ function fixture() {
       uvs: [0, 0, 1, 0, 0, 1] },
     { id: "keyform_b", topologyId: "topology", keyArtId: "keyart_b",
       semanticSlotId: "slot", positions: [20, 20, 30, 20, 20, 30],
+      uvs: [0, 0, 1, 0, 0, 1] },
+    { id: "keyform_b2", topologyId: "topology", keyArtId: "keyart_b",
+      semanticSlotId: "slot_alternate", positions: [40, 40, 50, 40, 40, 50],
       uvs: [0, 0, 1, 0, 0, 1] },
   );
   project.temporalPrograms.push({ id: "program", durationTicks: 120000,
@@ -109,6 +119,13 @@ test("Solve preview is transient, history-free, read-only, and serializes no wor
   correspondence.addPin("vtx_0001", { x: 5, y: 7 });
   correspondence.solve();
   assert.equal(correspondence.getState().previewActive, true);
+  assert.deepEqual(correspondence.getState().candidateContext, {
+    topologyId: "topology",
+    sourceKeyformId: "keyform_a",
+    targetKeyformId: "keyform_b",
+    sourceEndpoint: "from",
+    targetEndpoint: "to",
+  });
   assert.equal(endpoint.getState().activeEndpoint, "to");
   assert.equal(endpoint.getState().editingEnabled, false);
   assert.throws(() => meshTools.execute("deform.move", {
@@ -117,7 +134,38 @@ test("Solve preview is transient, history-free, read-only, and serializes no wor
   assert.equal(JSON.stringify(session.project), before);
   assert.equal(session.history.length, historyLength);
   assert.doesNotMatch(serializeProject(session.project),
-    /selectedPin|pendingVertex|candidatePositions|falloffPower|previewActive|pinCount/);
+    /selectedPin|pendingVertex|candidatePositions|candidateContext|falloffPower|previewActive|pinCount/);
+  correspondence.clearPreview();
+  assert.equal(correspondence.getState().candidateContext, null);
+});
+
+test("Apply rejects and clears a candidate after compatible-size target keyform selection changes", () => {
+  const { session, endpoint, meshTools, correspondence } = fixture();
+  correspondence.addPin("vtx_0001", { x: 5, y: 7 });
+  correspondence.solve();
+  // Exercise the preview controller boundary directly: a second keyform for
+  // the same topology/KeyArt/slot is forbidden by project validation, while
+  // endpoint selection itself is transient state.
+  endpoint.selectedKeyformIds.to = "keyform_b2";
+  const beforeB2 = [...session.query("mesh.get_keyform", { keyformId: "keyform_b2" }).positions];
+  assert.throws(() => correspondence.apply(meshTools),
+    (error) => error.code === "CORRESPONDENCE_CANDIDATE_CONTEXT_CHANGED");
+  assert.deepEqual(session.query("mesh.get_keyform", { keyformId: "keyform_b2" }).positions, beforeB2);
+  assert.equal(correspondence.getState().candidatePositions, null);
+  assert.equal(correspondence.getState().candidateContext, null);
+});
+
+test("Apply rejects and clears a candidate after topology selection changes", () => {
+  const { session, endpoint, meshTools, correspondence } = fixture();
+  correspondence.addPin("vtx_0001", { x: 5, y: 7 });
+  correspondence.solve();
+  const historyLength = session.history.length;
+  endpoint.selectTopology("topology_other");
+  assert.throws(() => correspondence.apply(meshTools),
+    (error) => error.code === "CORRESPONDENCE_CANDIDATE_CONTEXT_CHANGED");
+  assert.equal(session.history.length, historyLength);
+  assert.equal(correspondence.getState().candidatePositions, null);
+  assert.equal(correspondence.getState().candidateContext, null);
 });
 
 test("Apply is one ordinary command; Undo and Redo restore exact positions without solver rerun", () => {
@@ -141,6 +189,7 @@ test("Apply is one ordinary command; Undo and Redo restore exact positions witho
   assert.equal(endpoint.getState().editingEnabled, true);
   assert.equal(endpoint.getState().activeEndpoint, "to");
   assert.equal(meshTools.getState().mode, "deform");
+  assert.equal(correspondence.getState().candidateContext, null);
   session.undo();
   assert.deepEqual(session.query("mesh.get_keyform", { keyformId: "keyform_b" }).positions, original);
   session.redo();

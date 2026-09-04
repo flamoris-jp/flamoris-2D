@@ -33,6 +33,7 @@ export class CorrespondencePreviewController {
     this.pendingVertexId = null;
     this.preset = "normal";
     this.candidatePositions = null;
+    this.candidateContext = null;
     this.diagnostics = [];
   }
 
@@ -83,6 +84,7 @@ export class CorrespondencePreviewController {
     );
     this.preset = preset;
     this.candidatePositions = null;
+    this.candidateContext = null;
     this.diagnostics = [];
     this.notify("correspondence-settings");
   }
@@ -101,6 +103,7 @@ export class CorrespondencePreviewController {
     this.selectedPinId = vertexId;
     this.pendingVertexId = null;
     this.candidatePositions = null;
+    this.candidateContext = null;
     this.diagnostics = [];
     this.notify("correspondence-pin-added");
     return this.getState();
@@ -118,6 +121,7 @@ export class CorrespondencePreviewController {
     this.selectedPinId = vertexId;
     this.pendingVertexId = null;
     this.candidatePositions = null;
+    this.candidateContext = null;
     this.diagnostics = [];
     this.notify("correspondence-pin-moved");
     return this.getState();
@@ -128,6 +132,7 @@ export class CorrespondencePreviewController {
     this.pendingVertexId = vertexId;
     this.selectedPinId = this.pins.has(vertexId) ? vertexId : null;
     this.candidatePositions = null;
+    this.candidateContext = null;
     this.diagnostics = [];
     this.endpointMesh.selectEndpoint(this.targetEndpoint);
     this.notify("correspondence-pin-placement");
@@ -156,6 +161,7 @@ export class CorrespondencePreviewController {
     if (this.selectedPinId === vertexId) this.selectedPinId = null;
     if (this.pendingVertexId === vertexId) this.pendingVertexId = null;
     this.candidatePositions = null;
+    this.candidateContext = null;
     this.diagnostics = [];
     this.notify("correspondence-pin-removed");
     return true;
@@ -166,6 +172,7 @@ export class CorrespondencePreviewController {
     this.selectedPinId = null;
     this.pendingVertexId = null;
     this.candidatePositions = null;
+    this.candidateContext = null;
     this.diagnostics = [];
     if (notify) this.notify("correspondence-cleared");
   }
@@ -173,6 +180,7 @@ export class CorrespondencePreviewController {
   clearPreview() {
     this.pendingVertexId = null;
     this.candidatePositions = null;
+    this.candidateContext = null;
     this.diagnostics = [];
     this.notify("correspondence-preview-cleared");
   }
@@ -193,6 +201,13 @@ export class CorrespondencePreviewController {
     this.candidatePositions = result.candidatePositions
       ? [...result.candidatePositions]
       : null;
+    this.candidateContext = this.candidatePositions ? {
+      topologyId: context.topology.id,
+      sourceKeyformId: context.sourceKeyform.id,
+      targetKeyformId: context.targetKeyform.id,
+      sourceEndpoint: this.sourceEndpoint,
+      targetEndpoint: this.targetEndpoint,
+    } : null;
     this.diagnostics = cloneProject(result.diagnostics);
     this.pendingVertexId = null;
     if (this.candidatePositions) {
@@ -205,19 +220,47 @@ export class CorrespondencePreviewController {
 
   apply(meshTools) {
     const candidate = this.candidatePositions ? [...this.candidatePositions] : null;
-    const { targetKeyform } = this.resolveContext();
+    const context = this.resolveContext();
+    const { topology, sourceKeyform, targetKeyform } = context;
     if (!candidate || this.diagnostics.length) throw inputError(
       "CORRESPONDENCE_NO_CANDIDATE", "Create a valid correspondence preview before Apply.",
     );
-    if (!targetKeyform || candidate.length !== targetKeyform.positions.length) throw inputError(
-      "CORRESPONDENCE_CANDIDATE_COUNT_MISMATCH",
-      "Candidate positions no longer match the target MeshKeyform.",
-    );
+    const currentContext = {
+      topologyId: topology?.id || null,
+      sourceKeyformId: sourceKeyform?.id || null,
+      targetKeyformId: targetKeyform?.id || null,
+      sourceEndpoint: this.sourceEndpoint,
+      targetEndpoint: this.targetEndpoint,
+    };
+    const contextMatches = this.candidateContext &&
+      Object.entries(currentContext).every(([key, value]) =>
+        this.candidateContext[key] === value);
+    if (!contextMatches) {
+      this.candidatePositions = null;
+      this.candidateContext = null;
+      this.diagnostics = [];
+      this.notify("correspondence-preview-invalidated");
+      throw inputError(
+        "CORRESPONDENCE_CANDIDATE_CONTEXT_CHANGED",
+        "Topology or endpoint keyform selection changed after Solve. Generate a new preview before Apply.",
+      );
+    }
+    if (!targetKeyform || candidate.length !== targetKeyform.positions.length) {
+      this.candidatePositions = null;
+      this.candidateContext = null;
+      this.diagnostics = [];
+      this.notify("correspondence-preview-invalidated");
+      throw inputError(
+        "CORRESPONDENCE_CANDIDATE_COUNT_MISMATCH",
+        "Candidate positions no longer match the target MeshKeyform.",
+      );
+    }
     const result = this.session.execute({
       type: "mesh_keyform.move_vertices",
       payload: { keyformId: targetKeyform.id, positions: candidate },
     }, { label: "Apply correspondence solve" });
     this.candidatePositions = null;
+    this.candidateContext = null;
     this.diagnostics = [];
     this.pendingVertexId = null;
     this.endpointMesh.selectEndpoint(this.targetEndpoint);
@@ -253,6 +296,7 @@ export class CorrespondencePreviewController {
       pendingVertexId: this.pendingVertexId,
       preset: this.preset,
       candidatePositions: this.candidatePositions ? [...this.candidatePositions] : null,
+      candidateContext: this.candidateContext ? cloneProject(this.candidateContext) : null,
       diagnostics: cloneProject(this.diagnostics),
       previewActive: Boolean(this.candidatePositions),
       pinCount: this.pins.size,

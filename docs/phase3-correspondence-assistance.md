@@ -63,9 +63,13 @@ screen -> document -> inverse target PartNode world transform -> mesh local
 Zoom, pan, viewport dimensions, and DOM layout are not solver inputs.
 
 Solve creates a read-only transient candidate. It does not mutate Project or
-history. Apply reuses `mesh_keyform.move_vertices` through `EditorSession` as
-one semantic transaction. Undo restores the exact previous target positions;
-Redo replays the recorded candidate payload without rerunning the solver.
+history. The candidate is bound to the exact topology ID, source/target
+keyform IDs, and endpoint direction used by Solve. Apply rejects and clears a
+stale candidate if any current context ID differs, even when the new target has
+the same vertex count. Apply reuses `mesh_keyform.move_vertices` through
+`EditorSession` as one semantic transaction. Undo restores the exact previous
+target positions; Redo replays the recorded candidate payload without
+rerunning the solver.
 After Apply, the target endpoint returns to ordinary Deform Mode with no
 solver-specific lock or persistent state.
 
