@@ -1,6 +1,7 @@
 package.json
 index.html
 desktop/main.mjs
+desktop/frame-sequence-ipc.mjs
 desktop/preload.cjs
 scripts/serve.mjs
 src/animation.js
