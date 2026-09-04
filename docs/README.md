@@ -7,6 +7,8 @@
 - [`roadmap.md`](roadmap.md) — dependency-driven implementation phases and acceptance criteria
 - [`phase3-mesh-topology-contract.md`](phase3-mesh-topology-contract.md) — Phase 3-1 stable identity, mode, mutation, restoration, and query contract
 - [`phase3-key-state-editing-ux.md`](phase3-key-state-editing-ux.md) — Phase 3-2 State Strip, playhead/evaluator, duration, playback, and transient-state contract
+- [`phase3-contour-automesh.md`](phase3-contour-automesh.md) — Phase 3-3 deterministic sparse contour generation, preview/apply, and destructive replacement contract
+- [`phase3-correspondence-assistance.md`](phase3-correspondence-assistance.md) — Phase 3-4 Stable-ID pins, deterministic solve, preview/apply, and persistence boundary
 - [`key-art-transition.md`](key-art-transition.md) — multi-Key-Art A→B→C transition model
 - [`mcp-design.md`](mcp-design.md) — MCP-ready command/transaction architecture
 - [`repository-boundaries.md`](repository-boundaries.md) — Product / Staging / Test / History separation, testing and CI boundary

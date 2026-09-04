@@ -10,6 +10,7 @@ import { EndpointMeshController } from "../src/ui/endpoint-mesh-controller.js";
 import { MeshToolController } from "../src/ui/mesh-tool-controller.js";
 import { CorrespondencePreviewController } from "../src/ui/correspondence-preview-controller.js";
 import { transformPoint } from "../src/core/transforms.js";
+import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
 
 function member(nodeId, appearanceId) {
   return { nodeId, appearanceId, opacity: 1, presence: "present", drawOrder: 0,
@@ -88,6 +89,7 @@ test("pin workspace supports add, move, delete, clear and rejects duplicate Stab
   const historyLength = session.history.length;
   correspondence.addPin("vtx_0001", { x: 4, y: 5 });
   assert.equal(correspondence.getState().pins[0].semanticLabel, "chin_tip");
+  assert.deepEqual(correspondence.getState().pins[0].source, { x: 0, y: 0 });
   assert.throws(() => correspondence.addPin("vtx_0001", { x: 1, y: 1 }),
     (error) => error.code === "CORRESPONDENCE_DUPLICATE_PIN");
   correspondence.movePin("vtx_0001", { x: 7, y: 8 });
@@ -155,6 +157,19 @@ test("B to A direction uses the same controller/core boundary", () => {
   assert.equal(preview.targetKeyformId, "keyform_a");
   assert.deepEqual(preview.candidatePositions, [-2, -1, 8, -1, -2, 9]);
   assert.equal(session.history.length, 2);
+});
+
+test("headless adapter commits an accepted solve through the existing typed command", () => {
+  const { session } = fixture();
+  const adapter = new HeadlessProductAdapter(session);
+  const before = session.history.length;
+  adapter.execute({
+    type: "mesh_keyform.move_vertices",
+    payload: { keyformId: "keyform_b", positions: [4, 5, 14, 5, 4, 15] },
+  }, { label: "Apply headless correspondence result" });
+  assert.deepEqual(adapter.query("mesh.get_keyform", { keyformId: "keyform_b" }).positions,
+    [4, 5, 14, 5, 4, 15]);
+  assert.equal(session.history.length, before + 1);
 });
 
 test("target anchor screen conversion is endpoint-local and independent of zoom/pan", () => {

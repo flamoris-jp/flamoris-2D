@@ -47,6 +47,24 @@ test("zero, unknown, duplicate, invalid anchor, and topology mismatch are reason
   }).diagnostics[0].code, "CORRESPONDENCE_TOPOLOGY_MISMATCH");
 });
 
+test("missing endpoint keyforms and non-finite solve output are diagnosed", () => {
+  assert.equal(solveCorrespondence({ topology, targetKeyform, pins: [] })
+    .diagnostics[0].code, "CORRESPONDENCE_MISSING_SOURCE_KEYFORM");
+  assert.equal(solveCorrespondence({ topology, sourceKeyform, pins: [] })
+    .diagnostics[0].code, "CORRESPONDENCE_MISSING_TARGET_KEYFORM");
+  const extremeSource = { ...sourceKeyform,
+    positions: [1e308, 1e308, -1e308, 1e308, -1e308, -1e308, 1e308, -1e308] };
+  const result = solveCorrespondence({
+    topology, sourceKeyform: extremeSource, targetKeyform,
+    pins: [
+      { vertexId: "vtx_0001", target: { x: -1e308, y: -1e308 } },
+      { vertexId: "vtx_0003", target: { x: 1e308, y: 1e308 } },
+    ],
+  });
+  assert.equal(result.candidatePositions, null);
+  assert.equal(result.diagnostics[0].code, "CORRESPONDENCE_NON_FINITE_RESULT");
+});
+
 test("one pin is deterministic whole-mesh translation with an exact anchor", () => {
   const input = [{ vertexId: "vtx_0003", target: { x: 15, y: 8 } }];
   const first = solve(input);

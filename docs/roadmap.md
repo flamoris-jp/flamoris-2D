@@ -140,7 +140,10 @@ Work:
 
 Phase 3-3 delivers the deterministic sparse Contour AutoMesh path described in
 `phase3-contour-automesh.md`. The existing grid generator remains available.
-Correspondence assistance and deformation helpers remain later Phase 3 work.
+Phase 3-4 adds transient Stable-ID correspondence pins and deterministic IDW
+target-keyform initialization described in `phase3-correspondence-assistance.md`.
+The accepted result remains ordinary editable MeshKeyform positions. Advanced
+deformation helpers remain later work.
 
 Acceptance criteria:
 

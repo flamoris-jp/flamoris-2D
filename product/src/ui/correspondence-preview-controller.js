@@ -228,16 +228,27 @@ export class CorrespondencePreviewController {
 
   getState() {
     const { topology, sourceKeyform, targetKeyform } = this.resolveContext();
+    const vertexIndex = new Map((topology?.vertexIds || [])
+      .map((vertexId, index) => [vertexId, index]));
     return {
       sourceEndpoint: this.sourceEndpoint,
       targetEndpoint: this.targetEndpoint,
       sourceKeyformId: sourceKeyform?.id || null,
       targetKeyformId: targetKeyform?.id || null,
       topologyId: topology?.id || null,
-      pins: [...this.pins.values()].map((pin) => ({
-        ...cloneProject(pin),
-        semanticLabel: topology?.vertexMetadata?.[pin.vertexId]?.semanticLabel || null,
-      })),
+      pins: [...this.pins.values()].map((pin) => {
+        const index = vertexIndex.get(pin.vertexId);
+        return {
+          ...cloneProject(pin),
+          source: Number.isSafeInteger(index) && sourceKeyform
+            ? {
+              x: sourceKeyform.positions[index * 2],
+              y: sourceKeyform.positions[index * 2 + 1],
+            }
+            : null,
+          semanticLabel: topology?.vertexMetadata?.[pin.vertexId]?.semanticLabel || null,
+        };
+      }),
       selectedPinId: this.selectedPinId,
       pendingVertexId: this.pendingVertexId,
       preset: this.preset,

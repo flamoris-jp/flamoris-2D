@@ -162,10 +162,33 @@ export function createViewportRenderer({
     context.save();
     context.font = "700 10px ui-monospace, monospace";
     context.textBaseline = "middle";
+    let sourceWorld = null;
+    let targetWorld = null;
+    try {
+      sourceWorld = state.editor?.endpointMesh.endpointWorldTransform(correspondence.sourceEndpoint);
+      targetWorld = state.editor?.endpointMesh.endpointWorldTransform(correspondence.targetEndpoint);
+    } catch (_error) {
+      // Invalid/missing endpoint mappings are reported by the controller. The
+      // viewport simply omits the optional displacement line.
+    }
     for (const pin of correspondence.pins || []) {
       const index = indexById.get(pin.vertexId);
       if (!Number.isSafeInteger(index) || index * 2 + 1 >= vertices.length) continue;
       const point = screenPointForPart(vertices[index * 2], vertices[index * 2 + 1]);
+      if (pin.source && sourceWorld && targetWorld) {
+        const sourceDocument = transformPoint(sourceWorld, pin.source);
+        const targetDocument = transformPoint(targetWorld, pin.target);
+        const sourcePoint = imageToScreen(sourceDocument.x, sourceDocument.y, state.view);
+        const targetPoint = imageToScreen(targetDocument.x, targetDocument.y, state.view);
+        context.beginPath();
+        context.moveTo(sourcePoint.x, sourcePoint.y);
+        context.lineTo(targetPoint.x, targetPoint.y);
+        context.setLineDash([4, 3]);
+        context.strokeStyle = "rgba(125, 168, 255, .72)";
+        context.lineWidth = 1.25;
+        context.stroke();
+        context.setLineDash([]);
+      }
       context.beginPath();
       context.arc(point.x, point.y, pin.vertexId === correspondence.selectedPinId ? 8 : 6, 0, Math.PI * 2);
       context.fillStyle = pin.vertexId === correspondence.selectedPinId
