@@ -11,6 +11,12 @@ contextBridge.exposeInMainWorld("flamorisDesktop", Object.freeze({
   acceptOpenedProject: (filePath) =>
     invoke("desktop:accept-opened-project", { filePath }),
   writeProject: (request) => invoke("desktop:write-project", request),
+  beginFrameSequenceExport: (request) =>
+    invoke("desktop:begin-frame-sequence-export", request),
+  writeFrameSequenceFrame: (request) =>
+    invoke("desktop:write-frame-sequence-frame", request),
+  endFrameSequenceExport: (request) =>
+    invoke("desktop:end-frame-sequence-export", request),
   projectFileExists: (request) =>
     invoke("desktop:project-file-exists", request),
   listSiblingProjectFiles: () =>

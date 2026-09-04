@@ -45,6 +45,7 @@ export function createExportOffscreenRenderer(renderTarget, dependencies = {}) {
         width: surface.width,
         height: surface.height,
         rowOrder: "top-to-bottom",
+        alphaMode: "premultiplied",
         data: renderer.readRgbaPixels(),
       });
     },
