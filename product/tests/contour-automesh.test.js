@@ -56,6 +56,30 @@ test("binary alpha threshold is deterministic", () => {
   assert.deepEqual([...createBinaryAlphaMask(image, 0.5).data], [0, 1, 1, 1]);
 });
 
+test("zero threshold keeps alpha zero transparent and accepts every non-zero alpha", () => {
+  const image = alphaImage(["##", "##"]);
+  image.data[3] = 0;
+  image.data[7] = 1;
+  image.data[11] = 127;
+  image.data[15] = 255;
+  assert.deepEqual([...createBinaryAlphaMask(image, 0).data], [0, 1, 1, 1]);
+});
+
+test("fully transparent alpha at zero threshold reports no visible region", () => {
+  const transparent = alphaImage(["....", "....", "....", "...."]);
+  assert.equal(
+    generateContourAutoMesh(transparent, { alphaThreshold: 0 }).diagnostics[0].code,
+    "AUTOMESH_NO_VISIBLE_ALPHA",
+  );
+});
+
+test("half threshold behavior remains byte-stable", () => {
+  const image = alphaImage(["##", "##"]);
+  image.data[3] = 127;
+  image.data[7] = 128;
+  assert.deepEqual([...createBinaryAlphaMask(image, 0.5).data], [0, 1, 1, 1]);
+});
+
 test("outer contour is closed by contract without duplicate terminal point", () => {
   const result = extractOuterContour(createBinaryAlphaMask(SHAPE));
   assert.equal(result.diagnostics.length, 0);

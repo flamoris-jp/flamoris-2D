@@ -19,6 +19,8 @@ RGBA alpha -> binary mask -> outer pixel-edge contour
 ```
 
 The alpha threshold is converted deterministically to an integer byte value.
+At threshold 0, every non-zero alpha is visible while alpha 0 remains fully
+transparent; zero never turns a transparent canvas into a visible rectangle.
 Four-connected visible components are counted before contour tracing. The
 initial implementation accepts one outer contour and reports reason-specific
 diagnostics for no alpha, tiny contours, disconnected visible regions, and

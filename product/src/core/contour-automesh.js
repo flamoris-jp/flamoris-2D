@@ -31,7 +31,9 @@ export function createBinaryAlphaMask(imageData, alphaThreshold = 0.1) {
     !data || data.length !== width * height * 4) {
     throw new TypeError("AutoMesh requires width × height RGBA image data.");
   }
-  const threshold = Math.round(clamp01(alphaThreshold, 0.1) * 255);
+  // A threshold of zero means "accept every non-zero alpha", never that a
+  // fully transparent pixel is visible.
+  const threshold = Math.max(1, Math.round(clamp01(alphaThreshold, 0.1) * 255));
   const mask = new Uint8Array(width * height);
   for (let index = 0; index < mask.length; index += 1) {
     mask[index] = data[index * 4 + 3] >= threshold ? 1 : 0;
