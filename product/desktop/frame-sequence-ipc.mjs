@@ -13,6 +13,7 @@ export function registerFrameSequenceIpc({
   assertTrusted,
   associatedDirectory,
   registry = new DesktopFrameSequenceSessionRegistry(),
+  onSessionEnded = null,
 }) {
   ipcMain.handle("desktop:begin-frame-sequence-export", async (event, request = {}) => {
     assertTrusted(event);
@@ -55,10 +56,14 @@ export function registerFrameSequenceIpc({
 
   ipcMain.handle("desktop:end-frame-sequence-export", async (event, request = {}) => {
     assertTrusted(event);
+    const status = request.status || "unknown";
     const result = registry.end(String(request.sessionId || ""));
+    if (result && typeof onSessionEnded === "function") {
+      onSessionEnded(Object.freeze({ ...result, status }));
+    }
     return {
       ok: true,
-      status: request.status || "unknown",
+      status,
       ...(result || {}),
     };
   });
