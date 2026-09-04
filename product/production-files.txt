@@ -2,6 +2,7 @@ package.json
 index.html
 desktop/main.mjs
 desktop/frame-sequence-ipc.mjs
+desktop/ffmpeg-video-encoder.mjs
 desktop/preload.cjs
 scripts/serve.mjs
 src/animation.js
