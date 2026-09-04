@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { rm } from "node:fs/promises";
+import { access, rm } from "node:fs/promises";
 
 import {
   assertOfficialFfmpegCapability,
@@ -10,6 +10,16 @@ import {
 function boundedAppend(current, chunk, maximum = 1024 * 1024) {
   const next = current + String(chunk || "");
   return next.length > maximum ? next.slice(next.length - maximum) : next;
+}
+
+async function defaultOutputExists(path) {
+  try {
+    await access(path);
+    return true;
+  } catch (error) {
+    if (error?.code === "ENOENT") return false;
+    throw error;
+  }
 }
 
 export function runEncoderProcess(executablePath, args, {
@@ -104,9 +114,16 @@ function encodeFailureCode(result) {
   return "VIDEO_ENCODER_FAILED";
 }
 
+function outputConflictError() {
+  const error = new Error("Video output already exists; overwrite is not allowed.");
+  error.code = "VIDEO_OUTPUT_CONFLICT";
+  return error;
+}
+
 /**
  * Encodes the canonical Phase 4-2 PNG sequence to MP4. Incomplete MP4 output
- * is removed on failure/cancellation; the PNG sequence remains authoritative.
+ * is removed on failure/cancellation; a pre-existing destination is never
+ * deleted. The PNG sequence remains authoritative.
  */
 export async function encodePngSequenceWithFfmpeg({
   executablePath = "ffmpeg",
@@ -117,8 +134,10 @@ export async function encodePngSequenceWithFfmpeg({
   signal = null,
   spawnProcess = spawn,
   removeFile = (path) => rm(path, { force: true }),
+  outputExists = defaultOutputExists,
   skipProbe = false,
 } = {}) {
+  if (await outputExists(outputPath)) throw outputConflictError();
   if (!skipProbe) {
     await probeFfmpegVideoEncoder({ executablePath, spawnProcess, signal });
   }
@@ -127,7 +146,6 @@ export async function encodePngSequenceWithFfmpeg({
   try {
     result = await runEncoderProcess(executablePath, args, { spawnProcess, signal });
   } catch (error) {
-    await removeFile(outputPath).catch(() => {});
     error.code ||= "VIDEO_ENCODER_SPAWN_FAILED";
     throw error;
   }
@@ -139,9 +157,12 @@ export async function encodePngSequenceWithFfmpeg({
     throw error;
   }
   if (result.code !== 0) {
-    await removeFile(outputPath).catch(() => {});
+    const code = encodeFailureCode(result);
+    if (code !== "VIDEO_OUTPUT_CONFLICT") {
+      await removeFile(outputPath).catch(() => {});
+    }
     const error = new Error(result.stderr || `FFmpeg exited with code ${result.code}.`);
-    error.code = encodeFailureCode(result);
+    error.code = code;
     error.exitCode = result.code;
     throw error;
   }

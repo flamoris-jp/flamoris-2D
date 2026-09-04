@@ -74,6 +74,7 @@ test("successful encode uses deterministic PNG ordering contract", async () => {
     frameRate: { numerator: 24, denominator: 1 },
     frameCount: 24,
     spawnProcess: spawner.spawn,
+    outputExists: async () => false,
     skipProbe: true,
   });
   assert.equal(result.ok, true);
@@ -95,6 +96,7 @@ test("encoder failure removes incomplete MP4 and preserves diagnostic stderr", a
     frameCount: 24,
     spawnProcess: spawner.spawn,
     removeFile: async (path) => removed.push(path),
+    outputExists: async () => false,
     skipProbe: true,
   }), (error) => {
     assert.equal(error.code, "VIDEO_ENCODER_FAILED");
@@ -104,7 +106,25 @@ test("encoder failure removes incomplete MP4 and preserves diagnostic stderr", a
   assert.deepEqual(removed, ["C:/exports/shot.mp4"]);
 });
 
-test("existing output conflict is explicit and incomplete output cleanup still runs", async () => {
+test("pre-existing output is rejected before spawning and is never deleted", async () => {
+  const removed = [];
+  const spawner = queuedSpawner([]);
+  await assert.rejects(() => encodePngSequenceWithFfmpeg({
+    executablePath: "ffmpeg.exe",
+    frameDirectory: "C:/temp/frames",
+    outputPath: "C:/exports/shot.mp4",
+    frameRate: { numerator: 30, denominator: 1 },
+    frameCount: 30,
+    spawnProcess: spawner.spawn,
+    removeFile: async (path) => removed.push(path),
+    outputExists: async () => true,
+    skipProbe: true,
+  }), (error) => error.code === "VIDEO_OUTPUT_CONFLICT");
+  assert.equal(spawner.calls.length, 0);
+  assert.deepEqual(removed, []);
+});
+
+test("race-time output conflict does not delete the winning file", async () => {
   const removed = [];
   const spawner = queuedSpawner([{ code: 1, stderr: "File already exists. Exiting. Not overwriting" }]);
   await assert.rejects(() => encodePngSequenceWithFfmpeg({
@@ -115,9 +135,10 @@ test("existing output conflict is explicit and incomplete output cleanup still r
     frameCount: 30,
     spawnProcess: spawner.spawn,
     removeFile: async (path) => removed.push(path),
+    outputExists: async () => false,
     skipProbe: true,
   }), (error) => error.code === "VIDEO_OUTPUT_CONFLICT");
-  assert.equal(removed.length, 1);
+  assert.deepEqual(removed, []);
 });
 
 test("cancellation terminates FFmpeg and removes partial output", async () => {
@@ -147,6 +168,7 @@ test("cancellation terminates FFmpeg and removes partial output", async () => {
     signal: controller.signal,
     spawnProcess,
     removeFile: async (path) => removed.push(path),
+    outputExists: async () => false,
     skipProbe: true,
   }), (error) => error.code === "VIDEO_ENCODER_CANCELLED");
   assert.deepEqual(child.killCalls, ["SIGTERM"]);
