@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 
 import { EditorSession } from "../src/commands/editor.js";
 import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
-import { serializeProject } from "../src/io/project-json.js";
+import { deserializeProject, serializeProject } from "../src/io/project-json.js";
 import { TransitionAuthoringController } from "../src/ui/transition-authoring-controller.js";
 import { EndpointMeshController } from "../src/ui/endpoint-mesh-controller.js";
 import { MeshToolController } from "../src/ui/mesh-tool-controller.js";
@@ -170,6 +170,20 @@ test("headless adapter commits an accepted solve through the existing typed comm
   assert.deepEqual(adapter.query("mesh.get_keyform", { keyformId: "keyform_b" }).positions,
     [4, 5, 14, 5, 4, 15]);
   assert.equal(session.history.length, before + 1);
+});
+
+test("applied solve survives Save/Open and remains an ordinary Deform-editable keyform", () => {
+  const { session, meshTools, correspondence } = fixture();
+  correspondence.addPin("vtx_0001", { x: 6, y: 8 });
+  correspondence.solve();
+  correspondence.apply(meshTools);
+  const solved = [6, 8, 16, 8, 6, 18];
+  assert.deepEqual(session.query("mesh.get_keyform", { keyformId: "keyform_b" }).positions, solved);
+  const reopened = deserializeProject(serializeProject(session.project));
+  assert.deepEqual(reopened.meshKeyforms.find(({ id }) => id === "keyform_b").positions, solved);
+  meshTools.execute("deform.move", { positions: [7, 9, 17, 9, 7, 19] });
+  assert.deepEqual(session.query("mesh.get_keyform", { keyformId: "keyform_b" }).positions,
+    [7, 9, 17, 9, 7, 19]);
 });
 
 test("target anchor screen conversion is endpoint-local and independent of zoom/pan", () => {
