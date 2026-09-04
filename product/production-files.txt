@@ -21,6 +21,7 @@ src/core/transforms.js
 src/core/temporal.js
 src/core/transition-evaluator.js
 src/core/evaluated-render.js
+src/core/shared-composition-renderer.js
 src/queries/project.js
 src/commands/editor.js
 src/commands/errors.js

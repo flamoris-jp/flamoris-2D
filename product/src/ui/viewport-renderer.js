@@ -2,7 +2,7 @@ import { getDeformedVertices, imageToScreen } from "../mesh.js";
 import { sampleLoop } from "../animation.js";
 import { transformPoint } from "../core/transforms.js";
 import { EDITOR_MODES, isMeshAuthoringMode } from "./editor-modes.js";
-import { createEvaluatedRenderPlan } from "../core/evaluated-render.js";
+import { renderEvaluatedComposition } from "../core/shared-composition-renderer.js";
 
 export function renderEvaluatedTransitionViewport({
   evaluation,
@@ -10,19 +10,22 @@ export function renderEvaluatedTransitionViewport({
   renderer,
   resolveArtwork,
 }) {
-  try {
-    const plan = createEvaluatedRenderPlan(evaluation, { resolveArtwork });
-    renderer.renderEvaluated(plan, view, resolveArtwork);
+  const result = renderEvaluatedComposition({
+    evaluation,
+    renderTarget: view,
+    renderer,
+    resolveArtwork,
+  });
+  if (result.failure) {
     return {
-      unsupportedReasons: plan.unsupportedReasons,
-      renderInstanceCount: plan.renderInstanceCount,
-    };
-  } catch (error) {
-    return {
-      unsupportedReasons: [`Evaluated render plan is invalid: ${error.message || String(error)}`],
+      unsupportedReasons: [`Evaluated render plan is invalid: ${result.failure.error.message || String(result.failure.error)}`],
       renderInstanceCount: 0,
     };
   }
+  return {
+    unsupportedReasons: result.unsupportedReasons,
+    renderInstanceCount: result.renderInstanceCount,
+  };
 }
 
 export function clearLayerCanvas(canvas) {
