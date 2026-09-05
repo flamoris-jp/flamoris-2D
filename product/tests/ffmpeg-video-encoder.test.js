@@ -86,7 +86,7 @@ test("successful encode uses deterministic PNG ordering and alpha flattening con
   assert.equal(args[args.indexOf("-frames:v") + 1], "24");
   assert.equal(args[args.indexOf("-c:v") + 1], "h264_mf");
   assert.equal(args[args.indexOf("-i") + 1], "C:/temp/frames/frame_%06d.png");
-  assert.equal(args[args.indexOf("-vf") + 1], "format=rgba,premultiply=inplace=1,format=nv12");
+  assert.equal(args[args.indexOf("-vf") + 1], "format=gbrap,premultiply=inplace=1,format=nv12");
   assert.equal(args[args.indexOf("-pix_fmt") + 1], "nv12");
 });
 
