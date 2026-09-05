@@ -69,10 +69,16 @@ export function buildH264MfEncodeArgs({
   ]);
 }
 
-export function parseFfmpegCapability({ versionText = "", buildConfText = "", encodersText = "" } = {}) {
+export function parseFfmpegCapability({
+  versionText = "",
+  buildConfText = "",
+  encodersText = "",
+  filtersText = "",
+} = {}) {
   const version = String(versionText);
   const build = String(buildConfText);
   const encoders = String(encodersText);
+  const filters = String(filtersText);
   const combined = `${version}\n${build}`;
   const flags = Object.freeze({
     gpl: /(?:^|\s)--enable-gpl(?:\s|$)/m.test(combined),
@@ -80,11 +86,13 @@ export function parseFfmpegCapability({ versionText = "", buildConfText = "", en
     libx264: /(?:^|\s)--enable-libx264(?:\s|$)/m.test(combined),
   });
   const h264Mf = /(?:^|\s)h264_mf(?:\s|$)/m.test(encoders);
+  const premultiply = /(?:^|\s)premultiply(?:\s|$)/m.test(filters);
   return Object.freeze({
     available: Boolean(version.trim()),
     h264Mf,
+    premultiply,
     flags,
-    distributionSafe: Boolean(version.trim()) && h264Mf &&
+    distributionSafe: Boolean(version.trim()) && h264Mf && premultiply &&
       !flags.gpl && !flags.nonfree && !flags.libx264,
   });
 }
@@ -98,6 +106,11 @@ export function assertOfficialFfmpegCapability(capability) {
   if (!capability.h264Mf) {
     const error = new Error("FFmpeg does not provide the required h264_mf encoder.");
     error.code = "VIDEO_ENCODER_H264_MF_UNAVAILABLE";
+    throw error;
+  }
+  if (!capability.premultiply) {
+    const error = new Error("FFmpeg does not provide the premultiply filter required for deterministic alpha flattening.");
+    error.code = "VIDEO_ENCODER_ALPHA_FILTER_UNAVAILABLE";
     throw error;
   }
   if (!capability.distributionSafe) {
