@@ -31,6 +31,7 @@ src/core/export-offscreen-renderer.js
 src/core/png-frame-encoder.js
 src/core/frame-sequence-export.js
 src/core/export-job-controller.js
+src/core/export-settings.js
 src/core/video-encoder.js
 src/queries/project.js
 src/commands/editor.js
@@ -80,6 +81,7 @@ src/ui/viewport-renderer.js
 src/ui/desktop-project-files.js
 src/ui/desktop-frame-sequence-sink.js
 src/ui/desktop-video-export.js
+src/ui/export-dialog-view.js
 src/ui/psd-render-assets.js
 src/desktop/shell-logic.js
 src/desktop/atomic-write.js

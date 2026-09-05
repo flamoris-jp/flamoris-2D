@@ -1,5 +1,6 @@
 import { PART_TRANSITION_MODES } from "./transition-authoring-controller.js";
 import { getDeformedVertices } from "../mesh.js";
+import { createExportDialogView } from "./export-dialog-view.js";
 
 const STATUS_LABELS = {
   mapped: "Mapped",
@@ -36,6 +37,12 @@ export function createTransitionAuthoringView({ state, elements, setStatus, onEn
   function endpointMesh() {
     return state.editor?.endpointMesh || null;
   }
+
+  const exportDialogView = createExportDialogView({
+    state,
+    elements,
+    setStatus,
+  });
 
   function act(action) {
     try {
@@ -243,6 +250,7 @@ export function createTransitionAuthoringView({ state, elements, setStatus, onEn
   }
 
   function render() {
+    exportDialogView.render();
     const editor = controller();
     elements.transitionAuthoringPanel.classList.toggle("unavailable", !editor);
     if (!editor) {
