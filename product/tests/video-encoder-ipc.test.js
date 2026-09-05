@@ -172,3 +172,102 @@ test("completed Desktop PNG sequence becomes the only approved video input path"
   assert.equal(encoded.ok, true);
   assert.equal(encodeCalls.length, 1);
 });
+
+test("temporary video frames stay behind the Desktop session and encode in exact order", async () => {
+  const temporaryDirectory = join(testRoot, "temporary", "video-1");
+  const writes = [];
+  const removed = [];
+  const { handlers, encodeCalls } = harness({
+    createTemporaryDirectory: async () => temporaryDirectory,
+    writeTemporaryFrame: async (directory, fileName, bytes) => {
+      writes.push({ directory, fileName, bytes: [...bytes] });
+      return { fileName };
+    },
+    removeTemporaryDirectory: async (directory) => { removed.push(directory); },
+  });
+
+  const session = await handlers.get("desktop:begin-video-export")({}, {
+    suggestedName: "shot",
+    temporaryFrames: true,
+  });
+  assert.equal(session.temporaryFrames, true);
+  assert.equal("frameDirectory" in session, false);
+
+  const outOfOrder = await handlers.get("desktop:write-video-frame")({}, {
+    sessionId: session.sessionId,
+    fileName: "frame_000002.png",
+    bytes: new Uint8Array([2]),
+  });
+  assert.equal(outOfOrder.desktopError.code, "VIDEO_FRAME_ORDER_INVALID");
+
+  for (const ordinal of [1, 2]) {
+    const written = await handlers.get("desktop:write-video-frame")({}, {
+      sessionId: session.sessionId,
+      fileName: `frame_${String(ordinal).padStart(6, "0")}.png`,
+      bytes: new Uint8Array([ordinal]),
+    });
+    assert.equal(written.ok, true);
+    assert.equal(written.writtenFrames, ordinal);
+  }
+
+  const encoded = await handlers.get("desktop:encode-video")({}, {
+    sessionId: session.sessionId,
+    frameRate: { numerator: 24, denominator: 1 },
+    frameCount: 2,
+  });
+  assert.equal(encoded.ok, true);
+  assert.equal(encodeCalls.length, 1);
+  assert.equal(encodeCalls[0].frameDirectory, temporaryDirectory);
+  assert.deepEqual(writes.map((entry) => entry.fileName), [
+    "frame_000001.png",
+    "frame_000002.png",
+  ]);
+  assert.deepEqual(removed, [temporaryDirectory]);
+});
+
+test("temporary video session rejects renderer filesystem paths and mismatched frame counts", async () => {
+  const temporaryDirectory = join(testRoot, "temporary", "video-2");
+  const { handlers, encodeCalls } = harness({
+    createTemporaryDirectory: async () => temporaryDirectory,
+    writeTemporaryFrame: async () => ({}),
+    removeTemporaryDirectory: async () => {},
+  });
+  const session = await handlers.get("desktop:begin-video-export")({}, { temporaryFrames: true });
+  await handlers.get("desktop:write-video-frame")({}, {
+    sessionId: session.sessionId,
+    fileName: "frame_000001.png",
+    bytes: new Uint8Array([1]),
+  });
+
+  const pathRejected = await handlers.get("desktop:encode-video")({}, {
+    sessionId: session.sessionId,
+    frameDirectory,
+    frameRate: { numerator: 24, denominator: 1 },
+    frameCount: 1,
+  });
+  assert.equal(pathRejected.desktopError.code, "VIDEO_FRAME_SOURCE_INVALID");
+
+  const countRejected = await handlers.get("desktop:encode-video")({}, {
+    sessionId: session.sessionId,
+    frameRate: { numerator: 24, denominator: 1 },
+    frameCount: 2,
+  });
+  assert.equal(countRejected.desktopError.code, "VIDEO_FRAME_COUNT_MISMATCH");
+  assert.equal(encodeCalls.length, 0);
+});
+
+test("cancel before encoding removes Desktop-owned temporary frames", async () => {
+  const temporaryDirectory = join(testRoot, "temporary", "video-3");
+  const removed = [];
+  const { handlers } = harness({
+    createTemporaryDirectory: async () => temporaryDirectory,
+    removeTemporaryDirectory: async (directory) => { removed.push(directory); },
+  });
+  const session = await handlers.get("desktop:begin-video-export")({}, { temporaryFrames: true });
+  const cancelled = await handlers.get("desktop:cancel-video-export")({}, {
+    sessionId: session.sessionId,
+  });
+  assert.equal(cancelled.canceled, true);
+  assert.equal(cancelled.active, false);
+  assert.deepEqual(removed, [temporaryDirectory]);
+});
