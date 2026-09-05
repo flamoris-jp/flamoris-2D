@@ -176,7 +176,12 @@ export class DesktopMp4ExportJob {
     const cancelEncoder = () => {
       cancellationRequest ||= Promise.resolve(this.desktopApi.cancelVideoExport({
         sessionId: session.sessionId,
-      })).catch(() => null);
+      })).catch((error) => ({
+        desktopError: {
+          code: error?.code || "VIDEO_CANCEL_FAILED",
+          message: error?.message || String(error),
+        },
+      }));
     };
     request.signal?.addEventListener?.("abort", cancelEncoder, { once: true });
 
@@ -189,15 +194,18 @@ export class DesktopMp4ExportJob {
       }));
       if (request.signal?.aborted) {
         cancelEncoder();
-        await cancellationRequest;
+        const cancelResult = await cancellationRequest;
         return Object.freeze({
           ...sequenceResult,
           ok: false,
           canceled: true,
-          diagnostics: [Object.freeze({
-            code: "export.cancelled",
-            message: "Video export was cancelled before encoding.",
-          })],
+          diagnostics: Object.freeze([
+            Object.freeze({
+              code: "export.cancelled",
+              message: "Video export was cancelled before encoding.",
+            }),
+            ...cleanupDiagnosticsFromDesktop(cancelResult),
+          ]),
         });
       }
 
