@@ -149,6 +149,47 @@ test("cancel between frame production and encoding closes the Desktop video sess
   assert.deepEqual(desktop.cancels, [{ sessionId: "video-1" }]);
 });
 
+test("temporary cleanup failure remains visible when frame production fails", async () => {
+  const desktop = desktopHarness();
+  desktop.api.cancelVideoExport = async (options) => {
+    desktop.cancels.push(options);
+    return {
+      ok: true,
+      canceled: true,
+      diagnostics: [{
+        code: "VIDEO_TEMP_CLEANUP_FAILED",
+        message: "temporary directory is locked",
+      }],
+    };
+  };
+  const job = new DesktopMp4ExportJob({
+    desktopApi: desktop.api,
+    frameRenderer: {
+      render() {
+        return {
+          ok: false,
+          diagnostics: [{
+            code: "export.frame_render_failure",
+            message: "frame render failed",
+          }],
+        };
+      },
+    },
+    encodePng: async () => new Uint8Array([1]),
+  });
+
+  const result = await job.run(request());
+  assert.equal(result.ok, false);
+  assert.equal(result.canceled, false);
+  assert.deepEqual(result.diagnostics.map((entry) => entry.code), [
+    "export.frame_render_failure",
+    "export.temp_cleanup_failure",
+  ]);
+  assert.equal(result.diagnostics[1].sourceCode, "VIDEO_TEMP_CLEANUP_FAILED");
+  assert.match(result.diagnostics[1].message, /locked/);
+  assert.deepEqual(desktop.cancels, [{ sessionId: "video-1" }]);
+});
+
 test("Desktop encoder diagnostics remain actionable at the export job boundary", async () => {
   const desktop = desktopHarness();
   desktop.api.encodeVideo = async () => ({
