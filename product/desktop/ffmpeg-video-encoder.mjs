@@ -104,7 +104,13 @@ export async function probeFfmpegVideoEncoder({
   const versionText = await checkedProbeCommand(executablePath, ["-hide_banner", "-version"], options);
   const buildConfText = await checkedProbeCommand(executablePath, ["-hide_banner", "-buildconf"], options);
   const encodersText = await checkedProbeCommand(executablePath, ["-hide_banner", "-encoders"], options);
-  const capability = parseFfmpegCapability({ versionText, buildConfText, encodersText });
+  const filtersText = await checkedProbeCommand(executablePath, ["-hide_banner", "-filters"], options);
+  const capability = parseFfmpegCapability({
+    versionText,
+    buildConfText,
+    encodersText,
+    filtersText,
+  });
   assertOfficialFfmpegCapability(capability);
   return Object.freeze({ executablePath, capability });
 }
