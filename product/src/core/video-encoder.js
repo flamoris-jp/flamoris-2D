@@ -3,7 +3,8 @@ import { normalizeFrameRate } from "./temporal.js";
 export const VIDEO_ENCODER_PROFILE = Object.freeze({
   container: "mp4",
   videoCodec: "h264_mf",
-  pixelFormat: "yuv420p",
+  pixelFormat: "nv12",
+  alphaComposite: "black",
   audio: "disabled",
   overwrite: "reject-existing-output",
 });
@@ -31,6 +32,13 @@ export function ffmpegFrameRate(frameRate) {
  * Builds the deterministic FFmpeg argv contract for the Phase 4 Windows video
  * path. The input is the canonical one-based PNG sequence produced by Phase
  * 4-2. h264_mf is intentionally selected instead of libx264.
+ *
+ * Phase 4-2 PNG frames may contain alpha, but the initial H.264 profile does
+ * not. Before handing pixels to Media Foundation, RGB is deterministically
+ * premultiplied by alpha and alpha is then discarded by conversion to NV12.
+ * This is equivalent to compositing straight-alpha PNG pixels over opaque
+ * black. Background selection, if added later, belongs to explicit export
+ * settings rather than implicit encoder behavior.
  */
 export function buildH264MfEncodeArgs({
   frameDirectory,
@@ -52,6 +60,7 @@ export function buildH264MfEncodeArgs({
     "-i", pattern,
     "-frames:v", String(count),
     "-an",
+    "-vf", "format=rgba,premultiply=inplace=1,format=nv12",
     "-c:v", VIDEO_ENCODER_PROFILE.videoCodec,
     "-pix_fmt", VIDEO_ENCODER_PROFILE.pixelFormat,
     "-movflags", "+faststart",
