@@ -75,6 +75,30 @@ This prevents accidental packaging of real PSD fixtures, test-only code, local h
 
 Before the first distributable build, add an automated check that the production artifact is derived only from the approved Product boundary.
 
+The current Electron build includes `desktop/**/*`, `src/**/*`, the entry
+HTML, the Product package manifest, and the required `ag-psd` runtime files.
+`production-files.txt` is the reviewed responsibility manifest for that
+boundary; a deterministic test verifies that its relative import graph is
+closed and that every listed file exists. The Electron glob and the manifest
+are intentionally not claimed to be the same mechanism yet. Making the build
+consume the manifest should be a separate packaging change, with a packaged
+application smoke test, rather than an incidental refactor.
+
+## 3.1 Runtime responsibility map
+
+| Area | Owns | Must not own |
+| --- | --- | --- |
+| `model/` | Persistent Project data and validation | DOM, filesystem, transient authoring selection |
+| `commands/`, `queries/` | The mutation/read boundary used by UI and MCP | Parallel persistent state or renderer policy |
+| `core/` | Canonical temporal/Transition evaluation and shared deterministic rendering/export orchestration | Viewport state, native dialogs, filesystem paths |
+| `ui/` | Transient controllers/views, viewport input/camera state, and Desktop bridge adapters | Direct filesystem/process access or persistent Project mutation outside commands |
+| `desktop/`, `src/desktop/` | Trusted Electron lifecycle, IPC validation, native dialogs, filesystem/session ownership, and FFmpeg process ownership | Transition evaluation or UI-only persistence |
+
+The browser bootstrap in `src/app.js` constructs and wires these
+responsibilities. Viewport camera geometry is isolated in
+`ui/viewport-camera-controller.js`; evaluated composition semantics remain in
+`core/shared-composition-renderer.js` and are shared by preview and export.
+
 ## 4. Staging
 
 `staging/` is for acceptance scenarios that intentionally resemble real production work but are not part of Product runtime.
