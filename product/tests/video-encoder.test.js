@@ -9,6 +9,8 @@ import {
   parseFfmpegCapability,
 } from "../src/core/video-encoder.js";
 
+const requiredFilters = " ..C premultiply N->V PreMultiply first stream with first plane of second stream.";
+
 test("video encoder profile is Windows Media Foundation H.264 without audio", () => {
   assert.deepEqual(VIDEO_ENCODER_PROFILE, {
     container: "mp4",
@@ -61,13 +63,15 @@ test("H.264 argv explicitly flattens PNG alpha over black before NV12 conversion
   assert.equal(args[args.indexOf("-pix_fmt") + 1], "nv12");
 });
 
-test("capability parser rejects GPL, nonfree, libx264, and missing h264_mf", () => {
+test("capability parser rejects GPL, nonfree, libx264, missing h264_mf, and missing alpha filter", () => {
   const safe = parseFfmpegCapability({
     versionText: "ffmpeg version 8.0",
     buildConfText: "configuration: --enable-shared --disable-gpl",
     encodersText: " V..... h264_mf H.264 via MediaFoundation",
+    filtersText: requiredFilters,
   });
   assert.equal(safe.distributionSafe, true);
+  assert.equal(safe.premultiply, true);
   assert.doesNotThrow(() => assertOfficialFfmpegCapability(safe));
 
   for (const flag of ["--enable-gpl", "--enable-nonfree", "--enable-libx264"]) {
@@ -75,6 +79,7 @@ test("capability parser rejects GPL, nonfree, libx264, and missing h264_mf", () 
       versionText: "ffmpeg version 8.0",
       buildConfText: `configuration: ${flag}`,
       encodersText: " V..... h264_mf H.264 via MediaFoundation",
+      filtersText: requiredFilters,
     });
     assert.equal(capability.distributionSafe, false);
     assert.throws(
@@ -87,7 +92,15 @@ test("capability parser rejects GPL, nonfree, libx264, and missing h264_mf", () 
     versionText: "ffmpeg version 8.0",
     buildConfText: "configuration: --enable-shared",
     encodersText: " V..... hevc_mf HEVC via MediaFoundation",
+    filtersText: requiredFilters,
   })), (error) => error.code === "VIDEO_ENCODER_H264_MF_UNAVAILABLE");
+
+  assert.throws(() => assertOfficialFfmpegCapability(parseFfmpegCapability({
+    versionText: "ffmpeg version 8.0",
+    buildConfText: "configuration: --enable-shared",
+    encodersText: " V..... h264_mf H.264 via MediaFoundation",
+    filtersText: " ... overlay VV->V Overlay a video source on top of the input.",
+  })), (error) => error.code === "VIDEO_ENCODER_ALPHA_FILTER_UNAVAILABLE");
 });
 
 test("encoder argv rejects invalid paths and frame counts", () => {
