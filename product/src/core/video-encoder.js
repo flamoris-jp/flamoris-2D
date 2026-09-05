@@ -34,11 +34,12 @@ export function ffmpegFrameRate(frameRate) {
  * 4-2. h264_mf is intentionally selected instead of libx264.
  *
  * Phase 4-2 PNG frames may contain alpha, but the initial H.264 profile does
- * not. Before handing pixels to Media Foundation, RGB is deterministically
- * premultiplied by alpha and alpha is then discarded by conversion to NV12.
- * This is equivalent to compositing straight-alpha PNG pixels over opaque
- * black. Background selection, if added later, belongs to explicit export
- * settings rather than implicit encoder behavior.
+ * not. Before handing pixels to Media Foundation, straight-alpha PNG pixels
+ * are converted to planar GBRAP, RGB is deterministically premultiplied by
+ * alpha in-place, and alpha is then discarded by conversion to NV12. This is
+ * equivalent to compositing over opaque black. Background selection, if added
+ * later, belongs to explicit export settings rather than implicit encoder
+ * behavior.
  */
 export function buildH264MfEncodeArgs({
   frameDirectory,
@@ -60,7 +61,7 @@ export function buildH264MfEncodeArgs({
     "-i", pattern,
     "-frames:v", String(count),
     "-an",
-    "-vf", "format=rgba,premultiply=inplace=1,format=nv12",
+    "-vf", "format=gbrap,premultiply=inplace=1,format=nv12",
     "-c:v", VIDEO_ENCODER_PROFILE.videoCodec,
     "-pix_fmt", VIDEO_ENCODER_PROFILE.pixelFormat,
     "-movflags", "+faststart",
