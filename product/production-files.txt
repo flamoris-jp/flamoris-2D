@@ -79,6 +79,7 @@ src/ui/viewport-input-controller.js
 src/ui/viewport-renderer.js
 src/ui/desktop-project-files.js
 src/ui/desktop-frame-sequence-sink.js
+src/ui/desktop-video-export.js
 src/ui/psd-render-assets.js
 src/desktop/shell-logic.js
 src/desktop/atomic-write.js
