@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld("flamorisDesktop", Object.freeze({
     invoke("desktop:end-frame-sequence-export", request),
   probeVideoEncoder: () => invoke("desktop:probe-video-encoder"),
   beginVideoExport: (request) => invoke("desktop:begin-video-export", request),
+  writeVideoFrame: (request) => invoke("desktop:write-video-frame", request),
   encodeVideo: (request) => invoke("desktop:encode-video", request),
   cancelVideoExport: (request) => invoke("desktop:cancel-video-export", request),
   projectFileExists: (request) =>
