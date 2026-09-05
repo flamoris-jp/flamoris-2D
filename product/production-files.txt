@@ -2,6 +2,8 @@ package.json
 index.html
 desktop/main.mjs
 desktop/frame-sequence-ipc.mjs
+desktop/ffmpeg-video-encoder.mjs
+desktop/video-encoder-ipc.mjs
 desktop/preload.cjs
 scripts/serve.mjs
 src/animation.js
@@ -28,6 +30,7 @@ src/core/export-frame-renderer.js
 src/core/export-offscreen-renderer.js
 src/core/png-frame-encoder.js
 src/core/frame-sequence-export.js
+src/core/video-encoder.js
 src/queries/project.js
 src/commands/editor.js
 src/commands/errors.js
