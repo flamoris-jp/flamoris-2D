@@ -38,7 +38,7 @@ test("rational FPS is preserved exactly in FFmpeg argv", () => {
     "-i", "C:/temp/frames/frame_%06d.png",
     "-frames:v", "30",
     "-an",
-    "-vf", "format=rgba,premultiply=inplace=1,format=nv12",
+    "-vf", "format=gbrap,premultiply=inplace=1,format=nv12",
     "-c:v", "h264_mf",
     "-pix_fmt", "nv12",
     "-movflags", "+faststart",
@@ -58,7 +58,7 @@ test("H.264 argv explicitly flattens PNG alpha over black before NV12 conversion
   });
   const filterIndex = args.indexOf("-vf");
   assert.notEqual(filterIndex, -1);
-  assert.equal(args[filterIndex + 1], "format=rgba,premultiply=inplace=1,format=nv12");
+  assert.equal(args[filterIndex + 1], "format=gbrap,premultiply=inplace=1,format=nv12");
   assert.equal(VIDEO_ENCODER_PROFILE.alphaComposite, "black");
   assert.equal(args[args.indexOf("-pix_fmt") + 1], "nv12");
 });
