@@ -13,7 +13,8 @@ test("video encoder profile is Windows Media Foundation H.264 without audio", ()
   assert.deepEqual(VIDEO_ENCODER_PROFILE, {
     container: "mp4",
     videoCodec: "h264_mf",
-    pixelFormat: "yuv420p",
+    pixelFormat: "nv12",
+    alphaComposite: "black",
     audio: "disabled",
     overwrite: "reject-existing-output",
   });
@@ -35,14 +36,29 @@ test("rational FPS is preserved exactly in FFmpeg argv", () => {
     "-i", "C:/temp/frames/frame_%06d.png",
     "-frames:v", "30",
     "-an",
+    "-vf", "format=rgba,premultiply=inplace=1,format=nv12",
     "-c:v", "h264_mf",
-    "-pix_fmt", "yuv420p",
+    "-pix_fmt", "nv12",
     "-movflags", "+faststart",
     "-n",
     "C:/exports/shot.mp4",
   ]);
   assert.equal(args.includes("libx264"), false);
   assert.equal(args.includes("-y"), false);
+});
+
+test("H.264 argv explicitly flattens PNG alpha over black before NV12 conversion", () => {
+  const args = buildH264MfEncodeArgs({
+    frameDirectory: "C:/temp/frames",
+    outputPath: "C:/exports/shot.mp4",
+    frameRate: { numerator: 24, denominator: 1 },
+    frameCount: 24,
+  });
+  const filterIndex = args.indexOf("-vf");
+  assert.notEqual(filterIndex, -1);
+  assert.equal(args[filterIndex + 1], "format=rgba,premultiply=inplace=1,format=nv12");
+  assert.equal(VIDEO_ENCODER_PROFILE.alphaComposite, "black");
+  assert.equal(args[args.indexOf("-pix_fmt") + 1], "nv12");
 });
 
 test("capability parser rejects GPL, nonfree, libx264, and missing h264_mf", () => {
