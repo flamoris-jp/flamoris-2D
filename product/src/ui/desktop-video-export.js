@@ -24,13 +24,13 @@ function diagnosticFromDesktop(result) {
   });
 }
 
-function cleanupDiagnosticsFromDesktop(result) {
+function cleanupDiagnosticsFromDesktop(result, { includeDesktopError = false } = {}) {
   const diagnostics = (result?.diagnostics || []).map((entry) => Object.freeze({
     code: "export.temp_cleanup_failure",
     message: entry.message || String(entry),
     sourceCode: entry.code || null,
   }));
-  if (result?.desktopError) {
+  if (includeDesktopError && result?.desktopError) {
     diagnostics.push(Object.freeze({
       code: "export.temp_cleanup_failure",
       message: result.desktopError.message || "Temporary video cleanup failed.",
@@ -92,7 +92,9 @@ export function createDesktopVideoFrameSink(desktopApi) {
       }
       try {
         const result = await desktopApi.cancelVideoExport({ sessionId: session.sessionId });
-        terminalDiagnostics = cleanupDiagnosticsFromDesktop(result);
+        terminalDiagnostics = cleanupDiagnosticsFromDesktop(result, {
+          includeDesktopError: true,
+        });
         return result;
       } catch (error) {
         terminalDiagnostics = Object.freeze([Object.freeze({
@@ -204,7 +206,9 @@ export class DesktopMp4ExportJob {
               code: "export.cancelled",
               message: "Video export was cancelled before encoding.",
             }),
-            ...cleanupDiagnosticsFromDesktop(cancelResult),
+            ...cleanupDiagnosticsFromDesktop(cancelResult, {
+              includeDesktopError: true,
+            }),
           ]),
         });
       }
