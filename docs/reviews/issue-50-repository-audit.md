@@ -35,3 +35,38 @@ Baseline: `dfc5af659c20604d6aecf085bdb02818568d92ac`
 4. Update the responsibility map and perform a final repository/diff review.
 
 The highest-risk areas are `app.js` wiring, Desktop IPC/session ownership, and shared preview/export rendering. This pass intentionally avoids changing evaluator, persistence schema, export job orchestration, IPC contracts, or packaging mechanics.
+
+## Final review
+
+- No blocker finding was identified. The production-manifest omission was the
+  only concrete high-value packaging-boundary defect and is fixed with
+  import-closure regression coverage.
+- The viewport camera extraction reduces `app.js` responsibility without
+  changing Project state, commands, persistence, evaluator, rendering, or
+  Desktop contracts. Camera behavior is now covered directly rather than only
+  through bootstrap wiring.
+- No new circular dependency was introduced: the camera controller depends
+  only on mesh coordinate helpers and affine transforms, while `app.js`
+  remains the composition root.
+- Preview/export continue to share the canonical evaluator output and
+  `shared-composition-renderer.js`; no export-only time or render semantics
+  were added.
+- Renderer modules still have no direct filesystem or child-process access.
+  Preload exposes purpose-specific operations and main-process handlers retain
+  trusted-sender/session validation.
+- CI remains unchanged. Product CI protects deterministic behavior on Linux;
+  Windows Desktop Package deliberately repeats Product tests on Windows before
+  packaging because platform-specific filesystem/process/package behavior is
+  a distinct risk, not accidental duplication.
+- Direct production dependencies remain `ag-psd 31.0.2`, `electron 44.1.0`,
+  and `electron-builder 26.15.7`. No dependency or license changed in this
+  refactor. Runtime FFmpeg remains externally supplied and guarded by the
+  existing LGPL-only capability policy. Lockfile/provenance hardening remains
+  deferred.
+
+## Manual QA remaining
+
+Real Windows production QA from Phase 4 remains intentionally outstanding:
+Save/Open and PSD re-import, viewport fit/zoom/pan at device scale, PNG
+sequence export, direct MP4 export, cancellation/temp cleanup, packaged
+`ag-psd` loading, and FFmpeg diagnostics.
