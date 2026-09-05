@@ -1,8 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { join, resolve } from "node:path";
 
 import { registerFrameSequenceIpc } from "../desktop/frame-sequence-ipc.mjs";
 import { registerVideoEncoderIpc } from "../desktop/video-encoder-ipc.mjs";
+
+const testRoot = resolve(process.cwd(), "test-video-encoder-ipc");
+const exportDirectory = join(testRoot, "exports");
+const videoOutputPath = join(exportDirectory, "shot.mp4");
+const frameParentDirectory = join(testRoot, "frames");
+const frameDirectory = join(frameParentDirectory, "shot");
+const unapprovedFrameDirectory = join(testRoot, "private", "not-exported-by-desktop");
 
 function harness(overrides = {}) {
   const handlers = new Map();
@@ -11,13 +19,13 @@ function harness(overrides = {}) {
     ipcMain: { handle(channel, handler) { handlers.set(channel, handler); } },
     dialog: {
       async showSaveDialog() {
-        return { canceled: false, filePath: "/exports/shot.mp4" };
+        return { canceled: false, filePath: videoOutputPath };
       },
     },
     mainWindow: () => ({ id: "window" }),
     assertTrusted: () => {},
-    associatedDirectory: () => "/exports",
-    isApprovedFrameDirectory: (path) => path === "/frames/shot",
+    associatedDirectory: () => exportDirectory,
+    isApprovedFrameDirectory: (path) => resolve(path) === frameDirectory,
     pathExists: () => false,
     probeEncoder: async () => ({ capability: { distributionSafe: true, h264Mf: true } }),
     encodeSequence: async (request) => {
@@ -35,18 +43,18 @@ test("native MP4 destination is owned by an opaque Desktop video session", async
     suggestedName: "My Shot",
   });
   assert.match(session.sessionId, /^video-export-/);
-  assert.equal(session.destination, "/exports/shot.mp4");
+  assert.equal(session.destination, videoOutputPath);
 
   const encoded = await handlers.get("desktop:encode-video")({}, {
     sessionId: session.sessionId,
-    frameDirectory: "/frames/shot",
+    frameDirectory,
     frameRate: { numerator: 30000, denominator: 1001 },
     frameCount: 30,
   });
   assert.equal(encoded.ok, true);
   assert.equal(encodeCalls.length, 1);
-  assert.equal(encodeCalls[0].outputPath, "/exports/shot.mp4");
-  assert.equal(encodeCalls[0].frameDirectory, "/frames/shot");
+  assert.equal(encodeCalls[0].outputPath, videoOutputPath);
+  assert.equal(encodeCalls[0].frameDirectory, frameDirectory);
 });
 
 test("renderer cannot ask FFmpeg to read an arbitrary filesystem directory", async () => {
@@ -54,7 +62,7 @@ test("renderer cannot ask FFmpeg to read an arbitrary filesystem directory", asy
   const session = await handlers.get("desktop:begin-video-export")({}, {});
   const result = await handlers.get("desktop:encode-video")({}, {
     sessionId: session.sessionId,
-    frameDirectory: "/private/not-exported-by-desktop",
+    frameDirectory: unapprovedFrameDirectory,
     frameRate: { numerator: 24, denominator: 1 },
     frameCount: 24,
   });
@@ -93,7 +101,7 @@ test("cancel aborts the active encoder process through the Desktop session", asy
   const session = await handlers.get("desktop:begin-video-export")({}, {});
   const encoding = handlers.get("desktop:encode-video")({}, {
     sessionId: session.sessionId,
-    frameDirectory: "/frames/shot",
+    frameDirectory,
     frameRate: { numerator: 24, denominator: 1 },
     frameCount: 24,
   });
@@ -112,24 +120,24 @@ test("completed Desktop PNG sequence becomes the only approved video input path"
   const encodeCalls = [];
   const registry = {
     async begin() {
-      return { sessionId: "frames-1", destination: "/frames/shot" };
+      return { sessionId: "frames-1", destination: frameDirectory };
     },
     async write() {
       return { writtenFrames: 1 };
     },
     end() {
-      return { destination: "/frames/shot", writtenFrames: 24 };
+      return { destination: frameDirectory, writtenFrames: 24 };
     },
   };
   registerFrameSequenceIpc({
     ipcMain: { handle(channel, handler) { handlers.set(channel, handler); } },
     dialog: {
-      async showOpenDialog() { return { canceled: false, filePaths: ["/frames"] }; },
-      async showSaveDialog() { return { canceled: false, filePath: "/exports/shot.mp4" }; },
+      async showOpenDialog() { return { canceled: false, filePaths: [frameParentDirectory] }; },
+      async showSaveDialog() { return { canceled: false, filePath: videoOutputPath }; },
     },
     mainWindow: () => ({ id: "window" }),
     assertTrusted: () => {},
-    associatedDirectory: () => "/exports",
+    associatedDirectory: () => exportDirectory,
     registry,
     videoEncoderOptions: {
       pathExists: () => false,
@@ -144,7 +152,7 @@ test("completed Desktop PNG sequence becomes the only approved video input path"
   const before = await handlers.get("desktop:begin-video-export")({}, {});
   const rejected = await handlers.get("desktop:encode-video")({}, {
     sessionId: before.sessionId,
-    frameDirectory: "/frames/shot",
+    frameDirectory,
     frameRate: { numerator: 24, denominator: 1 },
     frameCount: 24,
   });
@@ -157,7 +165,7 @@ test("completed Desktop PNG sequence becomes the only approved video input path"
   const after = await handlers.get("desktop:begin-video-export")({}, {});
   const encoded = await handlers.get("desktop:encode-video")({}, {
     sessionId: after.sessionId,
-    frameDirectory: "/frames/shot",
+    frameDirectory,
     frameRate: { numerator: 24, denominator: 1 },
     frameCount: 24,
   });
