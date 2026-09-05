@@ -24,6 +24,22 @@ function diagnosticFromDesktop(result) {
   });
 }
 
+function cleanupDiagnosticsFromDesktop(result) {
+  const diagnostics = (result?.diagnostics || []).map((entry) => Object.freeze({
+    code: "export.temp_cleanup_failure",
+    message: entry.message || String(entry),
+    sourceCode: entry.code || null,
+  }));
+  if (result?.desktopError) {
+    diagnostics.push(Object.freeze({
+      code: "export.temp_cleanup_failure",
+      message: result.desktopError.message || "Temporary video cleanup failed.",
+      sourceCode: result.desktopError.code || null,
+    }));
+  }
+  return Object.freeze(diagnostics);
+}
+
 export function createDesktopVideoFrameSink(desktopApi) {
   if (!desktopApi ||
     typeof desktopApi.beginVideoExport !== "function" ||
@@ -33,9 +49,11 @@ export function createDesktopVideoFrameSink(desktopApi) {
   }
 
   let completedSession = null;
+  let terminalDiagnostics = Object.freeze([]);
   return Object.freeze({
     async begin(request) {
       completedSession = null;
+      terminalDiagnostics = Object.freeze([]);
       const result = await desktopApi.beginVideoExport({
         suggestedName: request.suggestedName,
         temporaryFrames: true,
@@ -72,11 +90,26 @@ export function createDesktopVideoFrameSink(desktopApi) {
         completedSession = session;
         return { ok: true, completed: true };
       }
-      return desktopApi.cancelVideoExport({ sessionId: session.sessionId });
+      try {
+        const result = await desktopApi.cancelVideoExport({ sessionId: session.sessionId });
+        terminalDiagnostics = cleanupDiagnosticsFromDesktop(result);
+        return result;
+      } catch (error) {
+        terminalDiagnostics = Object.freeze([Object.freeze({
+          code: "export.temp_cleanup_failure",
+          message: error?.message || String(error),
+          sourceCode: error?.code || null,
+        })]);
+        return { ok: false, canceled: details?.status === "cancelled" };
+      }
     },
 
     completedSession() {
       return completedSession;
+    },
+
+    terminalDiagnostics() {
+      return terminalDiagnostics;
     },
   });
 }
@@ -112,7 +145,17 @@ export class DesktopMp4ExportJob {
         callerProgress?.(Object.freeze({ ...entry, phase: "rendering" }));
       },
     });
-    if (!sequenceResult.ok) return sequenceResult;
+    if (!sequenceResult.ok) {
+      const cleanupDiagnostics = sink.terminalDiagnostics();
+      if (!cleanupDiagnostics.length) return sequenceResult;
+      return Object.freeze({
+        ...sequenceResult,
+        diagnostics: Object.freeze([
+          ...(sequenceResult.diagnostics || []),
+          ...cleanupDiagnostics,
+        ]),
+      });
+    }
 
     const session = sink.completedSession();
     if (!session?.sessionId) {
@@ -171,11 +214,7 @@ export class DesktopMp4ExportJob {
           canceled: failureDiagnostic.code === "export.cancelled",
           diagnostics: Object.freeze([
             failureDiagnostic,
-            ...(encoded?.diagnostics || []).map((entry) => Object.freeze({
-              code: "export.temp_cleanup_failure",
-              message: entry.message || String(entry),
-              sourceCode: entry.code || null,
-            })),
+            ...cleanupDiagnosticsFromDesktop(encoded),
           ]),
         });
       }
@@ -185,11 +224,7 @@ export class DesktopMp4ExportJob {
         ok: true,
         canceled: false,
         destination: encoded?.destination || sequenceResult.destination || null,
-        diagnostics: Object.freeze((encoded?.diagnostics || []).map((entry) => Object.freeze({
-          code: "export.temp_cleanup_failure",
-          message: entry.message || String(entry),
-          sourceCode: entry.code || null,
-        }))),
+        diagnostics: cleanupDiagnosticsFromDesktop(encoded),
       });
     } finally {
       request.signal?.removeEventListener?.("abort", cancelEncoder);
