@@ -149,6 +149,43 @@ test("cancel between frame production and encoding closes the Desktop video sess
   assert.deepEqual(desktop.cancels, [{ sessionId: "video-1" }]);
 });
 
+test("pre-encode cancel preserves temporary cleanup diagnostics", async () => {
+  const desktop = desktopHarness();
+  const controller = new AbortController();
+  desktop.api.cancelVideoExport = async (options) => {
+    desktop.cancels.push(options);
+    return {
+      ok: true,
+      canceled: true,
+      diagnostics: [{
+        code: "VIDEO_TEMP_CLEANUP_FAILED",
+        message: "temporary directory is locked",
+      }],
+    };
+  };
+  const job = new DesktopMp4ExportJob({
+    desktopApi: desktop.api,
+    frameRenderer: fakeFrameRenderer(),
+    encodePng: async () => new Uint8Array([1]),
+  });
+
+  const result = await job.run(request({
+    signal: controller.signal,
+    onProgress(entry) {
+      if (entry.phase === "encoding") controller.abort();
+    },
+  }));
+
+  assert.equal(result.ok, false);
+  assert.equal(result.canceled, true);
+  assert.deepEqual(result.diagnostics.map((entry) => entry.code), [
+    "export.cancelled",
+    "export.temp_cleanup_failure",
+  ]);
+  assert.equal(result.diagnostics[1].sourceCode, "VIDEO_TEMP_CLEANUP_FAILED");
+  assert.match(result.diagnostics[1].message, /locked/);
+});
+
 test("temporary cleanup failure remains visible when frame production fails", async () => {
   const desktop = desktopHarness();
   desktop.api.cancelVideoExport = async (options) => {
