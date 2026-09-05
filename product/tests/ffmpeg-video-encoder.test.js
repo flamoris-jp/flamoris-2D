@@ -51,21 +51,24 @@ test("process adapter preserves argv and captures stdout/stderr", async () => {
   assert.equal(spawner.calls[0].options.windowsHide, true);
 });
 
-test("capability probe requires h264_mf and LGPL-only build policy", async () => {
+test("capability probe requires h264_mf, premultiply, and LGPL-only build policy", async () => {
   const spawner = queuedSpawner([
     { code: 0, stdout: "ffmpeg version 8.0" },
     { code: 0, stdout: "configuration: --enable-shared --disable-gpl" },
     { code: 0, stdout: " V..... h264_mf H.264 via MediaFoundation" },
+    { code: 0, stdout: " ..C premultiply N->V PreMultiply first stream with first plane of second stream." },
   ]);
   const result = await probeFfmpegVideoEncoder({
     executablePath: "C:/tools/ffmpeg.exe",
     spawnProcess: spawner.spawn,
   });
   assert.equal(result.capability.distributionSafe, true);
-  assert.equal(spawner.calls.length, 3);
+  assert.equal(result.capability.premultiply, true);
+  assert.equal(spawner.calls.length, 4);
+  assert.deepEqual(spawner.calls[3].args, ["-hide_banner", "-filters"]);
 });
 
-test("successful encode uses deterministic PNG ordering contract", async () => {
+test("successful encode uses deterministic PNG ordering and alpha flattening contract", async () => {
   const spawner = queuedSpawner([{ code: 0, stderr: "encoded" }]);
   const result = await encodePngSequenceWithFfmpeg({
     executablePath: "ffmpeg.exe",
@@ -83,6 +86,8 @@ test("successful encode uses deterministic PNG ordering contract", async () => {
   assert.equal(args[args.indexOf("-frames:v") + 1], "24");
   assert.equal(args[args.indexOf("-c:v") + 1], "h264_mf");
   assert.equal(args[args.indexOf("-i") + 1], "C:/temp/frames/frame_%06d.png");
+  assert.equal(args[args.indexOf("-vf") + 1], "format=rgba,premultiply=inplace=1,format=nv12");
+  assert.equal(args[args.indexOf("-pix_fmt") + 1], "nv12");
 });
 
 test("encoder failure removes incomplete MP4 and preserves diagnostic stderr", async () => {
