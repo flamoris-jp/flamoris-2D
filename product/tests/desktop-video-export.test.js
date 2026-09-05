@@ -244,6 +244,7 @@ test("Desktop encoder diagnostics remain actionable at the export job boundary",
   const result = await job.run(request());
   assert.equal(result.ok, false);
   assert.equal(result.canceled, false);
+  assert.equal(result.diagnostics.length, 1);
   assert.equal(result.diagnostics[0].code, "export.encoder_failure");
   assert.equal(result.diagnostics[0].sourceCode, "VIDEO_ENCODER_UNAVAILABLE");
   assert.match(result.diagnostics[0].message, /ffmpeg missing/);
