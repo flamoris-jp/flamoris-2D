@@ -1,5 +1,17 @@
 import { objectSelectionForMode } from "./editor-modes.js";
 
+export function clippingMaskControlState(binding, showMask, transitionPreview) {
+  const previewAvailable = transitionPreview?.viewMode === "preview" &&
+    Boolean(transitionPreview.evaluation);
+  return {
+    checked: Boolean(showMask),
+    disabled: !binding || !previewAvailable,
+    title: previewAvailable
+      ? "Show the evaluated clipping-source geometry in Transition Preview."
+      : "Available only while an evaluated Transition Preview is visible.",
+  };
+}
+
 export function createSceneEditorView({
   state,
   elements,
@@ -124,8 +136,14 @@ export function createSceneEditorView({
       elements.clippingEnabledInput.disabled = !clipping.binding;
       elements.clippingModeSelect.value = clipping.binding?.mode || "inside";
       elements.removeClippingButton.disabled = !clipping.binding;
-      elements.showClippingMaskInput.checked = clipping.showMask;
-      elements.showClippingMaskInput.disabled = !clipping.binding;
+      const maskControl = clippingMaskControlState(
+        clipping.binding,
+        clipping.showMask,
+        state.editor.transitionPreview.getState(),
+      );
+      elements.showClippingMaskInput.checked = maskControl.checked;
+      elements.showClippingMaskInput.disabled = maskControl.disabled;
+      elements.showClippingMaskInput.title = maskControl.title;
       elements.clippingSourceSelect.replaceChildren();
       const empty = document.createElement("option");
       empty.value = "";

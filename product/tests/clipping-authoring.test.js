@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import { EditorSession, TransactionError } from "../src/commands/editor.js";
 import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
 import { ClippingAuthoringController } from "../src/ui/clipping-authoring-controller.js";
+import { clippingMaskControlState } from "../src/ui/scene-editor-view.js";
 import { clippingMaskOverlayTriangles } from "../src/ui/viewport-renderer.js";
 
 function fixture() {
@@ -129,4 +130,33 @@ test("mask overlay is confined to viewport code and never enters export core", a
   ]);
   assert.match(viewport, /drawClippingMaskVisualization/);
   assert.doesNotMatch(exportCore, /showMask|clippingMaskOverlayTriangles|overlayCanvas/);
+});
+
+test("Show Clipping Mask is enabled only when its evaluated preview display path exists", () => {
+  const binding = {
+    id: "clip_target",
+    targetNodeId: "target",
+    sourceNodeId: "source_a",
+    mode: "inside",
+    enabled: true,
+  };
+  const evaluatedPreview = {
+    viewMode: "preview",
+    evaluation: { evaluatedParts: [] },
+  };
+  assert.deepEqual(clippingMaskControlState(binding, true, evaluatedPreview), {
+    checked: true,
+    disabled: false,
+    title: "Show the evaluated clipping-source geometry in Transition Preview.",
+  });
+  for (const unsupported of [
+    { viewMode: "edit", evaluation: { evaluatedParts: [] } },
+    { viewMode: "preview", evaluation: null },
+  ]) {
+    const state = clippingMaskControlState(binding, true, unsupported);
+    assert.equal(state.checked, true);
+    assert.equal(state.disabled, true);
+    assert.match(state.title, /only while an evaluated Transition Preview/);
+  }
+  assert.equal(clippingMaskControlState(null, false, evaluatedPreview).disabled, true);
 });
