@@ -1,5 +1,17 @@
 import { objectSelectionForMode } from "./editor-modes.js";
 
+export function clippingMaskControlState(binding, showMask, transitionPreview) {
+  const previewAvailable = transitionPreview?.viewMode === "preview" &&
+    Boolean(transitionPreview.evaluation);
+  return {
+    checked: Boolean(showMask),
+    disabled: !binding || !previewAvailable,
+    title: previewAvailable
+      ? "Show the evaluated clipping-source geometry in Transition Preview."
+      : "Available only while an evaluated Transition Preview is visible.",
+  };
+}
+
 export function createSceneEditorView({
   state,
   elements,
@@ -33,6 +45,7 @@ export function createSceneEditorView({
     }
     const list = document.createElement("ul");
     list.className = "tree-children";
+    const clippingTargets = state.editor.clippingAuthoring.bindingTargetIds();
     const filtered = Boolean(state.editor.filterText.trim());
     const appendNode = (node, parent, depth) => {
       const item = document.createElement("li");
@@ -74,8 +87,12 @@ export function createSceneEditorView({
       const lock = document.createElement("span");
       lock.className = node.locked ? "tree-lock" : "tree-kind";
       lock.textContent = node.locked ? "◆" : (node.kind === "group" ? "G" : "P");
+      const clipping = document.createElement("span");
+      clipping.className = "tree-clipping";
+      clipping.textContent = clippingTargets.has(node.id) ? "⊂" : "";
+      clipping.title = clippingTargets.has(node.id) ? "Clipping binding" : "";
 
-      row.append(toggle, visibility, label, lock);
+      row.append(toggle, visibility, label, clipping, lock);
       row.addEventListener("click", () => {
         selectSceneNode(node.id);
       });
@@ -112,6 +129,34 @@ export function createSceneEditorView({
     elements.displayNameInput.value = node.displayName;
     elements.visibilityInput.checked = node.visible;
     elements.lockedInput.checked = node.locked;
+    const clipping = state.editor.clippingAuthoring.getState(node.id);
+    elements.clippingControls.hidden = !clipping.available;
+    if (clipping.available) {
+      elements.clippingEnabledInput.checked = Boolean(clipping.binding?.enabled);
+      elements.clippingEnabledInput.disabled = !clipping.binding;
+      elements.clippingModeSelect.value = clipping.binding?.mode || "inside";
+      elements.removeClippingButton.disabled = !clipping.binding;
+      const maskControl = clippingMaskControlState(
+        clipping.binding,
+        clipping.showMask,
+        state.editor.transitionPreview.getState(),
+      );
+      elements.showClippingMaskInput.checked = maskControl.checked;
+      elements.showClippingMaskInput.disabled = maskControl.disabled;
+      elements.showClippingMaskInput.title = maskControl.title;
+      elements.clippingSourceSelect.replaceChildren();
+      const empty = document.createElement("option");
+      empty.value = "";
+      empty.textContent = "— Select source —";
+      elements.clippingSourceSelect.append(empty);
+      for (const source of clipping.sourceCandidates) {
+        const option = document.createElement("option");
+        option.value = source.id;
+        option.textContent = `${source.displayName} (${source.id})`;
+        elements.clippingSourceSelect.append(option);
+      }
+      elements.clippingSourceSelect.value = clipping.binding?.sourceNodeId || "";
+    }
     elements.nodeIdOutput.textContent = node.id;
     const parent = node.parentId
       ? state.editor.session.query("scene.get_node", { nodeId: node.parentId })

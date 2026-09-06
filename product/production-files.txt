@@ -26,6 +26,7 @@ src/core/transforms.js
 src/core/temporal.js
 src/core/transition-evaluator.js
 src/core/clipping-evaluator.js
+src/core/clipping-raster-plan.js
 src/core/evaluated-render.js
 src/core/shared-composition-renderer.js
 src/core/composition-render-target.js
@@ -66,6 +67,7 @@ src/ui/mesh-editing-controller.js
 src/ui/mesh-tool-controller.js
 src/ui/automesh-preview-controller.js
 src/ui/correspondence-preview-controller.js
+src/ui/clipping-authoring-controller.js
 src/ui/correspondence-view.js
 src/core/contour-automesh.js
 src/core/correspondence-solver.js

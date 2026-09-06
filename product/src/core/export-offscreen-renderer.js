@@ -38,6 +38,7 @@ export function createExportOffscreenRenderer(renderTarget, dependencies = {}) {
   const Renderer = dependencies.MeshRendererClass || MeshRenderer;
   const renderer = new Renderer(surface);
   return Object.freeze({
+    compositionCapabilities: renderer.compositionCapabilities,
     renderEvaluated(plan, target, resolveArtwork) {
       renderer.renderEvaluated(plan, target, resolveArtwork);
       return Object.freeze({
