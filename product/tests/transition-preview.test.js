@@ -554,6 +554,28 @@ test("renderer-unsupported evaluated clipping marks the controller non-authorita
   assert.match(preview.getState().authorityReasons[0], /Clipping rasterization is unsupported/);
 });
 
+test("shared preview plan accepts clipping only for an explicitly capable backend", () => {
+  const { preview } = fixture();
+  const evaluation = preview.setTick(60000);
+  evaluation.evaluatedParts[0].renderInstances[0].clipping = {
+    sourceRenderInstanceId: "evaluated_mask",
+    mode: "inside",
+  };
+  const plans = [];
+  const report = renderEvaluatedTransitionViewport({
+    evaluation,
+    view: { scale: 1, originX: 0, originY: 0 },
+    renderer: {
+      compositionCapabilities: { clippingRasterization: true },
+      renderEvaluated(plan) { plans.push(plan); },
+    },
+    resolveArtwork: (nodeId) => ({ nodeId }),
+  });
+
+  assert.deepEqual(report.unsupportedReasons, []);
+  assert.equal(plans[0].batches[0].renderInstances[0].clipping.sourceRenderInstanceId, "evaluated_mask");
+});
+
 test("transition-default track and SemanticSlot override use the existing evaluator precedence", () => {
   const { preview } = fixture();
   preview.addTrack({ kind: "OpacityTrack", target: { transitionDefault: true }, trackId: "opacity_default" });
