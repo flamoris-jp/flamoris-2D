@@ -144,6 +144,12 @@ function endpointClipping(project, from, to, amount) {
 }
 
 function sampledClipping(project, sample, semanticSlotId, state) {
+  const binding = state
+    ? clippingBindingForTarget(project, state.node.id)
+    : null;
+  if (binding && !binding.enabled) {
+    return { sourceNodeId: null, mode: binding.mode };
+  }
   const sampled = sampledValue(
     sample,
     "ClippingTrack",
@@ -152,7 +158,7 @@ function sampledClipping(project, sample, semanticSlotId, state) {
     state?.node.id,
   );
   if (sampled !== null) {
-    return { sourceNodeId: sampled.sourceNodeId, mode: "inside" };
+    return { sourceNodeId: sampled.sourceNodeId, mode: binding?.mode || "inside" };
   }
   return endpointStateClipping(project, state);
 }

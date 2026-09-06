@@ -93,11 +93,17 @@ function cycleProblems(project, bindings) {
     });
 }
 
-export function validateClippingBindings(project, register = () => {}) {
+export function validateClippingBindings(project, registerExternal = null) {
   if (!Array.isArray(project.clippingBindings)) {
     return [problem("collection.invalid", "clippingBindings", "clippingBindings must be an array.")];
   }
   const issues = [];
+  const localIds = new Map();
+  const register = registerExternal || ((id, path) => {
+    if (localIds.has(id)) {
+      issues.push(problem("identity.duplicate", path, "Duplicate stable ID " + id + ".", id));
+    } else localIds.set(id, path);
+  });
   const nodes = project.scene?.nodes || {};
   const targets = new Map();
   const structurallyUsable = [];
@@ -192,7 +198,10 @@ export function validateClippingBindings(project, register = () => {}) {
           "A clipping target may have at most one clipping binding.",
           binding.id || null,
           "error",
-          { targetNodeId: binding.targetNodeId, bindingIds: [previous, binding.id].sort(compareText) },
+          {
+            targetNodeId: binding.targetNodeId,
+            bindingIds: [previous, binding.id].filter(nonEmpty).sort(compareText),
+          },
         ));
       } else targets.set(binding.targetNodeId, binding.id);
     }

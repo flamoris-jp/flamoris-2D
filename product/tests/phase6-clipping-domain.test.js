@@ -157,6 +157,17 @@ test("missing source and missing target use reason-specific diagnostics", () => 
   assert.deepEqual(issueCodes(missingTarget), ["CLIPPING_TARGET_MISSING"]);
 });
 
+test("clipping-specific validation reports duplicate stable binding IDs", () => {
+  const project = domainProject();
+  for (const id of ["source", "target_a", "target_b"]) addNode(project, id);
+  project.clippingBindings.push(
+    binding("duplicate", "target_a", "source"),
+    binding("duplicate", "target_b", "source"),
+  );
+  assert.equal(clippingValidationResult(project).issues.some((entry) =>
+    entry.code === "identity.duplicate" && entry.entityId === "duplicate"), true);
+});
+
 test("source and target must be distinct renderable part nodes", () => {
   const project = domainProject();
   addNode(project, "part");
@@ -222,6 +233,8 @@ test("commands replace one target source and preserve Undo Redo", () => {
   session.undo();
   assert.deepEqual(session.query("clipping.get_for_node", { nodeId: "target" }),
     binding("clip", "target", "source_b", false));
+  session.redo();
+  assert.equal(session.query("clipping.get_for_node", { nodeId: "target" }), null);
 });
 
 test("transaction rollback leaves no partial clipping cycle", () => {
@@ -307,6 +320,31 @@ test("existing ClippingTrack remains discrete and step-switches resolved source 
     .find((part) => part.semanticSlotId === "slot_target").renderInstances[0];
   assert.equal(target(before).clipping.sourceRenderInstanceId, "transition_ab:slot_mask:hold");
   assert.equal(target(after).clipping.sourceRenderInstanceId, "transition_ab:slot_mask_alt:hold");
+});
+
+test("disabled binding suppresses its static and tracked clipping relationship", () => {
+  const project = evaluationProject();
+  project.clippingBindings[0].enabled = false;
+  project.temporalPrograms[0].tracks.push({
+    trackId: "track_clipping",
+    version: 1,
+    kind: "ClippingTrack",
+    target: { semanticSlotId: "slot_target" },
+    channels: {
+      clipping: {
+        keyframes: [{
+          id: "clip_key",
+          timeTicks: 0,
+          value: { sourceNodeId: "mask_alt" },
+          interpolationToNext: { kind: "step" },
+        }],
+      },
+    },
+  });
+  const evaluated = evaluateTransition(project, "transition_ab", 60000);
+  const target = evaluated.evaluatedParts.find((part) =>
+    part.semanticSlotId === "slot_target").renderInstances[0];
+  assert.equal(target.clipping, null);
 });
 
 test("clipping validation, queries, and evaluation ignore map and collection insertion order", () => {
