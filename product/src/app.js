@@ -1046,6 +1046,28 @@ elements.lockedInput.addEventListener("change", () => {
   const nodeId = state.editor?.selectedNodeId;
   if (nodeId) state.editor.setLocked(nodeId, elements.lockedInput.checked);
 });
+elements.clippingSourceSelect.addEventListener("change", () => {
+  commitInspectorEdit(() => {
+    const nodeId = state.editor?.selectedNodeId;
+    if (!nodeId || !elements.clippingSourceSelect.value) return;
+    state.editor.clippingAuthoring.setSource(nodeId, elements.clippingSourceSelect.value);
+  });
+});
+elements.clippingEnabledInput.addEventListener("change", () => {
+  commitInspectorEdit(() => {
+    const nodeId = state.editor?.selectedNodeId;
+    if (nodeId) state.editor.clippingAuthoring.setEnabled(nodeId, elements.clippingEnabledInput.checked);
+  });
+});
+elements.removeClippingButton.addEventListener("click", () => {
+  commitInspectorEdit(() => {
+    const nodeId = state.editor?.selectedNodeId;
+    if (nodeId) state.editor.clippingAuthoring.remove(nodeId);
+  });
+});
+elements.showClippingMaskInput.addEventListener("change", () => {
+  state.editor?.clippingAuthoring.setShowMask(elements.showClippingMaskInput.checked);
+});
 elements.transformInputs.forEach((input) => {
   input.addEventListener("change", () => {
     commitInspectorEdit(() => {

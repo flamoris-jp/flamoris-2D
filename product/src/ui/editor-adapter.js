@@ -7,6 +7,7 @@ import { TransitionDiagnosticsController } from "./transition-diagnostics-contro
 import { MeshToolController } from "./mesh-tool-controller.js";
 import { KeyStateStripController } from "./key-state-strip-controller.js";
 import { CorrespondencePreviewController } from "./correspondence-preview-controller.js";
+import { ClippingAuthoringController } from "./clipping-authoring-controller.js";
 
 function filterTree(node, matches) {
   const children = node.children
@@ -37,6 +38,9 @@ export class EditorUiAdapter {
     this.filterText = "";
     this.activeTool = "translate";
     this.transformDrag = null;
+    this.clippingAuthoring = new ClippingAuthoringController(session, {
+      onChange: (reason) => this.notify(reason),
+    });
     this.transitionAuthoring = new TransitionAuthoringController(session, {
       onChange: (reason) => {
         if (reason === "transition-selection") {

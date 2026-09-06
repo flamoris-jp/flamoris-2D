@@ -47,7 +47,7 @@
 .tree-row {
   min-height: 29px;
   display: grid;
-  grid-template-columns: 22px 22px 1fr 24px;
+  grid-template-columns: 22px 22px 1fr 18px 24px;
   align-items: center;
   padding-right: 5px;
   border-radius: 5px;
@@ -70,6 +70,7 @@
 .tree-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: default; }
 .tree-kind { color: #72948f; font-size: 9px; }
 .tree-lock { color: var(--gold); }
+.tree-clipping { color: var(--mint); font-size: 13px; text-align: center; }
 .panel-empty { margin: auto; padding: 22px 12px; color: #607773; font-size: 11px; line-height: 1.7; text-align: center; }
 .mesh-lab { border-top: 1px solid var(--line); padding-top: 10px; }
 .mesh-lab summary { cursor: pointer; color: #97b2ad; font-size: 11px; }
@@ -154,6 +155,20 @@ button:not(:disabled):hover, .file-button:hover { border-color: var(--mint); tra
 .inspector-form legend { padding: 0 6px; color: #9fb8b4; font-size: 10px; }
 .inspector-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .inspector-grid label { display: grid; gap: 4px; color: #708985; font-size: 9px; }
+.inspector-form select {
+  min-width: 0;
+  width: 100%;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(0, 0, 0, .2);
+  color: var(--text);
+}
+.inspector-form fieldset > label { display: grid; gap: 5px; margin-top: 8px; color: var(--muted); font-size: 10px; }
+.inspector-form fieldset > label:first-of-type { margin-top: 0; }
+.inspector-form .clipping-toggle { display: flex; align-items: center; }
+.inspector-form .clipping-toggle input { accent-color: var(--mint); }
+.inspector-form #removeClippingButton { min-height: 32px; margin-top: 9px; font-size: 10px; }
 
 .transition-authoring {
   display: grid;
