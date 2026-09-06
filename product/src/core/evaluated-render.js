@@ -106,7 +106,8 @@ export function createEvaluatedRenderPlan(evaluatedTransition, {
       unsupportedReasons.push(`Render instance ${label} has unsupported mesh geometry.`);
       continue;
     }
-    if (renderInstance.clipping?.sourceNodeId && !clippingRasterization) {
+    if ((renderInstance.clipping?.sourceRenderInstanceId || renderInstance.clipping?.sourceNodeId) &&
+      !clippingRasterization) {
       unsupportedReasons.push(`Clipping rasterization is unsupported for ${label}.`);
     }
     const samples = renderInstance.appearanceSamples || [];

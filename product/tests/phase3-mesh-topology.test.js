@@ -3,7 +3,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 import { EditorSession, TransactionError } from "../src/commands/editor.js";
-import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
+import {
+  createIdFactory,
+  createProject,
+  createSceneNode,
+  PROJECT_SCHEMA_VERSION,
+} from "../src/model/project.js";
 import { validateProject } from "../src/model/validation.js";
 import {
   deserializeProject,
@@ -364,7 +369,7 @@ test("schema 3 migration adds identity metadata and a monotonic cursor without r
   delete legacy.meshTopologies[0].vertexMetadata;
   delete legacy.meshTopologies[0].nextVertexSequence;
   const migrated = migrateProjectSchema(legacy);
-  assert.equal(migrated.schemaVersion, 4);
+  assert.equal(migrated.schemaVersion, PROJECT_SCHEMA_VERSION);
   assert.deepEqual(migrated.meshTopologies[0].vertexIds, [
     "vtx_0001", "vtx_0002", "vtx_0003", "vtx_0004",
   ]);

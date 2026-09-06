@@ -10,6 +10,10 @@ import {
   evaluateTransitionExportFrame,
   planTransitionExportFrames,
 } from "../core/export-frame-evaluator.js";
+import {
+  clippingBindingForTarget,
+  clippingValidationResult,
+} from "../model/clipping-validation.js";
 
 function temporalProgram(project, programId) {
   const program = project.temporalPrograms.find((entry) => entry.id === programId);
@@ -187,12 +191,19 @@ export const projectQueries = {
       meshes: project.meshes.length,
       meshTopologies: project.meshTopologies.length,
       meshKeyforms: project.meshKeyforms.length,
+      clippingBindings: project.clippingBindings.length,
       transitions: project.transitions.length,
       clips: project.animation.clips.length,
       temporalPrograms: project.temporalPrograms.length,
     },
   }),
   "project.validate": (project) => validationResult(project),
+  "clipping.get_for_node": (project, input) =>
+    cloneProject(clippingBindingForTarget(project, input.nodeId)),
+  "clipping.list": (project) => [...project.clippingBindings]
+    .sort((left, right) => left.id.localeCompare(right.id))
+    .map(cloneProject),
+  "clipping.validate": (project) => clippingValidationResult(project),
   "scene.get_tree": (project, input = {}) =>
     treeNode(project, project.scene.rootId, input.includeHidden !== false),
   "scene.get_node": (project, input) => {
