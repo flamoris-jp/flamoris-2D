@@ -20,6 +20,13 @@ import {
 } from "../src/io/project-json.js";
 import { EditorSession, TransactionError } from "../src/commands/editor.js";
 import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
+import {
+  createWarpEvaluationStages,
+  evaluateWarpPoint,
+  evaluateWarpPoints,
+  evaluateWarpStages,
+  warpDeformerAncestors,
+} from "../src/core/warp-deformer-evaluator.js";
 
 function pointIds(count) {
   return Array.from({ length: count }, (_, index) => `cp_${index + 1}`);
@@ -93,6 +100,16 @@ function createWarpCommand({
       bounds: { left: 0, top: 0, right: 100, bottom: 100 },
       controlPointIds: ids,
     },
+  };
+}
+
+function evaluationStage(created, updates = {}) {
+  const controlPoints = defaultWarpKeyformControlPoints(created.deformer, created.controlPoints)
+    .map((point) => ({ ...point, ...(updates[point.controlPointId] || {}) }));
+  return {
+    deformer: created.deformer,
+    controlPoints: created.controlPoints,
+    keyform: { deformerId: created.deformer.id, keyArtId: "key_art", controlPoints },
   };
 }
 
@@ -388,4 +405,101 @@ test("headless capabilities expose deterministic Warp commands and queries", () 
   adapter.execute(createWarpCommand({ parentNodeId: project.scene.rootId }));
   assert.equal(adapter.query("deformer.get", { deformerId: "warp" }).id, "warp");
   assert.deepEqual(adapter.query("deformer.validate", {}), { valid: true, issues: [] });
+});
+
+test("undeformed 2x2 lattice is identity at corners edges center and boundaries", () => {
+  const project = domainProject();
+  const created = addWarp(project);
+  const stage = evaluationStage(created);
+  const positions = [0, 0, 50, 0, 50, 50, 100, 100, 0, 100, 100, 0];
+  assert.deepEqual(evaluateWarpPoints(stage, positions), positions);
+});
+
+test("bilinear displacement is easy to audit at a corner edge and center", () => {
+  const project = domainProject();
+  const created = addWarp(project);
+  const stage = evaluationStage(created, { warp_cp_1: { x: 10, y: 0 } });
+  assert.deepEqual(evaluateWarpPoint(stage, { x: 0, y: 0 }), { x: 10, y: 0 });
+  assert.deepEqual(evaluateWarpPoint(stage, { x: 50, y: 0 }), { x: 55, y: 0 });
+  assert.deepEqual(evaluateWarpPoint(stage, { x: 50, y: 50 }), { x: 52.5, y: 50 });
+  assert.deepEqual(evaluateWarpPoint(stage, { x: 100, y: 100 }), { x: 100, y: 100 });
+});
+
+test("outside points use clamped boundary displacement without boundary collapse", () => {
+  const project = domainProject();
+  const created = addWarp(project);
+  const stage = evaluationStage(created, {
+    warp_cp_1: { x: 10, y: 0 },
+    warp_cp_3: { x: 10, y: 100 },
+  });
+  assert.deepEqual(evaluateWarpPoint(stage, { x: -20, y: 50 }), { x: -10, y: 50 });
+  assert.deepEqual(evaluateWarpPoint(stage, { x: 120, y: 50 }), { x: 120, y: 50 });
+});
+
+test("Warp evaluation is repeatable and independent of point collection insertion order", () => {
+  const project = domainProject();
+  const created = addWarp(project, { size: 3 });
+  const stage = evaluationStage(created, { warp_cp_5: { x: 60, y: 40 } });
+  const reversed = {
+    ...stage,
+    controlPoints: [...stage.controlPoints].reverse(),
+    keyform: { ...stage.keyform, controlPoints: [...stage.keyform.controlPoints].reverse() },
+  };
+  const expected = evaluateWarpPoints(stage, [25, 25, 50, 50, 75, 75]);
+  assert.deepEqual(evaluateWarpPoints(stage, [25, 25, 50, 50, 75, 75]), expected);
+  assert.deepEqual(evaluateWarpPoints(reversed, [25, 25, 50, 50, 75, 75]), expected);
+});
+
+test("explicit Deformer-local transforms preserve the evaluation-stage boundary", () => {
+  const project = domainProject();
+  const created = addWarp(project);
+  const stage = {
+    ...evaluationStage(created, { warp_cp_1: { x: 10, y: 0 } }),
+    toDeformerLocal: [1, 0, 0, 1, -100, -200],
+    fromDeformerLocal: [1, 0, 0, 1, 100, 200],
+  };
+  assert.deepEqual(evaluateWarpPoints(stage, [100, 200]), [110, 200]);
+});
+
+test("nested Warp stages resolve and evaluate parent first", () => {
+  const project = domainProject();
+  const body = addWarp(project, { id: "body" });
+  const head = addWarp(project, { id: "head", parentNodeId: "body" });
+  project.scene.nodes.face = createSceneNode({
+    id: "face", displayName: "face", parentId: "head",
+  });
+  project.scene.nodes.head.children.push("face");
+  addKeyArt(project);
+  const parentStage = evaluationStage(body, Object.fromEntries(
+    body.deformer.controlPointIds.map((id, index) => [id, {
+      x: body.controlPoints[index].u * 100 + 5,
+      y: body.controlPoints[index].v * 100,
+    }]),
+  ));
+  const childStage = evaluationStage(head, {
+    head_cp_2: { x: 100, y: 10 },
+    head_cp_4: { x: 100, y: 110 },
+  });
+  for (const stage of [parentStage, childStage]) {
+    project.rig.warpDeformerKeyforms.push(stage.keyform);
+  }
+
+  assert.deepEqual(warpDeformerAncestors(project, "face"), ["body", "head"]);
+  const resolved = createWarpEvaluationStages(project, "face", "key_art");
+  assert.deepEqual(resolved.diagnostics, []);
+  assert.deepEqual(resolved.stages.map(({ deformer }) => deformer.id), ["body", "head"]);
+  assert.deepEqual(evaluateWarpStages([5, 5], [parentStage, childStage]), [10, 6]);
+  assert.notDeepEqual(evaluateWarpStages([5, 5], [childStage, parentStage]), [10, 6]);
+});
+
+test("evaluation-stage resolution diagnoses a missing Key Art keyform deterministically", () => {
+  const project = domainProject();
+  addWarp(project);
+  project.scene.nodes.face = createSceneNode({
+    id: "face", displayName: "face", parentId: "warp",
+  });
+  project.scene.nodes.warp.children.push("face");
+  const result = createWarpEvaluationStages(project, "face", "missing_key_art");
+  assert.deepEqual(result.stages, []);
+  assert.equal(result.diagnostics[0].code, "DEFORMER_KEYFORM_MISSING");
 });

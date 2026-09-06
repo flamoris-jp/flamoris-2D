@@ -210,6 +210,18 @@ For each child vertex:
 4. apply deformed position;
 5. continue downstream world transform/render evaluation.
 
+Phase 6-3 uses bilinear displacement interpolation. Normalized lattice lookup
+is clamped to the nearest boundary for points outside the bounds, while the
+interpolated boundary displacement is added to the original point. This avoids
+unbounded extrapolation without collapsing outside geometry onto the boundary.
+Exact right/bottom boundaries select the final cell at cell coordinate `1`.
+
+The pure evaluation-stage API accepts explicit transforms into and out of each
+Deformer-local space. Nested stages are supplied in Scene ancestor order,
+parent first. Phase 6-4 owns construction of those spaces from evaluated A/B
+state and integration into Transition output; Phase 6-3 does not add a second
+Transition evaluator or time model.
+
 Canonical Phase 6 geometry order:
 
 ```text

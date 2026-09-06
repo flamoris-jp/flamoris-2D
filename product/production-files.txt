@@ -25,6 +25,7 @@ src/model/clipping-transition-validation.js
 src/model/temporal-validation.js
 src/model/transition-validation.js
 src/core/transforms.js
+src/core/warp-deformer-evaluator.js
 src/core/temporal.js
 src/core/transition-evaluator.js
 src/core/clipping-evaluator.js
