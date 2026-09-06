@@ -18,6 +18,7 @@ src/styles/viewport.css
 src/styles/dialogs.css
 src/model/project.js
 src/model/warp-deformer.js
+src/model/warp-deformer-validation.js
 src/model/validation.js
 src/model/clipping-validation.js
 src/model/clipping-transition-validation.js
