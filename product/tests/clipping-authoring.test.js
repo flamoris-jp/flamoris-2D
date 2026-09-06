@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import { EditorSession, TransactionError } from "../src/commands/editor.js";
 import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
 import { ClippingAuthoringController } from "../src/ui/clipping-authoring-controller.js";
+import { clippingMaskOverlayTriangles } from "../src/ui/viewport-renderer.js";
 
 function fixture() {
   const project = createProject({
@@ -88,4 +89,44 @@ test("Scene indicator and Inspector state are query projections with no persiste
   assert.match(controllerSource, /session\.execute/);
   assert.doesNotMatch(controllerSource, /session\.project|clippingBindings\s*=/);
   assert.match(viewSource, /bindingTargetIds\(\)/);
+});
+
+test("clipping visualization projects evaluated source geometry through its final transform", () => {
+  const evaluation = {
+    evaluatedParts: [{
+      renderInstances: [{
+        renderInstanceId: "target_instance",
+        sourceNodeId: "target",
+        clipping: { sourceRenderInstanceId: "source_instance", mode: "inside" },
+        mesh: { positions: [0, 0, 1, 0, 0, 1], indices: [0, 1, 2] },
+        transform: [1, 0, 0, 1, 0, 0],
+      }, {
+        renderInstanceId: "source_instance",
+        sourceNodeId: "source_a",
+        clipping: null,
+        mesh: { positions: [0, 0, 10, 0, 0, 10], indices: [0, 1, 2] },
+        transform: [2, 0, 0, 3, 5, 7],
+      }],
+    }],
+  };
+  assert.deepEqual(
+    clippingMaskOverlayTriangles(evaluation, "target", {
+      scale: 2,
+      originX: 11,
+      originY: 13,
+    }),
+    [[{ x: 21, y: 27 }, { x: 61, y: 27 }, { x: 21, y: 87 }]],
+  );
+  assert.deepEqual(clippingMaskOverlayTriangles(evaluation, "unbound", {
+    scale: 2, originX: 11, originY: 13,
+  }), []);
+});
+
+test("mask overlay is confined to viewport code and never enters export core", async () => {
+  const [viewport, exportCore] = await Promise.all([
+    readFile(new URL("../src/ui/viewport-renderer.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/core/export-frame-renderer.js", import.meta.url), "utf8"),
+  ]);
+  assert.match(viewport, /drawClippingMaskVisualization/);
+  assert.doesNotMatch(exportCore, /showMask|clippingMaskOverlayTriangles|overlayCanvas/);
 });

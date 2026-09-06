@@ -35,6 +35,30 @@ export function clearLayerCanvas(canvas) {
   context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 }
 
+export function clippingMaskOverlayTriangles(evaluation, targetNodeId, view) {
+  if (!evaluation || !targetNodeId || !view) return [];
+  const instances = (evaluation.evaluatedParts || [])
+    .flatMap((part) => part.renderInstances || [])
+    .sort((left, right) => left.renderInstanceId.localeCompare(right.renderInstanceId));
+  const byId = new Map(instances.map((instance) => [instance.renderInstanceId, instance]));
+  const result = [];
+  for (const target of instances.filter((instance) =>
+    instance.sourceNodeId === targetNodeId && instance.clipping?.sourceRenderInstanceId)) {
+    const source = byId.get(target.clipping.sourceRenderInstanceId);
+    if (!source) continue;
+    for (let index = 0; index < source.mesh.indices.length; index += 3) {
+      result.push(source.mesh.indices.slice(index, index + 3).map((vertexIndex) => {
+        const documentPoint = transformPoint(source.transform, {
+          x: source.mesh.positions[vertexIndex * 2],
+          y: source.mesh.positions[vertexIndex * 2 + 1],
+        });
+        return imageToScreen(documentPoint.x, documentPoint.y, view);
+      }));
+    }
+  }
+  return result;
+}
+
 const blendMap = new Map([
   ["normal", "source-over"],
   ["pass through", "source-over"],
@@ -67,6 +91,7 @@ export function createViewportRenderer({
   transitionPreviewContext = () => null,
   autoMeshPreviewContext = () => null,
   correspondencePreviewContext = () => null,
+  clippingAuthoringContext = () => null,
 }) {
   function screenPointForPart(x, y) {
     const basePoint = {
@@ -344,6 +369,34 @@ export function createViewportRenderer({
     }
   }
 
+  function drawClippingMaskVisualization(evaluation) {
+    const clipping = clippingAuthoringContext();
+    if (!clipping?.showMask || !clipping.targetNodeId) return;
+    const triangles = clippingMaskOverlayTriangles(
+      evaluation,
+      clipping.targetNodeId,
+      state.view,
+    );
+    if (!triangles.length) return;
+    const context = elements.overlayCanvas.getContext("2d");
+    const ratio = window.devicePixelRatio || 1;
+    context.save();
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.fillStyle = "rgba(74, 222, 200, 0.22)";
+    context.strokeStyle = "rgba(129, 255, 232, 0.9)";
+    context.lineWidth = 1.5;
+    for (const triangle of triangles) {
+      context.beginPath();
+      context.moveTo(triangle[0].x, triangle[0].y);
+      context.lineTo(triangle[1].x, triangle[1].y);
+      context.lineTo(triangle[2].x, triangle[2].y);
+      context.closePath();
+      context.fill();
+      context.stroke();
+    }
+    context.restore();
+  }
+
   function render() {
     const transitionPreview = transitionPreviewContext();
     if (transitionPreview?.viewMode === "preview") {
@@ -369,6 +422,7 @@ export function createViewportRenderer({
         resolveArtwork,
       });
       state.editor?.transitionPreview.setRenderReport(report);
+      drawClippingMaskVisualization(transitionPreview.evaluation);
       return;
     }
     drawPsdBackgrounds();

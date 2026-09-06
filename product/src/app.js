@@ -157,6 +157,16 @@ const viewportRenderer = createViewportRenderer({
   transitionPreviewContext: () => state.editor?.transitionPreview.getState() || null,
   autoMeshPreviewContext: () => autoMeshPreview.getState(),
   correspondencePreviewContext: () => state.editor?.correspondencePreview.getState() || null,
+  clippingAuthoringContext: () => {
+    const targetNodeId = state.editor?.selectedNodeId || null;
+    const clipping = targetNodeId
+      ? state.editor.clippingAuthoring.getState(targetNodeId)
+      : null;
+    return {
+      targetNodeId,
+      showMask: Boolean(clipping?.binding && clipping.showMask),
+    };
+  },
 });
 
 const sceneEditorView = createSceneEditorView({
