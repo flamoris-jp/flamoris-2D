@@ -1,6 +1,6 @@
 export { commandSchemas } from "../commands/schemas.js";
 
-export const MCP_SCHEMA_VERSION = 6;
+export const MCP_SCHEMA_VERSION = 7;
 
 const nodeId = {
   type: "string",
@@ -13,6 +13,9 @@ const keyArtId = { ...nodeId };
 const semanticSlotId = { ...nodeId };
 
 export const querySchemas = {
+  "clipping.get_for_node": idQuery("nodeId", nodeId),
+  "clipping.list": emptyQuery(),
+  "clipping.validate": emptyQuery(),
   "keyart.get": idQuery("keyArtId", keyArtId),
   "keyart.list": emptyQuery(),
   "semantic_slot.get": idQuery("semanticSlotId", semanticSlotId),

@@ -76,6 +76,7 @@ export function createFl2dDocument(
     };
   });
   body.meshKeyforms = [...body.meshKeyforms].sort(byId);
+  body.clippingBindings = [...body.clippingBindings].sort(byId);
   body.transitions = [...body.transitions].sort(byId).map((transition) => ({
     ...transition,
     partTransitions: [...transition.partTransitions].sort(byId),
@@ -159,6 +160,12 @@ export function migrateProjectSchema(value) {
       })) + 1,
     }));
     project.schemaVersion = 4;
+  }
+  if (project?.schemaVersion === 4) {
+    project.clippingBindings = Array.isArray(project.clippingBindings)
+      ? project.clippingBindings
+      : [];
+    project.schemaVersion = 5;
   }
   if (project?.schemaVersion !== PROJECT_SCHEMA_VERSION) {
     throw new ProjectFormatError(

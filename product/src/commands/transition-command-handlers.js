@@ -23,7 +23,7 @@ function assertNewId(project, id) {
     ...Object.keys(project.scene?.nodes || {}),
     ...[
       "sourceAssets", "semanticSlots", "keyArts", "meshes", "meshTopologies",
-      "meshKeyforms", "transitions", "temporalPrograms",
+      "meshKeyforms", "clippingBindings", "transitions", "temporalPrograms",
     ].flatMap((name) => (project[name] || []).map((entry) => entry.id)),
   ];
   if (used.includes(id)) throw new CommandError("Stable ID already exists.", "identity.duplicate", { id });
