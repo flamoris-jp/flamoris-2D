@@ -49,6 +49,8 @@ function cycleProblems(project, bindings) {
     compareText(left.targetNodeId, right.targetNodeId) || compareText(left.id, right.id))) {
     if (!binding.enabled || binding.targetNodeId === binding.sourceNodeId ||
       !nodes[binding.targetNodeId] || !nodes[binding.sourceNodeId] ||
+      !isRenderableClippingNode(nodes[binding.targetNodeId]) ||
+      !isRenderableClippingNode(nodes[binding.sourceNodeId]) ||
       bindingByTarget.has(binding.targetNodeId)) continue;
     bindingByTarget.set(binding.targetNodeId, binding);
   }

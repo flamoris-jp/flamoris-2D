@@ -116,7 +116,6 @@ export function validateProject(project) {
     ["meshes", project.meshes],
     ["meshTopologies", project.meshTopologies],
     ["meshKeyforms", project.meshKeyforms],
-    ["clippingBindings", project.clippingBindings],
     ["transitions", project.transitions],
     ["animation.clips", project.animation?.clips],
     ["animation.tracks", project.animation?.tracks],
