@@ -538,11 +538,11 @@ test("renderer-supported endpoint evaluations are visually equivalent through th
 
 test("renderer-unsupported evaluated clipping marks the controller non-authoritative", () => {
   const { preview } = fixture();
-  preview.addTrack({ kind: "ClippingTrack", target: { semanticSlotId: "semantic_eye" }, trackId: "clipping" });
-  preview.addKeyframe("clipping", "clipping", {
-    id: "clip_key", timeTicks: 0, value: { sourceNodeId: "node_a" }, interpolationToNext: { kind: "step" },
-  });
   const evaluation = preview.setTick(60000);
+  evaluation.evaluatedParts[0].renderInstances[0].clipping = {
+    sourceRenderInstanceId: "evaluated_mask",
+    mode: "inside",
+  };
   const report = renderEvaluatedTransitionViewport({
     evaluation,
     view: { scale: 1, originX: 0, originY: 0 },

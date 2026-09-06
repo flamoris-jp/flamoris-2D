@@ -4,6 +4,8 @@ import {
   keyArtMemberFor,
   semanticMappingFor,
 } from "../model/transition-validation.js";
+import { clippingBindingForTarget } from "../model/clipping-validation.js";
+import { resolveEvaluatedClipping } from "./clipping-evaluator.js";
 
 function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -119,9 +121,40 @@ function endpointDrawOrder(from, to, amount) {
   return state?.member.drawOrder ?? 0;
 }
 
-function endpointClipping(from, to, amount) {
+function bindingClipping(project, targetNodeId) {
+  const binding = targetNodeId
+    ? clippingBindingForTarget(project, targetNodeId)
+    : null;
+  if (!binding || !binding.enabled) return null;
+  return { sourceNodeId: binding.sourceNodeId, mode: binding.mode };
+}
+
+function endpointStateClipping(project, state) {
+  const binding = state ? clippingBindingForTarget(project, state.node.id) : null;
+  if (binding && !binding.enabled) return { sourceNodeId: null, mode: binding.mode };
+  if (state?.member.clipping?.sourceNodeId) {
+    return { sourceNodeId: state.member.clipping.sourceNodeId, mode: binding?.mode || "inside" };
+  }
+  return bindingClipping(project, state?.node.id) || { sourceNodeId: null, mode: "inside" };
+}
+
+function endpointClipping(project, from, to, amount) {
   const state = amount < 0.5 ? from : to;
-  return structuredClone(state?.member.clipping || { sourceNodeId: null });
+  return endpointStateClipping(project, state);
+}
+
+function sampledClipping(project, sample, semanticSlotId, state) {
+  const sampled = sampledValue(
+    sample,
+    "ClippingTrack",
+    "clipping",
+    semanticSlotId,
+    state?.node.id,
+  );
+  if (sampled !== null) {
+    return { sourceNodeId: sampled.sourceNodeId, mode: "inside" };
+  }
+  return endpointStateClipping(project, state);
 }
 
 function endpointOpacity(from, to, amount) {
@@ -222,7 +255,7 @@ function endpointPartState(project, transition, part, slot, endpoint, fromKeyArt
       ),
       opacity: state.member.opacity,
       drawOrder: state.member.drawOrder,
-      clipping: state.member.clipping,
+      clipping: endpointStateClipping(project, state),
       transform: state.worldTransform,
     })],
   };
@@ -235,7 +268,10 @@ function evaluateMorph(project, transition, part, slot, from, to, fromMesh, toMe
   const opacity = clamp(sampledValue(sample, "OpacityTrack", "opacity", slot.id) ?? endpointOpacity(from, to, u), 0, 1);
   const presence = sampledValue(sample, "PresenceTrack", "presence", slot.id) ?? endpointPresence(from, to, u);
   const drawOrder = sampledValue(sample, "DrawOrderTrack", "drawOrder", slot.id) ?? endpointDrawOrder(from, to, u);
-  const clipping = sampledValue(sample, "ClippingTrack", "clipping", slot.id) ?? endpointClipping(from, to, u);
+  const clippingSample = sampledValue(sample, "ClippingTrack", "clipping", slot.id);
+  const clipping = clippingSample !== null
+    ? { sourceNodeId: clippingSample.sourceNodeId, mode: "inside" }
+    : endpointClipping(project, from, to, u);
   if (presence !== "present") return { semanticSlotId: slot.id, presence, renderInstances: [] };
   const topology = entity(project, "meshTopologies", part.topologyId, "MeshTopology");
   const mesh = {
@@ -263,7 +299,7 @@ function sourceInstance(project, transition, part, slot, endpoint, state, mesh, 
   const sourceWeight = compositeGroupId ? 1 : weight;
   const opacity = clamp(state.member.opacity * sourceWeight * (opacityValue ?? 1), 0, 1);
   const drawOrder = sampledValue(sample, "DrawOrderTrack", "drawOrder", slot.id, state.node.id) ?? state.member.drawOrder;
-  const clipping = sampledValue(sample, "ClippingTrack", "clipping", slot.id, state.node.id) ?? state.member.clipping;
+  const clipping = sampledClipping(project, sample, slot.id, state);
   return instance({
     id: transition.id + ":" + slot.id + ":" + endpoint,
     source: state,
@@ -300,7 +336,7 @@ function evaluateSingle(project, transition, part, slot, endpoint, state, mesh, 
   const authoredOpacity = sampledValue(sample, "OpacityTrack", "opacity", slot.id, state.node.id);
   const resolvedOpacity = clamp(authoredOpacity ?? opacity, 0, 1);
   const drawOrder = sampledValue(sample, "DrawOrderTrack", "drawOrder", slot.id, state.node.id) ?? state.member.drawOrder;
-  const clipping = sampledValue(sample, "ClippingTrack", "clipping", slot.id, state.node.id) ?? state.member.clipping;
+  const clipping = sampledClipping(project, sample, slot.id, state);
   return {
     semanticSlotId: slot.id,
     presence: resolvedPresence,
@@ -362,6 +398,9 @@ const DIAGNOSTIC_MESSAGES = Object.freeze({
   TRANSITION_CLIPPING_REFERENCE_INVALID: "A clipping reference does not resolve to a scene node.",
   TRANSITION_CLIPPING_RENDER_UNSUPPORTED: "The evaluator produced clipping state that the current renderer cannot rasterize.",
   TRANSITION_DRAW_ORDER_CONFLICT: "Multiple visible render instances conflict at the same explicit draw order.",
+  CLIPPING_SOURCE_MISSING: "The evaluated clipping source node is missing.",
+  CLIPPING_SOURCE_NOT_RENDERABLE: "The clipping source cannot be resolved to one evaluated render instance.",
+  CLIPPING_CYCLE: "The evaluated clipping relationships contain a cycle.",
 });
 
 function diagnostic(transitionId, code, severity, semanticSlotId = null, timeTicks = null, details = {}) {
@@ -640,16 +679,30 @@ export function evaluateTransition(project, transitionId, timeTicks) {
     }
   }
   const orderedParts = evaluatedParts.sort((left, right) => compareText(left.semanticSlotId, right.semanticSlotId));
+  const clipping = resolveEvaluatedClipping(project, orderedParts);
   const diagnostics = sortDiagnostics(attachAcknowledgements(transition, [
     ...structuralDiagnostics(project, transition, fromKeyArt, toKeyArt, slots, partBySlot),
-    ...drawOrderDiagnostics(transition, orderedParts, clampedTicks),
+    ...drawOrderDiagnostics(transition, clipping.evaluatedParts, clampedTicks),
+    ...clipping.diagnostics.map((entry) => diagnostic(
+      transition.id,
+      entry.code,
+      entry.severity,
+      entry.semanticSlotId,
+      clampedTicks,
+      {
+        renderInstanceId: entry.renderInstanceId,
+        targetNodeId: entry.targetNodeId,
+        sourceNodeId: entry.sourceNodeId,
+        ...entry.details,
+      },
+    )),
   ]));
   return {
     transitionId: transition.id,
     timeTicks: clampedTicks,
     normalizedTime,
-    evaluatedParts: orderedParts,
-    compositeGroups: compositeGroups(orderedParts),
+    evaluatedParts: clipping.evaluatedParts,
+    compositeGroups: compositeGroups(clipping.evaluatedParts),
     diagnostics,
   };
 }
