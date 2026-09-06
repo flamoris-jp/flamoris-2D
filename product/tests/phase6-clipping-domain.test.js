@@ -297,6 +297,81 @@ test("ClippingTrack cycle is rejected and rolls back its transaction", () => {
   assert.deepEqual(session.project, before);
 });
 
+test("mutually exclusive A/B node-target tracks do not form a persistent cycle", () => {
+  const project = domainProject();
+  for (const id of ["a", "b", "a2", "b2"]) addNode(project, id);
+  project.keyArts.push(
+    {
+      id: "keyart_a",
+      displayName: "A",
+      rootNodeId: project.scene.rootId,
+      sourceAssetId: null,
+      members: [member("a", "appearance_a", 0), member("b", "appearance_b", 1)],
+      metadata: {},
+    },
+    {
+      id: "keyart_b",
+      displayName: "B",
+      rootNodeId: project.scene.rootId,
+      sourceAssetId: null,
+      members: [member("a2", "appearance_a2", 0), member("b2", "appearance_b2", 1)],
+      metadata: {},
+    },
+  );
+  project.semanticSlots.push(
+    {
+      id: "slot_a",
+      displayName: "A",
+      role: null,
+      mappings: [
+        { keyArtId: "keyart_a", nodeId: "a" },
+        { keyArtId: "keyart_b", nodeId: "a2" },
+      ],
+      metadata: {},
+    },
+    {
+      id: "slot_b",
+      displayName: "B",
+      role: null,
+      mappings: [
+        { keyArtId: "keyart_a", nodeId: "b" },
+        { keyArtId: "keyart_b", nodeId: "b2" },
+      ],
+      metadata: {},
+    },
+  );
+  project.temporalPrograms.push({
+    id: "program_ab",
+    durationTicks: 120000,
+    tracks: [
+      clippingTrack("track_a", { nodeId: "a" }, "b2"),
+      clippingTrack("track_b2", { nodeId: "b2" }, "a"),
+    ],
+    events: [],
+    regions: [],
+  });
+  project.transitions.push({
+    id: "transition_ab",
+    displayName: "A to B",
+    fromKeyArtId: "keyart_a",
+    toKeyArtId: "keyart_b",
+    temporalProgramId: "program_ab",
+    partTransitions: ["slot_a", "slot_b"].map((semanticSlotId) => ({
+      id: "part_" + semanticSlotId,
+      semanticSlotId,
+      mode: "hold",
+      topologyId: null,
+      fromKeyformId: null,
+      toKeyformId: null,
+      configuration: {},
+    })),
+    diagnosticOverrides: [],
+  });
+
+  assert.deepEqual(validateProject(project), []);
+  assert.doesNotThrow(() => new EditorSession(project));
+});
+
 test("KeyArt clipping cycle is rejected before persistent commit", () => {
   const session = new EditorSession(evaluationProject());
   const before = structuredClone(session.project);

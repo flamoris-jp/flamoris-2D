@@ -1,5 +1,4 @@
 import { evaluateTransition } from "../core/transition-evaluator.js";
-import { sampleTemporalProgram } from "../core/temporal.js";
 import {
   clippingBindingForTarget,
   findClippingDependencyCycles,
@@ -201,66 +200,6 @@ function transitionSampleTimes(program) {
     .sort((left, right) => left - right);
 }
 
-function sampledTrackPriority(project, program, track, nodeId) {
-  if (track.target?.semanticSlotId) {
-    const slot = (project.semanticSlots || []).find((entry) =>
-      entry.id === track.target.semanticSlotId);
-    return (slot?.mappings || []).some((mapping) => mapping.nodeId === nodeId) ? 3 : 0;
-  }
-  if (track.target?.nodeId) return track.target.nodeId === nodeId ? 2 : 0;
-  if (track.target?.transitionDefault !== true) return 0;
-  return clippingTrackTargets(project, program, track).includes(nodeId) ? 1 : 0;
-}
-
-function validateProgramTrackCycles(project, seenCycles) {
-  const issues = [];
-  const nodes = project.scene?.nodes || {};
-  for (const [programIndex, program] of (project.temporalPrograms || []).entries()) {
-    if (!Array.isArray(program?.tracks) || !Number.isSafeInteger(program.durationTicks) ||
-      program.durationTicks < 1) continue;
-    for (const timeTicks of transitionSampleTimes(program)) {
-      let sample;
-      try {
-        sample = sampleTemporalProgram(program, timeTicks);
-      } catch {
-        continue;
-      }
-      const relations = [];
-      for (const nodeId of Object.keys(nodes).sort(compareText)) {
-        if (!isRenderableClippingNode(nodes[nodeId])) continue;
-        const binding = clippingBindingForTarget(project, nodeId);
-        if (binding && !binding.enabled) continue;
-        const sampled = sample.tracks
-          .filter((track) => track.kind === "ClippingTrack" && track.values.clipping !== null)
-          .map((track) => ({ track, priority: sampledTrackPriority(project, program, track, nodeId) }))
-          .filter((entry) => entry.priority > 0)
-          .sort((left, right) => right.priority - left.priority ||
-            compareText(left.track.trackId, right.track.trackId))[0]?.track.values.clipping;
-        const sourceNodeId = sampled !== undefined
-          ? sampled.sourceNodeId
-          : binding?.enabled ? binding.sourceNodeId : null;
-        if (sourceNodeId && sourceNodeId !== nodeId &&
-          isRenderableClippingNode(nodes[sourceNodeId])) {
-          relations.push({ targetNodeId: nodeId, sourceNodeId });
-        }
-      }
-      for (const nodeIds of findClippingDependencyCycles(relations)) {
-        const key = cycleKey(nodeIds);
-        if (seenCycles.has(key)) continue;
-        seenCycles.add(key);
-        issues.push(problem(
-          "CLIPPING_CYCLE",
-          `temporalPrograms.${programIndex}.tracks`,
-          "Clipping dependencies must not contain a cycle.",
-          program.id,
-          { programId: program.id, timeTicks, nodeIds },
-        ));
-      }
-    }
-  }
-  return issues;
-}
-
 function validateTransitionCycles(project, seenCycles) {
   const issues = [];
   const programs = new Map((project.temporalPrograms || []).map((program) =>
@@ -307,7 +246,6 @@ export function validateTransitionClipping(project) {
   return [
     ...validateAuthoredReferences(project),
     ...validateKeyArtCycles(project, seenCycles),
-    ...validateProgramTrackCycles(project, seenCycles),
     ...validateTransitionCycles(project, seenCycles),
   ].sort((left, right) =>
     compareText(left.code, right.code) ||
