@@ -20,7 +20,11 @@ export class SharedCompositionRenderer {
   }) {
     let plan;
     try {
-      plan = createEvaluatedRenderPlan(evaluation, { resolveArtwork });
+      plan = createEvaluatedRenderPlan(evaluation, {
+        resolveArtwork,
+        clippingRasterization:
+          this.renderer.compositionCapabilities?.clippingRasterization === true,
+      });
     } catch (error) {
       return {
         rendered: false,

@@ -169,6 +169,18 @@
                 <label>Pivot Y<input id="pivotYInput" type="number" step="0.1" data-transform-path="pivot.y" /></label>
               </div>
             </fieldset>
+            <fieldset id="clippingControls" hidden>
+              <legend>Clipping</legend>
+              <label class="clipping-toggle"><input id="clippingEnabledInput" type="checkbox" /> Enable clipping</label>
+              <label>Clip To
+                <select id="clippingSourceSelect"><option value="">— Select source —</option></select>
+              </label>
+              <label>Mode
+                <select id="clippingModeSelect" disabled><option value="inside">Inside</option></select>
+              </label>
+              <label class="clipping-toggle"><input id="showClippingMaskInput" type="checkbox" /> Show Clipping Mask (Transition Preview only)</label>
+              <button id="removeClippingButton" type="button" class="secondary">Remove clipping</button>
+            </fieldset>
           </form>
 
           <section id="transitionAuthoringPanel" class="transition-authoring" aria-labelledby="transitionAuthoringTitle">

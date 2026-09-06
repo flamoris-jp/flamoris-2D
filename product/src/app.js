@@ -157,6 +157,16 @@ const viewportRenderer = createViewportRenderer({
   transitionPreviewContext: () => state.editor?.transitionPreview.getState() || null,
   autoMeshPreviewContext: () => autoMeshPreview.getState(),
   correspondencePreviewContext: () => state.editor?.correspondencePreview.getState() || null,
+  clippingAuthoringContext: () => {
+    const targetNodeId = state.editor?.selectedNodeId || null;
+    const clipping = targetNodeId
+      ? state.editor.clippingAuthoring.getState(targetNodeId)
+      : null;
+    return {
+      targetNodeId,
+      showMask: Boolean(clipping?.binding && clipping.showMask),
+    };
+  },
 });
 
 const sceneEditorView = createSceneEditorView({
@@ -1045,6 +1055,28 @@ elements.visibilityInput.addEventListener("change", () => {
 elements.lockedInput.addEventListener("change", () => {
   const nodeId = state.editor?.selectedNodeId;
   if (nodeId) state.editor.setLocked(nodeId, elements.lockedInput.checked);
+});
+elements.clippingSourceSelect.addEventListener("change", () => {
+  commitInspectorEdit(() => {
+    const nodeId = state.editor?.selectedNodeId;
+    if (!nodeId || !elements.clippingSourceSelect.value) return;
+    state.editor.clippingAuthoring.setSource(nodeId, elements.clippingSourceSelect.value);
+  });
+});
+elements.clippingEnabledInput.addEventListener("change", () => {
+  commitInspectorEdit(() => {
+    const nodeId = state.editor?.selectedNodeId;
+    if (nodeId) state.editor.clippingAuthoring.setEnabled(nodeId, elements.clippingEnabledInput.checked);
+  });
+});
+elements.removeClippingButton.addEventListener("click", () => {
+  commitInspectorEdit(() => {
+    const nodeId = state.editor?.selectedNodeId;
+    if (nodeId) state.editor.clippingAuthoring.remove(nodeId);
+  });
+});
+elements.showClippingMaskInput.addEventListener("change", () => {
+  state.editor?.clippingAuthoring.setShowMask(elements.showClippingMaskInput.checked);
 });
 elements.transformInputs.forEach((input) => {
   input.addEventListener("change", () => {
