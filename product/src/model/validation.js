@@ -2,6 +2,7 @@ import { PROJECT_SCHEMA_VERSION } from "./project.js";
 import { validateTemporalPrograms } from "./temporal-validation.js";
 import { TIMEBASE_TICKS_PER_SECOND, normalizeFrameRate } from "../core/temporal.js";
 import { validateTransitionDomain } from "./transition-validation.js";
+import { validateClippingBindings } from "./clipping-validation.js";
 
 function issue(code, path, message, entityId = null, severity = "error") {
   return { code, path, message, entityId, severity };
@@ -115,6 +116,7 @@ export function validateProject(project) {
     ["meshes", project.meshes],
     ["meshTopologies", project.meshTopologies],
     ["meshKeyforms", project.meshKeyforms],
+    ["clippingBindings", project.clippingBindings],
     ["transitions", project.transitions],
     ["animation.clips", project.animation?.clips],
     ["animation.tracks", project.animation?.tracks],
@@ -127,6 +129,7 @@ export function validateProject(project) {
 
   issues.push(...validateTemporalPrograms(project, register));
   issues.push(...validateTransitionDomain(project, register));
+  issues.push(...validateClippingBindings(project, register));
 
   if (nodes[rootId]) {
     const visiting = new Set();

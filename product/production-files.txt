@@ -18,6 +18,7 @@ src/styles/viewport.css
 src/styles/dialogs.css
 src/model/project.js
 src/model/validation.js
+src/model/clipping-validation.js
 src/model/temporal-validation.js
 src/model/transition-validation.js
 src/core/transforms.js
