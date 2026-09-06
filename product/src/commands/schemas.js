@@ -14,6 +14,21 @@ const temporalObject = { type: "object" };
 const domainObject = { type: "object" };
 const numberArray = { type: "array", items: finiteNumber };
 const vertexIdArray = { type: "array", items: nonEmptyString };
+const warpBounds = {
+  type: "object",
+  required: ["left", "top", "right", "bottom"],
+  properties: {
+    left: finiteNumber, top: finiteNumber, right: finiteNumber, bottom: finiteNumber,
+  },
+  additionalProperties: false,
+};
+const warpControlPointPosition = {
+  type: "object",
+  required: ["controlPointId", "x", "y"],
+  properties: { controlPointId: nonEmptyString, x: finiteNumber, y: finiteNumber },
+  additionalProperties: false,
+};
+const warpControlPointPositions = { type: "array", items: warpControlPointPosition };
 
 const clippingBinding = {
   type: "object",
@@ -52,6 +67,77 @@ const transform = {
 };
 
 export const commandSchemas = {
+  "deformer.create_warp": {
+    type: "object",
+    required: ["id", "displayName", "parentNodeId", "columns", "rows", "bounds", "controlPointIds"],
+    properties: {
+      id: nonEmptyString,
+      displayName: nonEmptyString,
+      parentNodeId: nodeId,
+      columns: { type: "integer", minimum: 2, maximum: 4 },
+      rows: { type: "integer", minimum: 2, maximum: 4 },
+      bounds: warpBounds,
+      controlPointIds: vertexIdArray,
+      index: nonNegativeInteger,
+    },
+    additionalProperties: false,
+  },
+  "deformer.remove": {
+    type: "object",
+    required: ["deformerId"],
+    properties: { deformerId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "deformer.rename": {
+    type: "object",
+    required: ["deformerId", "displayName"],
+    properties: { deformerId: nonEmptyString, displayName: nonEmptyString },
+    additionalProperties: false,
+  },
+  "deformer.set_grid": {
+    type: "object",
+    required: ["deformerId", "columns", "rows", "bounds", "controlPointIds"],
+    properties: {
+      deformerId: nonEmptyString,
+      columns: { type: "integer", minimum: 2, maximum: 4 },
+      rows: { type: "integer", minimum: 2, maximum: 4 },
+      bounds: warpBounds,
+      controlPointIds: vertexIdArray,
+    },
+    additionalProperties: false,
+  },
+  "deformer.set_keyform": {
+    type: "object",
+    required: ["deformerId", "keyArtId", "controlPoints"],
+    properties: {
+      deformerId: nonEmptyString,
+      keyArtId: nonEmptyString,
+      controlPoints: warpControlPointPositions,
+    },
+    additionalProperties: false,
+  },
+  "deformer.move_control_points": {
+    type: "object",
+    required: ["deformerId", "keyArtId", "controlPoints"],
+    properties: {
+      deformerId: nonEmptyString,
+      keyArtId: nonEmptyString,
+      controlPoints: warpControlPointPositions,
+    },
+    additionalProperties: false,
+  },
+  "deformer.reset_control_points": {
+    type: "object",
+    required: ["deformerId", "keyArtId"],
+    properties: { deformerId: nonEmptyString, keyArtId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "deformer.reparent_node": {
+    type: "object",
+    required: ["nodeId", "parentId"],
+    properties: { nodeId, parentId: nodeId, index: nonNegativeInteger },
+    additionalProperties: false,
+  },
   "clipping.create": {
     type: "object",
     required: ["binding"],
@@ -445,6 +531,24 @@ function entityRestoreSchema() {
 }
 
 const internalCommandSchemas = {
+  "deformer.remove_internal": {
+    type: "object",
+    required: ["deformerId"],
+    properties: { deformerId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "deformer.remove_keyform_internal": {
+    type: "object",
+    required: ["deformerId", "keyArtId"],
+    properties: { deformerId: nonEmptyString, keyArtId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "deformer.restore": {
+    type: "object",
+    required: ["snapshot"],
+    properties: { snapshot: domainObject },
+    additionalProperties: false,
+  },
   "clipping.remove_internal": {
     type: "object",
     required: ["bindingId"],

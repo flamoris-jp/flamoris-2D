@@ -18,6 +18,8 @@ import {
   migrateProjectSchema,
   serializeProject,
 } from "../src/io/project-json.js";
+import { EditorSession, TransactionError } from "../src/commands/editor.js";
+import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
 
 function pointIds(count) {
   return Array.from({ length: count }, (_, index) => `cp_${index + 1}`);
@@ -72,6 +74,26 @@ function addKeyArt(project, id = "key_art") {
 
 function issueCodes(project) {
   return validateProject(project).map((entry) => entry.code);
+}
+
+function createWarpCommand({
+  id = "warp",
+  parentNodeId,
+  size = 2,
+  ids = pointIds(size * size).map((pointId) => `${id}_${pointId}`),
+} = {}) {
+  return {
+    type: "deformer.create_warp",
+    payload: {
+      id,
+      displayName: id,
+      parentNodeId,
+      columns: size,
+      rows: size,
+      bounds: { left: 0, top: 0, right: 100, bottom: 100 },
+      controlPointIds: ids,
+    },
+  };
 }
 
 for (const size of [2, 3, 4]) {
@@ -230,4 +252,140 @@ test("pre-Phase-6-3 schema migrates to empty Warp collections without losing cli
   assert.deepEqual(migrated.rig.warpDeformerKeyforms, []);
   assert.equal(migrated.clippingBindings[0].id, "clip");
   assert.deepEqual(validateProject(migrated), []);
+});
+
+test("Warp commands create rename reparent and remove through normal Undo Redo", () => {
+  const project = domainProject();
+  const session = new EditorSession(project);
+  session.execute(createWarpCommand({ id: "body", parentNodeId: project.scene.rootId }));
+  session.execute(createWarpCommand({ id: "head", parentNodeId: "body" }));
+  session.execute({
+    type: "deformer.rename", payload: { deformerId: "head", displayName: "Head Warp" },
+  });
+  assert.equal(session.query("deformer.get", { deformerId: "head" }).displayName, "Head Warp");
+  assert.deepEqual(session.query("deformer.list").map(({ id }) => id), ["body", "head"]);
+
+  session.execute({
+    type: "deformer.reparent_node",
+    payload: { nodeId: "head", parentId: project.scene.rootId },
+  });
+  assert.equal(session.query("deformer.get", { deformerId: "head" }).parentNodeId, project.scene.rootId);
+  session.undo();
+  assert.equal(session.query("deformer.get", { deformerId: "head" }).parentNodeId, "body");
+
+  session.execute({ type: "deformer.remove", payload: { deformerId: "body" } });
+  assert.equal(session.query("deformer.get", { deformerId: "head" }).parentNodeId, project.scene.rootId);
+  session.undo();
+  assert.equal(session.query("deformer.get", { deformerId: "head" }).parentNodeId, "body");
+  session.redo();
+  assert.equal(session.query("deformer.get", { deformerId: "head" }).parentNodeId, project.scene.rootId);
+});
+
+test("set grid rejects authored keyform loss and all keyform edits are undoable", () => {
+  const project = domainProject();
+  addKeyArt(project);
+  const session = new EditorSession(project);
+  session.execute(createWarpCommand({ parentNodeId: project.scene.rootId }));
+  const deformer = session.query("deformer.get", { deformerId: "warp" });
+  const positions = defaultWarpKeyformControlPoints(deformer, deformer.controlPoints);
+  session.execute({
+    type: "deformer.set_keyform",
+    payload: { deformerId: "warp", keyArtId: "key_art", controlPoints: positions.reverse() },
+  });
+  assert.deepEqual(session.query("deformer.get_keyform", {
+    deformerId: "warp", keyArtId: "key_art",
+  }).controlPoints.map(({ controlPointId }) => controlPointId), deformer.controlPointIds);
+  session.execute({
+    type: "deformer.move_control_points",
+    payload: {
+      deformerId: "warp", keyArtId: "key_art",
+      controlPoints: [{ controlPointId: deformer.controlPointIds[0], x: 20, y: 30 }],
+    },
+  });
+  assert.deepEqual(session.query("deformer.get_keyform", {
+    deformerId: "warp", keyArtId: "key_art",
+  }).controlPoints[0], { controlPointId: deformer.controlPointIds[0], x: 20, y: 30 });
+  session.undo();
+  assert.equal(session.query("deformer.get_keyform", {
+    deformerId: "warp", keyArtId: "key_art",
+  }).controlPoints[0].x, 0);
+  session.execute({
+    type: "deformer.reset_control_points",
+    payload: { deformerId: "warp", keyArtId: "key_art" },
+  });
+  assert.throws(() => session.execute({
+    type: "deformer.set_grid",
+    payload: {
+      deformerId: "warp", columns: 3, rows: 3,
+      bounds: { left: 0, top: 0, right: 100, bottom: 100 },
+      controlPointIds: pointIds(9).map((id) => `new_${id}`),
+    },
+  }), /Remove authored keyforms/);
+});
+
+test("set grid is undoable when no authored keyforms exist", () => {
+  const project = domainProject();
+  const session = new EditorSession(project);
+  session.execute(createWarpCommand({ parentNodeId: project.scene.rootId }));
+  const nextIds = pointIds(9).map((id) => `new_${id}`);
+  session.execute({
+    type: "deformer.set_grid",
+    payload: {
+      deformerId: "warp", columns: 3, rows: 3,
+      bounds: { left: -10, top: -20, right: 90, bottom: 80 }, controlPointIds: nextIds,
+    },
+  });
+  assert.deepEqual(session.query("deformer.get", { deformerId: "warp" }).controlPointIds, nextIds);
+  session.undo();
+  assert.equal(session.query("deformer.get", { deformerId: "warp" }).columns, 2);
+  session.redo();
+  assert.equal(session.query("deformer.get", { deformerId: "warp" }).columns, 3);
+});
+
+test("failed Warp transaction rolls back and hierarchy cycles are rejected", () => {
+  const project = domainProject();
+  const session = new EditorSession(project);
+  const before = structuredClone(session.project);
+  assert.throws(() => session.executeTransaction([
+    createWarpCommand({ id: "body", parentNodeId: project.scene.rootId }),
+    createWarpCommand({ id: "head", parentNodeId: "missing" }),
+  ]));
+  assert.deepEqual(session.project, before);
+
+  session.execute(createWarpCommand({ id: "body", parentNodeId: project.scene.rootId }));
+  session.execute(createWarpCommand({ id: "head", parentNodeId: "body" }));
+  assert.throws(() => session.execute({
+    type: "deformer.reparent_node", payload: { nodeId: "body", parentId: "head" },
+  }), /cycle/);
+});
+
+test("invalid keyform is rejected by transaction validation without partial state", () => {
+  const project = domainProject();
+  addKeyArt(project);
+  const session = new EditorSession(project);
+  session.execute(createWarpCommand({ parentNodeId: project.scene.rootId }));
+  assert.throws(() => session.execute({
+    type: "deformer.set_keyform",
+    payload: {
+      deformerId: "warp", keyArtId: "key_art",
+      controlPoints: [{ controlPointId: "warp_cp_1", x: 0, y: 0 }],
+    },
+  }), (error) => {
+    assert.equal(error instanceof TransactionError, true);
+    return true;
+  });
+  assert.equal(session.query("deformer.get_keyform", {
+    deformerId: "warp", keyArtId: "key_art",
+  }), null);
+});
+
+test("headless capabilities expose deterministic Warp commands and queries", () => {
+  const project = domainProject();
+  const adapter = new HeadlessProductAdapter(new EditorSession(project));
+  assert.ok(adapter.capabilities().commands["deformer.create_warp"]);
+  assert.ok(adapter.capabilities().commands["deformer.set_keyform"]);
+  assert.ok(adapter.capabilities().queries["deformer.get_keyform"]);
+  adapter.execute(createWarpCommand({ parentNodeId: project.scene.rootId }));
+  assert.equal(adapter.query("deformer.get", { deformerId: "warp" }).id, "warp");
+  assert.deepEqual(adapter.query("deformer.validate", {}), { valid: true, issues: [] });
 });

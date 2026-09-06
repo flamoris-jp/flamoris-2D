@@ -14,6 +14,7 @@ import {
   clippingBindingForTarget,
   clippingValidationResult,
 } from "../model/clipping-validation.js";
+import { warpDeformerValidationResult } from "../model/warp-deformer-validation.js";
 
 function temporalProgram(project, programId) {
   const program = project.temporalPrograms.find((entry) => entry.id === programId);
@@ -204,6 +205,25 @@ export const projectQueries = {
     .sort((left, right) => left.id.localeCompare(right.id))
     .map(cloneProject),
   "clipping.validate": (project) => clippingValidationResult(project),
+  "deformer.list": (project) => [...project.rig.deformers]
+    .sort((left, right) => left.id.localeCompare(right.id))
+    .map(cloneProject),
+  "deformer.get": (project, input) => {
+    const deformer = project.rig.deformers.find((entry) => entry.id === input.deformerId);
+    if (!deformer) throw new Error(`Unknown WarpDeformer ${input.deformerId}.`);
+    return {
+      ...cloneProject(deformer),
+      controlPoints: deformer.controlPointIds.map((id) => cloneProject(
+        project.rig.warpControlPoints.find((entry) => entry.id === id),
+      )),
+      childNodeIds: [...(project.scene.nodes[deformer.id]?.children || [])],
+    };
+  },
+  "deformer.get_keyform": (project, input) => cloneProject(
+    project.rig.warpDeformerKeyforms.find((entry) =>
+      entry.deformerId === input.deformerId && entry.keyArtId === input.keyArtId) || null,
+  ),
+  "deformer.validate": (project) => warpDeformerValidationResult(project),
   "scene.get_tree": (project, input = {}) =>
     treeNode(project, project.scene.rootId, input.includeHidden !== false),
   "scene.get_node": (project, input) => {

@@ -177,3 +177,8 @@ export function validateWarpDeformers(project, register = () => {}) {
     compareText(left.code, right.code) || compareText(left.entityId || "", right.entityId || "") ||
     compareText(left.path, right.path));
 }
+
+export function warpDeformerValidationResult(project) {
+  const issues = validateWarpDeformers(project);
+  return { valid: issues.length === 0, issues };
+}

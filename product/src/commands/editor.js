@@ -8,6 +8,7 @@ import { temporalCommandHandlers } from "./temporal-command-handlers.js";
 import { transitionCommandHandlers } from "./transition-command-handlers.js";
 import { meshTopologyCommandHandlers } from "./mesh-topology-command-handlers.js";
 import { clippingCommandHandlers } from "./clipping-command-handlers.js";
+import { warpDeformerCommandHandlers } from "./warp-deformer-command-handlers.js";
 
 export { CommandError, TransactionError } from "./errors.js";
 
@@ -17,6 +18,7 @@ const handlers = {
   ...transitionCommandHandlers,
   ...meshTopologyCommandHandlers,
   ...clippingCommandHandlers,
+  ...warpDeformerCommandHandlers,
 };
 
 function assertCommand(command, { allowInternal = false } = {}) {
