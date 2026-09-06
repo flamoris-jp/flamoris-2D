@@ -26,6 +26,7 @@ src/core/transforms.js
 src/core/temporal.js
 src/core/transition-evaluator.js
 src/core/clipping-evaluator.js
+src/core/clipping-raster-plan.js
 src/core/evaluated-render.js
 src/core/shared-composition-renderer.js
 src/core/composition-render-target.js
