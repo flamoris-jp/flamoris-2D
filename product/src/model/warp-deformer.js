@@ -6,13 +6,17 @@ export function isWarpGridDimension(value) {
   return Number.isInteger(value) && WARP_GRID_PRESETS.includes(value);
 }
 
+export function isWarpGridPreset(columns, rows) {
+  return columns === rows && isWarpGridDimension(columns);
+}
+
 export function createRegularWarpControlPoints({
   deformerId,
   columns,
   rows,
   controlPointIds,
 }) {
-  if (!isWarpGridDimension(columns) || !isWarpGridDimension(rows)) {
+  if (!isWarpGridPreset(columns, rows)) {
     throw new TypeError("Warp grid dimensions must use the 2x2, 3x3, or 4x4 presets.");
   }
   if (!Array.isArray(controlPointIds) || controlPointIds.length !== columns * rows) {

@@ -88,8 +88,15 @@ export function createFl2dDocument(
         left.keyArtId < right.keyArtId ? -1 : left.keyArtId > right.keyArtId ? 1 : 0)
     .map((keyform) => ({
       ...keyform,
-      controlPoints: [...keyform.controlPoints].sort((left, right) =>
-        left.controlPointId < right.controlPointId ? -1 : left.controlPointId > right.controlPointId ? 1 : 0),
+      controlPoints: (() => {
+        const deformer = body.rig.deformers.find((entry) => entry.id === keyform.deformerId);
+        const order = new Map((deformer?.controlPointIds || [])
+          .map((controlPointId, index) => [controlPointId, index]));
+        return [...keyform.controlPoints].sort((left, right) =>
+          (order.get(left.controlPointId) ?? Number.MAX_SAFE_INTEGER) -
+            (order.get(right.controlPointId) ?? Number.MAX_SAFE_INTEGER) ||
+          (left.controlPointId < right.controlPointId ? -1 : left.controlPointId > right.controlPointId ? 1 : 0));
+      })(),
     }));
   body.transitions = [...body.transitions].sort(byId).map((transition) => ({
     ...transition,

@@ -190,6 +190,18 @@ Initial grid presets: 2x2, 3x3, 4x4.
 
 Control points require stable identity. Key Art A and B may store different authored control-point positions while compatible Deformer topology remains stable.
 
+The `WarpDeformer.id` is the same logical stable ID as its `DeformerNode` in
+the Scene map. The Scene node owns `children[]` and is the only hierarchy;
+`parentNodeId` on the rig capability must match `SceneNode.parentId` and is
+validated rather than forming a second graph. Warp capabilities, control-point
+topology, and Key-Art keyforms are stored in `project.rig.deformers`,
+`project.rig.warpControlPoints`, and `project.rig.warpDeformerKeyforms`.
+
+Preset topology is square only (2x2, 3x3, or 4x4). `controlPointIds[]` is the
+canonical row-major order from top-left to bottom-right. The normalized `u/v`
+values are derived once at creation, while identity always remains the explicit
+stable ID rather than an array index or floating-point coordinate.
+
 ## 9. Deformation semantics
 
 Initial implementation should use deterministic regular lattice interpolation, such as bilinear/bicubic evaluation over the grid.

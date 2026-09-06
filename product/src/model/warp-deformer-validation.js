@@ -1,4 +1,4 @@
-import { isWarpGridDimension } from "./warp-deformer.js";
+import { isWarpGridPreset } from "./warp-deformer.js";
 
 function problem(code, path, message, entityId = null) {
   return { code, path, message, entityId, severity: "error" };
@@ -68,7 +68,7 @@ export function validateWarpDeformers(project, register = () => {}) {
       issues.push(problem("DEFORMER_CHILD_REFERENCE_INVALID", `${path}.displayName`,
         "WarpDeformer display name must match its Scene node.", deformer.id));
     }
-    if (!isWarpGridDimension(deformer.columns) || !isWarpGridDimension(deformer.rows)) {
+    if (!isWarpGridPreset(deformer.columns, deformer.rows)) {
       issues.push(problem("DEFORMER_CONTROL_POINT_INVALID", `${path}.columns`,
         "Warp grid dimensions must use the 2x2, 3x3, or 4x4 presets.", deformer.id));
     }
@@ -105,7 +105,7 @@ export function validateWarpDeformers(project, register = () => {}) {
 
   for (const [index, deformer] of deformers.entries()) {
     if (!Array.isArray(deformer.controlPointIds) ||
-      !isWarpGridDimension(deformer.columns) || !isWarpGridDimension(deformer.rows)) continue;
+      !isWarpGridPreset(deformer.columns, deformer.rows)) continue;
     for (const [pointIndex, pointId] of deformer.controlPointIds.entries()) {
       const point = controlPointById.get(pointId);
       const expectedU = (pointIndex % deformer.columns) / (deformer.columns - 1);
@@ -116,6 +116,14 @@ export function validateWarpDeformers(project, register = () => {}) {
           `rig.deformers.${index}.controlPointIds.${pointIndex}`,
           "Warp control-point topology must match the canonical row-major regular grid.", deformer.id));
       }
+    }
+  }
+
+  for (const [pointId, point] of controlPointById) {
+    const owner = deformerById.get(point.deformerId);
+    if (owner && !owner.controlPointIds.includes(pointId)) {
+      issues.push(problem("DEFORMER_CONTROL_POINT_INVALID", `rig.warpControlPoints.${pointId}`,
+        "WarpControlPoint is not part of its owner's canonical topology.", pointId));
     }
   }
 

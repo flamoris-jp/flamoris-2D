@@ -193,6 +193,8 @@ export const projectQueries = {
       meshTopologies: project.meshTopologies.length,
       meshKeyforms: project.meshKeyforms.length,
       clippingBindings: project.clippingBindings.length,
+      deformers: project.rig.deformers.length,
+      warpDeformerKeyforms: project.rig.warpDeformerKeyforms.length,
       transitions: project.transitions.length,
       clips: project.animation.clips.length,
       temporalPrograms: project.temporalPrograms.length,

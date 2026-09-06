@@ -165,6 +165,9 @@ test("regular topology rejects unsupported grid dimensions and missing stable ID
     deformerId: "warp", columns: 5, rows: 2, controlPointIds: pointIds(10),
   }), /2x2, 3x3, or 4x4/);
   assert.throws(() => createRegularWarpControlPoints({
+    deformerId: "warp", columns: 2, rows: 3, controlPointIds: pointIds(6),
+  }), /2x2, 3x3, or 4x4/);
+  assert.throws(() => createRegularWarpControlPoints({
     deformerId: "warp", columns: 2, rows: 2, controlPointIds: pointIds(3),
   }), /one stable ID per control point/);
 });

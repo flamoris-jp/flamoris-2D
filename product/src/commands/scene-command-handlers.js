@@ -97,9 +97,9 @@ export const sceneCommandHandlers = {
       );
     }
     const parent = nodeFor(project, payload.parentId);
-    if (parent.kind !== "group") {
+    if (!["group", "deformer"].includes(parent.kind)) {
       throw new CommandError(
-        "Groups can only be created under a group.",
+        "Groups can only be created under a group or deformer.",
         "scene.invalid_parent_kind",
       );
     }
