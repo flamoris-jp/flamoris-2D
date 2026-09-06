@@ -32,6 +32,42 @@ function canonicalCycle(nodeIds) {
   return [...nodeIds.slice(start), ...nodeIds.slice(0, start)];
 }
 
+export function findClippingDependencyCycles(relations) {
+  const sourceByTarget = new Map();
+  for (const relation of [...relations].sort((left, right) =>
+    compareText(left.targetNodeId, right.targetNodeId) ||
+    compareText(left.sourceNodeId, right.sourceNodeId))) {
+    if (!sourceByTarget.has(relation.targetNodeId)) {
+      sourceByTarget.set(relation.targetNodeId, relation.sourceNodeId);
+    }
+  }
+
+  const state = new Map();
+  const stack = [];
+  const stackIndex = new Map();
+  const found = new Map();
+  const visit = (nodeId) => {
+    state.set(nodeId, "visiting");
+    stackIndex.set(nodeId, stack.length);
+    stack.push(nodeId);
+    const sourceNodeId = sourceByTarget.get(nodeId);
+    if (sourceNodeId && sourceByTarget.has(sourceNodeId)) {
+      if (state.get(sourceNodeId) === "visiting") {
+        const cycle = canonicalCycle(stack.slice(stackIndex.get(sourceNodeId)));
+        found.set(cycle.join("\u0000"), cycle);
+      } else if (state.get(sourceNodeId) !== "visited") visit(sourceNodeId);
+    }
+    stack.pop();
+    stackIndex.delete(nodeId);
+    state.set(nodeId, "visited");
+  };
+  for (const nodeId of [...sourceByTarget.keys()].sort(compareText)) {
+    if (!state.has(nodeId)) visit(nodeId);
+  }
+  return [...found.values()].sort((left, right) =>
+    compareText(left.join("\u0000"), right.join("\u0000")));
+}
+
 export function isRenderableClippingNode(node) {
   return node?.kind === "part";
 }
@@ -55,31 +91,7 @@ function cycleProblems(project, bindings) {
     bindingByTarget.set(binding.targetNodeId, binding);
   }
 
-  const state = new Map();
-  const stack = [];
-  const stackIndex = new Map();
-  const found = new Map();
-  const visit = (nodeId) => {
-    state.set(nodeId, "visiting");
-    stackIndex.set(nodeId, stack.length);
-    stack.push(nodeId);
-    const sourceNodeId = bindingByTarget.get(nodeId)?.sourceNodeId;
-    if (sourceNodeId && bindingByTarget.has(sourceNodeId)) {
-      if (state.get(sourceNodeId) === "visiting") {
-        const cycle = canonicalCycle(stack.slice(stackIndex.get(sourceNodeId)));
-        found.set(cycle.join("\u0000"), cycle);
-      } else if (state.get(sourceNodeId) !== "visited") visit(sourceNodeId);
-    }
-    stack.pop();
-    stackIndex.delete(nodeId);
-    state.set(nodeId, "visited");
-  };
-  for (const nodeId of [...bindingByTarget.keys()].sort(compareText)) {
-    if (!state.has(nodeId)) visit(nodeId);
-  }
-
-  return [...found.values()]
-    .sort((left, right) => compareText(left.join("\u0000"), right.join("\u0000")))
+  return findClippingDependencyCycles([...bindingByTarget.values()])
     .map((nodeIds) => {
       const bindingIds = nodeIds.map((nodeId) => bindingByTarget.get(nodeId).id).sort(compareText);
       return problem(

@@ -44,6 +44,25 @@ function binding(id, targetNodeId, sourceNodeId, enabled = true) {
   return { id, targetNodeId, sourceNodeId, mode: "inside", enabled };
 }
 
+function clippingTrack(trackId, target, sourceNodeId) {
+  return {
+    trackId,
+    version: 1,
+    kind: "ClippingTrack",
+    target,
+    channels: {
+      clipping: {
+        keyframes: [{
+          id: trackId + "_key",
+          timeTicks: 0,
+          value: { sourceNodeId },
+          interpolationToNext: { kind: "step" },
+        }],
+      },
+    },
+  };
+}
+
 function issueCodes(project) {
   return validateClippingBindings(project).map((entry) => entry.code);
 }
@@ -250,6 +269,52 @@ test("transaction rollback leaves no partial clipping cycle", () => {
   assert.deepEqual(session.query("clipping.list"), []);
 });
 
+test("ClippingTrack cycle is rejected and rolls back its transaction", () => {
+  const session = new EditorSession(evaluationProject());
+  const before = structuredClone(session.project);
+  const track = clippingTrack(
+    "track_cycle",
+    { semanticSlotId: "slot_mask" },
+    "mask_alt",
+  );
+  track.channels.clipping.keyframes.push({
+    id: "track_cycle_key_cycle",
+    timeTicks: 60000,
+    value: { sourceNodeId: "target" },
+    interpolationToNext: { kind: "step" },
+  });
+  assert.throws(() => session.execute({
+    type: "animation.temporal.add_track",
+    payload: {
+      programId: "program_ab",
+      track,
+    },
+  }), (error) => {
+    assert.equal(error instanceof TransactionError, true);
+    assert.equal(error.issues.some((entry) => entry.code === "CLIPPING_CYCLE"), true);
+    return true;
+  });
+  assert.deepEqual(session.project, before);
+});
+
+test("KeyArt clipping cycle is rejected before persistent commit", () => {
+  const session = new EditorSession(evaluationProject());
+  const before = structuredClone(session.project);
+  const keyArt = structuredClone(session.project.keyArts[0]);
+  keyArt.members.find((entry) => entry.nodeId === "mask").clipping = {
+    sourceNodeId: "target",
+  };
+  assert.throws(() => session.execute({
+    type: "keyart.update",
+    payload: { keyArtId: keyArt.id, keyArt },
+  }), (error) => {
+    assert.equal(error instanceof TransactionError, true);
+    assert.equal(error.issues.some((entry) => entry.code === "CLIPPING_CYCLE"), true);
+    return true;
+  });
+  assert.deepEqual(session.project, before);
+});
+
 test("Save Open preserves clipping stable IDs and canonical collection order", () => {
   const project = domainProject();
   for (const id of ["source", "target_a", "target_b"]) addNode(project, id);
@@ -344,6 +409,50 @@ test("disabled binding suppresses its static and tracked clipping relationship",
   const evaluated = evaluateTransition(project, "transition_ab", 60000);
   const target = evaluated.evaluatedParts.find((part) =>
     part.semanticSlotId === "slot_target").renderInstances[0];
+  assert.equal(target.clipping, null);
+});
+
+test("Morph also suppresses ClippingTrack when its binding is disabled", () => {
+  const project = evaluationProject();
+  project.clippingBindings[0].enabled = false;
+  project.meshTopologies.push({
+    id: "topology_target",
+    vertexIds: ["vtx_target_1", "vtx_target_2", "vtx_target_3"],
+    indices: [0, 1, 2],
+  });
+  project.meshKeyforms.push(
+    {
+      id: "keyform_target_a",
+      topologyId: "topology_target",
+      keyArtId: "keyart_a",
+      semanticSlotId: "slot_target",
+      positions: [0, 0, 10, 0, 0, 10],
+      uvs: [0, 0, 1, 0, 0, 1],
+    },
+    {
+      id: "keyform_target_b",
+      topologyId: "topology_target",
+      keyArtId: "keyart_b",
+      semanticSlotId: "slot_target",
+      positions: [1, 1, 11, 1, 1, 11],
+      uvs: [0, 0, 1, 0, 0, 1],
+    },
+  );
+  const part = project.transitions[0].partTransitions.find((entry) =>
+    entry.semanticSlotId === "slot_target");
+  Object.assign(part, {
+    mode: "morph",
+    topologyId: "topology_target",
+    fromKeyformId: "keyform_target_a",
+    toKeyformId: "keyform_target_b",
+  });
+  project.temporalPrograms[0].tracks.push(
+    clippingTrack("track_clipping", { semanticSlotId: "slot_target" }, "mask_alt"),
+  );
+  assert.deepEqual(validateProject(project), []);
+  const evaluated = evaluateTransition(project, "transition_ab", 60000);
+  const target = evaluated.evaluatedParts.find((entry) =>
+    entry.semanticSlotId === "slot_target").renderInstances[0];
   assert.equal(target.clipping, null);
 });
 

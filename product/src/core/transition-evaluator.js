@@ -138,11 +138,6 @@ function endpointStateClipping(project, state) {
   return bindingClipping(project, state?.node.id) || { sourceNodeId: null, mode: "inside" };
 }
 
-function endpointClipping(project, from, to, amount) {
-  const state = amount < 0.5 ? from : to;
-  return endpointStateClipping(project, state);
-}
-
 function sampledClipping(project, sample, semanticSlotId, state) {
   const binding = state
     ? clippingBindingForTarget(project, state.node.id)
@@ -274,10 +269,7 @@ function evaluateMorph(project, transition, part, slot, from, to, fromMesh, toMe
   const opacity = clamp(sampledValue(sample, "OpacityTrack", "opacity", slot.id) ?? endpointOpacity(from, to, u), 0, 1);
   const presence = sampledValue(sample, "PresenceTrack", "presence", slot.id) ?? endpointPresence(from, to, u);
   const drawOrder = sampledValue(sample, "DrawOrderTrack", "drawOrder", slot.id) ?? endpointDrawOrder(from, to, u);
-  const clippingSample = sampledValue(sample, "ClippingTrack", "clipping", slot.id);
-  const clipping = clippingSample !== null
-    ? { sourceNodeId: clippingSample.sourceNodeId, mode: "inside" }
-    : endpointClipping(project, from, to, u);
+  const clipping = sampledClipping(project, sample, slot.id, u < 0.5 ? from : to);
   if (presence !== "present") return { semanticSlotId: slot.id, presence, renderInstances: [] };
   const topology = entity(project, "meshTopologies", part.topologyId, "MeshTopology");
   const mesh = {
