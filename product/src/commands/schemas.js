@@ -15,6 +15,19 @@ const domainObject = { type: "object" };
 const numberArray = { type: "array", items: finiteNumber };
 const vertexIdArray = { type: "array", items: nonEmptyString };
 
+const clippingBinding = {
+  type: "object",
+  required: ["id", "targetNodeId", "sourceNodeId", "mode", "enabled"],
+  properties: {
+    id: nonEmptyString,
+    targetNodeId: nodeId,
+    sourceNodeId: nodeId,
+    mode: { type: "string", const: "inside" },
+    enabled: { type: "boolean" },
+  },
+  additionalProperties: false,
+};
+
 const point = {
   type: "object",
   required: ["x", "y"],
@@ -39,6 +52,30 @@ const transform = {
 };
 
 export const commandSchemas = {
+  "clipping.create": {
+    type: "object",
+    required: ["binding"],
+    properties: { binding: clippingBinding },
+    additionalProperties: false,
+  },
+  "clipping.set_source": {
+    type: "object",
+    required: ["bindingId", "sourceNodeId"],
+    properties: { bindingId: nonEmptyString, sourceNodeId: nodeId },
+    additionalProperties: false,
+  },
+  "clipping.set_enabled": {
+    type: "object",
+    required: ["bindingId", "enabled"],
+    properties: { bindingId: nonEmptyString, enabled: { type: "boolean" } },
+    additionalProperties: false,
+  },
+  "clipping.remove": {
+    type: "object",
+    required: ["bindingId"],
+    properties: { bindingId: nonEmptyString },
+    additionalProperties: false,
+  },
   "keyart.create": {
     type: "object",
     required: ["keyArt"],
@@ -408,6 +445,18 @@ function entityRestoreSchema() {
 }
 
 const internalCommandSchemas = {
+  "clipping.remove_internal": {
+    type: "object",
+    required: ["bindingId"],
+    properties: { bindingId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "clipping.restore": {
+    type: "object",
+    required: ["binding", "index"],
+    properties: { binding: clippingBinding, index: nonNegativeInteger },
+    additionalProperties: false,
+  },
   "keyArts.remove_internal": entityRemovalSchema(),
   "keyart.restore": entityRestoreSchema(),
   "semanticSlots.remove_internal": entityRemovalSchema(),
