@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 
 import { EditorSession } from "../src/commands/editor.js";
 import { deserializeProject, serializeProject } from "../src/io/project-json.js";
@@ -250,4 +251,19 @@ test("viewport pointer drag selects and commits one Warp authoring gesture", () 
   assert.deepEqual(session.query("deformer.get_keyform", {
     deformerId: "warp", keyArtId: "keyart_a",
   }).controlPoints[0], { controlPointId: "cp_tl", x: 8, y: 4 });
+});
+
+test("Warp authoring stays DOM-independent, command-based, and production packaged", async () => {
+  const [controller, overlay, manifest] = await Promise.all([
+    readFile(new URL("../src/ui/deformer-authoring-controller.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/ui/deformer-viewport-overlay.js", import.meta.url), "utf8"),
+    readFile(new URL("../production-files.txt", import.meta.url), "utf8"),
+  ]);
+  assert.doesNotMatch(controller, /\bdocument\b|\bwindow\b|HTMLElement|session\.project/);
+  assert.match(controller, /deformer\.move_control_points/);
+  assert.match(controller, /deformer\.set_keyform/);
+  assert.match(controller, /deformer\.reset_control_points/);
+  assert.doesNotMatch(overlay, /SharedCompositionRenderer|renderEvaluated|clippingBinding/);
+  assert.match(manifest, /^src\/ui\/deformer-authoring-controller\.js$/m);
+  assert.match(manifest, /^src\/ui\/deformer-viewport-overlay\.js$/m);
 });
