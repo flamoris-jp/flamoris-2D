@@ -280,6 +280,23 @@ controlPoint(t) = lerp(controlPointA, controlPointB, transitionWeight)
 
 Reuse the existing deterministic Transition timing and timebase.
 
+Phase 6-4 resolves Warp at the existing Transition render-instance boundary.
+For Morph, the endpoint mesh positions are interpolated first, then every
+common ancestor Warp cage is interpolated with the same sampled
+`geometryWeight`, and the resulting stages are evaluated parent first. Hold,
+Appear, Disappear, and Occlusion use the selected endpoint's Warp keyform.
+Replace keeps its existing dual-render-instance composition and evaluates each
+endpoint instance with that endpoint's Warp keyform. The evaluated part world
+transform is used only to construct the reversible Part-local to Deformer-local
+space; the renderer receives only the final deformed local mesh and remains
+unaware of Warp domain state.
+
+The ancestor Warp stable-ID sequence must agree at both Morph endpoints. A
+missing keyform or incompatible ancestor/topology produces deterministic
+diagnostics. Evaluation never creates persistent keyforms; an explicit first
+authoring edit creates the regular-lattice keyform through the existing
+Deformer command boundary.
+
 If required Deformer keyforms/topology are missing or incompatible, evaluation emits diagnostics rather than inventing geometry.
 
 Example diagnostics:
@@ -312,6 +329,15 @@ UI should provide:
 - Inspector grid preset and active Key Art;
 - viewport lattice boundary, grid, control points, selection, box select, move, reset selected/all;
 - Key Art A/B marker and optional transient ghost comparison.
+
+The active Warp Key Art is the endpoint selected by the existing Key State
+Strip / Transition endpoint workflow. Selected/hovered control points, box
+selection, drag previews, and optional ghost state are editor-workspace state
+only. A drag may preview transient positions, but commits one
+`deformer.move_control_points` command so one gesture creates one history
+entry. The existing viewport overlay canvas and camera transform render the
+lattice; no second Scene tree, canvas stack, render loop, or persistent UI
+model is introduced.
 
 No brush/proportional-edit layer is required initially because the lattice itself provides broad deformation.
 

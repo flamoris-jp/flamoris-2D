@@ -8,6 +8,7 @@ import { MeshToolController } from "./mesh-tool-controller.js";
 import { KeyStateStripController } from "./key-state-strip-controller.js";
 import { CorrespondencePreviewController } from "./correspondence-preview-controller.js";
 import { ClippingAuthoringController } from "./clipping-authoring-controller.js";
+import { DeformerAuthoringController } from "./deformer-authoring-controller.js";
 
 function filterTree(node, matches) {
   const children = node.children
@@ -55,6 +56,9 @@ export class EditorUiAdapter {
     this.endpointMesh = new EndpointMeshController(session, this.transitionAuthoring, {
       onChange: (reason) => this.notify(reason),
     });
+    this.deformerAuthoring = new DeformerAuthoringController(session, this.endpointMesh, {
+      onChange: (reason) => this.notify(reason),
+    });
     this.transitionPreview = new TransitionPreviewController(session, this.transitionAuthoring, {
       onChange: (reason) => this.notify(reason),
     });
@@ -95,7 +99,7 @@ export class EditorUiAdapter {
   expandAllGroups() {
     const tree = this.session.query("scene.get_tree", { includeHidden: true });
     const walk = (node) => {
-      if (node.kind === "group") this.expandedNodeIds.add(node.id);
+      if (["group", "deformer"].includes(node.kind)) this.expandedNodeIds.add(node.id);
       node.children.forEach(walk);
     };
     walk(tree);
@@ -129,6 +133,9 @@ export class EditorUiAdapter {
     if (nodeId !== null) this.session.query("scene.get_node", { nodeId });
     if (this.selectedNodeId === nodeId) return;
     this.selectedNodeId = nodeId;
+    this.deformerAuthoring.selectDeformer(
+      nodeId && this.session.project.scene.nodes[nodeId]?.kind === "deformer" ? nodeId : null,
+    );
     this.cancelTransformDrag();
     this.notify("selection");
   }

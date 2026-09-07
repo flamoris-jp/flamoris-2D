@@ -167,6 +167,7 @@ const viewportRenderer = createViewportRenderer({
       showMask: Boolean(clipping?.binding && clipping.showMask),
     };
   },
+  deformerAuthoringContext: () => state.editor?.deformerAuthoring.getState() || null,
 });
 
 const sceneEditorView = createSceneEditorView({
@@ -531,7 +532,8 @@ function handleEditorChange(reason) {
     reason === "selection" &&
     isMeshAuthoringMode(state.editorMode) &&
     state.editTargetNodeId &&
-    state.editor.selectedNodeId !== state.editTargetNodeId
+    state.editor.selectedNodeId !== state.editTargetNodeId &&
+    state.editor.selectedNode()?.kind !== "deformer"
   ) {
     state.editor.selectedNodeId = state.editTargetNodeId;
     setStatus("Edit Mode中はactive mesh-edit targetを変更できません");
@@ -1045,8 +1047,21 @@ function commitInspectorEdit(action) {
 
 elements.displayNameInput.addEventListener("change", () => {
   commitInspectorEdit(() => {
-    state.editor?.renameSelected(elements.displayNameInput.value);
+    if (state.editor?.selectedNode()?.kind === "deformer") {
+      state.editor.deformerAuthoring.rename(elements.displayNameInput.value);
+    } else state.editor?.renameSelected(elements.displayNameInput.value);
   });
+});
+elements.deformerGridSelect.addEventListener("change", () => {
+  commitInspectorEdit(() => {
+    state.editor?.deformerAuthoring.setGrid(Number(elements.deformerGridSelect.value));
+  });
+});
+elements.resetSelectedDeformerPointsButton.addEventListener("click", () => {
+  commitInspectorEdit(() => state.editor?.deformerAuthoring.resetSelected());
+});
+elements.resetAllDeformerPointsButton.addEventListener("click", () => {
+  commitInspectorEdit(() => state.editor?.deformerAuthoring.resetAll());
 });
 elements.visibilityInput.addEventListener("change", () => {
   const nodeId = state.editor?.selectedNodeId;
@@ -1118,6 +1133,7 @@ bindViewportInteractions({
   endpointMesh: () => state.editor?.endpointMesh || null,
   meshTools: () => state.editor?.meshTools || null,
   correspondencePreview: () => state.editor?.correspondencePreview || null,
+  deformerAuthoring: () => state.editor?.deformerAuthoring || null,
   loadFile,
 });
 

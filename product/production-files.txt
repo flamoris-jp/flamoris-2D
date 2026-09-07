@@ -72,6 +72,8 @@ src/ui/mesh-tool-controller.js
 src/ui/automesh-preview-controller.js
 src/ui/correspondence-preview-controller.js
 src/ui/clipping-authoring-controller.js
+src/ui/deformer-authoring-controller.js
+src/ui/deformer-viewport-overlay.js
 src/ui/correspondence-view.js
 src/core/contour-automesh.js
 src/core/correspondence-solver.js

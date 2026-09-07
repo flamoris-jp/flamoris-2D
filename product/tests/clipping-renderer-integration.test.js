@@ -5,6 +5,10 @@ import { ExportFrameRenderer } from "../src/core/export-frame-renderer.js";
 import { createClippingRasterPlan } from "../src/core/clipping-raster-plan.js";
 import { evaluateTransition } from "../src/core/transition-evaluator.js";
 import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
+import {
+  createWarpDeformer,
+  defaultWarpKeyformControlPoints,
+} from "../src/model/warp-deformer.js";
 import { renderEvaluatedTransitionViewport } from "../src/ui/viewport-renderer.js";
 
 function member(nodeId, appearanceId, drawOrder, opacity = 1) {
@@ -130,6 +134,98 @@ function capableCapture(calls) {
   };
 }
 
+function attachNestedWarp(project) {
+  const existingChildren = [...project.scene.nodes[project.scene.rootId].children];
+  const add = (id, parentNodeId) => {
+    const created = createWarpDeformer({
+      id,
+      displayName: id,
+      parentNodeId,
+      columns: 2,
+      rows: 2,
+      bounds: { left: 0, top: 0, right: 64, bottom: 64 },
+      controlPointIds: [`${id}_tl`, `${id}_tr`, `${id}_bl`, `${id}_br`],
+    });
+    project.scene.nodes[id] = createSceneNode({
+      id, kind: "deformer", displayName: id, parentId: parentNodeId,
+    });
+    project.rig.deformers.push(created.deformer);
+    project.rig.warpControlPoints.push(...created.controlPoints);
+    const regular = defaultWarpKeyformControlPoints(created.deformer, created.controlPoints);
+    project.rig.warpDeformerKeyforms.push(
+      {
+        deformerId: id,
+        keyArtId: "keyart_a",
+        controlPoints: regular.map((point) => ({
+          ...point,
+          x: point.x + (id === "head_warp" ? 3 : 0),
+          y: point.y + (id === "body_warp" ? 2 : 0),
+        })),
+      },
+      {
+        deformerId: id,
+        keyArtId: "keyart_b",
+        controlPoints: regular.map((point) => ({
+          ...point,
+          x: point.x + (id === "head_warp" ? 7 : 0),
+          y: point.y + (id === "body_warp" ? 6 : 0),
+        })),
+      },
+    );
+    return created;
+  };
+  add("body_warp", project.scene.rootId);
+  add("head_warp", "body_warp");
+  project.scene.nodes[project.scene.rootId].children = ["body_warp"];
+  project.scene.nodes.body_warp.children = ["head_warp"];
+  project.scene.nodes.head_warp.children = existingChildren;
+  for (const nodeId of existingChildren) project.scene.nodes[nodeId].parentId = "head_warp";
+}
+
+function addMorphPart(project, slotId, drawOrder) {
+  const nodes = ["a", "b"].map((endpoint) => `${slotId}_${endpoint}`);
+  for (const nodeId of nodes) {
+    project.scene.nodes[nodeId] = createSceneNode({
+      id: nodeId,
+      displayName: nodeId,
+      parentId: project.scene.rootId,
+      bounds: { left: 0, top: 0, right: 12, bottom: 12 },
+    });
+    project.scene.nodes[project.scene.rootId].children.push(nodeId);
+  }
+  project.keyArts[0].members.push(member(nodes[0], `${slotId}_appearance_a`, drawOrder));
+  project.keyArts[1].members.push(member(nodes[1], `${slotId}_appearance_b`, drawOrder));
+  project.semanticSlots.push({
+    id: slotId,
+    displayName: slotId,
+    role: null,
+    mappings: [
+      { keyArtId: "keyart_a", nodeId: nodes[0] },
+      { keyArtId: "keyart_b", nodeId: nodes[1] },
+    ],
+    metadata: {},
+  });
+  project.meshTopologies.push({
+    id: `${slotId}_topology`,
+    vertexIds: [`${slotId}_v0`, `${slotId}_v1`, `${slotId}_v2`],
+    indices: [0, 1, 2],
+  });
+  project.meshKeyforms.push(
+    { id: `${slotId}_keyform_a`, topologyId: `${slotId}_topology`, keyArtId: "keyart_a", semanticSlotId: slotId, positions: [0, 0, 12, 0, 0, 12], uvs: [0, 0, 1, 0, 0, 1] },
+    { id: `${slotId}_keyform_b`, topologyId: `${slotId}_topology`, keyArtId: "keyart_b", semanticSlotId: slotId, positions: [2, 0, 14, 0, 2, 12], uvs: [0, 0, 1, 0, 0, 1] },
+  );
+  project.transitions[0].partTransitions.push({
+    id: `${slotId}_transition`,
+    semanticSlotId: slotId,
+    mode: "morph",
+    topologyId: `${slotId}_topology`,
+    fromKeyformId: `${slotId}_keyform_a`,
+    toKeyformId: `${slotId}_keyform_b`,
+    configuration: {},
+  });
+  return nodes;
+}
+
 test("Hold, Morph, and Replace clipping share identical preview and export render plans", () => {
   for (const mode of ["hold", "morph", "replace"]) {
     const project = fixture(mode);
@@ -234,4 +330,57 @@ test("invalid resolved source fails safely in the shared preview renderer", () =
     resolveArtwork: (nodeId) => ({ nodeId }),
   });
   assert.match(report.unsupportedReasons[0], /missing_evaluated_source is unavailable/);
+});
+
+test("FLAMORIS face proof keeps nested-Warp face hair iris and pupil on the shared clipping/export path", () => {
+  const project = fixture("morph");
+  addMorphPart(project, "face", 3);
+  addMorphPart(project, "front_hair", 4);
+  const pupilNodes = addMorphPart(project, "pupil", 5);
+  project.clippingBindings.push(
+    { id: "pupil_clip_a", targetNodeId: pupilNodes[0], sourceNodeId: "source_a", mode: "inside", enabled: true },
+    { id: "pupil_clip_b", targetNodeId: pupilNodes[1], sourceNodeId: "source_b", mode: "inside", enabled: true },
+  );
+  attachNestedWarp(project);
+  const evaluation = evaluateTransition(project, "transition_ab", 60000);
+  const target = evaluation.evaluatedParts.find((part) => part.semanticSlotId === "slot_target")
+    .renderInstances[0];
+  const source = evaluation.evaluatedParts.flatMap((part) => part.renderInstances)
+    .find((instance) => instance.renderInstanceId === target.clipping.sourceRenderInstanceId);
+  assert.deepEqual(source.mesh.positions, [6, 4, 18, 4, 6, 16]);
+  assert.deepEqual(target.mesh.positions, [6, 4, 18, 4, 6, 16]);
+  assert.equal(source.opacity, 0.6);
+  for (const slotId of ["face", "front_hair"]) {
+    assert.deepEqual(
+      evaluation.evaluatedParts.find((part) => part.semanticSlotId === slotId)
+        .renderInstances[0].mesh.positions,
+      [6, 4, 18, 4, 6, 16],
+    );
+  }
+  const pupil = evaluation.evaluatedParts.find((part) => part.semanticSlotId === "pupil")
+    .renderInstances[0];
+  assert.equal(pupil.clipping.sourceRenderInstanceId, source.renderInstanceId);
+
+  const previewCalls = [];
+  renderEvaluatedTransitionViewport({
+    evaluation,
+    view: { scale: 1, originX: 0, originY: 0 },
+    renderer: capableCapture(previewCalls),
+    resolveArtwork: (nodeId) => ({ nodeId }),
+  });
+  const exportCalls = [];
+  const exported = new ExportFrameRenderer({
+    createOffscreenRenderer: () => capableCapture(exportCalls),
+  }).render({
+    project,
+    transitionId: "transition_ab",
+    frameRate: { numerator: 24, denominator: 1 },
+    frameIndex: 12,
+    outputWidth: 64,
+    outputHeight: 64,
+    renderAssets: assets(project),
+  });
+  assert.equal(exported.ok, true);
+  assert.deepEqual(exportCalls[0].plan, previewCalls[0].plan);
+  assert.equal(createClippingRasterPlan(exportCalls[0].plan).maskSourceIds.length, 1);
 });

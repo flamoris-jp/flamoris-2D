@@ -3,6 +3,7 @@ import { sampleLoop } from "../animation.js";
 import { transformPoint } from "../core/transforms.js";
 import { EDITOR_MODES, isMeshAuthoringMode } from "./editor-modes.js";
 import { renderEvaluatedComposition } from "../core/shared-composition-renderer.js";
+import { projectDeformerLattice } from "./deformer-viewport-overlay.js";
 
 export function renderEvaluatedTransitionViewport({
   evaluation,
@@ -92,6 +93,7 @@ export function createViewportRenderer({
   autoMeshPreviewContext = () => null,
   correspondencePreviewContext = () => null,
   clippingAuthoringContext = () => null,
+  deformerAuthoringContext = () => null,
 }) {
   function screenPointForPart(x, y) {
     const basePoint = {
@@ -397,6 +399,69 @@ export function createViewportRenderer({
     context.restore();
   }
 
+  function drawDeformerOverlay() {
+    const authoring = deformerAuthoringContext();
+    if (!authoring?.available || !authoring.activeKeyArt || !state.view) return;
+    const projected = projectDeformerLattice({
+      project: state.editor.session.project,
+      deformer: authoring.deformer,
+      keyArtId: authoring.activeKeyArt.id,
+      controlPoints: authoring.controlPoints,
+      view: state.view,
+    });
+    if (!projected.points.length) return;
+    const selected = new Set(authoring.selectedControlPointIds);
+    const context = elements.overlayCanvas.getContext("2d");
+    const ratio = window.devicePixelRatio || 1;
+    context.save();
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.lineWidth = 1.5;
+    context.strokeStyle = "rgba(91, 224, 255, .86)";
+    context.beginPath();
+    for (const [from, to] of projected.segments) {
+      context.moveTo(projected.points[from].screen.x, projected.points[from].screen.y);
+      context.lineTo(projected.points[to].screen.x, projected.points[to].screen.y);
+    }
+    context.stroke();
+    for (const point of projected.points) {
+      const active = selected.has(point.controlPointId);
+      const hovered = authoring.hoverControlPointId === point.controlPointId;
+      context.beginPath();
+      context.arc(point.screen.x, point.screen.y, active ? 6 : hovered ? 5 : 4, 0, Math.PI * 2);
+      context.fillStyle = active ? "#ffca67" : hovered ? "#b9fff2" : "#5be0ff";
+      context.fill();
+      context.strokeStyle = active ? "#4f3412" : "#123d43";
+      context.stroke();
+    }
+    if (authoring.boxSelection) {
+      let from = authoring.boxSelection.from;
+      let to = authoring.boxSelection.to;
+      if (authoring.boxSelection.coordinateSpace !== "screen") {
+        const world = state.editor.worldTransform(authoring.deformer.id);
+        const fromDocument = transformPoint(world, from);
+        const toDocument = transformPoint(world, to);
+        from = imageToScreen(fromDocument.x, fromDocument.y, state.view);
+        to = imageToScreen(toDocument.x, toDocument.y, state.view);
+      }
+      context.setLineDash([4, 3]);
+      context.strokeStyle = "rgba(255, 202, 103, .9)";
+      context.fillStyle = "rgba(255, 202, 103, .12)";
+      context.fillRect(Math.min(from.x, to.x), Math.min(from.y, to.y), Math.abs(to.x - from.x), Math.abs(to.y - from.y));
+      context.strokeRect(Math.min(from.x, to.x), Math.min(from.y, to.y), Math.abs(to.x - from.x), Math.abs(to.y - from.y));
+      context.setLineDash([]);
+    }
+    context.fillStyle = "rgba(12, 26, 25, .9)";
+    context.fillRect(14, 14, 270, 28);
+    context.fillStyle = "#5be0ff";
+    context.font = "700 12px ui-monospace, monospace";
+    context.fillText(
+      `WARP · KEY ART ${authoring.activeKeyArt.endpoint === "from" ? "A" : "B"} · ${authoring.activeKeyArt.displayName}`,
+      24,
+      33,
+    );
+    context.restore();
+  }
+
   function render() {
     const transitionPreview = transitionPreviewContext();
     if (transitionPreview?.viewMode === "preview") {
@@ -433,6 +498,7 @@ export function createViewportRenderer({
         { x: 0, y: 0 },
       );
       drawOverlay(new Float32Array());
+      drawDeformerOverlay();
       drawTransformGizmo();
       return;
     }
@@ -452,8 +518,24 @@ export function createViewportRenderer({
       : true;
     renderer.render(vertices, state.view, state.partOffset, world, visible);
     drawOverlay(visible ? vertices : new Float32Array());
+    drawDeformerOverlay();
     drawTransformGizmo();
   }
 
-  return { render, screenPointForPart };
+  return {
+    render,
+    screenPointForPart,
+    projectedDeformerLattice() {
+      const authoring = deformerAuthoringContext();
+      return authoring?.available && authoring.activeKeyArt && state.view
+        ? projectDeformerLattice({
+          project: state.editor.session.project,
+          deformer: authoring.deformer,
+          keyArtId: authoring.activeKeyArt.id,
+          controlPoints: authoring.controlPoints,
+          view: state.view,
+        })
+        : { points: [], segments: [], diagnostics: [] };
+    },
+  };
 }

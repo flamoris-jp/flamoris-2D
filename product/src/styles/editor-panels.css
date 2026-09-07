@@ -169,6 +169,9 @@ button:not(:disabled):hover, .file-button:hover { border-color: var(--mint); tra
 .inspector-form .clipping-toggle { display: flex; align-items: center; }
 .inspector-form .clipping-toggle input { accent-color: var(--mint); }
 .inspector-form #removeClippingButton { min-height: 32px; margin-top: 9px; font-size: 10px; }
+.deformer-grid-reason { display: block; min-height: 14px; margin-top: 6px; color: #d7ad6a; font-size: 9px; line-height: 1.4; }
+.deformer-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 9px; }
+.deformer-actions button { min-height: 32px; padding: 6px; font-size: 10px; }
 
 .transition-authoring {
   display: grid;

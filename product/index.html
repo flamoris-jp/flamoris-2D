@@ -169,6 +169,25 @@
                 <label>Pivot Y<input id="pivotYInput" type="number" step="0.1" data-transform-path="pivot.y" /></label>
               </div>
             </fieldset>
+            <fieldset id="deformerControls" hidden>
+              <legend>Warp Deformer</legend>
+              <label>Grid preset
+                <select id="deformerGridSelect">
+                  <option value="2">2x2</option>
+                  <option value="3">3x3</option>
+                  <option value="4">4x4</option>
+                </select>
+              </label>
+              <output id="deformerGridReason" class="deformer-grid-reason"></output>
+              <dl class="identity-list">
+                <div><dt>Active Key Art</dt><dd id="deformerActiveKeyArt">Select A or B</dd></div>
+                <div><dt>Selected points</dt><dd id="deformerSelectionCount">0</dd></div>
+              </dl>
+              <div class="deformer-actions">
+                <button id="resetSelectedDeformerPointsButton" type="button" class="secondary">Reset selected</button>
+                <button id="resetAllDeformerPointsButton" type="button" class="secondary">Reset all</button>
+              </div>
+            </fieldset>
             <fieldset id="clippingControls" hidden>
               <legend>Clipping</legend>
               <label class="clipping-toggle"><input id="clippingEnabledInput" type="checkbox" /> Enable clipping</label>

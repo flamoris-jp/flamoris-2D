@@ -21,11 +21,14 @@ export function createSceneEditorView({
   updateZoomOutput,
 }) {
   function selectSceneNode(nodeId) {
-    const nextNodeId = objectSelectionForMode(
-      state.editorMode,
-      state.editor.selectedNodeId,
-      nodeId,
-    );
+    const requestedNode = state.editor.getNode?.(nodeId) || null;
+    const nextNodeId = requestedNode?.kind === "deformer"
+      ? nodeId
+      : objectSelectionForMode(
+        state.editorMode,
+        state.editor.selectedNodeId,
+        nodeId,
+      );
     if (nextNodeId === state.editor.selectedNodeId && nodeId !== nextNodeId) {
       setStatus("Edit Mode中はactive mesh-edit targetを変更できません");
       return;
@@ -61,10 +64,11 @@ export function createSceneEditorView({
       const toggle = document.createElement("button");
       toggle.type = "button";
       toggle.className = "tree-toggle";
-      toggle.textContent = node.kind === "group"
+      const expandable = ["group", "deformer"].includes(node.kind);
+      toggle.textContent = expandable
         ? (state.editor.expandedNodeIds.has(node.id) ? "▾" : "▸")
         : "·";
-      toggle.disabled = node.kind !== "group";
+      toggle.disabled = !expandable;
       toggle.addEventListener("click", (event) => {
         event.stopPropagation();
         state.editor.toggleExpanded(node.id);
@@ -86,7 +90,8 @@ export function createSceneEditorView({
       label.title = `${node.displayName} (${node.id})`;
       const lock = document.createElement("span");
       lock.className = node.locked ? "tree-lock" : "tree-kind";
-      lock.textContent = node.locked ? "◆" : (node.kind === "group" ? "G" : "P");
+      lock.textContent = node.locked ? "◆" :
+        (node.kind === "group" ? "G" : node.kind === "deformer" ? "D" : "P");
       const clipping = document.createElement("span");
       clipping.className = "tree-clipping";
       clipping.textContent = clippingTargets.has(node.id) ? "⊂" : "";
@@ -124,11 +129,30 @@ export function createSceneEditorView({
       elements.nodeIdOutput.textContent = "";
       elements.parentOutput.textContent = "";
       elements.transformInputs.forEach((input) => { input.value = ""; });
+      elements.deformerControls.hidden = true;
       return;
     }
     elements.displayNameInput.value = node.displayName;
     elements.visibilityInput.checked = node.visible;
     elements.lockedInput.checked = node.locked;
+    const deformer = state.editor.deformerAuthoring.getState();
+    elements.deformerControls.hidden = !deformer.available;
+    if (deformer.available) {
+      elements.deformerGridSelect.value = String(deformer.deformer.columns);
+      elements.deformerGridSelect.disabled = deformer.gridLocked;
+      elements.deformerGridSelect.title = deformer.gridLockReason;
+      elements.deformerGridReason.textContent = deformer.gridLockReason;
+      elements.deformerActiveKeyArt.textContent = deformer.activeKeyArt
+        ? `${deformer.activeKeyArt.endpoint === "from" ? "A" : "B"} · ${deformer.activeKeyArt.displayName}`
+        : "Select Key State A or B";
+      elements.deformerSelectionCount.textContent = String(deformer.selectedControlPointIds.length);
+      elements.resetSelectedDeformerPointsButton.disabled =
+        !deformer.keyform || !deformer.selectedControlPointIds.length;
+      elements.resetAllDeformerPointsButton.disabled = !deformer.activeKeyArt;
+      elements.resetAllDeformerPointsButton.title = deformer.keyform
+        ? "Reset all Warp control points"
+        : "Create an identity Warp keyform for the active Key Art";
+    }
     const clipping = state.editor.clippingAuthoring.getState(node.id);
     elements.clippingControls.hidden = !clipping.available;
     if (clipping.available) {
