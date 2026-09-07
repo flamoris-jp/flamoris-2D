@@ -5,6 +5,11 @@ import { EditorSession } from "../src/commands/editor.js";
 import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
 import { createWarpDeformer } from "../src/model/warp-deformer.js";
 import { DeformerAuthoringController } from "../src/ui/deformer-authoring-controller.js";
+import {
+  nearestDeformerControlPoint,
+  projectDeformerLattice,
+} from "../src/ui/deformer-viewport-overlay.js";
+import { bindViewportInteractions } from "../src/ui/viewport-input-controller.js";
 
 function fixture() {
   const project = createProject({
@@ -152,4 +157,90 @@ test("authored Warp keyforms lock grid changes with an explicit reason", () => {
   assert.equal(controller.getState().gridLocked, true);
   assert.match(controller.getState().gridLockReason, /Authored Warp keyforms/);
   assert.throws(() => controller.setGrid(3), /must be removed/);
+});
+
+test("viewport projection exposes the regular lattice with stable control-point identity", () => {
+  const { session, controller } = fixture();
+  const state = controller.getState();
+  const projected = projectDeformerLattice({
+    project: session.project,
+    deformer: state.deformer,
+    keyArtId: state.activeKeyArt.id,
+    controlPoints: state.controlPoints,
+    view: { scale: 2, originX: 10, originY: 20 },
+  });
+  assert.equal(projected.points.length, 4);
+  assert.equal(projected.segments.length, 4);
+  assert.deepEqual(projected.points[0], {
+    controlPointId: "cp_tl",
+    document: { x: 0, y: 0 },
+    screen: { x: 10, y: 20 },
+  });
+  assert.equal(nearestDeformerControlPoint(projected, { x: 12, y: 21 }), "cp_tl");
+});
+
+test("viewport pointer drag selects and commits one Warp authoring gesture", () => {
+  const { session, controller } = fixture();
+  const listeners = new Map();
+  const target = (extra = {}) => ({
+    ...extra,
+    addEventListener(type, listener) {
+      const atType = listeners.get(type) || [];
+      atType.push(listener);
+      listeners.set(type, atType);
+    },
+  });
+  const classes = { add() {}, remove() {} };
+  const elements = {
+    overlayCanvas: target({
+      getBoundingClientRect: () => ({ left: 0, top: 0 }),
+      setPointerCapture() {},
+    }),
+    viewportWrap: target({ classList: classes }),
+  };
+  const state = {
+    mode: "psd",
+    editorMode: "object",
+    editor: {
+      session,
+      selectedNodeId: "warp",
+      worldTransform: () => [1, 0, 0, 1, 0, 0],
+      transitionPreview: { getState: () => ({ viewMode: "endpoint-a" }) },
+    },
+    previewMode: false,
+    spacePressed: false,
+    view: { scale: 1, originX: 0, originY: 0 },
+    psdParts: [],
+  };
+  const viewportRenderer = {
+    projectedDeformerLattice: () => projectDeformerLattice({
+      project: session.project,
+      deformer: controller.getState().deformer,
+      keyArtId: "keyart_a",
+      controlPoints: controller.getState().controlPoints,
+      view: state.view,
+    }),
+  };
+  bindViewportInteractions({
+    state,
+    elements,
+    viewportRenderer,
+    returnToEdit() {}, zoomAtScreenPoint() {}, panViewBy() {}, setEditorMode() {},
+    undoProject() {}, redoProject() {}, render() {}, setStatus() {},
+    selectedPart: () => null,
+    deformerAuthoring: () => controller,
+    loadFile() {},
+    windowTarget: target(),
+  });
+  const dispatch = (type, event) => (listeners.get(type) || []).forEach((listener) => listener(event));
+  dispatch("pointerdown", {
+    button: 0, pointerId: 7, clientX: 0, clientY: 0, shiftKey: false, preventDefault() {},
+  });
+  dispatch("pointermove", { pointerId: 7, clientX: 8, clientY: 4 });
+  assert.equal(session.undoStack.length, 0);
+  dispatch("pointerup", { type: "pointerup", pointerId: 7 });
+  assert.equal(session.undoStack.length, 1);
+  assert.deepEqual(session.query("deformer.get_keyform", {
+    deformerId: "warp", keyArtId: "keyart_a",
+  }).controlPoints[0], { controlPointId: "cp_tl", x: 8, y: 4 });
 });
