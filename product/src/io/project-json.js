@@ -77,6 +77,27 @@ export function createFl2dDocument(
   });
   body.meshKeyforms = [...body.meshKeyforms].sort(byId);
   body.clippingBindings = [...body.clippingBindings].sort(byId);
+  body.rig.deformers = [...body.rig.deformers].sort(byId).map((deformer) => ({
+    ...deformer,
+    controlPointIds: [...deformer.controlPointIds],
+  }));
+  body.rig.warpControlPoints = [...body.rig.warpControlPoints].sort(byId);
+  body.rig.warpDeformerKeyforms = [...body.rig.warpDeformerKeyforms]
+    .sort((left, right) =>
+      left.deformerId < right.deformerId ? -1 : left.deformerId > right.deformerId ? 1 :
+        left.keyArtId < right.keyArtId ? -1 : left.keyArtId > right.keyArtId ? 1 : 0)
+    .map((keyform) => ({
+      ...keyform,
+      controlPoints: (() => {
+        const deformer = body.rig.deformers.find((entry) => entry.id === keyform.deformerId);
+        const order = new Map((deformer?.controlPointIds || [])
+          .map((controlPointId, index) => [controlPointId, index]));
+        return [...keyform.controlPoints].sort((left, right) =>
+          (order.get(left.controlPointId) ?? Number.MAX_SAFE_INTEGER) -
+            (order.get(right.controlPointId) ?? Number.MAX_SAFE_INTEGER) ||
+          (left.controlPointId < right.controlPointId ? -1 : left.controlPointId > right.controlPointId ? 1 : 0));
+      })(),
+    }));
   body.transitions = [...body.transitions].sort(byId).map((transition) => ({
     ...transition,
     partTransitions: [...transition.partTransitions].sort(byId),
@@ -166,6 +187,20 @@ export function migrateProjectSchema(value) {
       ? project.clippingBindings
       : [];
     project.schemaVersion = 5;
+  }
+  if (project?.schemaVersion === 5) {
+    project.rig = project.rig && typeof project.rig === "object"
+      ? project.rig
+      : { deformers: [], bones: [], constraints: [] };
+    // Schema 5 reserved this as an untyped rig placeholder. It predates the
+    // WarpDeformer contract, so preserving entries would misinterpret legacy
+    // data as authored Warp topology in schema 6.
+    project.rig.deformers = [];
+    project.rig.warpControlPoints = [];
+    project.rig.warpDeformerKeyforms = [];
+    project.rig.bones = Array.isArray(project.rig.bones) ? project.rig.bones : [];
+    project.rig.constraints = Array.isArray(project.rig.constraints) ? project.rig.constraints : [];
+    project.schemaVersion = 6;
   }
   if (project?.schemaVersion !== PROJECT_SCHEMA_VERSION) {
     throw new ProjectFormatError(

@@ -190,6 +190,18 @@ Initial grid presets: 2x2, 3x3, 4x4.
 
 Control points require stable identity. Key Art A and B may store different authored control-point positions while compatible Deformer topology remains stable.
 
+The `WarpDeformer.id` is the same logical stable ID as its `DeformerNode` in
+the Scene map. The Scene node owns `children[]` and is the only hierarchy;
+`parentNodeId` on the rig capability must match `SceneNode.parentId` and is
+validated rather than forming a second graph. Warp capabilities, control-point
+topology, and Key-Art keyforms are stored in `project.rig.deformers`,
+`project.rig.warpControlPoints`, and `project.rig.warpDeformerKeyforms`.
+
+Preset topology is square only (2x2, 3x3, or 4x4). `controlPointIds[]` is the
+canonical row-major order from top-left to bottom-right. The normalized `u/v`
+values are derived once at creation, while identity always remains the explicit
+stable ID rather than an array index or floating-point coordinate.
+
 ## 9. Deformation semantics
 
 Initial implementation should use deterministic regular lattice interpolation, such as bilinear/bicubic evaluation over the grid.
@@ -209,6 +221,23 @@ For each child vertex:
 3. evaluate lattice displacement;
 4. apply deformed position;
 5. continue downstream world transform/render evaluation.
+
+Phase 6-3 uses bilinear displacement interpolation. Normalized lattice lookup
+is clamped to the nearest boundary for points outside the bounds, while the
+interpolated boundary displacement is added to the original point. This avoids
+unbounded extrapolation without collapsing outside geometry onto the boundary.
+Exact right/bottom boundaries select the final cell at cell coordinate `1`.
+
+The pure evaluation-stage API accepts explicit transforms into and out of each
+Deformer-local space. Nested stages are supplied in Scene ancestor order,
+parent first. Before evaluating a child stage, all upstream parent stages
+project both the child's regular base lattice and its authored control-point
+positions into evaluated space. A child therefore evaluates against its
+already-warped cage; this retains non-affine parent Warp rather than reducing
+it to an affine approximation. The inverse lookup of the projected bilinear
+cell is analytic and deterministic, not iterative. Phase 6-4 owns construction
+of those spaces from evaluated A/B state and integration into Transition output;
+Phase 6-3 does not add a second Transition evaluator or time model.
 
 Canonical Phase 6 geometry order:
 
