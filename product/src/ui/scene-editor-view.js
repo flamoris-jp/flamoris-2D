@@ -148,7 +148,10 @@ export function createSceneEditorView({
       elements.deformerSelectionCount.textContent = String(deformer.selectedControlPointIds.length);
       elements.resetSelectedDeformerPointsButton.disabled =
         !deformer.keyform || !deformer.selectedControlPointIds.length;
-      elements.resetAllDeformerPointsButton.disabled = !deformer.keyform;
+      elements.resetAllDeformerPointsButton.disabled = !deformer.activeKeyArt;
+      elements.resetAllDeformerPointsButton.title = deformer.keyform
+        ? "Reset all Warp control points"
+        : "Create an identity Warp keyform for the active Key Art";
     }
     const clipping = state.editor.clippingAuthoring.getState(node.id);
     elements.clippingControls.hidden = !clipping.available;

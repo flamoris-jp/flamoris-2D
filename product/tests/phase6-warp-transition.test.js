@@ -8,6 +8,8 @@ import {
 } from "../src/model/warp-deformer.js";
 import { evaluateTransition } from "../src/core/transition-evaluator.js";
 import { interpolateWarpKeyforms } from "../src/core/warp-deformer-evaluator.js";
+import { EditorSession } from "../src/commands/editor.js";
+import { DeformerAuthoringController } from "../src/ui/deformer-authoring-controller.js";
 
 function member(nodeId, appearanceId) {
   return {
@@ -167,6 +169,51 @@ test("missing and incompatible Warp endpoint state emits deterministic diagnosti
   incompatible.scene.nodes[incompatible.scene.rootId].children.push("node_b");
   assert.ok(evaluateTransition(incompatible, "transition", 50).diagnostics
     .some((entry) => entry.code === "DEFORMER_KEYFORM_INCOMPATIBLE"));
+});
+
+test("explicit Reset All authors an identity B keyform for a deformed A Transition", () => {
+  const { project, regular } = fixture();
+  project.rig.warpDeformerKeyforms = project.rig.warpDeformerKeyforms
+    .filter((entry) => entry.keyArtId !== "keyart_b");
+  const session = new EditorSession(project);
+  let endpoint = "from";
+  const controller = new DeformerAuthoringController(session, {
+    getState: () => ({
+      editingEnabled: true,
+      activeEndpoint: endpoint,
+      activeTransition: session.query("transition.get", { transitionId: "transition" }),
+      endpoints: {
+        from: { keyArt: { id: "keyart_a", displayName: "A" } },
+        to: { keyArt: { id: "keyart_b", displayName: "B" } },
+      },
+    }),
+  });
+  controller.selectDeformer("head_warp");
+  controller.selectControlPoint("warp_tl");
+  controller.beginDrag();
+  controller.previewDrag({ x: 10, y: 0 });
+  controller.commitDrag();
+
+  endpoint = "to";
+  assert.equal(controller.getState().keyform, null);
+  controller.resetAll();
+  assert.deepEqual(session.query("deformer.get_keyform", {
+    deformerId: "head_warp", keyArtId: "keyart_b",
+  }).controlPoints, regular);
+
+  const midpoint = evaluateTransition(session.project, "transition", 50);
+  assert.equal(midpoint.diagnostics.some((entry) =>
+    entry.code === "DEFORMER_KEYFORM_MISSING"), false);
+  assert.deepEqual(positionsAt(session.project, 100), [[2, 2, 12, 2, 2, 12]]);
+  assert.equal(session.undoStack.at(-1).label, "Create identity Warp keyform");
+  session.undo();
+  assert.equal(session.query("deformer.get_keyform", {
+    deformerId: "head_warp", keyArtId: "keyart_b",
+  }), null);
+  session.redo();
+  assert.deepEqual(session.query("deformer.get_keyform", {
+    deformerId: "head_warp", keyArtId: "keyart_b",
+  }).controlPoints, regular);
 });
 
 test("Warp keyform interpolation is canonical and independent of collection insertion order", () => {

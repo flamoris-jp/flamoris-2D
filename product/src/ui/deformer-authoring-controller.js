@@ -220,11 +220,21 @@ export class DeformerAuthoringController {
   resetAll() {
     const deformer = this.deformer();
     const keyArt = this.activeKeyArt();
-    if (!deformer || !keyArt || !this.persistentKeyform(deformer, keyArt)) return null;
-    return this.session.execute({
-      type: "deformer.reset_control_points",
-      payload: { deformerId: deformer.id, keyArtId: keyArt.id },
-    }, { label: "Reset Warp control points" });
+    if (!deformer || !keyArt) return null;
+    const keyform = this.persistentKeyform(deformer, keyArt);
+    return keyform
+      ? this.session.execute({
+        type: "deformer.reset_control_points",
+        payload: { deformerId: deformer.id, keyArtId: keyArt.id },
+      }, { label: "Reset Warp control points" })
+      : this.session.execute({
+        type: "deformer.set_keyform",
+        payload: {
+          deformerId: deformer.id,
+          keyArtId: keyArt.id,
+          controlPoints: this.defaultPositions(deformer),
+        },
+      }, { label: "Create identity Warp keyform" });
   }
 
   rename(displayName) {
