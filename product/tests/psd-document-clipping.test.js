@@ -2,6 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { MeshRenderer } from "../src/renderer.js";
+import { createIdFactory } from "../src/model/project.js";
+import { createProjectFromPsd } from "../src/io/psd-project.js";
+import { createPsdReimportReview } from "../src/io/psd-reimport-review.js";
+import { deserializeProject, serializeProject } from "../src/io/project-json.js";
+import { collectPsdParts } from "../src/psd.js";
+import { bindPsdPartsToProject } from "../src/ui/editor-adapter.js";
+import {
+  hydratePsdRenderAssets,
+  serializePsdRenderAssets,
+} from "../src/ui/psd-render-assets.js";
+import { buildReviewedRenderParts } from "../src/ui/reimport-render-history.js";
 import {
   createViewportRenderer,
 } from "../src/ui/viewport-renderer.js";
@@ -143,6 +154,82 @@ test("valid positive PSD left/top placement survives document clipping unchanged
   assert.equal(raster.height, 100);
 });
 
+test("save, reopen, and reviewed re-import preserve off-canvas raster placement", async () => {
+  const raster = {
+    width: 1400,
+    height: 1200,
+    flamorisRasterFingerprint: "fixture:oversized:v1",
+    toDataURL: () => "data:image/png;base64,AA==",
+  };
+  const psd = {
+    width: 1000,
+    height: 1000,
+    children: [{
+      id: 57,
+      name: "oversized background",
+      left: -200,
+      top: -100,
+      right: 1200,
+      bottom: 1100,
+      canvas: raster,
+    }],
+  };
+  const project = createProjectFromPsd(psd, {
+    idFactory: createIdFactory("document-clip-save"),
+  });
+  const currentParts = bindPsdPartsToProject(collectPsdParts(psd.children), project);
+  const [part] = currentParts;
+  const [record] = serializePsdRenderAssets(currentParts);
+  const reopenedProject = deserializeProject(serializeProject(project));
+  const reopenedRaster = { width: 1400, height: 1200 };
+  const hydration = await hydratePsdRenderAssets([record], reopenedProject, {
+    loadImage: async () => reopenedRaster,
+  });
+
+  assert.deepEqual(
+    { left: record.left, top: record.top, right: record.right, bottom: record.bottom },
+    { left: -200, top: -100, right: 1200, bottom: 1100 },
+  );
+  assert.equal(hydration.parts[0].canvas, reopenedRaster);
+  assert.deepEqual(
+    reopenedProject.scene.nodes[part.nodeId].bounds,
+    { left: -200, top: -100, right: 1200, bottom: 1100 },
+  );
+
+  const replacementRaster = {
+    ...raster,
+    flamorisRasterFingerprint: "fixture:oversized:v2",
+  };
+  const nextPsd = {
+    ...psd,
+    children: [{ ...psd.children[0], canvas: replacementRaster }],
+  };
+  const review = createPsdReimportReview(project, nextPsd, {
+    idFactory: createIdFactory("document-clip-reimport"),
+  });
+  assert.equal(review.rows[0].action, "update");
+  const importedParts = bindPsdPartsToProject(
+    collectPsdParts(nextPsd.children),
+    review.importedProject,
+  );
+  const result = buildReviewedRenderParts(
+    currentParts,
+    importedParts,
+    review,
+    review.buildResult(),
+  );
+  assert.equal(result[0].canvas, replacementRaster);
+  assert.deepEqual(
+    {
+      left: result[0].left,
+      top: result[0].top,
+      right: result[0].right,
+      bottom: result[0].bottom,
+    },
+    { left: -200, top: -100, right: 1200, bottom: 1100 },
+  );
+});
+
 function instrumentedWebGlCanvas() {
   const operations = [];
   let resourceId = 0;
@@ -208,4 +295,44 @@ test("WebGL mesh composition applies the same viewport document clip in device p
   const drawIndex = canvas.operations.findIndex((call) => call[0] === "drawElements");
   const scissorIndex = canvas.operations.findIndex((call) => call[0] === "scissor");
   assert.ok(scissorIndex >= 0 && scissorIndex < drawIndex);
+});
+
+test("evaluated transition composition uses the same WebGL document clip", () => {
+  const canvas = instrumentedWebGlCanvas();
+  const renderer = new MeshRenderer(canvas);
+  const view = {
+    scale: 0.5,
+    originX: 100,
+    originY: 50,
+    viewportWidth: 1000,
+    viewportHeight: 600,
+    clipRect: { x: 100, y: 50, width: 500, height: 500 },
+  };
+  const instance = {
+    renderInstanceId: "oversized",
+    sourceNodeId: "oversized",
+    transform: [1, 0, 0, 1, 0, 0],
+    mesh: {
+      positions: [-200, -100, 1200, -100, -200, 1100],
+      indices: [0, 1, 2],
+    },
+    appearanceSamples: [{
+      appearanceId: "oversized-appearance",
+      sourceNodeId: "oversized",
+      uvs: [0, 0, 1, 0, 0, 1],
+      weight: 1,
+    }],
+    opacity: 1,
+    drawOrder: 0,
+    clipping: null,
+  };
+
+  renderer.renderEvaluated({
+    batches: [{ kind: "instance", drawOrder: 0, renderInstances: [instance] }],
+  }, view, () => ({ nodeId: "oversized" }));
+
+  const drawIndex = canvas.operations.findIndex((call) => call[0] === "drawElements");
+  assert.ok(canvas.operations.slice(0, drawIndex).some((call) =>
+    call[0] === "scissor" && call.slice(1).every((value, index) =>
+      value === [200, 100, 1000, 1000][index])));
 });
