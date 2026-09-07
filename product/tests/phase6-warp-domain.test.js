@@ -18,7 +18,7 @@ import {
   migrateProjectSchema,
   serializeProject,
 } from "../src/io/project-json.js";
-import { EditorSession, TransactionError } from "../src/commands/editor.js";
+import { EditorSession } from "../src/commands/editor.js";
 import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
 import {
   createWarpEvaluationStages,
@@ -347,6 +347,46 @@ test("set grid rejects authored keyform loss and all keyform edits are undoable"
   }), /Remove authored keyforms/);
 });
 
+test("control-point mutations reject unknown and duplicate stable IDs without history changes", () => {
+  const project = domainProject();
+  addKeyArt(project);
+  const session = new EditorSession(project);
+  session.execute(createWarpCommand({ parentNodeId: project.scene.rootId }));
+  const deformer = session.query("deformer.get", { deformerId: "warp" });
+  session.execute({
+    type: "deformer.set_keyform",
+    payload: {
+      deformerId: "warp",
+      keyArtId: "key_art",
+      controlPoints: defaultWarpKeyformControlPoints(deformer, deformer.controlPoints),
+    },
+  });
+  const before = structuredClone(session.project);
+  const attempts = [
+    {
+      controlPoints: [{ controlPointId: "typo", x: 10, y: 20 }],
+      code: "deformer.control_point_not_found",
+    },
+    {
+      controlPoints: [
+        { controlPointId: deformer.controlPointIds[0], x: 10, y: 20 },
+        { controlPointId: deformer.controlPointIds[0], x: 30, y: 40 },
+      ],
+      code: "deformer.duplicate_control_point",
+    },
+  ];
+  for (const attempt of attempts) {
+    assert.throws(() => session.execute({
+      type: "deformer.move_control_points",
+      payload: { deformerId: "warp", keyArtId: "key_art", controlPoints: attempt.controlPoints },
+    }), (error) => {
+      assert.equal(error.code, attempt.code);
+      return true;
+    });
+    assert.deepEqual(session.project, before);
+  }
+});
+
 test("set grid is undoable when no authored keyforms exist", () => {
   const project = domainProject();
   const session = new EditorSession(project);
@@ -383,7 +423,7 @@ test("failed Warp transaction rolls back and hierarchy cycles are rejected", () 
   }), /cycle/);
 });
 
-test("invalid keyform is rejected by transaction validation without partial state", () => {
+test("incomplete keyform is rejected before persistent mutation", () => {
   const project = domainProject();
   addKeyArt(project);
   const session = new EditorSession(project);
@@ -395,7 +435,7 @@ test("invalid keyform is rejected by transaction validation without partial stat
       controlPoints: [{ controlPointId: "warp_cp_1", x: 0, y: 0 }],
     },
   }), (error) => {
-    assert.equal(error instanceof TransactionError, true);
+    assert.equal(error.code, "DEFORMER_KEYFORM_INCOMPATIBLE");
     return true;
   });
   assert.equal(session.query("deformer.get_keyform", {

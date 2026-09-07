@@ -18,6 +18,26 @@ function keyformIndex(project, deformerId, keyArtId) {
     entry.deformerId === deformerId && entry.keyArtId === keyArtId);
 }
 
+function assertControlPointIds(deformer, controlPoints, { complete = false } = {}) {
+  const seen = new Set();
+  for (const point of controlPoints) {
+    const controlPointId = point.controlPointId;
+    if (!deformer.controlPointIds.includes(controlPointId)) {
+      throw new CommandError("Warp control point does not belong to this topology.",
+        "deformer.control_point_not_found", { deformerId: deformer.id, controlPointId });
+    }
+    if (seen.has(controlPointId)) {
+      throw new CommandError("Warp control point may appear only once per mutation.",
+        "deformer.duplicate_control_point", { deformerId: deformer.id, controlPointId });
+    }
+    seen.add(controlPointId);
+  }
+  if (complete && seen.size !== deformer.controlPointIds.length) {
+    throw new CommandError("Warp keyform must provide every topology control point.",
+      "DEFORMER_KEYFORM_INCOMPATIBLE", { deformerId: deformer.id });
+  }
+}
+
 function orderedKeyform(deformer, keyform) {
   const byId = new Map((keyform.controlPoints || []).map((point) => [point.controlPointId, point]));
   return {
@@ -163,6 +183,7 @@ export const warpDeformerCommandHandlers = {
 
   "deformer.set_keyform": (project, payload) => {
     const deformer = deformerFor(project, payload.deformerId);
+    assertControlPointIds(deformer, payload.controlPoints, { complete: true });
     const index = keyformIndex(project, deformer.id, payload.keyArtId);
     const previous = index >= 0 ? cloneProject(project.rig.warpDeformerKeyforms[index]) : null;
     const next = orderedKeyform(deformer, {
@@ -193,6 +214,7 @@ export const warpDeformerCommandHandlers = {
 
   "deformer.move_control_points": (project, payload) => {
     const deformer = deformerFor(project, payload.deformerId);
+    assertControlPointIds(deformer, payload.controlPoints);
     const index = keyformIndex(project, deformer.id, payload.keyArtId);
     if (index < 0) throw new CommandError("Warp keyform does not exist.", "deformer.keyform_not_found");
     const previous = cloneProject(project.rig.warpDeformerKeyforms[index]);
