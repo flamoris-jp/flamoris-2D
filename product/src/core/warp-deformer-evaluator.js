@@ -73,6 +73,56 @@ function evaluationTopology(deformer, controlPoints, keyform) {
   });
 }
 
+export function interpolateWarpKeyforms(deformer, fromKeyform, toKeyform, amount) {
+  if (!Number.isFinite(amount) || amount < 0 || amount > 1) {
+    throw new WarpDeformerEvaluationError(
+      "Warp keyform interpolation weight must be between zero and one.",
+      "DEFORMER_CONTROL_POINT_INVALID",
+      { deformerId: deformer.id },
+    );
+  }
+  const canonical = (keyform, endpoint) => {
+    if (!keyform || keyform.deformerId !== deformer.id) {
+      throw new WarpDeformerEvaluationError(
+        `Warp ${endpoint} keyform is missing or belongs to another deformer.`,
+        keyform ? "DEFORMER_KEYFORM_INCOMPATIBLE" : "DEFORMER_KEYFORM_MISSING",
+        { deformerId: deformer.id, endpoint },
+      );
+    }
+    const byId = new Map();
+    for (const point of keyform.controlPoints || []) {
+      if (byId.has(point.controlPointId) || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+        throw new WarpDeformerEvaluationError(
+          `Warp ${endpoint} keyform has invalid control points.`,
+          "DEFORMER_CONTROL_POINT_INVALID",
+          { deformerId: deformer.id, endpoint, controlPointId: point.controlPointId },
+        );
+      }
+      byId.set(point.controlPointId, point);
+    }
+    if (byId.size !== deformer.controlPointIds.length ||
+      deformer.controlPointIds.some((id) => !byId.has(id))) {
+      throw new WarpDeformerEvaluationError(
+        `Warp ${endpoint} keyform does not match the deformer topology.`,
+        "DEFORMER_KEYFORM_INCOMPATIBLE",
+        { deformerId: deformer.id, endpoint },
+      );
+    }
+    return byId;
+  };
+  const from = canonical(fromKeyform, "from");
+  const to = canonical(toKeyform, "to");
+  return {
+    deformerId: deformer.id,
+    keyArtId: amount === 0 ? fromKeyform.keyArtId : amount === 1 ? toKeyform.keyArtId : null,
+    controlPoints: deformer.controlPointIds.map((controlPointId) => ({
+      controlPointId,
+      x: lerp(from.get(controlPointId).x, to.get(controlPointId).x, amount),
+      y: lerp(from.get(controlPointId).y, to.get(controlPointId).y, amount),
+    })),
+  };
+}
+
 function localLatticePositions(stage) {
   const points = evaluationTopology(stage.deformer, stage.controlPoints, stage.keyform);
   const base = [];

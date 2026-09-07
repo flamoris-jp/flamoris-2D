@@ -1,11 +1,18 @@
 import { sampleTemporalProgram } from "./temporal.js";
-import { worldTransformMatrix } from "./transforms.js";
+import { invertAffine, multiplyAffine, worldTransformMatrix } from "./transforms.js";
 import {
   keyArtMemberFor,
   semanticMappingFor,
 } from "../model/transition-validation.js";
 import { clippingBindingForTarget } from "../model/clipping-validation.js";
 import { resolveEvaluatedClipping } from "./clipping-evaluator.js";
+import {
+  createWarpEvaluationStages,
+  evaluateWarpStages,
+  interpolateWarpKeyforms,
+  WarpDeformerEvaluationError,
+  warpDeformerAncestors,
+} from "./warp-deformer-evaluator.js";
 
 function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -61,6 +68,84 @@ function keyformMesh(project, keyformId, fallbackNode) {
     indices: [...topology.indices],
     uvs: [...keyform.uvs],
   };
+}
+
+function warpSpace(project, deformerId, partWorldTransform) {
+  const toDeformerLocal = multiplyAffine(
+    invertAffine(worldTransformMatrix(project, deformerId)),
+    partWorldTransform,
+  );
+  return { toDeformerLocal, fromDeformerLocal: invertAffine(toDeformerLocal) };
+}
+
+function warpIssue(issues, error, semanticSlotId, details = {}) {
+  const code = error instanceof WarpDeformerEvaluationError
+    ? error.code : "DEFORMER_CONTROL_POINT_INVALID";
+  issues.push({
+    code,
+    semanticSlotId,
+    details: { ...details, ...(error?.details || {}), reason: error?.message || String(error) },
+  });
+}
+
+function endpointWarpMesh(project, state, keyArtId, mesh, semanticSlotId, issues) {
+  if (!state || !mesh) return mesh;
+  try {
+    const resolved = createWarpEvaluationStages(project, state.node.id, keyArtId, {
+      spaceForDeformer: (deformerId) => warpSpace(project, deformerId, state.worldTransform),
+    });
+    if (resolved.diagnostics.length) {
+      for (const entry of resolved.diagnostics) {
+        issues.push({ code: entry.code, semanticSlotId, details: { ...entry } });
+      }
+      return mesh;
+    }
+    if (!resolved.stages.length) return mesh;
+    return { ...mesh, positions: evaluateWarpStages(mesh.positions, resolved.stages) };
+  } catch (error) {
+    warpIssue(issues, error, semanticSlotId, { nodeId: state.node.id, keyArtId });
+    return mesh;
+  }
+}
+
+function morphWarpMesh(project, from, to, fromKeyArtId, toKeyArtId, mesh,
+  geometryWeight, transform, semanticSlotId, issues) {
+  if (!from || !to || !mesh) return mesh;
+  try {
+    const fromAncestors = warpDeformerAncestors(project, from.node.id);
+    const toAncestors = warpDeformerAncestors(project, to.node.id);
+    if (fromAncestors.join("\u0000") !== toAncestors.join("\u0000")) {
+      throw new WarpDeformerEvaluationError(
+        "Morph endpoints do not share the same ancestor Warp sequence.",
+        "DEFORMER_KEYFORM_INCOMPATIBLE",
+        { fromAncestors, toAncestors },
+      );
+    }
+    if (!fromAncestors.length) return mesh;
+    const stages = fromAncestors.map((deformerId) => {
+      const deformer = project.rig.deformers.find((entry) => entry.id === deformerId);
+      const fromKeyform = project.rig.warpDeformerKeyforms.find((entry) =>
+        entry.deformerId === deformerId && entry.keyArtId === fromKeyArtId);
+      const toKeyform = project.rig.warpDeformerKeyforms.find((entry) =>
+        entry.deformerId === deformerId && entry.keyArtId === toKeyArtId);
+      return {
+        deformer,
+        controlPoints: project.rig.warpControlPoints.filter((point) =>
+          point.deformerId === deformerId),
+        keyform: interpolateWarpKeyforms(deformer, fromKeyform, toKeyform, geometryWeight),
+        ...warpSpace(project, deformerId, transform),
+      };
+    });
+    return { ...mesh, positions: evaluateWarpStages(mesh.positions, stages) };
+  } catch (error) {
+    warpIssue(issues, error, semanticSlotId, {
+      fromNodeId: from.node.id,
+      toNodeId: to.node.id,
+      fromKeyArtId,
+      toKeyArtId,
+    });
+    return mesh;
+  }
 }
 
 function normalizedWeights(weights) {
@@ -230,7 +315,7 @@ function instance({
   };
 }
 
-function endpointPartState(project, transition, part, slot, endpoint, fromKeyArt, toKeyArt) {
+function endpointPartState(project, transition, part, slot, endpoint, fromKeyArt, toKeyArt, warpIssues) {
   const keyArt = endpoint === "from" ? fromKeyArt : toKeyArt;
   const mapping = semanticMappingFor(slot, keyArt.id);
   const state = memberState(project, keyArt, mapping);
@@ -239,7 +324,9 @@ function endpointPartState(project, transition, part, slot, endpoint, fromKeyArt
     return { semanticSlotId: slot.id, presence, renderInstances: [] };
   }
   const keyformId = endpoint === "from" ? part?.fromKeyformId : part?.toKeyformId;
-  const mesh = keyformMesh(project, keyformId, state.node);
+  const mesh = endpointWarpMesh(
+    project, state, keyArt.id, keyformMesh(project, keyformId, state.node), slot.id, warpIssues,
+  );
   return {
     semanticSlotId: slot.id,
     presence,
@@ -262,7 +349,8 @@ function endpointPartState(project, transition, part, slot, endpoint, fromKeyArt
   };
 }
 
-function evaluateMorph(project, transition, part, slot, from, to, fromMesh, toMesh, sample, u) {
+function evaluateMorph(project, transition, part, slot, from, to, fromMesh, toMesh,
+  fromKeyArtId, toKeyArtId, sample, u, warpIssues) {
   const geometryWeight = clamp(sampledValue(sample, "GeometryBlendTrack", "geometryWeight", slot.id) ?? u, 0, 1);
   const appearanceWeights = sampledValue(sample, "AppearanceTrack", "appearance", slot.id) ||
     endpointWeights(from, to, u);
@@ -272,10 +360,15 @@ function evaluateMorph(project, transition, part, slot, from, to, fromMesh, toMe
   const clipping = sampledClipping(project, sample, slot.id, u < 0.5 ? from : to);
   if (presence !== "present") return { semanticSlotId: slot.id, presence, renderInstances: [] };
   const topology = entity(project, "meshTopologies", part.topologyId, "MeshTopology");
-  const mesh = {
+  let mesh = {
     positions: lerpArray(fromMesh.positions, toMesh.positions, geometryWeight),
     indices: [...topology.indices],
   };
+  const transform = endpointTransform(from, to, geometryWeight);
+  mesh = morphWarpMesh(
+    project, from, to, fromKeyArtId, toKeyArtId, mesh, geometryWeight, transform,
+    slot.id, warpIssues,
+  );
   return {
     semanticSlotId: slot.id,
     presence,
@@ -287,21 +380,23 @@ function evaluateMorph(project, transition, part, slot, from, to, fromMesh, toMe
       opacity,
       drawOrder,
       clipping,
-      transform: endpointTransform(from, to, geometryWeight),
+      transform,
     })],
   };
 }
 
-function sourceInstance(project, transition, part, slot, endpoint, state, mesh, weight, sample, compositeGroupId = null) {
+function sourceInstance(project, transition, part, slot, endpoint, state, keyArtId, mesh,
+  weight, sample, warpIssues, compositeGroupId = null) {
   const opacityValue = sampledValue(sample, "OpacityTrack", "opacity", slot.id, state.node.id);
   const sourceWeight = compositeGroupId ? 1 : weight;
   const opacity = clamp(state.member.opacity * sourceWeight * (opacityValue ?? 1), 0, 1);
   const drawOrder = sampledValue(sample, "DrawOrderTrack", "drawOrder", slot.id, state.node.id) ?? state.member.drawOrder;
   const clipping = sampledClipping(project, sample, slot.id, state);
+  const warpedMesh = endpointWarpMesh(project, state, keyArtId, mesh, slot.id, warpIssues);
   return instance({
     id: transition.id + ":" + slot.id + ":" + endpoint,
     source: state,
-    mesh,
+    mesh: warpedMesh,
     appearance: appearanceSamples({ [state.member.appearanceId]: 1 }, endpoint === "from" ? state : null, endpoint === "to" ? state : null, mesh, mesh),
     opacity,
     drawOrder,
@@ -312,7 +407,8 @@ function sourceInstance(project, transition, part, slot, endpoint, state, mesh, 
   });
 }
 
-function evaluateReplace(project, transition, part, slot, from, to, fromMesh, toMesh, sample, u) {
+function evaluateReplace(project, transition, part, slot, from, to, fromMesh, toMesh,
+  sample, u, warpIssues) {
   const authored = sampledValue(sample, "AppearanceTrack", "appearance", slot.id);
   const weights = normalizedWeights(authored || endpointWeights(from, to, u));
   const weightFor = (appearanceId) => weights.find((entry) => entry.appearanceId === appearanceId)?.weight ?? 0;
@@ -320,14 +416,19 @@ function evaluateReplace(project, transition, part, slot, from, to, fromMesh, to
   const renderInstances = [];
   const fromWeight = from ? weightFor(from.member.appearanceId) : 0;
   const toWeight = to ? weightFor(to.member.appearanceId) : 0;
-  if (from && fromWeight > 0) renderInstances.push(sourceInstance(project, transition, part, slot, "from", from, fromMesh, fromWeight, sample, compositeGroupId));
-  if (to && toWeight > 0) renderInstances.push(sourceInstance(project, transition, part, slot, "to", to, toMesh, toWeight, sample, compositeGroupId));
+  if (from && fromWeight > 0) renderInstances.push(sourceInstance(
+    project, transition, part, slot, "from", from, transition.fromKeyArtId, fromMesh,
+    fromWeight, sample, warpIssues, compositeGroupId));
+  if (to && toWeight > 0) renderInstances.push(sourceInstance(
+    project, transition, part, slot, "to", to, transition.toKeyArtId, toMesh,
+    toWeight, sample, warpIssues, compositeGroupId));
   const authoredPresence = sampledValue(sample, "PresenceTrack", "presence", slot.id);
   const presence = authoredPresence ?? (renderInstances.length ? "present" : "absent");
   return { semanticSlotId: slot.id, presence, renderInstances: presence === "present" ? renderInstances : [] };
 }
 
-function evaluateSingle(project, transition, part, slot, endpoint, state, mesh, sample, opacity, presence) {
+function evaluateSingle(project, transition, part, slot, endpoint, state, keyArtId, mesh,
+  sample, opacity, presence, warpIssues) {
   const authoredPresence = sampledValue(sample, "PresenceTrack", "presence", slot.id, state?.node.id);
   const resolvedPresence = authoredPresence ?? presence;
   if (!state || resolvedPresence !== "present") return { semanticSlotId: slot.id, presence: resolvedPresence, renderInstances: [] };
@@ -341,7 +442,7 @@ function evaluateSingle(project, transition, part, slot, endpoint, state, mesh, 
     renderInstances: [instance({
       id: transition.id + ":" + slot.id + ":" + part.mode,
       source: state,
-      mesh,
+      mesh: endpointWarpMesh(project, state, keyArtId, mesh, slot.id, warpIssues),
       appearance: appearanceSamples({ [state.member.appearanceId]: 1 }, endpoint === "from" ? state : null, endpoint === "to" ? state : null, mesh, mesh),
       opacity: resolvedOpacity,
       drawOrder,
@@ -399,6 +500,12 @@ const DIAGNOSTIC_MESSAGES = Object.freeze({
   CLIPPING_SOURCE_MISSING: "The evaluated clipping source node is missing.",
   CLIPPING_SOURCE_NOT_RENDERABLE: "The clipping source cannot be resolved to one evaluated render instance.",
   CLIPPING_CYCLE: "The evaluated clipping relationships contain a cycle.",
+  DEFORMER_KEYFORM_MISSING: "A required WarpDeformer keyform is missing.",
+  DEFORMER_KEYFORM_INCOMPATIBLE: "WarpDeformer endpoint keyforms or hierarchy are incompatible.",
+  DEFORMER_CONTROL_POINT_INVALID: "WarpDeformer control-point data cannot be evaluated.",
+  DEFORMER_CHILD_REFERENCE_INVALID: "The evaluated Scene child does not resolve to a WarpDeformer hierarchy.",
+  DEFORMER_PARENT_MISSING: "The evaluated WarpDeformer hierarchy has a missing parent.",
+  DEFORMER_CYCLE: "The evaluated WarpDeformer hierarchy contains a cycle.",
 });
 
 function diagnostic(transitionId, code, severity, semanticSlotId = null, timeTicks = null, details = {}) {
@@ -640,14 +747,19 @@ export function evaluateTransition(project, transitionId, timeTicks) {
   const slots = relevantSlots(project, transition);
   const partBySlot = new Map(transition.partTransitions.map((part) => [part.semanticSlotId, part]));
   const evaluatedParts = [];
+  const warpIssues = [];
   for (const slot of slots) {
     const part = partBySlot.get(slot.id) || null;
     if (clampedTicks === 0) {
-      evaluatedParts.push(endpointPartState(project, transition, part, slot, "from", fromKeyArt, toKeyArt));
+      evaluatedParts.push(endpointPartState(
+        project, transition, part, slot, "from", fromKeyArt, toKeyArt, warpIssues,
+      ));
       continue;
     }
     if (clampedTicks === program.durationTicks) {
-      evaluatedParts.push(endpointPartState(project, transition, part, slot, "to", fromKeyArt, toKeyArt));
+      evaluatedParts.push(endpointPartState(
+        project, transition, part, slot, "to", fromKeyArt, toKeyArt, warpIssues,
+      ));
       continue;
     }
     if (!part) {
@@ -660,20 +772,40 @@ export function evaluateTransition(project, transitionId, timeTicks) {
     const to = memberState(project, toKeyArt, toMapping);
     const fromMesh = from ? keyformMesh(project, part.fromKeyformId, from.node) : null;
     const toMesh = to ? keyformMesh(project, part.toKeyformId, to.node) : null;
-    if (part.mode === "morph") evaluatedParts.push(evaluateMorph(project, transition, part, slot, from, to, fromMesh, toMesh, sample, normalizedTime));
-    else if (part.mode === "replace") evaluatedParts.push(evaluateReplace(project, transition, part, slot, from, to, fromMesh, toMesh, sample, normalizedTime));
+    if (part.mode === "morph") evaluatedParts.push(evaluateMorph(
+      project, transition, part, slot, from, to, fromMesh, toMesh,
+      fromKeyArt.id, toKeyArt.id, sample, normalizedTime, warpIssues,
+    ));
+    else if (part.mode === "replace") evaluatedParts.push(evaluateReplace(
+      project, transition, part, slot, from, to, fromMesh, toMesh,
+      sample, normalizedTime, warpIssues,
+    ));
     else if (part.mode === "hold") {
       const holdTo = part.configuration?.holdEndpoint === "to";
       const state = holdTo ? to : from || to;
       const mesh = holdTo ? toMesh : fromMesh || toMesh;
-      evaluatedParts.push(evaluateSingle(project, transition, part, slot, holdTo ? "to" : "from", state, mesh, sample, state?.member.opacity ?? 0, state?.member.presence ?? "absent"));
+      const endpoint = holdTo || !from ? "to" : "from";
+      evaluatedParts.push(evaluateSingle(
+        project, transition, part, slot, endpoint, state,
+        endpoint === "to" ? toKeyArt.id : fromKeyArt.id, mesh, sample,
+        state?.member.opacity ?? 0, state?.member.presence ?? "absent", warpIssues,
+      ));
     } else if (part.mode === "appear") {
-      evaluatedParts.push(evaluateSingle(project, transition, part, slot, "to", to, toMesh, sample, (to?.member.opacity ?? 0) * normalizedTime, "present"));
+      evaluatedParts.push(evaluateSingle(
+        project, transition, part, slot, "to", to, toKeyArt.id, toMesh, sample,
+        (to?.member.opacity ?? 0) * normalizedTime, "present", warpIssues,
+      ));
     } else if (part.mode === "disappear") {
-      evaluatedParts.push(evaluateSingle(project, transition, part, slot, "from", from, fromMesh, sample, (from?.member.opacity ?? 0) * (1 - normalizedTime), "present"));
+      evaluatedParts.push(evaluateSingle(
+        project, transition, part, slot, "from", from, fromKeyArt.id, fromMesh, sample,
+        (from?.member.opacity ?? 0) * (1 - normalizedTime), "present", warpIssues,
+      ));
     } else if (part.mode === "occlusion") {
       const defaultPresence = normalizedTime < 0.5 ? from?.member.presence ?? "present" : "occluded";
-      evaluatedParts.push(evaluateSingle(project, transition, part, slot, "from", from, fromMesh, sample, from?.member.opacity ?? 0, defaultPresence));
+      evaluatedParts.push(evaluateSingle(
+        project, transition, part, slot, "from", from, fromKeyArt.id, fromMesh, sample,
+        from?.member.opacity ?? 0, defaultPresence, warpIssues,
+      ));
     }
   }
   const orderedParts = evaluatedParts.sort((left, right) => compareText(left.semanticSlotId, right.semanticSlotId));
@@ -693,6 +825,14 @@ export function evaluateTransition(project, transitionId, timeTicks) {
         sourceNodeId: entry.sourceNodeId,
         ...entry.details,
       },
+    )),
+    ...warpIssues.map((entry) => diagnostic(
+      transition.id,
+      entry.code,
+      "error",
+      entry.semanticSlotId,
+      clampedTicks,
+      entry.details,
     )),
   ]));
   return {
