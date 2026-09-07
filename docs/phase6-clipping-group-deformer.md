@@ -230,9 +230,14 @@ Exact right/bottom boundaries select the final cell at cell coordinate `1`.
 
 The pure evaluation-stage API accepts explicit transforms into and out of each
 Deformer-local space. Nested stages are supplied in Scene ancestor order,
-parent first. Phase 6-4 owns construction of those spaces from evaluated A/B
-state and integration into Transition output; Phase 6-3 does not add a second
-Transition evaluator or time model.
+parent first. Before evaluating a child stage, all upstream parent stages
+project both the child's regular base lattice and its authored control-point
+positions into evaluated space. A child therefore evaluates against its
+already-warped cage; this retains non-affine parent Warp rather than reducing
+it to an affine approximation. The inverse lookup of the projected bilinear
+cell is analytic and deterministic, not iterative. Phase 6-4 owns construction
+of those spaces from evaluated A/B state and integration into Transition output;
+Phase 6-3 does not add a second Transition evaluator or time model.
 
 Canonical Phase 6 geometry order:
 

@@ -24,6 +24,7 @@ import {
   createWarpEvaluationStages,
   evaluateWarpPoint,
   evaluateWarpPoints,
+  evaluateWarpStageLattice,
   evaluateWarpStages,
   warpDeformerAncestors,
 } from "../src/core/warp-deformer-evaluator.js";
@@ -45,6 +46,7 @@ function addWarp(project, {
   id = "warp",
   parentNodeId = project.scene.rootId,
   size = 2,
+  bounds = { left: 0, top: 0, right: 100, bottom: 100 },
   ids = pointIds(size * size).map((pointId) => `${id}_${pointId}`),
 } = {}) {
   const created = createWarpDeformer({
@@ -53,7 +55,7 @@ function addWarp(project, {
     parentNodeId,
     columns: size,
     rows: size,
-    bounds: { left: 0, top: 0, right: 100, bottom: 100 },
+    bounds,
     controlPointIds: ids,
   });
   project.scene.nodes[id] = createSceneNode({
@@ -464,24 +466,26 @@ test("explicit Deformer-local transforms preserve the evaluation-stage boundary"
   assert.deepEqual(evaluateWarpPoints(stage, [100, 200]), [110, 200]);
 });
 
-test("nested Warp stages resolve and evaluate parent first", () => {
+test("nested Warp evaluates a non-affine parent on the child cage and its vertex", () => {
   const project = domainProject();
   const body = addWarp(project, { id: "body" });
-  const head = addWarp(project, { id: "head", parentNodeId: "body" });
+  const head = addWarp(project, {
+    id: "head",
+    parentNodeId: "body",
+    bounds: { left: 20, top: 20, right: 80, bottom: 80 },
+  });
   project.scene.nodes.face = createSceneNode({
     id: "face", displayName: "face", parentId: "head",
   });
   project.scene.nodes.head.children.push("face");
   addKeyArt(project);
-  const parentStage = evaluationStage(body, Object.fromEntries(
-    body.deformer.controlPointIds.map((id, index) => [id, {
-      x: body.controlPoints[index].u * 100 + 5,
-      y: body.controlPoints[index].v * 100,
-    }]),
-  ));
+  const parentStage = evaluationStage(body, {
+    body_cp_2: { x: 130, y: 0 },
+    body_cp_4: { x: 100, y: 130 },
+  });
   const childStage = evaluationStage(head, {
-    head_cp_2: { x: 100, y: 10 },
-    head_cp_4: { x: 100, y: 110 },
+    head_cp_2: { x: 90, y: 20 },
+    head_cp_4: { x: 90, y: 80 },
   });
   for (const stage of [parentStage, childStage]) {
     project.rig.warpDeformerKeyforms.push(stage.keyform);
@@ -491,8 +495,12 @@ test("nested Warp stages resolve and evaluate parent first", () => {
   const resolved = createWarpEvaluationStages(project, "face", "key_art");
   assert.deepEqual(resolved.diagnostics, []);
   assert.deepEqual(resolved.stages.map(({ deformer }) => deformer.id), ["body", "head"]);
-  assert.deepEqual(evaluateWarpStages([5, 5], [parentStage, childStage]), [10, 6]);
-  assert.notDeepEqual(evaluateWarpStages([5, 5], [childStage, parentStage]), [10, 6]);
+  const evaluatedChild = evaluateWarpStageLattice(childStage, [parentStage]);
+  assert.deepEqual(evaluatedChild.evaluatedLattice.base.slice(0, 2), [24.8, 21.2]);
+  const parentOnly = evaluateWarpPoints(parentStage, [50, 50]);
+  assert.deepEqual(parentOnly, [57.5, 57.5]);
+  assert.deepEqual(evaluateWarpStages([50, 50], [parentStage, childStage]), [63.25, 58.25]);
+  assert.notDeepEqual(evaluateWarpPoints(childStage, parentOnly), [63.25, 58.25]);
 });
 
 test("evaluation-stage resolution diagnoses a missing Key Art keyform deterministically", () => {
