@@ -1,6 +1,6 @@
 export { commandSchemas } from "../commands/schemas.js";
 
-export const MCP_SCHEMA_VERSION = 7;
+export const MCP_SCHEMA_VERSION = 8;
 
 const nodeId = {
   type: "string",
@@ -13,6 +13,15 @@ const keyArtId = { ...nodeId };
 const semanticSlotId = { ...nodeId };
 
 export const querySchemas = {
+  "deformer.list": emptyQuery(),
+  "deformer.get": idQuery("deformerId", nodeId),
+  "deformer.get_keyform": {
+    type: "object",
+    required: ["deformerId", "keyArtId"],
+    properties: { deformerId: nodeId, keyArtId },
+    additionalProperties: false,
+  },
+  "deformer.validate": emptyQuery(),
   "clipping.get_for_node": idQuery("nodeId", nodeId),
   "clipping.list": emptyQuery(),
   "clipping.validate": emptyQuery(),

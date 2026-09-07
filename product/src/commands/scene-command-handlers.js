@@ -97,9 +97,9 @@ export const sceneCommandHandlers = {
       );
     }
     const parent = nodeFor(project, payload.parentId);
-    if (parent.kind !== "group") {
+    if (!["group", "deformer"].includes(parent.kind)) {
       throw new CommandError(
-        "Groups can only be created under a group.",
+        "Groups can only be created under a group or deformer.",
         "scene.invalid_parent_kind",
       );
     }
@@ -169,7 +169,7 @@ export const sceneCommandHandlers = {
         "scene.reparent_root",
       );
     }
-    if (nextParent.kind !== "group") {
+    if (!["group", "deformer"].includes(nextParent.kind)) {
       throw new CommandError(
         "Parent must be a group.",
         "scene.invalid_parent_kind",
@@ -195,6 +195,10 @@ export const sceneCommandHandlers = {
       : Math.max(0, Math.min(nextParent.children.length, payload.index));
     nextParent.children.splice(index, 0, node.id);
     node.parentId = nextParent.id;
+    if (node.kind === "deformer") {
+      const deformer = project.rig.deformers.find((entry) => entry.id === node.id);
+      if (deformer) deformer.parentNodeId = nextParent.id;
+    }
     return {
       inverse: {
         type: "scene.reparent_node",
