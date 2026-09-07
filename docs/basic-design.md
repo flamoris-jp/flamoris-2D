@@ -418,6 +418,20 @@ Import should preserve as much as practical:
 - opacity
 - supported masks/blending metadata
 
+Raster placement uses one PSD document-space contract. A layer raster canvas
+contains the complete pixel rectangle described by its
+`left/top/right/bottom` bounds, including negative coordinates or pixels beyond
+the PSD document edges. Import, Save/Open, and re-import preserve that complete
+raster and those bounds; rendering applies `left/top` exactly once after the
+Scene world transform.
+
+Normal composition clips final pixels to the Project canvas rectangle
+`0 <= x < project.canvas.width`, `0 <= y < project.canvas.height`. The viewport
+derives that clip rectangle through its camera transform, while export obtains
+the same boundary from its exact-size render target. Source rasters are not
+destructively cropped, so later Object, Mesh, or Warp deformation can move
+formerly off-canvas pixels into the visible document.
+
 Re-import flow:
 
 ```text
