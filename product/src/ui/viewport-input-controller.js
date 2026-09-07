@@ -1,6 +1,5 @@
 import { getDeformedVertices, screenToImage } from "../mesh.js";
-import { invertAffine, transformPoint } from "../core/transforms.js";
-import { nearestDeformerControlPoint } from "./deformer-viewport-overlay.js";
+import { nearestDeformerControlPoint, unprojectDeformerDocumentPoint } from "./deformer-viewport-overlay.js";
 import {
   createTransformGesture,
   pickNodeAtDocumentPoint,
@@ -58,12 +57,14 @@ export function bindViewportInteractions({
   function screenToActiveDeformer(screenPoint) {
     const authoring = deformerAuthoring();
     const authoringState = authoring?.getState();
-    if (!authoringState?.available) return null;
+    if (!authoringState?.available || !authoringState.activeKeyArt) return null;
     const documentPoint = screenToImage(screenPoint.x, screenPoint.y, state.view);
-    return transformPoint(
-      invertAffine(state.editor.worldTransform(authoringState.deformer.id)),
+    return unprojectDeformerDocumentPoint({
+      project: state.editor.session.project,
+      deformer: authoringState.deformer,
+      keyArtId: authoringState.activeKeyArt.id,
       documentPoint,
-    );
+    }).point;
   }
 
   function nearestVertex(screenPoint, radius = 12) {
@@ -95,6 +96,7 @@ export function bindViewportInteractions({
     );
     const localPoint = screenToActiveDeformer(screenPoint);
     if (pickedControlPointId) {
+      if (!localPoint) return false;
       deformer.selectControlPoint(pickedControlPointId, {
         additive: event.shiftKey,
         toggle: event.shiftKey,
@@ -299,6 +301,7 @@ export function bindViewportInteractions({
     if (deformerGesture?.pointerId === event.pointerId) {
       const localPoint = screenToActiveDeformer(screenPoint);
       if (deformerGesture.kind === "drag") {
+        if (!localPoint) return;
         deformer.previewDrag({
           x: localPoint.x - deformerGesture.start.x,
           y: localPoint.y - deformerGesture.start.y,

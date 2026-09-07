@@ -13,7 +13,7 @@ import {
 } from "../src/ui/deformer-viewport-overlay.js";
 import { bindViewportInteractions } from "../src/ui/viewport-input-controller.js";
 
-function fixture() {
+function fixture({ nonlinearParent = false } = {}) {
   const project = createProject({
     name: "Deformer Authoring",
     width: 100,
@@ -39,6 +39,37 @@ function fixture() {
     { id: "keyart_a", displayName: "A", rootNodeId: project.scene.rootId, members: [], metadata: {} },
     { id: "keyart_b", displayName: "B", rootNodeId: project.scene.rootId, members: [], metadata: {} },
   );
+  if (nonlinearParent) {
+    const parent = createWarpDeformer({
+      id: "parent_warp",
+      displayName: "Parent Warp",
+      parentNodeId: project.scene.rootId,
+      columns: 2,
+      rows: 2,
+      bounds: { left: 0, top: 0, right: 100, bottom: 100 },
+      controlPointIds: ["parent_tl", "parent_tr", "parent_bl", "parent_br"],
+    });
+    project.scene.nodes.parent_warp = createSceneNode({
+      id: "parent_warp", kind: "deformer", displayName: "Parent Warp",
+      parentId: project.scene.rootId,
+    });
+    project.scene.nodes[project.scene.rootId].children = ["parent_warp"];
+    project.scene.nodes.parent_warp.children.push("warp");
+    project.scene.nodes.warp.parentId = "parent_warp";
+    created.deformer.parentNodeId = "parent_warp";
+    project.rig.deformers.push(parent.deformer);
+    project.rig.warpControlPoints.push(...parent.controlPoints);
+    project.rig.warpDeformerKeyforms.push({
+      deformerId: "parent_warp",
+      keyArtId: "keyart_a",
+      controlPoints: [
+        { controlPointId: "parent_tl", x: 0, y: 0 },
+        { controlPointId: "parent_tr", x: 200, y: 0 },
+        { controlPointId: "parent_bl", x: 0, y: 100 },
+        { controlPointId: "parent_br", x: 100, y: 100 },
+      ],
+    });
+  }
   const session = new EditorSession(project);
   let endpoint = "from";
   const endpointMesh = {
@@ -251,6 +282,77 @@ test("viewport pointer drag selects and commits one Warp authoring gesture", () 
   assert.deepEqual(session.query("deformer.get_keyform", {
     deformerId: "warp", keyArtId: "keyart_a",
   }).controlPoints[0], { controlPointId: "cp_tl", x: 8, y: 4 });
+});
+
+test("nested Warp pointer drag follows a nonlinearly projected child control point", () => {
+  const { session, controller } = fixture({ nonlinearParent: true });
+  const listeners = new Map();
+  const target = (extra = {}) => ({
+    ...extra,
+    addEventListener(type, listener) {
+      const atType = listeners.get(type) || [];
+      atType.push(listener);
+      listeners.set(type, atType);
+    },
+  });
+  const elements = {
+    overlayCanvas: target({
+      getBoundingClientRect: () => ({ left: 0, top: 0 }),
+      setPointerCapture() {},
+    }),
+    viewportWrap: target({ classList: { add() {}, remove() {} } }),
+  };
+  const state = {
+    mode: "psd",
+    editorMode: "object",
+    editor: {
+      session,
+      selectedNodeId: "warp",
+      worldTransform: () => [1, 0, 0, 1, 0, 0],
+      transitionPreview: { getState: () => ({ viewMode: "endpoint-a" }) },
+    },
+    previewMode: false,
+    spacePressed: false,
+    view: { scale: 1, originX: 0, originY: 0 },
+    psdParts: [],
+  };
+  const viewportRenderer = {
+    projectedDeformerLattice: () => projectDeformerLattice({
+      project: session.project,
+      deformer: controller.getState().deformer,
+      keyArtId: "keyart_a",
+      controlPoints: controller.getState().controlPoints,
+      view: state.view,
+    }),
+  };
+  bindViewportInteractions({
+    state,
+    elements,
+    viewportRenderer,
+    returnToEdit() {}, zoomAtScreenPoint() {}, panViewBy() {}, setEditorMode() {},
+    undoProject() {}, redoProject() {}, render() {}, setStatus() {},
+    selectedPart: () => null,
+    deformerAuthoring: () => controller,
+    loadFile() {},
+    windowTarget: target(),
+  });
+  const dispatch = (type, event) => (listeners.get(type) || []).forEach((listener) => listener(event));
+  const before = viewportRenderer.projectedDeformerLattice().points[0].screen;
+  dispatch("pointerdown", {
+    button: 0, pointerId: 8, clientX: before.x, clientY: before.y,
+    shiftKey: false, preventDefault() {},
+  });
+  dispatch("pointermove", { pointerId: 8, clientX: before.x + 10, clientY: before.y });
+  dispatch("pointerup", { type: "pointerup", pointerId: 8 });
+
+  const keyform = session.query("deformer.get_keyform", {
+    deformerId: "warp", keyArtId: "keyart_a",
+  });
+  assert.ok(Math.abs(keyform.controlPoints[0].x - 5) < 1e-9);
+  const after = viewportRenderer.projectedDeformerLattice().points[0].screen;
+  assert.ok(Math.abs(after.x - before.x - 10) < 1e-9);
+  assert.ok(Math.abs(after.y - before.y) < 1e-9);
+  assert.equal(session.undoStack.length, 1);
 });
 
 test("Warp authoring stays DOM-independent, command-based, and production packaged", async () => {

@@ -1,8 +1,9 @@
 import {
   createWarpEvaluationStages,
   evaluateWarpStageLattice,
+  invertWarpStages,
 } from "../core/warp-deformer-evaluator.js";
-import { invertAffine, worldTransformMatrix } from "../core/transforms.js";
+import { invertAffine, transformPoint, worldTransformMatrix } from "../core/transforms.js";
 import { imageToScreen } from "../mesh.js";
 
 function resolvedParentStages(project, deformerId, keyArtId) {
@@ -61,6 +62,27 @@ export function projectDeformerLattice({
     }
   }
   return { points, segments, diagnostics: [] };
+}
+
+export function unprojectDeformerDocumentPoint({
+  project,
+  deformer,
+  keyArtId,
+  documentPoint,
+}) {
+  if (!project || !deformer || !keyArtId || !documentPoint) {
+    return { point: null, diagnostics: [] };
+  }
+  const parents = resolvedParentStages(project, deformer.id, keyArtId);
+  if (parents.diagnostics.length) return { point: null, diagnostics: parents.diagnostics };
+  const beforeParentWarp = invertWarpStages(documentPoint, parents.stages);
+  return {
+    point: transformPoint(
+      invertAffine(worldTransformMatrix(project, deformer.id)),
+      beforeParentWarp,
+    ),
+    diagnostics: [],
+  };
 }
 
 export function nearestDeformerControlPoint(projected, screenPoint, radius = 12) {
