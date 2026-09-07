@@ -1,4 +1,5 @@
 import { getDeformedVertices, screenToImage } from "../mesh.js";
+import { nearestDeformerControlPoint, unprojectDeformerDocumentPoint } from "./deformer-viewport-overlay.js";
 import {
   createTransformGesture,
   pickNodeAtDocumentPoint,
@@ -32,9 +33,11 @@ export function bindViewportInteractions({
   endpointMesh = () => null,
   meshTools = () => null,
   correspondencePreview = () => null,
+  deformerAuthoring = () => null,
   loadFile,
   windowTarget = window,
 }) {
+  let deformerGesture = null;
   function pointerPosition(event) {
     const rect = elements.overlayCanvas.getBoundingClientRect();
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
@@ -49,6 +52,19 @@ export function bindViewportInteractions({
       worldTransform,
       partOffset: state.partOffset,
     });
+  }
+
+  function screenToActiveDeformer(screenPoint) {
+    const authoring = deformerAuthoring();
+    const authoringState = authoring?.getState();
+    if (!authoringState?.available || !authoringState.activeKeyArt) return null;
+    const documentPoint = screenToImage(screenPoint.x, screenPoint.y, state.view);
+    return unprojectDeformerDocumentPoint({
+      project: state.editor.session.project,
+      deformer: authoringState.deformer,
+      keyArtId: authoringState.activeKeyArt.id,
+      documentPoint,
+    }).point;
   }
 
   function nearestVertex(screenPoint, radius = 12) {
@@ -68,6 +84,37 @@ export function bindViewportInteractions({
       }
     }
     return nearest;
+  }
+
+  function beginDeformerGesture(event, screenPoint) {
+    const deformer = deformerAuthoring();
+    const deformerState = deformer?.getState();
+    if (!deformerState?.available || !deformerState.activeKeyArt) return false;
+    const pickedControlPointId = nearestDeformerControlPoint(
+      viewportRenderer.projectedDeformerLattice(),
+      screenPoint,
+    );
+    const localPoint = screenToActiveDeformer(screenPoint);
+    if (pickedControlPointId) {
+      if (!localPoint) return false;
+      deformer.selectControlPoint(pickedControlPointId, {
+        additive: event.shiftKey,
+        toggle: event.shiftKey,
+      });
+      if (deformer.getState().selectedControlPointIds.length) {
+        deformer.beginDrag();
+        deformerGesture = { kind: "drag", pointerId: event.pointerId, start: localPoint };
+      }
+    } else {
+      deformer.beginBoxSelection(screenPoint, "screen");
+      deformerGesture = {
+        kind: "box", pointerId: event.pointerId, start: screenPoint, additive: event.shiftKey,
+      };
+    }
+    elements.overlayCanvas.setPointerCapture(event.pointerId);
+    event.preventDefault();
+    render();
+    return true;
   }
 
   elements.overlayCanvas.addEventListener("wheel", (event) => {
@@ -134,6 +181,9 @@ export function bindViewportInteractions({
       event.preventDefault();
       return;
     }
+
+    if (["object", "mesh"].includes(route) && state.editor &&
+      beginDeformerGesture(event, screenPoint)) return;
 
     if (route === "object" && state.editor) {
       const documentPoint = screenToImage(screenPoint.x, screenPoint.y, state.view);
@@ -247,6 +297,26 @@ export function bindViewportInteractions({
   elements.overlayCanvas.addEventListener("pointermove", (event) => {
     const screenPoint = pointerPosition(event);
 
+    const deformer = deformerAuthoring();
+    if (deformerGesture?.pointerId === event.pointerId) {
+      const localPoint = screenToActiveDeformer(screenPoint);
+      if (deformerGesture.kind === "drag") {
+        if (!localPoint) return;
+        deformer.previewDrag({
+          x: localPoint.x - deformerGesture.start.x,
+          y: localPoint.y - deformerGesture.start.y,
+        });
+      } else deformer.previewBoxSelection(screenPoint);
+      render();
+      return;
+    }
+    if (deformer?.getState().available) {
+      deformer.setHover(nearestDeformerControlPoint(
+        viewportRenderer.projectedDeformerLattice(),
+        screenPoint,
+      ));
+    }
+
     if (state.pan && state.pan.pointerId === event.pointerId) {
       panViewBy(
         screenPoint.x - state.pan.last.x,
@@ -275,6 +345,27 @@ export function bindViewportInteractions({
   });
 
   function endDrag(event) {
+    if (deformerGesture?.pointerId === event.pointerId) {
+      const deformer = deformerAuthoring();
+      if (event.type === "pointercancel") {
+        if (deformerGesture.kind === "drag") deformer.cancelDrag();
+        else deformer.clearWorkspace();
+      } else if (deformerGesture.kind === "drag") {
+        deformer.commitDrag();
+        setStatus("Warp操作を1件のUndo履歴として適用しました");
+      } else {
+        const points = viewportRenderer.projectedDeformerLattice().points.map((point) => ({
+          controlPointId: point.controlPointId,
+          x: point.screen.x,
+          y: point.screen.y,
+        }));
+        deformer.commitBoxSelection({ additive: deformerGesture.additive, points });
+        setStatus("Warp control pointsを範囲選択しました");
+      }
+      deformerGesture = null;
+      render();
+      return;
+    }
     if (state.drag) {
       const endpoint = endpointMesh();
       const tools = meshTools();

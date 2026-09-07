@@ -26,6 +26,7 @@ import {
   evaluateWarpPoints,
   evaluateWarpStageLattice,
   evaluateWarpStages,
+  invertWarpPoint,
   warpDeformerAncestors,
 } from "../src/core/warp-deformer-evaluator.js";
 
@@ -470,6 +471,20 @@ test("bilinear displacement is easy to audit at a corner edge and center", () =>
   assert.deepEqual(evaluateWarpPoint(stage, { x: 50, y: 0 }), { x: 55, y: 0 });
   assert.deepEqual(evaluateWarpPoint(stage, { x: 50, y: 50 }), { x: 52.5, y: 50 });
   assert.deepEqual(evaluateWarpPoint(stage, { x: 100, y: 100 }), { x: 100, y: 100 });
+});
+
+test("bilinear Warp inversion maps projected authoring input back without iteration", () => {
+  const project = domainProject();
+  const created = addWarp(project);
+  const stage = evaluationStage(created, {
+    warp_cp_2: { x: 200, y: 0 },
+    warp_cp_4: { x: 100, y: 100 },
+  });
+  const source = { x: 30, y: 25 };
+  const projected = evaluateWarpPoint(stage, source);
+  const restored = invertWarpPoint(stage, projected);
+  assert.ok(Math.abs(restored.x - source.x) < 1e-9);
+  assert.ok(Math.abs(restored.y - source.y) < 1e-9);
 });
 
 test("outside points use clamped boundary displacement without boundary collapse", () => {

@@ -73,6 +73,56 @@ function evaluationTopology(deformer, controlPoints, keyform) {
   });
 }
 
+export function interpolateWarpKeyforms(deformer, fromKeyform, toKeyform, amount) {
+  if (!Number.isFinite(amount) || amount < 0 || amount > 1) {
+    throw new WarpDeformerEvaluationError(
+      "Warp keyform interpolation weight must be between zero and one.",
+      "DEFORMER_CONTROL_POINT_INVALID",
+      { deformerId: deformer.id },
+    );
+  }
+  const canonical = (keyform, endpoint) => {
+    if (!keyform || keyform.deformerId !== deformer.id) {
+      throw new WarpDeformerEvaluationError(
+        `Warp ${endpoint} keyform is missing or belongs to another deformer.`,
+        keyform ? "DEFORMER_KEYFORM_INCOMPATIBLE" : "DEFORMER_KEYFORM_MISSING",
+        { deformerId: deformer.id, endpoint },
+      );
+    }
+    const byId = new Map();
+    for (const point of keyform.controlPoints || []) {
+      if (byId.has(point.controlPointId) || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+        throw new WarpDeformerEvaluationError(
+          `Warp ${endpoint} keyform has invalid control points.`,
+          "DEFORMER_CONTROL_POINT_INVALID",
+          { deformerId: deformer.id, endpoint, controlPointId: point.controlPointId },
+        );
+      }
+      byId.set(point.controlPointId, point);
+    }
+    if (byId.size !== deformer.controlPointIds.length ||
+      deformer.controlPointIds.some((id) => !byId.has(id))) {
+      throw new WarpDeformerEvaluationError(
+        `Warp ${endpoint} keyform does not match the deformer topology.`,
+        "DEFORMER_KEYFORM_INCOMPATIBLE",
+        { deformerId: deformer.id, endpoint },
+      );
+    }
+    return byId;
+  };
+  const from = canonical(fromKeyform, "from");
+  const to = canonical(toKeyform, "to");
+  return {
+    deformerId: deformer.id,
+    keyArtId: amount === 0 ? fromKeyform.keyArtId : amount === 1 ? toKeyform.keyArtId : null,
+    controlPoints: deformer.controlPointIds.map((controlPointId) => ({
+      controlPointId,
+      x: lerp(from.get(controlPointId).x, to.get(controlPointId).x, amount),
+      y: lerp(from.get(controlPointId).y, to.get(controlPointId).y, amount),
+    })),
+  };
+}
+
 function localLatticePositions(stage) {
   const points = evaluationTopology(stage.deformer, stage.controlPoints, stage.keyform);
   const base = [];
@@ -139,17 +189,20 @@ function inverseCellCandidates(values, columns, row, column, point) {
   return candidates;
 }
 
-function evaluateWarpedLatticePoint(stage, point) {
-  const { base, authored } = stage.evaluatedLattice;
+function mapPointBetweenLattices(stage, source, target, point) {
   let best = null;
   for (let row = 0; row < stage.deformer.rows - 1; row += 1) {
     for (let column = 0; column < stage.deformer.columns - 1; column += 1) {
-      for (const candidate of inverseCellCandidates(base, stage.deformer.columns, row, column, point)) {
+      for (const candidate of inverseCellCandidates(
+        source, stage.deformer.columns, row, column, point,
+      )) {
         const u = clamp01(candidate.u);
         const v = clamp01(candidate.v);
-        const projectedBase = evaluateCell(base, stage.deformer.columns, row, column, u, v);
-        const distance = squaredDistance(point, projectedBase);
-        const candidateResult = { row, column, u, v, projectedBase, distance };
+        const projectedSource = evaluateCell(
+          source, stage.deformer.columns, row, column, u, v,
+        );
+        const distance = squaredDistance(point, projectedSource);
+        const candidateResult = { row, column, u, v, projectedSource, distance };
         if (!best || distance < best.distance - 1e-10 ||
           (Math.abs(distance - best.distance) <= 1e-10 &&
             (row < best.row || row === best.row && column < best.column))) {
@@ -159,17 +212,47 @@ function evaluateWarpedLatticePoint(stage, point) {
     }
   }
   if (!best) throw new WarpDeformerEvaluationError(
-    "Warped child lattice is not evaluable.",
+    "Warp lattice mapping is not evaluable.",
     "DEFORMER_KEYFORM_INCOMPATIBLE",
     { deformerId: stage.deformer.id },
   );
-  const projectedAuthored = evaluateCell(
-    authored, stage.deformer.columns, best.row, best.column, best.u, best.v,
+  const projectedTarget = evaluateCell(
+    target, stage.deformer.columns, best.row, best.column, best.u, best.v,
   );
   return {
-    x: point.x + projectedAuthored.x - best.projectedBase.x,
-    y: point.y + projectedAuthored.y - best.projectedBase.y,
+    x: point.x + projectedTarget.x - best.projectedSource.x,
+    y: point.y + projectedTarget.y - best.projectedSource.y,
   };
+}
+
+function evaluateWarpedLatticePoint(stage, point) {
+  const { base, authored } = stage.evaluatedLattice;
+  return mapPointBetweenLattices(stage, base, authored, point);
+}
+
+/**
+ * Deterministically maps a point from a stage's deformed cage back into its
+ * undeformed input space. Bilinear cells are solved analytically; no frame
+ * history or iterative approximation is involved.
+ */
+export function invertWarpPoint(stage, point) {
+  assertFinitePoint(point);
+  const toLocal = stage.toDeformerLocal || IDENTITY_AFFINE;
+  const fromLocal = stage.fromDeformerLocal || invertAffine(toLocal);
+  const localPoint = transformPoint(toLocal, point);
+  const lattice = stage.evaluatedLattice || localLatticePositions(stage);
+  const undeformed = mapPointBetweenLattices(
+    stage, lattice.authored, lattice.base, localPoint,
+  );
+  return transformPoint(fromLocal, undeformed);
+}
+
+export function invertWarpStages(point, stages) {
+  let current = { ...point };
+  for (let index = stages.length - 1; index >= 0; index -= 1) {
+    current = invertWarpPoint(stages[index], current);
+  }
+  return current;
 }
 
 export function evaluateWarpPoint(stage, point) {
