@@ -266,12 +266,14 @@ test("pre-Phase-6-3 schema migrates to empty Warp collections without losing cli
     id: "target", displayName: "target", parentId: legacy.scene.rootId,
   });
   legacy.scene.nodes[legacy.scene.rootId].children.push("source", "target");
+  legacy.rig.deformers.push({ id: "legacy_placeholder", arbitrary: "schema_5" });
   delete legacy.rig.warpControlPoints;
   delete legacy.rig.warpDeformerKeyforms;
   const migrated = migrateProjectSchema(legacy);
   assert.equal(migrated.schemaVersion, PROJECT_SCHEMA_VERSION);
   assert.deepEqual(migrated.rig.warpControlPoints, []);
   assert.deepEqual(migrated.rig.warpDeformerKeyforms, []);
+  assert.deepEqual(migrated.rig.deformers, []);
   assert.equal(migrated.clippingBindings[0].id, "clip");
   assert.deepEqual(validateProject(migrated), []);
 });

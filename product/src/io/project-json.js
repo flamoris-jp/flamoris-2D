@@ -192,9 +192,10 @@ export function migrateProjectSchema(value) {
     project.rig = project.rig && typeof project.rig === "object"
       ? project.rig
       : { deformers: [], bones: [], constraints: [] };
-    project.rig.deformers = Array.isArray(project.rig.deformers)
-      ? project.rig.deformers
-      : [];
+    // Schema 5 reserved this as an untyped rig placeholder. It predates the
+    // WarpDeformer contract, so preserving entries would misinterpret legacy
+    // data as authored Warp topology in schema 6.
+    project.rig.deformers = [];
     project.rig.warpControlPoints = [];
     project.rig.warpDeformerKeyforms = [];
     project.rig.bones = Array.isArray(project.rig.bones) ? project.rig.bones : [];
