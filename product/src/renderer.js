@@ -23,6 +23,32 @@ function renderTargetSize(canvas, renderTarget) {
   return { width, height };
 }
 
+export function renderTargetScissorBox(canvas, renderTarget) {
+  const clip = renderTarget?.clipRect;
+  if (!clip) return null;
+  const values = [clip.x, clip.y, clip.width, clip.height];
+  if (!values.every(Number.isFinite) || clip.width < 0 || clip.height < 0) {
+    throw new RangeError("Composition clip rectangle must be finite and non-negative.");
+  }
+  const targetSize = renderTargetSize(canvas, renderTarget);
+  const left = Math.max(0, Math.min(targetSize.width, clip.x));
+  const top = Math.max(0, Math.min(targetSize.height, clip.y));
+  const right = Math.max(left, Math.min(targetSize.width, clip.x + clip.width));
+  const bottom = Math.max(top, Math.min(targetSize.height, clip.y + clip.height));
+  const scaleX = canvas.width / targetSize.width;
+  const scaleY = canvas.height / targetSize.height;
+  const deviceLeft = Math.floor(left * scaleX);
+  const deviceTop = Math.floor(top * scaleY);
+  const deviceRight = Math.ceil(right * scaleX);
+  const deviceBottom = Math.ceil(bottom * scaleY);
+  return {
+    x: deviceLeft,
+    y: canvas.height - deviceBottom,
+    width: Math.max(0, deviceRight - deviceLeft),
+    height: Math.max(0, deviceBottom - deviceTop),
+  };
+}
+
 const VERTEX_SHADER = `#version 300 es
 in vec2 a_position;
 in vec2 a_uv0;
@@ -214,6 +240,27 @@ export class MeshRenderer {
     this.indexCount = 0;
   }
 
+  clearColorTarget(framebuffer, width, height) {
+    const gl = this.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    gl.viewport(0, 0, width, height);
+    gl.disable(gl.SCISSOR_TEST);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+  }
+
+  applyRenderTargetClip(renderTarget) {
+    const gl = this.gl;
+    const box = renderTargetScissorBox(this.canvas, renderTarget);
+    if (!box) {
+      gl.disable(gl.SCISSOR_TEST);
+      return null;
+    }
+    gl.enable(gl.SCISSOR_TEST);
+    gl.scissor(box.x, box.y, box.width, box.height);
+    return box;
+  }
+
   ensureAccumulationTarget() {
     const gl = this.gl;
     const width = this.canvas.width;
@@ -314,10 +361,8 @@ export class MeshRenderer {
     for (const [index, renderInstanceId] of rasterPlan.maskSourceIds.entries()) {
       const instance = rasterPlan.instancesById.get(renderInstanceId);
       const target = this.ensureClippingTarget(index);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
-      gl.viewport(0, 0, target.width, target.height);
-      gl.clearColor(0, 0, 0, 0);
-      gl.clear(gl.COLOR_BUFFER_BIT);
+      this.clearColorTarget(target.framebuffer, target.width, target.height);
+      this.applyRenderTargetClip(view);
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       const dependencyMask = instance.clipping
@@ -335,10 +380,11 @@ export class MeshRenderer {
     return maskTextures;
   }
 
-  compositeAccumulation() {
+  compositeAccumulation(view) {
     const gl = this.gl;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    this.applyRenderTargetClip(view);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.useProgram(this.compositeProgram);
@@ -351,49 +397,54 @@ export class MeshRenderer {
 
   renderEvaluated(plan, view, resolveArtwork) {
     const gl = this.gl;
-    const maskTextures = this.renderClippingMasks(plan, view, resolveArtwork);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    for (const batch of plan.batches) {
-      if (batch.kind === "instance") {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    try {
+      const maskTextures = this.renderClippingMasks(plan, view, resolveArtwork);
+      this.clearColorTarget(null, this.canvas.width, this.canvas.height);
+      this.applyRenderTargetClip(view);
+      for (const batch of plan.batches) {
+        if (batch.kind === "instance") {
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+          this.applyRenderTargetClip(view);
+          gl.enable(gl.BLEND);
+          gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+          for (const renderInstance of batch.renderInstances) {
+            this.drawInstance(
+              renderInstance,
+              view,
+              resolveArtwork,
+              1,
+              renderInstance.clipping
+                ? maskTextures.get(renderInstance.clipping.sourceRenderInstanceId)
+                : null,
+            );
+          }
+          continue;
+        }
+        this.ensureAccumulationTarget();
+        this.clearColorTarget(
+          this.accumulationFramebuffer,
+          this.canvas.width,
+          this.canvas.height,
+        );
+        this.applyRenderTargetClip(view);
         gl.enable(gl.BLEND);
-        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+        gl.blendFunc(gl.ONE, gl.ONE);
+        const weightSum = batch.renderInstances.reduce((sum, entry) => sum + entry.compositeWeight, 0);
         for (const renderInstance of batch.renderInstances) {
           this.drawInstance(
             renderInstance,
             view,
             resolveArtwork,
-            1,
+            renderInstance.compositeWeight / weightSum,
             renderInstance.clipping
               ? maskTextures.get(renderInstance.clipping.sourceRenderInstanceId)
               : null,
           );
         }
-        continue;
+        this.compositeAccumulation(view);
       }
-      this.ensureAccumulationTarget();
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.accumulationFramebuffer);
-      gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-      gl.clearColor(0, 0, 0, 0);
-      gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.enable(gl.BLEND);
-      gl.blendFunc(gl.ONE, gl.ONE);
-      const weightSum = batch.renderInstances.reduce((sum, entry) => sum + entry.compositeWeight, 0);
-      for (const renderInstance of batch.renderInstances) {
-        this.drawInstance(
-          renderInstance,
-          view,
-          resolveArtwork,
-          renderInstance.compositeWeight / weightSum,
-          renderInstance.clipping
-            ? maskTextures.get(renderInstance.clipping.sourceRenderInstanceId)
-            : null,
-        );
-      }
-      this.compositeAccumulation();
+    } finally {
+      gl.disable(gl.SCISSOR_TEST);
     }
   }
 
@@ -427,33 +478,37 @@ export class MeshRenderer {
     visible = true,
   ) {
     const gl = this.gl;
-    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    if (!this.indexCount || !visible) return;
+    try {
+      this.clearColorTarget(null, this.canvas.width, this.canvas.height);
+      if (!this.indexCount || !visible) return;
+      this.applyRenderTargetClip(view);
 
-    gl.useProgram(this.program);
-    gl.bindVertexArray(this.vao);
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW);
-    gl.uniform2f(this.locations.viewport, this.canvas.clientWidth, this.canvas.clientHeight);
-    gl.uniform2f(this.locations.origin, view.originX, view.originY);
-    gl.uniform2f(this.locations.partOffset, partOffset.x, partOffset.y);
-    gl.uniform1f(this.locations.scale, view.scale);
-    gl.uniformMatrix3fv(this.locations.world, false, new Float32Array([
-      world[0], world[1], 0,
-      world[2], world[3], 0,
-      world[4], world[5], 1,
-    ]));
-    gl.uniform1i(this.locations.texture0, 0);
-    gl.uniform1i(this.locations.texture1, 1);
-    gl.uniform2f(this.locations.appearanceWeights, 1, 0);
-    gl.uniform1i(this.locations.appearanceCount, 1);
-    gl.uniform1f(this.locations.opacity, 1);
-    gl.uniform1f(this.locations.contribution, 1);
-    gl.uniform1i(this.locations.clippingEnabled, 0);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.textures[0]);
-    gl.drawElements(gl.TRIANGLES, this.indexCount, gl.UNSIGNED_INT, 0);
+      gl.useProgram(this.program);
+      gl.bindVertexArray(this.vao);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW);
+      const targetSize = renderTargetSize(this.canvas, view);
+      gl.uniform2f(this.locations.viewport, targetSize.width, targetSize.height);
+      gl.uniform2f(this.locations.origin, view.originX, view.originY);
+      gl.uniform2f(this.locations.partOffset, partOffset.x, partOffset.y);
+      gl.uniform1f(this.locations.scale, view.scale);
+      gl.uniformMatrix3fv(this.locations.world, false, new Float32Array([
+        world[0], world[1], 0,
+        world[2], world[3], 0,
+        world[4], world[5], 1,
+      ]));
+      gl.uniform1i(this.locations.texture0, 0);
+      gl.uniform1i(this.locations.texture1, 1);
+      gl.uniform2f(this.locations.appearanceWeights, 1, 0);
+      gl.uniform1i(this.locations.appearanceCount, 1);
+      gl.uniform1f(this.locations.opacity, 1);
+      gl.uniform1f(this.locations.contribution, 1);
+      gl.uniform1i(this.locations.clippingEnabled, 0);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, this.textures[0]);
+      gl.drawElements(gl.TRIANGLES, this.indexCount, gl.UNSIGNED_INT, 0);
+    } finally {
+      gl.disable(gl.SCISSOR_TEST);
+    }
   }
 }

@@ -36,6 +36,43 @@ export function clearLayerCanvas(canvas) {
   context.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 }
 
+export function createViewportDocumentRenderTarget({
+  view,
+  documentWidth,
+  documentHeight,
+  viewportWidth,
+  viewportHeight,
+}) {
+  if (!view) return null;
+  const target = { ...view };
+  if (Number.isFinite(viewportWidth) && viewportWidth > 0) {
+    target.viewportWidth = viewportWidth;
+  }
+  if (Number.isFinite(viewportHeight) && viewportHeight > 0) {
+    target.viewportHeight = viewportHeight;
+  }
+  if (Number.isFinite(documentWidth) && documentWidth > 0 &&
+    Number.isFinite(documentHeight) && documentHeight > 0 &&
+    Number.isFinite(view.scale) && view.scale > 0) {
+    target.clipRect = {
+      x: view.originX,
+      y: view.originY,
+      width: documentWidth * view.scale,
+      height: documentHeight * view.scale,
+    };
+  }
+  return target;
+}
+
+export function clipCanvasContextToRenderTarget(context, renderTarget) {
+  const clip = renderTarget?.clipRect;
+  if (!clip) return false;
+  context.beginPath();
+  context.rect(clip.x, clip.y, clip.width, clip.height);
+  context.clip();
+  return true;
+}
+
 export function clippingMaskOverlayTriangles(evaluation, targetNodeId, view) {
   if (!evaluation || !targetNodeId || !view) return [];
   const instances = (evaluation.evaluatedParts || [])
@@ -95,6 +132,16 @@ export function createViewportRenderer({
   clippingAuthoringContext = () => null,
   deformerAuthoringContext = () => null,
 }) {
+  function viewportRenderTarget() {
+    return createViewportDocumentRenderTarget({
+      view: state.view,
+      documentWidth: state.documentWidth,
+      documentHeight: state.documentHeight,
+      viewportWidth: elements.glCanvas.clientWidth,
+      viewportHeight: elements.glCanvas.clientHeight,
+    });
+  }
+
   function screenPointForPart(x, y) {
     const basePoint = {
       x: x + state.partOffset.x,
@@ -358,6 +405,12 @@ export function createViewportRenderer({
     below.setTransform(ratio, 0, 0, ratio, 0, 0);
     above.setTransform(ratio, 0, 0, ratio, 0, 0);
 
+    const renderTarget = viewportRenderTarget();
+    below.save();
+    above.save();
+    clipCanvasContextToRenderTarget(below, renderTarget);
+    clipCanvasContextToRenderTarget(above, renderTarget);
+
     const activeIndex = selectedPartIndex();
     const endpoint = endpointContext();
     const endpointMembers = endpoint
@@ -369,6 +422,8 @@ export function createViewportRenderer({
       const target = activeIndex >= 0 && index > activeIndex ? above : below;
       drawPsdPart(target, state.psdParts[index]);
     }
+    below.restore();
+    above.restore();
   }
 
   function drawClippingMaskVisualization(evaluation) {
@@ -482,7 +537,7 @@ export function createViewportRenderer({
         state.psdParts.find((part) => part.nodeId === nodeId)?.canvas || null;
       const report = renderEvaluatedTransitionViewport({
         evaluation: transitionPreview.evaluation,
-        view: state.view,
+        view: viewportRenderTarget(),
         renderer,
         resolveArtwork,
       });
@@ -494,7 +549,9 @@ export function createViewportRenderer({
     if (!state.mesh || !state.view) {
       renderer.render(
         new Float32Array(),
-        { originX: 0, originY: 0, scale: 1 },
+        state.view
+          ? viewportRenderTarget()
+          : { originX: 0, originY: 0, scale: 1 },
         { x: 0, y: 0 },
       );
       drawOverlay(new Float32Array());
@@ -516,7 +573,7 @@ export function createViewportRenderer({
     const visible = part?.nodeId && state.editor
       ? state.editor.getNode(part.nodeId).effectiveVisible
       : true;
-    renderer.render(vertices, state.view, state.partOffset, world, visible);
+    renderer.render(vertices, viewportRenderTarget(), state.partOffset, world, visible);
     drawOverlay(visible ? vertices : new Float32Array());
     drawDeformerOverlay();
     drawTransformGizmo();
