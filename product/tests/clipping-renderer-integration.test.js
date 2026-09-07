@@ -5,6 +5,10 @@ import { ExportFrameRenderer } from "../src/core/export-frame-renderer.js";
 import { createClippingRasterPlan } from "../src/core/clipping-raster-plan.js";
 import { evaluateTransition } from "../src/core/transition-evaluator.js";
 import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
+import {
+  createWarpDeformer,
+  defaultWarpKeyformControlPoints,
+} from "../src/model/warp-deformer.js";
 import { renderEvaluatedTransitionViewport } from "../src/ui/viewport-renderer.js";
 
 function member(nodeId, appearanceId, drawOrder, opacity = 1) {
@@ -130,6 +134,54 @@ function capableCapture(calls) {
   };
 }
 
+function attachNestedWarp(project) {
+  const existingChildren = [...project.scene.nodes[project.scene.rootId].children];
+  const add = (id, parentNodeId) => {
+    const created = createWarpDeformer({
+      id,
+      displayName: id,
+      parentNodeId,
+      columns: 2,
+      rows: 2,
+      bounds: { left: 0, top: 0, right: 64, bottom: 64 },
+      controlPointIds: [`${id}_tl`, `${id}_tr`, `${id}_bl`, `${id}_br`],
+    });
+    project.scene.nodes[id] = createSceneNode({
+      id, kind: "deformer", displayName: id, parentId: parentNodeId,
+    });
+    project.rig.deformers.push(created.deformer);
+    project.rig.warpControlPoints.push(...created.controlPoints);
+    const regular = defaultWarpKeyformControlPoints(created.deformer, created.controlPoints);
+    project.rig.warpDeformerKeyforms.push(
+      {
+        deformerId: id,
+        keyArtId: "keyart_a",
+        controlPoints: regular.map((point) => ({
+          ...point,
+          x: point.x + (id === "head_warp" ? 3 : 0),
+          y: point.y + (id === "body_warp" ? 2 : 0),
+        })),
+      },
+      {
+        deformerId: id,
+        keyArtId: "keyart_b",
+        controlPoints: regular.map((point) => ({
+          ...point,
+          x: point.x + (id === "head_warp" ? 7 : 0),
+          y: point.y + (id === "body_warp" ? 6 : 0),
+        })),
+      },
+    );
+    return created;
+  };
+  add("body_warp", project.scene.rootId);
+  add("head_warp", "body_warp");
+  project.scene.nodes[project.scene.rootId].children = ["body_warp"];
+  project.scene.nodes.body_warp.children = ["head_warp"];
+  project.scene.nodes.head_warp.children = existingChildren;
+  for (const nodeId of existingChildren) project.scene.nodes[nodeId].parentId = "head_warp";
+}
+
 test("Hold, Morph, and Replace clipping share identical preview and export render plans", () => {
   for (const mode of ["hold", "morph", "replace"]) {
     const project = fixture(mode);
@@ -234,4 +286,40 @@ test("invalid resolved source fails safely in the shared preview renderer", () =
     resolveArtwork: (nodeId) => ({ nodeId }),
   });
   assert.match(report.unsupportedReasons[0], /missing_evaluated_source is unavailable/);
+});
+
+test("nested Warp deforms clipping source and target before the shared preview/export boundary", () => {
+  const project = fixture("morph");
+  attachNestedWarp(project);
+  const evaluation = evaluateTransition(project, "transition_ab", 60000);
+  const target = evaluation.evaluatedParts.find((part) => part.semanticSlotId === "slot_target")
+    .renderInstances[0];
+  const source = evaluation.evaluatedParts.flatMap((part) => part.renderInstances)
+    .find((instance) => instance.renderInstanceId === target.clipping.sourceRenderInstanceId);
+  assert.deepEqual(source.mesh.positions, [6, 4, 18, 4, 6, 16]);
+  assert.deepEqual(target.mesh.positions, [6, 4, 18, 4, 6, 16]);
+  assert.equal(source.opacity, 0.6);
+
+  const previewCalls = [];
+  renderEvaluatedTransitionViewport({
+    evaluation,
+    view: { scale: 1, originX: 0, originY: 0 },
+    renderer: capableCapture(previewCalls),
+    resolveArtwork: (nodeId) => ({ nodeId }),
+  });
+  const exportCalls = [];
+  const exported = new ExportFrameRenderer({
+    createOffscreenRenderer: () => capableCapture(exportCalls),
+  }).render({
+    project,
+    transitionId: "transition_ab",
+    frameRate: { numerator: 24, denominator: 1 },
+    frameIndex: 12,
+    outputWidth: 64,
+    outputHeight: 64,
+    renderAssets: assets(project),
+  });
+  assert.equal(exported.ok, true);
+  assert.deepEqual(exportCalls[0].plan, previewCalls[0].plan);
+  assert.equal(createClippingRasterPlan(exportCalls[0].plan).maskSourceIds.length, 1);
 });
