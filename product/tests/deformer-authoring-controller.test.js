@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { EditorSession } from "../src/commands/editor.js";
+import { deserializeProject, serializeProject } from "../src/io/project-json.js";
 import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
 import { createWarpDeformer } from "../src/model/warp-deformer.js";
 import { DeformerAuthoringController } from "../src/ui/deformer-authoring-controller.js";
@@ -99,6 +100,12 @@ test("Warp A and B authoring states are independent", () => {
   assert.deepEqual(session.query("deformer.get_keyform", {
     deformerId: "warp", keyArtId: "keyart_b",
   }).controlPoints[0], { controlPointId: "cp_tl", x: 0, y: 20 });
+  const reopened = deserializeProject(serializeProject(session.project));
+  assert.deepEqual(
+    reopened.rig.warpDeformerKeyforms,
+    session.project.rig.warpDeformerKeyforms,
+  );
+  assert.deepEqual(reopened.rig.deformers[0].controlPointIds, ["cp_tl", "cp_tr", "cp_bl", "cp_br"]);
 });
 
 test("Warp multi-select, box select, drag preview and reset remain command based", () => {

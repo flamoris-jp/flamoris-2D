@@ -434,11 +434,15 @@ export function createViewportRenderer({
       context.stroke();
     }
     if (authoring.boxSelection) {
-      const world = state.editor.worldTransform(authoring.deformer.id);
-      const fromDocument = transformPoint(world, authoring.boxSelection.from);
-      const toDocument = transformPoint(world, authoring.boxSelection.to);
-      const from = imageToScreen(fromDocument.x, fromDocument.y, state.view);
-      const to = imageToScreen(toDocument.x, toDocument.y, state.view);
+      let from = authoring.boxSelection.from;
+      let to = authoring.boxSelection.to;
+      if (authoring.boxSelection.coordinateSpace !== "screen") {
+        const world = state.editor.worldTransform(authoring.deformer.id);
+        const fromDocument = transformPoint(world, from);
+        const toDocument = transformPoint(world, to);
+        from = imageToScreen(fromDocument.x, fromDocument.y, state.view);
+        to = imageToScreen(toDocument.x, toDocument.y, state.view);
+      }
       context.setLineDash([4, 3]);
       context.strokeStyle = "rgba(255, 202, 103, .9)";
       context.fillStyle = "rgba(255, 202, 103, .12)";

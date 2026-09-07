@@ -110,8 +110,12 @@ export class DeformerAuthoringController {
     this.notify("deformer-point-hover");
   }
 
-  beginBoxSelection(point) {
-    this.boxSelection = { from: cloneProject(point), to: cloneProject(point) };
+  beginBoxSelection(point, coordinateSpace = "deformer-local") {
+    this.boxSelection = {
+      from: cloneProject(point),
+      to: cloneProject(point),
+      coordinateSpace,
+    };
     this.notify("deformer-box-preview");
   }
 
@@ -121,10 +125,10 @@ export class DeformerAuthoringController {
     this.notify("deformer-box-preview");
   }
 
-  commitBoxSelection({ additive = false } = {}) {
+  commitBoxSelection({ additive = false, points = null } = {}) {
     if (!this.boxSelection) return [];
     const rect = normalizedRect(this.boxSelection.from, this.boxSelection.to);
-    const selected = this.currentPositions()
+    const selected = (points || this.currentPositions())
       .filter((point) => point.x >= rect.left && point.x <= rect.right &&
         point.y >= rect.top && point.y <= rect.bottom)
       .map((point) => point.controlPointId);

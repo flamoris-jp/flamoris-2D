@@ -104,9 +104,9 @@ export function bindViewportInteractions({
         deformerGesture = { kind: "drag", pointerId: event.pointerId, start: localPoint };
       }
     } else {
-      deformer.beginBoxSelection(localPoint);
+      deformer.beginBoxSelection(screenPoint, "screen");
       deformerGesture = {
-        kind: "box", pointerId: event.pointerId, start: localPoint, additive: event.shiftKey,
+        kind: "box", pointerId: event.pointerId, start: screenPoint, additive: event.shiftKey,
       };
     }
     elements.overlayCanvas.setPointerCapture(event.pointerId);
@@ -303,7 +303,7 @@ export function bindViewportInteractions({
           x: localPoint.x - deformerGesture.start.x,
           y: localPoint.y - deformerGesture.start.y,
         });
-      } else deformer.previewBoxSelection(localPoint);
+      } else deformer.previewBoxSelection(screenPoint);
       render();
       return;
     }
@@ -351,7 +351,12 @@ export function bindViewportInteractions({
         deformer.commitDrag();
         setStatus("Warp操作を1件のUndo履歴として適用しました");
       } else {
-        deformer.commitBoxSelection({ additive: deformerGesture.additive });
+        const points = viewportRenderer.projectedDeformerLattice().points.map((point) => ({
+          controlPointId: point.controlPointId,
+          x: point.screen.x,
+          y: point.screen.y,
+        }));
+        deformer.commitBoxSelection({ additive: deformerGesture.additive, points });
         setStatus("Warp control pointsを範囲選択しました");
       }
       deformerGesture = null;
