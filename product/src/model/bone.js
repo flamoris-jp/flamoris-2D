@@ -4,6 +4,15 @@ export function identityBonePoseDelta() {
   return { x: 0, y: 0, rotation: 0 };
 }
 
+export function boneSceneTransform(restLocalTransform) {
+  return {
+    position: { x: restLocalTransform.x, y: restLocalTransform.y },
+    rotation: restLocalTransform.rotation,
+    scale: { x: 1, y: 1 },
+    pivot: { x: 0, y: 0 },
+  };
+}
+
 export function createBone({
   id,
   parentNodeId,

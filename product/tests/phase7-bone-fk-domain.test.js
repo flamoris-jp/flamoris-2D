@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  boneSceneTransform,
   createBone,
   createBonePoseKeyform,
   identityBonePoseDelta,
@@ -24,6 +25,8 @@ import {
   interpolateBonePoseDeltas,
   projectBoneBindFrame,
 } from "../src/core/bone-fk-evaluator.js";
+import { EditorSession } from "../src/commands/editor.js";
+import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
 
 function boneProject() {
   return createProject({
@@ -59,6 +62,7 @@ function addBone(project, {
     kind: "bone",
     displayName: id,
     parentId: parentNodeId,
+    transform: boneSceneTransform({ x, y, rotation }),
   });
   project.scene.nodes[parentNodeId].children.push(id);
   const bone = createBone({
@@ -74,6 +78,26 @@ function addBone(project, {
 
 function codes(project) {
   return validateProject(project).map(({ code }) => code);
+}
+
+function createBoneCommand({
+  id,
+  parentNodeId,
+  x = 0,
+  y = 0,
+  rotation = 0,
+  length = 100,
+} = {}) {
+  return {
+    type: "bone.create",
+    payload: {
+      id,
+      displayName: id,
+      parentNodeId,
+      restLocalTransform: { x, y, rotation },
+      length,
+    },
+  };
 }
 
 test("new schema contains empty typed Bone collections", () => {
@@ -105,6 +129,7 @@ test("Bone validation diagnoses identity parent rest length and child-kind viola
   project.rig.bones[0].parentNodeId = "missing";
   project.rig.bones[0].restLocalTransform.rotation = Number.NaN;
   project.rig.bones[0].length = 0;
+  project.rig.bones[0].unsupported = true;
   project.scene.nodes.part = createSceneNode({
     id: "part",
     kind: "part",
@@ -298,4 +323,184 @@ test("Bone pose interpolation uses linear translation and shortest-arc rotation"
   const midpoint = interpolateBonePoseDeltas(from, to, 0.5);
   assert.deepEqual({ x: midpoint.x, y: midpoint.y }, { x: 10, y: 0 });
   assert.ok(Math.abs(midpoint.rotation - Math.PI) < 1e-12);
+});
+
+test("Bone commands create rename enable and pose through normal Undo Redo", () => {
+  const project = boneProject();
+  addKeyArt(project, "pose");
+  const session = new EditorSession(project);
+  session.execute(createBoneCommand({
+    id: "upper",
+    parentNodeId: project.scene.rootId,
+    length: 10,
+  }));
+  session.execute(createBoneCommand({
+    id: "forearm",
+    parentNodeId: "upper",
+    x: 10,
+    length: 5,
+  }));
+  session.execute({
+    type: "bone.rename",
+    payload: { boneId: "forearm", displayName: "Forearm" },
+  });
+  session.execute({
+    type: "bone.set_enabled",
+    payload: { boneId: "forearm", enabled: false },
+  });
+  session.execute({
+    type: "bone.set_keyform",
+    payload: {
+      boneId: "upper",
+      keyArtId: "pose",
+      localDelta: { x: 0, y: 0, rotation: Math.PI / 2 },
+    },
+  });
+
+  assert.equal(session.query("bone.get", { boneId: "forearm" }).displayName, "Forearm");
+  assert.equal(session.query("bone.get", { boneId: "forearm" }).enabled, false);
+  assert.deepEqual(session.query("bone.list").map(({ id }) => id), ["forearm", "upper"]);
+  assert.equal(session.query("bone.get_keyform", {
+    boneId: "upper", keyArtId: "pose",
+  }).localDelta.rotation, Math.PI / 2);
+  const evaluated = session.query("bone.get_evaluated_pose", {
+    boneId: "forearm", keyArtId: "pose",
+  });
+  assert.deepEqual(evaluated.diagnostics, []);
+  assert.ok(Math.abs(evaluated.pose.head.y - 10) < 1e-12);
+
+  session.undo();
+  assert.equal(session.query("bone.get_keyform", {
+    boneId: "upper", keyArtId: "pose",
+  }), null);
+  session.redo();
+  assert.equal(session.query("bone.get_keyform", {
+    boneId: "upper", keyArtId: "pose",
+  }).localDelta.rotation, Math.PI / 2);
+});
+
+test("Bone rest and hierarchy changes reject authored pose reinterpretation", () => {
+  const project = boneProject();
+  addKeyArt(project, "pose");
+  const session = new EditorSession(project);
+  session.execute(createBoneCommand({
+    id: "upper", parentNodeId: project.scene.rootId, length: 10,
+  }));
+  session.execute(createBoneCommand({
+    id: "forearm", parentNodeId: "upper", x: 10, length: 5,
+  }));
+  session.execute({
+    type: "bone.set_keyform",
+    payload: {
+      boneId: "forearm",
+      keyArtId: "pose",
+      localDelta: { x: 0, y: 0, rotation: 0.2 },
+    },
+  });
+  const before = structuredClone(session.project);
+  for (const command of [
+    {
+      type: "bone.set_rest",
+      payload: {
+        boneId: "forearm",
+        restLocalTransform: { x: 10, y: 2, rotation: 0 },
+        length: 5,
+      },
+    },
+    {
+      type: "bone.set_rest",
+      payload: {
+        boneId: "upper",
+        restLocalTransform: { x: 1, y: 0, rotation: 0 },
+        length: 10,
+      },
+    },
+    {
+      type: "bone.reparent",
+      payload: { boneId: "upper", parentNodeId: "forearm" },
+    },
+  ]) {
+    assert.throws(() => session.execute(command));
+    assert.deepEqual(session.project, before);
+  }
+  session.execute({
+    type: "bone.reset_keyform",
+    payload: { boneId: "forearm", keyArtId: "pose" },
+  });
+  session.execute({
+    type: "bone.set_rest",
+    payload: {
+      boneId: "forearm",
+      restLocalTransform: { x: 10, y: 2, rotation: 0 },
+      length: 6,
+    },
+  });
+  assert.equal(session.query("bone.get", { boneId: "forearm" }).length, 6);
+  assert.deepEqual(session.query("scene.get_node", { nodeId: "forearm" }).transform,
+    boneSceneTransform({ x: 10, y: 2, rotation: 0 }));
+  session.undo();
+  assert.equal(session.query("bone.get", { boneId: "forearm" }).length, 5);
+});
+
+test("generic Scene transform cannot silently diverge from Bone rest semantics", () => {
+  const project = boneProject();
+  const session = new EditorSession(project);
+  session.execute(createBoneCommand({
+    id: "upper", parentNodeId: project.scene.rootId, x: 10, y: 20, length: 10,
+  }));
+  const before = structuredClone(session.project);
+  assert.throws(() => session.execute({
+    type: "scene.set_transform",
+    payload: {
+      nodeId: "upper",
+      coordinateSpace: "node-local",
+      transform: {
+        position: { x: 30, y: 40 },
+        rotation: 0,
+        scale: { x: 1, y: 1 },
+        pivot: { x: 0, y: 0 },
+      },
+    },
+  }));
+  assert.deepEqual(session.project, before);
+});
+
+test("Bone reparent and leaf removal preserve exact history state", () => {
+  const project = boneProject();
+  const session = new EditorSession(project);
+  session.execute(createBoneCommand({
+    id: "upper", parentNodeId: project.scene.rootId, length: 10,
+  }));
+  session.execute(createBoneCommand({
+    id: "forearm", parentNodeId: "upper", x: 10, length: 5,
+  }));
+  assert.throws(() => session.execute({
+    type: "bone.remove", payload: { boneId: "upper" },
+  }), /leaf Bone/);
+  session.execute({
+    type: "bone.reparent",
+    payload: { boneId: "forearm", parentNodeId: project.scene.rootId },
+  });
+  assert.equal(session.query("bone.get", { boneId: "forearm" }).parentNodeId,
+    project.scene.rootId);
+  session.undo();
+  assert.equal(session.query("bone.get", { boneId: "forearm" }).parentNodeId, "upper");
+  session.redo();
+  session.execute({ type: "bone.remove", payload: { boneId: "forearm" } });
+  assert.deepEqual(session.query("bone.list").map(({ id }) => id), ["upper"]);
+  session.undo();
+  assert.deepEqual(session.query("bone.list").map(({ id }) => id), ["forearm", "upper"]);
+});
+
+test("headless capabilities expose the same typed Bone commands and queries", () => {
+  const project = boneProject();
+  const adapter = new HeadlessProductAdapter(new EditorSession(project));
+  assert.ok(adapter.capabilities().commands["bone.create"]);
+  assert.ok(adapter.capabilities().commands["bone.set_keyform"]);
+  assert.ok(adapter.capabilities().queries["bone.get_evaluated_pose"]);
+  adapter.execute(createBoneCommand({
+    id: "upper", parentNodeId: project.scene.rootId, length: 10,
+  }));
+  assert.equal(adapter.query("bone.get", { boneId: "upper" }).id, "upper");
+  assert.deepEqual(adapter.query("bone.validate", {}), { valid: true, issues: [] });
 });

@@ -15,6 +15,8 @@ import {
   clippingValidationResult,
 } from "../model/clipping-validation.js";
 import { warpDeformerValidationResult } from "../model/warp-deformer-validation.js";
+import { boneValidationResult } from "../model/bone-validation.js";
+import { evaluateBoneFk } from "../core/bone-fk-evaluator.js";
 
 function temporalProgram(project, programId) {
   const program = project.temporalPrograms.find((entry) => entry.id === programId);
@@ -195,6 +197,8 @@ export const projectQueries = {
       clippingBindings: project.clippingBindings.length,
       deformers: project.rig.deformers.length,
       warpDeformerKeyforms: project.rig.warpDeformerKeyforms.length,
+      bones: project.rig.bones.length,
+      bonePoseKeyforms: project.rig.bonePoseKeyforms.length,
       transitions: project.transitions.length,
       clips: project.animation.clips.length,
       temporalPrograms: project.temporalPrograms.length,
@@ -226,6 +230,46 @@ export const projectQueries = {
       entry.deformerId === input.deformerId && entry.keyArtId === input.keyArtId) || null,
   ),
   "deformer.validate": (project) => warpDeformerValidationResult(project),
+  "bone.list": (project) => [...project.rig.bones]
+    .sort((left, right) => left.id.localeCompare(right.id))
+    .map((bone) => ({
+      ...cloneProject(bone),
+      displayName: project.scene.nodes[bone.id]?.displayName || null,
+      childBoneIds: (project.scene.nodes[bone.id]?.children || [])
+        .filter((id) => project.scene.nodes[id]?.kind === "bone"),
+    })),
+  "bone.get": (project, input) => {
+    const bone = project.rig.bones.find((entry) => entry.id === input.boneId);
+    if (!bone) throw new Error(`Unknown Bone ${input.boneId}.`);
+    return {
+      ...cloneProject(bone),
+      displayName: project.scene.nodes[bone.id]?.displayName || null,
+      childBoneIds: (project.scene.nodes[bone.id]?.children || [])
+        .filter((id) => project.scene.nodes[id]?.kind === "bone"),
+    };
+  },
+  "bone.get_keyform": (project, input) => cloneProject(
+    project.rig.bonePoseKeyforms.find((entry) =>
+      entry.boneId === input.boneId && entry.keyArtId === input.keyArtId) || null,
+  ),
+  "bone.get_evaluated_pose": (project, input) => {
+    if (!project.rig.bones.some((entry) => entry.id === input.boneId)) {
+      throw new Error(`Unknown Bone ${input.boneId}.`);
+    }
+    if (!project.keyArts.some((entry) => entry.id === input.keyArtId)) {
+      throw new Error(`Unknown KeyArt ${input.keyArtId}.`);
+    }
+    const result = evaluateBoneFk(project, input.keyArtId);
+    return {
+      pose: cloneProject(
+        result.poses.find((entry) => entry.boneId === input.boneId) || null,
+      ),
+      diagnostics: cloneProject(
+        result.diagnostics.filter((entry) => entry.boneId === input.boneId),
+      ),
+    };
+  },
+  "bone.validate": (project) => boneValidationResult(project),
   "scene.get_tree": (project, input = {}) =>
     treeNode(project, project.scene.rootId, input.includeHidden !== false),
   "scene.get_node": (project, input) => {

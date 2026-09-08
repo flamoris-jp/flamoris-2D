@@ -38,6 +38,16 @@ function validLocalTransform(value) {
     finite(value.x) && finite(value.y) && finite(value.rotation);
 }
 
+function sceneTransformMatchesRest(transform, rest) {
+  return transform?.position?.x === rest?.x &&
+    transform?.position?.y === rest?.y &&
+    transform?.rotation === rest?.rotation &&
+    transform?.scale?.x === 1 &&
+    transform?.scale?.y === 1 &&
+    transform?.pivot?.x === 0 &&
+    transform?.pivot?.y === 0;
+}
+
 export function validateBones(project) {
   const issues = [];
   const nodes = project.scene?.nodes || {};
@@ -66,6 +76,12 @@ export function validateBones(project) {
       issues.push(problem("BONE_REST_INVALID", path, "Bone must be an object."));
       continue;
     }
+    if (!exactKeys(bone, [
+      "id", "parentNodeId", "restLocalTransform", "length", "enabled",
+    ])) {
+      issues.push(problem("BONE_REST_INVALID", path,
+        "Bone contains missing or unsupported persistent fields.", bone.id || null));
+    }
     if (!nonEmpty(bone.id)) {
       issues.push(problem("identity.missing", `${path}.id`, "Bone stable ID is required."));
     } else if (boneById.has(bone.id)) {
@@ -90,6 +106,11 @@ export function validateBones(project) {
     if (node && node.parentId !== bone.parentNodeId) {
       issues.push(problem("BONE_SCENE_IDENTITY_MISMATCH", `${path}.parentNodeId`,
         "Bone parent must match the Scene hierarchy.", bone.id || null));
+    }
+    if (node?.kind === "bone" &&
+      !sceneTransformMatchesRest(node.transform, bone.restLocalTransform)) {
+      issues.push(problem("BONE_SCENE_IDENTITY_MISMATCH", `${path}.restLocalTransform`,
+        "BoneNode transform must mirror the Bone rest-local transform.", bone.id || null));
     }
     if (!validLocalTransform(bone.restLocalTransform)) {
       issues.push(problem("BONE_REST_INVALID", `${path}.restLocalTransform`,
