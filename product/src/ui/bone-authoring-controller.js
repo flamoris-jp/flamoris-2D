@@ -256,11 +256,23 @@ export class BoneAuthoringController {
 
   bindTarget(targetNodeId, boneId = this.selectedBoneId) {
     if (!boneId) throw new Error("Select a Bone before creating a rigid attachment.");
-    const existing = this.session.query("bone.get_rigid_binding_for_target", { targetNodeId });
-    if (existing) return this.session.execute({
-      type: "bone.set_rigid_binding_bone",
-      payload: { bindingId: existing.id, boneId },
-    }, { label: "Change rigid Bone attachment" });
+    const existing = this.session.query("bone.list_rigid_bindings")
+      .find((entry) => entry.targetNodeId === targetNodeId) || null;
+    if (existing) {
+      const commands = [];
+      if (existing.boneId !== boneId) commands.push({
+        type: "bone.set_rigid_binding_bone",
+        payload: { bindingId: existing.id, boneId },
+      });
+      if (!existing.enabled) commands.push({
+        type: "bone.set_rigid_binding_enabled",
+        payload: { bindingId: existing.id, enabled: true },
+      });
+      if (!commands.length) return null;
+      return this.session.executeTransaction(commands, {
+        label: "Change rigid Bone attachment",
+      });
+    }
     return this.session.execute({
       type: "bone.create_rigid_binding",
       payload: { binding: {

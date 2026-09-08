@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 
 import {
   createIdFactory,
@@ -17,6 +18,8 @@ import {
   defaultWarpKeyformControlPoints,
 } from "../src/model/warp-deformer.js";
 import { evaluateTransition } from "../src/core/transition-evaluator.js";
+import { evaluateTransitionExportFrame } from "../src/core/export-frame-evaluator.js";
+import { createEvaluatedRenderPlan } from "../src/core/evaluated-render.js";
 
 function member(nodeId, appearanceId) {
   return {
@@ -235,6 +238,43 @@ function closeArray(actual, expected, epsilon = 1e-9) {
   ));
 }
 
+function addClippingSource(project) {
+  const rootId = project.scene.rootId;
+  project.scene.nodes.mask = createSceneNode({
+    id: "mask",
+    displayName: "Mask",
+    parentId: rootId,
+    bounds: { left: -20, top: -20, right: 20, bottom: 20 },
+  });
+  project.scene.nodes[rootId].children.push("mask");
+  for (const keyArt of project.keyArts) {
+    keyArt.members.push(member("mask", `appearance_mask_${keyArt.id}`));
+    keyArt.members.at(-1).drawOrder = 1;
+  }
+  project.semanticSlots.push({
+    id: "mask_slot",
+    displayName: "Mask",
+    mappings: [
+      { keyArtId: "key_a", nodeId: "mask" },
+      { keyArtId: "key_b", nodeId: "mask" },
+    ],
+    metadata: {},
+  });
+  project.transitions[0].partTransitions.push({
+    id: "mask_transition",
+    semanticSlotId: "mask_slot",
+    mode: "hold",
+    topologyId: null,
+    fromKeyformId: null,
+    toKeyformId: null,
+    configuration: { holdEndpoint: "from" },
+  });
+  project.clippingBindings.push(
+    { id: "clip_a", targetNodeId: "part_a", sourceNodeId: "mask", mode: "inside", enabled: true },
+    { id: "clip_b", targetNodeId: "part_b", sourceNodeId: "mask", mode: "inside", enabled: true },
+  );
+}
+
 test("rigid FK uses exact A, exact B, and deterministic interpolated endpoint poses", () => {
   const project = fixture();
   closeArray(instances(project, 0)[0].mesh.positions, [10, 0, 11, 0, 10, 1]);
@@ -324,4 +364,47 @@ test("degenerate post-Warp bind frame emits a deterministic Bone diagnostic", ()
   assert.ok(first.diagnostics.some((entry) =>
     entry.code === "BONE_PROJECTED_FRAME_DEGENERATE" && entry.severity === "error"));
   assert.deepEqual(first, second);
+});
+
+test("clipping resolves against final geometry after rigid Bone deformation", () => {
+  const project = fixture();
+  addClippingSource(project);
+  const evaluation = evaluateTransition(project, "transition", 50);
+  const target = evaluation.evaluatedParts.find((entry) => entry.semanticSlotId === "slot")
+    .renderInstances[0];
+  const source = evaluation.evaluatedParts.find((entry) => entry.semanticSlotId === "mask_slot")
+    .renderInstances[0];
+  closeArray(target.mesh.positions.slice(0, 2), [
+    10 * Math.SQRT1_2, 10 * Math.SQRT1_2,
+  ]);
+  assert.equal(target.clipping.sourceRenderInstanceId, source.renderInstanceId);
+  assert.equal(target.clipping.mode, "inside");
+});
+
+test("preview and export plans share identical evaluated rigid geometry", () => {
+  const project = fixture();
+  const previewEvaluation = evaluateTransition(project, "transition", 50);
+  const exported = evaluateTransitionExportFrame(project, {
+    transitionId: "transition",
+    frameRate: { numerator: 2400, denominator: 1 },
+    frameIndex: 1,
+  });
+  assert.equal(exported.frame.timeTicks, 50);
+  assert.deepEqual(exported.evaluatedTransition, previewEvaluation);
+  const resolveArtwork = () => ({});
+  assert.deepEqual(
+    createEvaluatedRenderPlan(exported.evaluatedTransition, { resolveArtwork }),
+    createEvaluatedRenderPlan(previewEvaluation, { resolveArtwork }),
+  );
+});
+
+test("shared renderer boundary remains Bone and RigidBinding unaware", async () => {
+  const sources = await Promise.all([
+    "../src/core/evaluated-render.js",
+    "../src/core/shared-composition-renderer.js",
+    "../src/core/export-frame-renderer.js",
+  ].map((path) => readFile(new URL(path, import.meta.url), "utf8")));
+  for (const source of sources) {
+    assert.equal(/Bone|RigidBinding|rigidBoneBinding/.test(source), false);
+  }
 });
