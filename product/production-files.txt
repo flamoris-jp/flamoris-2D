@@ -19,6 +19,8 @@ src/styles/dialogs.css
 src/model/project.js
 src/model/bone.js
 src/model/bone-validation.js
+src/model/rigid-bone-binding.js
+src/model/rigid-bone-binding-validation.js
 src/model/warp-deformer.js
 src/model/warp-deformer-validation.js
 src/model/validation.js
