@@ -309,15 +309,24 @@ export function evaluateWarpPoints(stage, positions) {
 
 export function evaluateWarpStages(positions, stages) {
   let current = [...positions];
-  const resolvedStages = [];
-  for (const stage of stages) {
-    const resolved = resolvedStages.length
-      ? evaluateWarpStageLattice(stage, resolvedStages)
-      : stage;
+  for (const resolved of resolveWarpEvaluationStages(stages)) {
     current = evaluateWarpPoints(resolved, current);
-    resolvedStages.push(resolved);
   }
   return current;
+}
+
+/**
+ * Resolves nested Warp cages once so downstream inverse projections use the
+ * exact same parent-first, non-affine stage semantics as forward evaluation.
+ */
+export function resolveWarpEvaluationStages(stages) {
+  const resolvedStages = [];
+  for (const stage of stages) {
+    resolvedStages.push(resolvedStages.length
+      ? evaluateWarpStageLattice(stage, resolvedStages)
+      : stage);
+  }
+  return resolvedStages;
 }
 
 /**

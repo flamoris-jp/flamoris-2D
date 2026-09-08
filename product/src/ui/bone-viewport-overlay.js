@@ -1,7 +1,19 @@
 import { imageToScreen } from "../mesh.js";
-import { evaluateBoneFk, bonePoseDeltaForKeyArt } from "../core/bone-fk-evaluator.js";
-import { evaluateEndpointProjectedBoneFk } from "../core/rigid-bone-evaluator.js";
-import { boneSceneTransform } from "../model/bone.js";
+import { bonePoseDeltaForKeyArt } from "../core/bone-fk-evaluator.js";
+import {
+  createEndpointBoneWarpEvaluationStages,
+  evaluateEndpointProjectedBoneFk,
+} from "../core/rigid-bone-evaluator.js";
+import {
+  invertWarpStages,
+  resolveWarpEvaluationStages,
+} from "../core/warp-deformer-evaluator.js";
+import {
+  invertAffine,
+  transformPoint,
+  worldTransformMatrix,
+} from "../core/transforms.js";
+import { boneSceneTransform, identityBonePoseDelta } from "../model/bone.js";
 import { cloneProject } from "../model/project.js";
 
 function distanceToSegment(point, from, to) {
@@ -35,13 +47,11 @@ export function projectBoneOverlay({ project, authoring, view }) {
       ? cloneProject(authoring.editableValue)
       : bonePoseDeltaForKeyArt(evaluationProject, bone.id, authoring.activeKeyArt?.id)
     : authoring.mode === "edit" ? () => ({ x: 0, y: 0, rotation: 0 }) : null;
-  const evaluation = authoring.activeKeyArt
-    ? evaluateEndpointProjectedBoneFk(
-      evaluationProject,
-      authoring.activeKeyArt.id,
-      { poseForBone },
-    )
-    : evaluateBoneFk(evaluationProject, null, { poseForBone });
+  const evaluation = evaluateEndpointProjectedBoneFk(
+    evaluationProject,
+    authoring.activeKeyArt?.id || null,
+    { poseForBone },
+  );
   const screenPose = new Map(evaluation.poses.map((pose) => [pose.boneId, {
     head: imageToScreen(pose.head.x, pose.head.y, view),
     tip: imageToScreen(pose.tip.x, pose.tip.y, view),
@@ -86,6 +96,84 @@ export function projectBoneOverlay({ project, authoring, view }) {
     }));
   }
   return { bones, ghosts, diagnostics: evaluation.diagnostics };
+}
+
+function authoringDiagnostic(error, boneId) {
+  return {
+    code: error?.code || "BONE_AUTHORING_SPACE_INVALID",
+    boneId: error?.details?.boneId || boneId,
+    message: error?.message || "Bone authoring space could not be resolved.",
+    ...(error?.details ? { details: error.details } : {}),
+  };
+}
+
+/**
+ * Freezes the selected Bone's document -> authoring-local projection for one
+ * gesture. Rest edits invert the canonical ancestor Warp stages and then the
+ * authoritative Scene parent transform. Pose edits use the projected FK frame
+ * immediately before the selected Bone's localDelta.
+ */
+export function createBoneAuthoringSpace({ project, authoring, boneId }) {
+  try {
+    const bone = project.rig?.bones?.find((entry) => entry.id === boneId);
+    const node = project.scene?.nodes?.[boneId];
+    if (!bone || !node || node.kind !== "bone") {
+      throw Object.assign(new Error("Bone authoring requires a matching BoneNode."), {
+        code: "BONE_NODE_MISSING",
+        details: { boneId },
+      });
+    }
+    if (authoring.mode === "edit") {
+      const rawStages = createEndpointBoneWarpEvaluationStages(
+        project,
+        boneId,
+        authoring.activeKeyArt?.id || null,
+      );
+      const stages = resolveWarpEvaluationStages(rawStages);
+      const toParentLocal = invertAffine(worldTransformMatrix(project, node.parentId));
+      return {
+        diagnostics: [],
+        toLocal(documentPoint) {
+          return transformPoint(
+            toParentLocal,
+            invertWarpStages(documentPoint, stages),
+          );
+        },
+      };
+    }
+    if (!authoring.activeKeyArt?.id) {
+      throw Object.assign(new Error("Select an active Key Art before posing a Bone."), {
+        code: "BONE_KEY_ART_REQUIRED",
+        details: { boneId },
+      });
+    }
+    const evaluation = evaluateEndpointProjectedBoneFk(
+      project,
+      authoring.activeKeyArt.id,
+      {
+        poseForBone: (entry) => entry.id === boneId
+          ? identityBonePoseDelta()
+          : bonePoseDeltaForKeyArt(project, entry.id, authoring.activeKeyArt.id),
+      },
+    );
+    if (evaluation.diagnostics.length) {
+      return { toLocal: null, diagnostics: evaluation.diagnostics };
+    }
+    const pose = evaluation.poses.find((entry) => entry.boneId === boneId);
+    if (!pose) throw Object.assign(new Error("Selected Bone was not produced by FK evaluation."), {
+      code: "BONE_NODE_MISSING",
+      details: { boneId },
+    });
+    const toPoseDeltaLocal = invertAffine(pose.poseMatrix);
+    return {
+      diagnostics: [],
+      toLocal(documentPoint) {
+        return transformPoint(toPoseDeltaLocal, documentPoint);
+      },
+    };
+  } catch (error) {
+    return { toLocal: null, diagnostics: [authoringDiagnostic(error, boneId)] };
+  }
 }
 
 export function nearestBoneHandle(overlay, point, radius = 10) {

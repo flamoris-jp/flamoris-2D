@@ -5,11 +5,16 @@ import { readFile } from "node:fs/promises";
 import { EditorSession } from "../src/commands/editor.js";
 import { serializeProject } from "../src/io/project-json.js";
 import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
+import {
+  createWarpDeformer,
+  defaultWarpKeyformControlPoints,
+} from "../src/model/warp-deformer.js";
 import { BoneAuthoringController } from "../src/ui/bone-authoring-controller.js";
 import {
   nearestBoneHandle,
   projectBoneOverlay,
 } from "../src/ui/bone-viewport-overlay.js";
+import { bindViewportInteractions } from "../src/ui/viewport-input-controller.js";
 
 function fixture() {
   const project = createProject({
@@ -34,6 +39,106 @@ function fixture() {
   controller.createChild({ displayName: "Root Bone", length: 10 });
   session.markSaved();
   return { session, controller, boneId: controller.selectedBoneId };
+}
+
+function viewportHarness(session, controller) {
+  const listeners = new Map();
+  const eventTarget = (extra = {}) => ({
+    ...extra,
+    addEventListener(type, listener) {
+      const values = listeners.get(type) || [];
+      values.push(listener);
+      listeners.set(type, values);
+    },
+  });
+  const elements = {
+    overlayCanvas: eventTarget({
+      getBoundingClientRect: () => ({ left: 0, top: 0 }),
+      setPointerCapture() {},
+    }),
+    viewportWrap: eventTarget({ classList: { add() {}, remove() {} } }),
+  };
+  const state = {
+    mode: "psd",
+    editorMode: "object",
+    editor: {
+      session,
+      selectedNodeId: controller.selectedBoneId,
+      selectNode(boneId) {
+        this.selectedNodeId = boneId;
+        controller.selectBone(boneId);
+      },
+      transitionPreview: { getState: () => ({ viewMode: "endpoint-a" }) },
+    },
+    previewMode: false,
+    spacePressed: false,
+    view: { scale: 1, originX: 0, originY: 0 },
+    psdParts: [],
+  };
+  const viewportRenderer = {
+    projectedBoneOverlay: () => projectBoneOverlay({
+      project: session.project,
+      authoring: controller.getState(),
+      view: state.view,
+    }),
+    projectedDeformerLattice: () => ({ points: [], segments: [], diagnostics: [] }),
+  };
+  bindViewportInteractions({
+    state,
+    elements,
+    viewportRenderer,
+    returnToEdit() {}, zoomAtScreenPoint() {}, panViewBy() {}, setEditorMode() {},
+    undoProject() {}, redoProject() {}, render() {}, setStatus() {},
+    selectedPart: () => null,
+    boneAuthoring: () => controller,
+    loadFile() {},
+    windowTarget: eventTarget(),
+  });
+  return {
+    overlay: () => viewportRenderer.projectedBoneOverlay(),
+    dispatch(type, point, pointerId = 1) {
+      for (const listener of listeners.get(type) || []) listener({
+        type,
+        button: 0,
+        pointerId,
+        clientX: point.x,
+        clientY: point.y,
+        shiftKey: false,
+        preventDefault() {},
+      });
+    },
+  };
+}
+
+function addNonlinearWarpAncestor(project, boneId) {
+  const rootId = project.scene.rootId;
+  const created = createWarpDeformer({
+    id: "warp",
+    displayName: "Warp",
+    parentNodeId: rootId,
+    columns: 2,
+    rows: 2,
+    bounds: { left: 0, top: 0, right: 100, bottom: 100 },
+    controlPointIds: ["warp_tl", "warp_tr", "warp_bl", "warp_br"],
+  });
+  project.scene.nodes.warp = createSceneNode({
+    id: "warp", kind: "deformer", displayName: "Warp", parentId: rootId,
+  });
+  project.scene.nodes.warp.children.push(boneId);
+  project.scene.nodes[rootId].children = project.scene.nodes[rootId].children
+    .map((id) => id === boneId ? "warp" : id);
+  project.scene.nodes[boneId].parentId = "warp";
+  project.rig.bones.find((bone) => bone.id === boneId).parentNodeId = "warp";
+  project.rig.deformers.push(created.deformer);
+  project.rig.warpControlPoints.push(...created.controlPoints);
+  const regular = defaultWarpKeyformControlPoints(created.deformer, created.controlPoints);
+  const nonlinear = regular.map((point) => point.controlPointId.endsWith("tr")
+    ? { ...point, x: 200 }
+    : point);
+  project.rig.warpDeformerKeyforms.push(
+    { deformerId: "warp", keyArtId: "key_a", controlPoints: structuredClone(nonlinear) },
+    { deformerId: "warp", keyArtId: "key_b", controlPoints: structuredClone(nonlinear) },
+  );
 }
 
 test("Bone Edit and Pose mutate separate persistent domains", () => {
@@ -153,6 +258,84 @@ test("viewport Bone projection exposes joints body parent link selected state an
   assert.deepEqual(child.parentLink, { from: parent.tip, to: child.head });
   assert.equal(nearestBoneHandle(overlay, child.rotationHandle).kind, "rotation");
   assert.equal(nearestBoneHandle(overlay, child.head).boneId, parentId);
+});
+
+test("viewport Edit drag converts document input through a rotated parent Bone", () => {
+  const { session, controller, boneId: parentId } = fixture();
+  controller.setRest({ x: 0, y: 0, rotation: Math.PI / 2, length: 10 });
+  controller.createChild({ displayName: "Child", length: 6 });
+  const childId = controller.selectedBoneId;
+  controller.setRest({ x: 20, y: 0, rotation: 0, length: 6 });
+  const viewport = viewportHarness(session, controller);
+  const historyBefore = session.undoStack.length;
+  const head = viewport.overlay().bones.find((entry) => entry.boneId === childId).head;
+  viewport.dispatch("pointerdown", head, 11);
+  viewport.dispatch("pointermove", { x: head.x + 5, y: head.y }, 11);
+  viewport.dispatch("pointerup", { x: head.x + 5, y: head.y }, 11);
+
+  assert.deepEqual(session.query("bone.get", { boneId: childId }).restLocalTransform, {
+    x: 20,
+    y: -5,
+    rotation: 0,
+  });
+  assert.equal(session.undoStack.length, historyBefore + 1);
+  const moved = viewport.overlay().bones.find((entry) => entry.boneId === childId);
+  assert.ok(Math.abs(moved.head.x - head.x - 5) < 1e-9);
+  assert.ok(Math.abs(moved.head.y - head.y) < 1e-9);
+
+  const rotationHandle = moved.rotationHandle;
+  viewport.dispatch("pointerdown", rotationHandle, 12);
+  viewport.dispatch("pointermove", { x: moved.head.x, y: moved.head.y - 28 }, 12);
+  viewport.dispatch("pointerup", { x: moved.head.x, y: moved.head.y - 28 }, 12);
+  assert.ok(Math.abs(
+    session.query("bone.get", { boneId: childId }).restLocalTransform.rotation - Math.PI / 2,
+  ) < 1e-9);
+  assert.equal(session.undoStack.length, historyBefore + 2);
+});
+
+test("viewport Pose drag writes the rotated-parent movement as Bone-local delta", () => {
+  const { session, controller } = fixture();
+  controller.setRest({ x: 0, y: 0, rotation: Math.PI / 2, length: 10 });
+  controller.createChild({ displayName: "Child", length: 6 });
+  const childId = controller.selectedBoneId;
+  controller.setRest({ x: 20, y: 0, rotation: 0, length: 6 });
+  controller.setMode("pose");
+  controller.setActiveKeyArt("key_a");
+  const viewport = viewportHarness(session, controller);
+  const historyBefore = session.undoStack.length;
+  const head = viewport.overlay().bones.find((entry) => entry.boneId === childId).head;
+  viewport.dispatch("pointerdown", head, 21);
+  viewport.dispatch("pointermove", { x: head.x + 5, y: head.y }, 21);
+  viewport.dispatch("pointerup", { x: head.x + 5, y: head.y }, 21);
+
+  assert.deepEqual(session.query("bone.get_keyform", {
+    boneId: childId,
+    keyArtId: "key_a",
+  }).localDelta, { x: 0, y: -5, rotation: 0 });
+  assert.equal(session.undoStack.length, historyBefore + 1);
+  const moved = viewport.overlay().bones.find((entry) => entry.boneId === childId);
+  assert.ok(Math.abs(moved.head.x - head.x - 5) < 1e-9);
+  assert.ok(Math.abs(moved.head.y - head.y) < 1e-9);
+});
+
+test("viewport length drag inverts a non-affine Warp before storing local length", () => {
+  const { session, controller, boneId } = fixture();
+  controller.setRest({ x: 10, y: 0, rotation: 0, length: 10 });
+  addNonlinearWarpAncestor(session.project, boneId);
+  controller.setActiveKeyArt("key_a");
+  const viewport = viewportHarness(session, controller);
+  const historyBefore = session.undoStack.length;
+  const projected = viewport.overlay().bones.find((entry) => entry.boneId === boneId);
+  assert.ok(Math.abs(projected.head.x - 20) < 1e-9);
+  assert.ok(Math.abs(projected.tip.x - 40) < 1e-9);
+  viewport.dispatch("pointerdown", projected.tip, 31);
+  viewport.dispatch("pointermove", { x: projected.tip.x + 20, y: projected.tip.y }, 31);
+  viewport.dispatch("pointerup", { x: projected.tip.x + 20, y: projected.tip.y }, 31);
+
+  assert.ok(Math.abs(session.query("bone.get", { boneId }).length - 20) < 1e-9);
+  assert.equal(session.undoStack.length, historyBefore + 1);
+  const moved = viewport.overlay().bones.find((entry) => entry.boneId === boneId);
+  assert.ok(Math.abs(moved.tip.x - projected.tip.x - 20) < 1e-9);
 });
 
 test("authoring creates a rigid influence without Scene reparent or draw-order mutation", () => {

@@ -60,7 +60,7 @@ function rootParentId(project, boneId) {
   );
 }
 
-function endpointStages(project, boneId, keyArtId) {
+export function createEndpointBoneWarpEvaluationStages(project, boneId, keyArtId) {
   const resolved = createWarpEvaluationStages(project, boneId, keyArtId, {
     spaceForDeformer: (deformerId) => documentWarpSpace(project, deformerId),
   });
@@ -126,7 +126,7 @@ export function evaluateEndpointProjectedBoneFk(project, keyArtId, {
     return evaluateBoneFk(project, keyArtId, {
       projectPoint: projectedWarpPoint(
         project,
-        (boneId) => endpointStages(project, boneId, keyArtId),
+        (boneId) => createEndpointBoneWarpEvaluationStages(project, boneId, keyArtId),
       ),
       poseForBone,
     });
