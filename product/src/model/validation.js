@@ -5,6 +5,7 @@ import { validateTransitionDomain } from "./transition-validation.js";
 import { validateClippingBindings } from "./clipping-validation.js";
 import { validateTransitionClipping } from "./clipping-transition-validation.js";
 import { validateWarpDeformers } from "./warp-deformer-validation.js";
+import { validateBones } from "./bone-validation.js";
 
 function issue(code, path, message, entityId = null, severity = "error") {
   return { code, path, message, entityId, severity };
@@ -133,6 +134,7 @@ export function validateProject(project) {
   issues.push(...validateClippingBindings(project, register));
   issues.push(...validateTransitionClipping(project));
   issues.push(...validateWarpDeformers(project, register));
+  issues.push(...validateBones(project));
 
   if (nodes[rootId]) {
     const visiting = new Set();
