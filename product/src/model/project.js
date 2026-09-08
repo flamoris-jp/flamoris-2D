@@ -1,6 +1,6 @@
 import { TIMEBASE_TICKS_PER_SECOND } from "../core/temporal.js";
 
-export const PROJECT_SCHEMA_VERSION = 6;
+export const PROJECT_SCHEMA_VERSION = 7;
 
 export function identityTransform() {
   return {
@@ -61,6 +61,7 @@ export function createProject({ id, name = "Untitled", width, height, idFactory 
       warpControlPoints: [],
       warpDeformerKeyforms: [],
       bones: [],
+      bonePoseKeyforms: [],
       constraints: [],
     },
     transitions: [],

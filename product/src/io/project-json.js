@@ -98,6 +98,18 @@ export function createFl2dDocument(
           (left.controlPointId < right.controlPointId ? -1 : left.controlPointId > right.controlPointId ? 1 : 0));
       })(),
     }));
+  body.rig.bones = [...body.rig.bones].sort(byId).map((bone) => ({
+    ...bone,
+    restLocalTransform: cloneProject(bone.restLocalTransform),
+  }));
+  body.rig.bonePoseKeyforms = [...body.rig.bonePoseKeyforms]
+    .sort((left, right) =>
+      left.boneId < right.boneId ? -1 : left.boneId > right.boneId ? 1 :
+        left.keyArtId < right.keyArtId ? -1 : left.keyArtId > right.keyArtId ? 1 : 0)
+    .map((keyform) => ({
+      ...keyform,
+      localDelta: cloneProject(keyform.localDelta),
+    }));
   body.transitions = [...body.transitions].sort(byId).map((transition) => ({
     ...transition,
     partTransitions: [...transition.partTransitions].sort(byId),
@@ -201,6 +213,17 @@ export function migrateProjectSchema(value) {
     project.rig.bones = Array.isArray(project.rig.bones) ? project.rig.bones : [];
     project.rig.constraints = Array.isArray(project.rig.constraints) ? project.rig.constraints : [];
     project.schemaVersion = 6;
+  }
+  if (project?.schemaVersion === 6) {
+    project.rig = project.rig && typeof project.rig === "object"
+      ? project.rig
+      : { deformers: [], warpControlPoints: [], warpDeformerKeyforms: [], constraints: [] };
+    // Schema 6 exposed bones only as an untyped future placeholder. Do not
+    // reinterpret arbitrary placeholder entries as the Phase 7 Bone contract.
+    project.rig.bones = [];
+    project.rig.bonePoseKeyforms = [];
+    project.rig.constraints = Array.isArray(project.rig.constraints) ? project.rig.constraints : [];
+    project.schemaVersion = 7;
   }
   if (project?.schemaVersion !== PROJECT_SCHEMA_VERSION) {
     throw new ProjectFormatError(

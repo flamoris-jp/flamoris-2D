@@ -1,6 +1,6 @@
 export { commandSchemas } from "../commands/schemas.js";
 
-export const MCP_SCHEMA_VERSION = 8;
+export const MCP_SCHEMA_VERSION = 9;
 
 const nodeId = {
   type: "string",
@@ -13,6 +13,21 @@ const keyArtId = { ...nodeId };
 const semanticSlotId = { ...nodeId };
 
 export const querySchemas = {
+  "bone.list": emptyQuery(),
+  "bone.get": idQuery("boneId", nodeId),
+  "bone.get_keyform": {
+    type: "object",
+    required: ["boneId", "keyArtId"],
+    properties: { boneId: nodeId, keyArtId },
+    additionalProperties: false,
+  },
+  "bone.get_evaluated_pose": {
+    type: "object",
+    required: ["boneId", "keyArtId"],
+    properties: { boneId: nodeId, keyArtId },
+    additionalProperties: false,
+  },
+  "bone.validate": emptyQuery(),
   "deformer.list": emptyQuery(),
   "deformer.get": idQuery("deformerId", nodeId),
   "deformer.get_keyform": {
