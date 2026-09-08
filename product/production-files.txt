@@ -82,6 +82,7 @@ src/ui/correspondence-preview-controller.js
 src/ui/clipping-authoring-controller.js
 src/ui/deformer-authoring-controller.js
 src/ui/bone-authoring-controller.js
+src/ui/bone-viewport-overlay.js
 src/ui/deformer-viewport-overlay.js
 src/ui/correspondence-view.js
 src/core/contour-automesh.js

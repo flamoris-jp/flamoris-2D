@@ -168,6 +168,7 @@ const viewportRenderer = createViewportRenderer({
     };
   },
   deformerAuthoringContext: () => state.editor?.deformerAuthoring.getState() || null,
+  boneAuthoringContext: () => state.editor?.boneAuthoring.getState() || null,
 });
 
 const sceneEditorView = createSceneEditorView({
@@ -1047,9 +1048,90 @@ function commitInspectorEdit(action) {
 
 elements.displayNameInput.addEventListener("change", () => {
   commitInspectorEdit(() => {
-    if (state.editor?.selectedNode()?.kind === "deformer") {
+    if (state.editor?.selectedNode()?.kind === "bone") {
+      state.editor.boneAuthoring.rename(elements.displayNameInput.value);
+    } else if (state.editor?.selectedNode()?.kind === "deformer") {
       state.editor.deformerAuthoring.rename(elements.displayNameInput.value);
     } else state.editor?.renameSelected(elements.displayNameInput.value);
+  });
+});
+elements.boneModeSelect.addEventListener("change", () => {
+  state.editor?.boneAuthoring.setMode(elements.boneModeSelect.value);
+});
+elements.boneActiveKeyArtSelect.addEventListener("change", () => {
+  state.editor?.boneAuthoring.setActiveKeyArt(elements.boneActiveKeyArtSelect.value || null);
+});
+elements.boneGhostKeyArtSelect.addEventListener("change", () => {
+  state.editor?.boneAuthoring.setGhostKeyArt(elements.boneGhostKeyArtSelect.value || null);
+});
+function commitBoneInspectorValue() {
+  commitInspectorEdit(() => {
+    const authoring = state.editor?.boneAuthoring;
+    if (!authoring?.selectedBoneId) return;
+    const value = {
+      x: Number(elements.boneXInput.value),
+      y: Number(elements.boneYInput.value),
+      rotation: Number(elements.boneRotationInput.value) * Math.PI / 180,
+    };
+    if (!Object.values(value).every(Number.isFinite)) {
+      throw new Error("Bone values must be finite.");
+    }
+    if (authoring.mode === "pose") authoring.setPose(value);
+    else {
+      const length = Number(elements.boneLengthInput.value);
+      if (!(length > 0)) throw new Error("Bone length must be positive.");
+      authoring.setRest({ ...value, length });
+    }
+  });
+}
+for (const input of [
+  elements.boneXInput,
+  elements.boneYInput,
+  elements.boneRotationInput,
+  elements.boneLengthInput,
+]) input.addEventListener("change", commitBoneInspectorValue);
+elements.createChildBoneButton.addEventListener("click", () => {
+  commitInspectorEdit(() => state.editor?.boneAuthoring.createChild());
+});
+elements.resetBonePoseButton.addEventListener("click", () => {
+  commitInspectorEdit(() => state.editor?.boneAuthoring.resetPose());
+});
+elements.boneParentSelect.addEventListener("change", () => {
+  commitInspectorEdit(() => state.editor?.boneAuthoring.reparent(elements.boneParentSelect.value));
+});
+elements.rigidBindingBoneSelect.addEventListener("change", () => {
+  commitInspectorEdit(() => {
+    const targetNodeId = state.editor?.selectedNodeId;
+    const boneId = elements.rigidBindingBoneSelect.value;
+    if (!targetNodeId) return;
+    const binding = state.editor.session.query("bone.list_rigid_bindings")
+      .find((entry) => entry.targetNodeId === targetNodeId);
+    if (!boneId && binding) {
+      state.editor.session.execute({
+        type: "bone.remove_rigid_binding", payload: { bindingId: binding.id },
+      }, { label: "Remove rigid Bone attachment" });
+    } else if (boneId) state.editor.boneAuthoring.bindTarget(targetNodeId, boneId);
+  });
+});
+elements.rigidBindingEnabledInput.addEventListener("change", () => {
+  commitInspectorEdit(() => {
+    const targetNodeId = state.editor?.selectedNodeId;
+    const binding = state.editor?.session.query("bone.list_rigid_bindings")
+      .find((entry) => entry.targetNodeId === targetNodeId);
+    if (binding) state.editor.session.execute({
+      type: "bone.set_rigid_binding_enabled",
+      payload: { bindingId: binding.id, enabled: elements.rigidBindingEnabledInput.checked },
+    }, { label: "Set rigid Bone attachment enabled" });
+  });
+});
+elements.removeRigidBindingButton.addEventListener("click", () => {
+  commitInspectorEdit(() => {
+    const targetNodeId = state.editor?.selectedNodeId;
+    const binding = state.editor?.session.query("bone.list_rigid_bindings")
+      .find((entry) => entry.targetNodeId === targetNodeId);
+    if (binding) state.editor.session.execute({
+      type: "bone.remove_rigid_binding", payload: { bindingId: binding.id },
+    }, { label: "Remove rigid Bone attachment" });
   });
 });
 elements.deformerGridSelect.addEventListener("change", () => {
@@ -1134,6 +1216,7 @@ bindViewportInteractions({
   meshTools: () => state.editor?.meshTools || null,
   correspondencePreview: () => state.editor?.correspondencePreview || null,
   deformerAuthoring: () => state.editor?.deformerAuthoring || null,
+  boneAuthoring: () => state.editor?.boneAuthoring || null,
   loadFile,
 });
 

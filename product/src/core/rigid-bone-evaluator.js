@@ -119,13 +119,16 @@ function evaluationDiagnostic(error, binding = null) {
   };
 }
 
-function fkEndpoint(project, keyArtId) {
+export function evaluateEndpointProjectedBoneFk(project, keyArtId, {
+  poseForBone = null,
+} = {}) {
   try {
     return evaluateBoneFk(project, keyArtId, {
       projectPoint: projectedWarpPoint(
         project,
         (boneId) => endpointStages(project, boneId, keyArtId),
       ),
+      poseForBone,
     });
   } catch (error) {
     return { poses: [], diagnostics: [evaluationDiagnostic(error)] };
@@ -195,7 +198,12 @@ export function evaluateEndpointRigidBoneMesh(project, {
 }) {
   const binding = rigidBoneBindingForTarget(project, targetNodeId);
   if (!binding) return { mesh, diagnostics: [] };
-  return applyPose(mesh, targetWorldTransform, binding, fkEndpoint(project, keyArtId));
+  return applyPose(
+    mesh,
+    targetWorldTransform,
+    binding,
+    evaluateEndpointProjectedBoneFk(project, keyArtId),
+  );
 }
 
 export function evaluateMorphRigidBoneMesh(project, {

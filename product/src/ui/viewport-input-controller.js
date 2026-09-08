@@ -1,5 +1,6 @@
 import { getDeformedVertices, screenToImage } from "../mesh.js";
 import { nearestDeformerControlPoint, unprojectDeformerDocumentPoint } from "./deformer-viewport-overlay.js";
+import { nearestBoneHandle } from "./bone-viewport-overlay.js";
 import {
   createTransformGesture,
   pickNodeAtDocumentPoint,
@@ -34,10 +35,12 @@ export function bindViewportInteractions({
   meshTools = () => null,
   correspondencePreview = () => null,
   deformerAuthoring = () => null,
+  boneAuthoring = () => null,
   loadFile,
   windowTarget = window,
 }) {
   let deformerGesture = null;
+  let boneGesture = null;
   function pointerPosition(event) {
     const rect = elements.overlayCanvas.getBoundingClientRect();
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
@@ -117,6 +120,42 @@ export function bindViewportInteractions({
     return true;
   }
 
+  function beginBoneGesture(event, screenPoint) {
+    const authoring = boneAuthoring();
+    const authoringState = authoring?.getState();
+    if (!authoringState?.selectedBoneId) return false;
+    const picked = nearestBoneHandle(viewportRenderer.projectedBoneOverlay(), screenPoint);
+    if (!picked) return false;
+    if (authoringState.mode === "pose" && !authoringState.activeKeyArt) {
+      setStatus("Bone Poseにはactive Key Artを明示的に選択してください");
+      return true;
+    }
+    if (picked.boneId !== authoringState.selectedBoneId) {
+      state.editor.selectNode(picked.boneId);
+    }
+    const overlay = viewportRenderer.projectedBoneOverlay();
+    const bone = overlay.bones.find((entry) => entry.boneId === picked.boneId);
+    const current = authoring.getState().editableValue;
+    if (!bone || !current) return false;
+    const documentPoint = screenToImage(screenPoint.x, screenPoint.y, state.view);
+    const head = screenToImage(bone.head.x, bone.head.y, state.view);
+    const kind = picked.kind === "tip" && authoring.mode === "edit"
+      ? "length" : picked.kind === "head" ? "translate" : "rotation";
+    authoring.beginGesture();
+    boneGesture = {
+      pointerId: event.pointerId,
+      kind,
+      initial: current,
+      start: documentPoint,
+      head,
+      startAngle: Math.atan2(documentPoint.y - head.y, documentPoint.x - head.x),
+    };
+    elements.overlayCanvas.setPointerCapture(event.pointerId);
+    event.preventDefault();
+    render();
+    return true;
+  }
+
   elements.overlayCanvas.addEventListener("wheel", (event) => {
     if (!state.view) return;
     event.preventDefault();
@@ -181,6 +220,8 @@ export function bindViewportInteractions({
       event.preventDefault();
       return;
     }
+
+    if (route === "object" && state.editor && beginBoneGesture(event, screenPoint)) return;
 
     if (["object", "mesh"].includes(route) && state.editor &&
       beginDeformerGesture(event, screenPoint)) return;
@@ -298,6 +339,31 @@ export function bindViewportInteractions({
     const screenPoint = pointerPosition(event);
 
     const deformer = deformerAuthoring();
+    const bone = boneAuthoring();
+    if (boneGesture?.pointerId === event.pointerId) {
+      const documentPoint = screenToImage(screenPoint.x, screenPoint.y, state.view);
+      if (boneGesture.kind === "translate") bone.previewGesture({
+        x: boneGesture.initial.x + documentPoint.x - boneGesture.start.x,
+        y: boneGesture.initial.y + documentPoint.y - boneGesture.start.y,
+      });
+      else if (boneGesture.kind === "length") bone.previewGesture({
+        length: Math.max(0.001, Math.hypot(
+          documentPoint.x - boneGesture.head.x,
+          documentPoint.y - boneGesture.head.y,
+        )),
+      });
+      else {
+        const angle = Math.atan2(
+          documentPoint.y - boneGesture.head.y,
+          documentPoint.x - boneGesture.head.x,
+        );
+        bone.previewGesture({
+          rotation: boneGesture.initial.rotation + angle - boneGesture.startAngle,
+        });
+      }
+      render();
+      return;
+    }
     if (deformerGesture?.pointerId === event.pointerId) {
       const localPoint = screenToActiveDeformer(screenPoint);
       if (deformerGesture.kind === "drag") {
@@ -315,6 +381,11 @@ export function bindViewportInteractions({
         viewportRenderer.projectedDeformerLattice(),
         screenPoint,
       ));
+    }
+    if (bone?.getState().selectedBoneId) {
+      bone.setHover(nearestBoneHandle(
+        viewportRenderer.projectedBoneOverlay(), screenPoint,
+      )?.boneId || null);
     }
 
     if (state.pan && state.pan.pointerId === event.pointerId) {
@@ -345,6 +416,17 @@ export function bindViewportInteractions({
   });
 
   function endDrag(event) {
+    if (boneGesture?.pointerId === event.pointerId) {
+      const bone = boneAuthoring();
+      if (event.type === "pointercancel") bone.cancelGesture();
+      else {
+        bone.commitGesture();
+        setStatus("Bone操作を1件のUndo履歴として適用しました");
+      }
+      boneGesture = null;
+      render();
+      return;
+    }
     if (deformerGesture?.pointerId === event.pointerId) {
       const deformer = deformerAuthoring();
       if (event.type === "pointercancel") {

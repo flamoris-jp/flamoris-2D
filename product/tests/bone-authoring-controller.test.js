@@ -4,8 +4,12 @@ import { readFile } from "node:fs/promises";
 
 import { EditorSession } from "../src/commands/editor.js";
 import { serializeProject } from "../src/io/project-json.js";
-import { createIdFactory, createProject } from "../src/model/project.js";
+import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
 import { BoneAuthoringController } from "../src/ui/bone-authoring-controller.js";
+import {
+  nearestBoneHandle,
+  projectBoneOverlay,
+} from "../src/ui/bone-viewport-overlay.js";
 
 function fixture() {
   const project = createProject({
@@ -18,6 +22,10 @@ function fixture() {
     { id: "key_a", displayName: "A", rootNodeId: project.scene.rootId, members: [], metadata: {} },
     { id: "key_b", displayName: "B", rootNodeId: project.scene.rootId, members: [], metadata: {} },
   );
+  project.scene.nodes.part = createSceneNode({
+    id: "part", displayName: "Part", parentId: project.scene.rootId,
+  });
+  project.scene.nodes[project.scene.rootId].children.push("part");
   const session = new EditorSession(project);
   let sequence = 0;
   const controller = new BoneAuthoringController(session, {
@@ -122,4 +130,44 @@ test("Bone authoring controller is DOM-independent and production packaged", asy
   assert.equal(source.includes("window."), false);
   assert.equal(source.includes("session.project"), false);
   assert.match(manifest, /src\/ui\/bone-authoring-controller\.js/);
+});
+
+test("viewport Bone projection exposes joints body parent link selected state and rotation handle", () => {
+  const { session, controller, boneId: parentId } = fixture();
+  controller.createChild({ displayName: "Child", length: 6 });
+  const childId = controller.selectedBoneId;
+  controller.setActiveKeyArt("key_a");
+  const overlay = projectBoneOverlay({
+    project: session.project,
+    authoring: controller.getState(),
+    view: { originX: 0, originY: 0, scale: 1 },
+  });
+  assert.deepEqual(overlay.diagnostics, []);
+  assert.equal(overlay.bones.length, 2);
+  const parent = overlay.bones.find((entry) => entry.boneId === parentId);
+  const child = overlay.bones.find((entry) => entry.boneId === childId);
+  assert.deepEqual(parent.head, { x: 0, y: 0 });
+  assert.deepEqual(parent.tip, { x: 10, y: 0 });
+  assert.equal(child.body.length, 4);
+  assert.equal(child.selected, true);
+  assert.deepEqual(child.parentLink, { from: parent.tip, to: child.head });
+  assert.equal(nearestBoneHandle(overlay, child.rotationHandle).kind, "rotation");
+  assert.equal(nearestBoneHandle(overlay, child.head).boneId, parentId);
+});
+
+test("authoring creates a rigid influence without Scene reparent or draw-order mutation", () => {
+  const { session, controller, boneId } = fixture();
+  const rootId = session.project.scene.rootId;
+  const order = [...session.project.scene.nodes[rootId].children];
+  controller.bindTarget("part", boneId);
+  assert.deepEqual(session.project.scene.nodes[rootId].children, order);
+  assert.equal(session.project.scene.nodes.part.parentId, rootId);
+  assert.deepEqual(session.query("bone.get_rigid_binding_for_target", {
+    targetNodeId: "part",
+  }), {
+    id: "rigid_binding_2",
+    targetNodeId: "part",
+    boneId,
+    enabled: true,
+  });
 });

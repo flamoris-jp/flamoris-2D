@@ -4,6 +4,7 @@ import { transformPoint } from "../core/transforms.js";
 import { EDITOR_MODES, isMeshAuthoringMode } from "./editor-modes.js";
 import { renderEvaluatedComposition } from "../core/shared-composition-renderer.js";
 import { projectDeformerLattice } from "./deformer-viewport-overlay.js";
+import { projectBoneOverlay } from "./bone-viewport-overlay.js";
 
 export function renderEvaluatedTransitionViewport({
   evaluation,
@@ -131,6 +132,7 @@ export function createViewportRenderer({
   correspondencePreviewContext = () => null,
   clippingAuthoringContext = () => null,
   deformerAuthoringContext = () => null,
+  boneAuthoringContext = () => null,
 }) {
   function viewportRenderTarget() {
     return createViewportDocumentRenderTarget({
@@ -332,6 +334,7 @@ export function createViewportRenderer({
     if (
       state.editorMode !== EDITOR_MODES.OBJECT ||
       !state.editor?.selectedNodeId ||
+      state.editor?.selectedNode()?.kind === "bone" ||
       !state.view
     ) return;
     const bounds = selectedNodeDocumentBounds();
@@ -517,6 +520,88 @@ export function createViewportRenderer({
     context.restore();
   }
 
+  function projectedBones() {
+    const authoring = boneAuthoringContext();
+    return authoring?.selectedBoneId && state.view
+      ? projectBoneOverlay({
+        project: state.editor.session.project,
+        authoring,
+        view: state.view,
+      })
+      : { bones: [], ghosts: [], diagnostics: [] };
+  }
+
+  function drawBoneOverlay() {
+    const authoring = boneAuthoringContext();
+    if (!authoring?.selectedBoneId || !state.view) return;
+    const projected = projectedBones();
+    const context = elements.overlayCanvas.getContext("2d");
+    const ratio = window.devicePixelRatio || 1;
+    context.save();
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.setLineDash([4, 4]);
+    context.strokeStyle = "rgba(174, 198, 218, .45)";
+    for (const ghost of projected.ghosts) {
+      context.beginPath();
+      context.moveTo(ghost.head.x, ghost.head.y);
+      context.lineTo(ghost.tip.x, ghost.tip.y);
+      context.stroke();
+    }
+    context.setLineDash([]);
+    for (const bone of projected.bones) {
+      if (bone.parentLink) {
+        context.beginPath();
+        context.moveTo(bone.parentLink.from.x, bone.parentLink.from.y);
+        context.lineTo(bone.parentLink.to.x, bone.parentLink.to.y);
+        context.strokeStyle = "rgba(91, 224, 255, .42)";
+        context.lineWidth = 1.25;
+        context.stroke();
+      }
+      context.beginPath();
+      context.moveTo(bone.body[0].x, bone.body[0].y);
+      bone.body.slice(1).forEach((point) => context.lineTo(point.x, point.y));
+      context.closePath();
+      context.fillStyle = bone.selected
+        ? "rgba(255, 202, 103, .42)" : bone.hovered
+          ? "rgba(185, 255, 242, .35)" : "rgba(91, 224, 255, .24)";
+      context.strokeStyle = bone.selected ? "#ffca67" : "#5be0ff";
+      context.lineWidth = bone.selected ? 2 : 1.5;
+      context.fill();
+      context.stroke();
+      for (const point of [bone.head, bone.tip]) {
+        context.beginPath();
+        context.arc(point.x, point.y, bone.selected ? 5 : 3.5, 0, Math.PI * 2);
+        context.fillStyle = bone.selected ? "#ffca67" : "#eafdf9";
+        context.fill();
+        context.stroke();
+      }
+      if (bone.selected) {
+        context.beginPath();
+        context.moveTo(bone.head.x, bone.head.y);
+        context.lineTo(bone.rotationHandle.x, bone.rotationHandle.y);
+        context.strokeStyle = "rgba(255, 202, 103, .72)";
+        context.stroke();
+        context.beginPath();
+        context.arc(bone.rotationHandle.x, bone.rotationHandle.y, 5, 0, Math.PI * 2);
+        context.fillStyle = "#ffca67";
+        context.fill();
+        context.stroke();
+      }
+    }
+    context.fillStyle = "rgba(12, 26, 25, .9)";
+    context.fillRect(14, 14, 270, 28);
+    context.fillStyle = authoring.mode === "pose" ? "#ffca67" : "#5be0ff";
+    context.font = "700 12px ui-monospace, monospace";
+    context.fillText(
+      `BONE ${authoring.mode === "pose" ? "POSE" : "EDIT"} · ${authoring.activeKeyArt?.displayName || "NO KEY ART"}`,
+      24,
+      33,
+    );
+    context.restore();
+  }
+
   function render() {
     const transitionPreview = transitionPreviewContext();
     if (transitionPreview?.viewMode === "preview") {
@@ -556,6 +641,7 @@ export function createViewportRenderer({
       );
       drawOverlay(new Float32Array());
       drawDeformerOverlay();
+      drawBoneOverlay();
       drawTransformGizmo();
       return;
     }
@@ -576,6 +662,7 @@ export function createViewportRenderer({
     renderer.render(vertices, viewportRenderTarget(), state.partOffset, world, visible);
     drawOverlay(visible ? vertices : new Float32Array());
     drawDeformerOverlay();
+    drawBoneOverlay();
     drawTransformGizmo();
   }
 
@@ -594,5 +681,6 @@ export function createViewportRenderer({
         })
         : { points: [], segments: [], diagnostics: [] };
     },
+    projectedBoneOverlay: projectedBones,
   };
 }
