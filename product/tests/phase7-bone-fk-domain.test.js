@@ -286,6 +286,53 @@ test("FK result is independent of Bone collection insertion order", () => {
   assert.deepEqual(evaluateBoneFk(project, "pose"), expected);
 });
 
+test("FK rejects Bone identity that does not match the authoritative Scene hierarchy", () => {
+  const missingNode = boneProject();
+  addBone(missingNode, { id: "upper", length: 10 });
+  delete missingNode.scene.nodes.upper;
+  assert.deepEqual(
+    evaluateBoneFk(missingNode, "unused").diagnostics.map(({ code, boneId }) =>
+      [code, boneId]),
+    [["BONE_NODE_MISSING", "upper"]],
+  );
+
+  const mismatchedParent = boneProject();
+  addBone(mismatchedParent, { id: "upper", length: 10 });
+  addBone(mismatchedParent, {
+    id: "forearm",
+    parentNodeId: "upper",
+    x: 10,
+    length: 5,
+  });
+  mismatchedParent.rig.bones.find(({ id }) => id === "forearm").parentNodeId =
+    mismatchedParent.scene.rootId;
+  const mismatchResult = evaluateBoneFk(mismatchedParent, "unused");
+  assert.deepEqual(mismatchResult.poses, []);
+  assert.deepEqual(
+    mismatchResult.diagnostics.map(({ code, boneId }) => [code, boneId]),
+    [["BONE_SCENE_IDENTITY_MISMATCH", "forearm"]],
+  );
+});
+
+test("FK rejects a Scene parent outside the supported Bone hierarchy", () => {
+  const project = boneProject();
+  project.scene.nodes.part = createSceneNode({
+    id: "part",
+    kind: "part",
+    displayName: "part",
+    parentId: project.scene.rootId,
+  });
+  project.scene.nodes[project.scene.rootId].children.push("part");
+  addBone(project, { id: "upper", parentNodeId: "part", length: 10 });
+
+  const result = evaluateBoneFk(project, "unused");
+  assert.deepEqual(result.poses, []);
+  assert.deepEqual(
+    result.diagnostics.map(({ code, boneId }) => [code, boneId]),
+    [["BONE_PARENT_INVALID", "upper"]],
+  );
+});
+
 test("projected post-Warp bind frame is explicit and deterministic", () => {
   const project = boneProject();
   addBone(project, { id: "upper", length: 10 });

@@ -107,12 +107,52 @@ export function boneEvaluationOrder(project) {
       );
     }
     state.set(bone.id, "visiting");
-    const parentNode = nodes[bone.parentNodeId];
+    const boneNode = nodes[bone.id];
+    if (!boneNode) {
+      throw new BoneEvaluationError(
+        "Bone must reference a BoneNode with the same stable ID.",
+        "BONE_NODE_MISSING",
+        { boneId: bone.id },
+      );
+    }
+    if (boneNode.kind !== "bone") {
+      throw new BoneEvaluationError(
+        "Bone stable ID must resolve to a BoneNode.",
+        "BONE_SCENE_IDENTITY_MISMATCH",
+        { boneId: bone.id, nodeKind: boneNode.kind },
+      );
+    }
+    if (boneNode.parentId !== bone.parentNodeId) {
+      throw new BoneEvaluationError(
+        "Bone parent must mirror the Scene hierarchy.",
+        "BONE_SCENE_IDENTITY_MISMATCH",
+        {
+          boneId: bone.id,
+          boneParentNodeId: bone.parentNodeId,
+          sceneParentNodeId: boneNode.parentId,
+        },
+      );
+    }
+    const parentNode = nodes[boneNode.parentId];
     if (!parentNode) {
       throw new BoneEvaluationError(
         "Bone parent node does not exist.",
         "BONE_PARENT_INVALID",
-        { boneId: bone.id, parentNodeId: bone.parentNodeId },
+        { boneId: bone.id, parentNodeId: boneNode.parentId },
+      );
+    }
+    if (!["group", "deformer", "bone"].includes(parentNode.kind)) {
+      throw new BoneEvaluationError(
+        "Bone parent must be a GroupNode, DeformerNode, or BoneNode.",
+        "BONE_PARENT_INVALID",
+        { boneId: bone.id, parentNodeId: parentNode.id, parentKind: parentNode.kind },
+      );
+    }
+    if (!(parentNode.children || []).includes(boneNode.id)) {
+      throw new BoneEvaluationError(
+        "Bone parent must own the BoneNode in the Scene hierarchy.",
+        "BONE_SCENE_IDENTITY_MISMATCH",
+        { boneId: bone.id, parentNodeId: parentNode.id },
       );
     }
     if (parentNode.kind === "bone") {
@@ -199,7 +239,7 @@ export function evaluateBoneFk(project, keyArtId, {
   const failed = new Set();
 
   for (const bone of order) {
-    const parentNode = nodes[bone.parentNodeId];
+    const parentNode = nodes[nodes[bone.id].parentId];
     const parentBoneId = parentNode?.kind === "bone" ? parentNode.id : null;
     if (parentBoneId && failed.has(parentBoneId)) {
       failed.add(bone.id);
