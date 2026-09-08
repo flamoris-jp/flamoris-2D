@@ -29,6 +29,12 @@ const warpControlPointPosition = {
   additionalProperties: false,
 };
 const warpControlPointPositions = { type: "array", items: warpControlPointPosition };
+const boneLocalTransform = {
+  type: "object",
+  required: ["x", "y", "rotation"],
+  properties: { x: finiteNumber, y: finiteNumber, rotation: finiteNumber },
+  additionalProperties: false,
+};
 
 const clippingBinding = {
   type: "object",
@@ -67,6 +73,74 @@ const transform = {
 };
 
 export const commandSchemas = {
+  "bone.create": {
+    type: "object",
+    required: ["id", "displayName", "parentNodeId", "restLocalTransform", "length"],
+    properties: {
+      id: nonEmptyString,
+      displayName: nonEmptyString,
+      parentNodeId: nodeId,
+      restLocalTransform: boneLocalTransform,
+      length: { type: "number", minimum: Number.MIN_VALUE },
+      enabled: { type: "boolean" },
+      index: nonNegativeInteger,
+    },
+    additionalProperties: false,
+  },
+  "bone.remove": {
+    type: "object",
+    required: ["boneId"],
+    properties: { boneId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "bone.rename": {
+    type: "object",
+    required: ["boneId", "displayName"],
+    properties: { boneId: nonEmptyString, displayName: nonEmptyString },
+    additionalProperties: false,
+  },
+  "bone.set_rest": {
+    type: "object",
+    required: ["boneId", "restLocalTransform", "length"],
+    properties: {
+      boneId: nonEmptyString,
+      restLocalTransform: boneLocalTransform,
+      length: { type: "number", minimum: Number.MIN_VALUE },
+    },
+    additionalProperties: false,
+  },
+  "bone.set_enabled": {
+    type: "object",
+    required: ["boneId", "enabled"],
+    properties: { boneId: nonEmptyString, enabled: { type: "boolean" } },
+    additionalProperties: false,
+  },
+  "bone.reparent": {
+    type: "object",
+    required: ["boneId", "parentNodeId"],
+    properties: {
+      boneId: nonEmptyString,
+      parentNodeId: nodeId,
+      index: nonNegativeInteger,
+    },
+    additionalProperties: false,
+  },
+  "bone.set_keyform": {
+    type: "object",
+    required: ["boneId", "keyArtId", "localDelta"],
+    properties: {
+      boneId: nonEmptyString,
+      keyArtId: nonEmptyString,
+      localDelta: boneLocalTransform,
+    },
+    additionalProperties: false,
+  },
+  "bone.reset_keyform": {
+    type: "object",
+    required: ["boneId", "keyArtId"],
+    properties: { boneId: nonEmptyString, keyArtId: nonEmptyString },
+    additionalProperties: false,
+  },
   "deformer.create_warp": {
     type: "object",
     required: ["id", "displayName", "parentNodeId", "columns", "rows", "bounds", "controlPointIds"],
@@ -531,6 +605,24 @@ function entityRestoreSchema() {
 }
 
 const internalCommandSchemas = {
+  "bone.remove_internal": {
+    type: "object",
+    required: ["boneId"],
+    properties: { boneId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "bone.remove_keyform_internal": {
+    type: "object",
+    required: ["boneId", "keyArtId"],
+    properties: { boneId: nonEmptyString, keyArtId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "bone.restore": {
+    type: "object",
+    required: ["snapshot"],
+    properties: { snapshot: domainObject },
+    additionalProperties: false,
+  },
   "deformer.remove_internal": {
     type: "object",
     required: ["deformerId"],
