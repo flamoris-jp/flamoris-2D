@@ -10,6 +10,7 @@ import { meshTopologyCommandHandlers } from "./mesh-topology-command-handlers.js
 import { clippingCommandHandlers } from "./clipping-command-handlers.js";
 import { warpDeformerCommandHandlers } from "./warp-deformer-command-handlers.js";
 import { boneCommandHandlers } from "./bone-command-handlers.js";
+import { rigidBoneBindingCommandHandlers } from "./rigid-bone-binding-command-handlers.js";
 
 export { CommandError, TransactionError } from "./errors.js";
 
@@ -21,6 +22,7 @@ const handlers = {
   ...clippingCommandHandlers,
   ...warpDeformerCommandHandlers,
   ...boneCommandHandlers,
+  ...rigidBoneBindingCommandHandlers,
 };
 
 function assertCommand(command, { allowInternal = false } = {}) {

@@ -15,6 +15,8 @@ import {
 } from "../src/model/rigid-bone-binding-validation.js";
 import { validateProject } from "../src/model/validation.js";
 import { migrateProjectSchema, serializeProject, deserializeProject } from "../src/io/project-json.js";
+import { EditorSession } from "../src/commands/editor.js";
+import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
 
 function projectFixture() {
   const project = createProject({
@@ -125,3 +127,80 @@ test("RigidBoneBinding saves and opens in canonical stable-ID order", () => {
   assert.equal(serializeProject(opened, 2, { now }), serialized);
 });
 
+test("rigid binding Commands, Queries, MCP, and Undo Redo share one boundary", () => {
+  const session = new EditorSession(projectFixture());
+  const adapter = new HeadlessProductAdapter(session);
+  const parentBefore = session.project.scene.nodes.part.parentId;
+  const drawOrderBefore = session.project.scene.nodes[session.project.scene.rootId]
+    .children.indexOf("part");
+  adapter.execute({
+    type: "bone.create_rigid_binding",
+    payload: {
+      binding: {
+        id: "binding",
+        targetNodeId: "part",
+        boneId: "bone",
+        enabled: true,
+      },
+    },
+  });
+  assert.equal(adapter.query("bone.get_rigid_binding", { bindingId: "binding" }).boneId,
+    "bone");
+  assert.equal(adapter.query("bone.get_rigid_binding_for_target", {
+    targetNodeId: "part",
+  }).id, "binding");
+  assert.equal(session.project.scene.nodes.part.parentId, parentBefore);
+  assert.equal(session.project.scene.nodes[session.project.scene.rootId]
+    .children.indexOf("part"), drawOrderBefore);
+  assert.deepEqual(adapter.query("bone.validate_rigid_bindings", {}), {
+    valid: true,
+    issues: [],
+  });
+
+  session.undo();
+  assert.deepEqual(adapter.query("bone.list_rigid_bindings", {}), []);
+  session.redo();
+  assert.equal(adapter.query("bone.get_rigid_binding_for_target", {
+    targetNodeId: "part",
+  }).id, "binding");
+  adapter.execute({
+    type: "bone.set_rigid_binding_enabled",
+    payload: { bindingId: "binding", enabled: false },
+  });
+  assert.equal(adapter.query("bone.get_rigid_binding_for_target", {
+    targetNodeId: "part",
+  }), null);
+  adapter.execute({
+    type: "bone.remove_rigid_binding",
+    payload: { bindingId: "binding" },
+  });
+  assert.deepEqual(adapter.query("bone.list_rigid_bindings", {}), []);
+  session.undo();
+  assert.equal(adapter.query("bone.get_rigid_binding", { bindingId: "binding" }).enabled,
+    false);
+});
+
+test("Bone structural edits reject dependent rigid bindings", () => {
+  const session = new EditorSession(projectFixture());
+  session.execute({
+    type: "bone.create_rigid_binding",
+    payload: {
+      binding: {
+        id: "binding", targetNodeId: "part", boneId: "bone", enabled: true,
+      },
+    },
+  });
+  for (const command of [
+    { type: "bone.remove", payload: { boneId: "bone" } },
+    {
+      type: "bone.set_rest",
+      payload: {
+        boneId: "bone",
+        restLocalTransform: { x: 1, y: 0, rotation: 0 },
+        length: 10,
+      },
+    },
+  ]) {
+    assert.throws(() => session.execute(command), /rigid bindings/);
+  }
+});
