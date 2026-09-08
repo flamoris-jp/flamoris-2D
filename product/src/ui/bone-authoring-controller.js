@@ -74,6 +74,24 @@ export class BoneAuthoringController {
     this.notify("bone-hover");
   }
 
+  projectChanged() {
+    const boneIds = new Set(this.session.query("bone.list").map((entry) => entry.id));
+    const keyArtIds = new Set(this.session.query("keyart.list").map((entry) => entry.id));
+    if (this.selectedBoneId && !boneIds.has(this.selectedBoneId)) {
+      this.selectedBoneId = null;
+      this.hoverBoneId = null;
+      this.gesture = null;
+    }
+    if (this.hoverBoneId && !boneIds.has(this.hoverBoneId)) this.hoverBoneId = null;
+    if (this.activeKeyArtId && !keyArtIds.has(this.activeKeyArtId)) {
+      this.activeKeyArtId = null;
+      this.gesture = null;
+    }
+    if (this.ghostKeyArtId && !keyArtIds.has(this.ghostKeyArtId)) {
+      this.ghostKeyArtId = null;
+    }
+  }
+
   selectedBone() {
     return this.selectedBoneId
       ? this.session.query("bone.get", { boneId: this.selectedBoneId })

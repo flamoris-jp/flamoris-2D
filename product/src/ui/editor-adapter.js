@@ -90,6 +90,7 @@ export class EditorUiAdapter {
     const sessionOnChange = session.onChange;
     session.onChange = (...args) => {
       sessionOnChange?.(...args);
+      this.boneAuthoring.projectChanged();
       this.transitionPreview.projectChanged();
       this.correspondencePreview.projectChanged();
       this.notify("project");
