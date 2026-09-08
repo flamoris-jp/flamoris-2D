@@ -400,3 +400,46 @@ export function createWarpEvaluationStages(project, nodeId, keyArtId, {
   }
   return { stages, diagnostics };
 }
+
+/**
+ * Resolves the canonical interpolated Warp stage sequence shared by Transition
+ * geometry and downstream post-Warp consumers such as projected Bone frames.
+ */
+export function createInterpolatedWarpEvaluationStages(
+  project,
+  fromNodeId,
+  toNodeId,
+  fromKeyArtId,
+  toKeyArtId,
+  amount,
+  { spaceForDeformer = () => ({}) } = {},
+) {
+  const fromAncestors = warpDeformerAncestors(project, fromNodeId);
+  const toAncestors = warpDeformerAncestors(project, toNodeId);
+  if (fromAncestors.join("\u0000") !== toAncestors.join("\u0000")) {
+    throw new WarpDeformerEvaluationError(
+      "Morph endpoints do not share the same ancestor Warp sequence.",
+      "DEFORMER_KEYFORM_INCOMPATIBLE",
+      { fromAncestors, toAncestors },
+    );
+  }
+  return fromAncestors.map((deformerId) => {
+    const deformer = project.rig.deformers.find((entry) => entry.id === deformerId);
+    if (!deformer) throw new WarpDeformerEvaluationError(
+      "DeformerNode has no matching WarpDeformer.",
+      "DEFORMER_CHILD_REFERENCE_INVALID",
+      { deformerId },
+    );
+    const fromKeyform = project.rig.warpDeformerKeyforms.find((entry) =>
+      entry.deformerId === deformerId && entry.keyArtId === fromKeyArtId);
+    const toKeyform = project.rig.warpDeformerKeyforms.find((entry) =>
+      entry.deformerId === deformerId && entry.keyArtId === toKeyArtId);
+    return {
+      deformer,
+      controlPoints: project.rig.warpControlPoints.filter((point) =>
+        point.deformerId === deformerId),
+      keyform: interpolateWarpKeyforms(deformer, fromKeyform, toKeyform, amount),
+      ...spaceForDeformer(deformerId),
+    };
+  });
+}
