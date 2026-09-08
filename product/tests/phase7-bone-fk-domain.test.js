@@ -18,6 +18,12 @@ import {
   migrateProjectSchema,
   serializeProject,
 } from "../src/io/project-json.js";
+import {
+  boneEvaluationOrder,
+  evaluateBoneFk,
+  interpolateBonePoseDeltas,
+  projectBoneBindFrame,
+} from "../src/core/bone-fk-evaluator.js";
 
 function boneProject() {
   return createProject({
@@ -207,4 +213,89 @@ test("schema 6 migration initializes typed Bone state and preserves Phase 6 Warp
   assert.deepEqual(migrated.rig.warpControlPoints, warpState.warpControlPoints);
   assert.deepEqual(migrated.rig.warpDeformerKeyforms, warpState.warpDeformerKeyforms);
   assert.deepEqual(validateProject(migrated), []);
+});
+
+test("FK rest pose is identity and exposes exact head and tip", () => {
+  const project = boneProject();
+  addBone(project, { id: "upper", x: 10, y: 20, length: 80 });
+  const result = evaluateBoneFk(project, "unused");
+  assert.deepEqual(result.diagnostics, []);
+  assert.deepEqual(result.poses[0].head, { x: 10, y: 20 });
+  assert.deepEqual(result.poses[0].tip, { x: 90, y: 20 });
+  assert.deepEqual(result.poses[0].skinMatrix, [1, 0, 0, 1, 0, 0]);
+});
+
+test("FK evaluates parent-first and parent rotation moves descendant frames", () => {
+  const project = boneProject();
+  addKeyArt(project, "pose");
+  addBone(project, { id: "upper", length: 10 });
+  addBone(project, { id: "forearm", parentNodeId: "upper", x: 10, length: 5 });
+  project.rig.bonePoseKeyforms.push(createBonePoseKeyform({
+    boneId: "upper",
+    keyArtId: "pose",
+    localDelta: { x: 0, y: 0, rotation: Math.PI / 2 },
+  }));
+  assert.deepEqual(boneEvaluationOrder(project).map(({ id }) => id), ["upper", "forearm"]);
+  const result = evaluateBoneFk(project, "pose");
+  assert.deepEqual(result.diagnostics, []);
+  const forearm = result.poses.find(({ boneId }) => boneId === "forearm");
+  assert.ok(Math.abs(forearm.head.x) < 1e-12);
+  assert.ok(Math.abs(forearm.head.y - 10) < 1e-12);
+  assert.ok(Math.abs(forearm.tip.x) < 1e-12);
+  assert.ok(Math.abs(forearm.tip.y - 15) < 1e-12);
+});
+
+test("FK result is independent of Bone collection insertion order", () => {
+  const project = boneProject();
+  addKeyArt(project, "pose");
+  addBone(project, { id: "z_root", x: 2, y: 3, length: 10 });
+  addBone(project, { id: "a_child", parentNodeId: "z_root", x: 10, length: 5 });
+  project.rig.bonePoseKeyforms.push(createBonePoseKeyform({
+    boneId: "a_child",
+    keyArtId: "pose",
+    localDelta: { x: 0, y: 0, rotation: 0.25 },
+  }));
+  const expected = evaluateBoneFk(project, "pose");
+  project.rig.bones.reverse();
+  project.rig.bonePoseKeyforms.reverse();
+  assert.deepEqual(evaluateBoneFk(project, "pose"), expected);
+});
+
+test("projected post-Warp bind frame is explicit and deterministic", () => {
+  const project = boneProject();
+  addBone(project, { id: "upper", length: 10 });
+  const shear = ({ x, y }) => ({ x: x + y * 0.5, y });
+  const result = evaluateBoneFk(project, "unused", { projectPoint: shear });
+  assert.deepEqual(result.diagnostics, []);
+  assert.deepEqual(result.poses[0].bindMatrix, [1, 0, 0.5, 1, 0, 0]);
+  assert.deepEqual(result.poses[0].skinMatrix, [1, 0, 0, 1, 0, 0]);
+
+  const frame = projectBoneBindFrame(project.rig.bones[0],
+    [1, 0, 0, 1, 0, 0], shear);
+  assert.deepEqual(frame, [1, 0, 0.5, 1, 0, 0]);
+});
+
+test("degenerate projected bind frame produces a deterministic diagnostic", () => {
+  const project = boneProject();
+  addBone(project, { id: "upper", length: 10 });
+  addBone(project, { id: "forearm", parentNodeId: "upper", x: 10, length: 5 });
+  const result = evaluateBoneFk(project, "unused", {
+    projectPoint: ({ x }) => ({ x, y: 0 }),
+  });
+  assert.deepEqual(result.poses, []);
+  assert.deepEqual(result.diagnostics.map(({ code, boneId }) => [code, boneId]), [
+    ["BONE_PARENT_INVALID", "forearm"],
+    ["BONE_PROJECTED_FRAME_DEGENERATE", "upper"],
+  ]);
+});
+
+test("Bone pose interpolation uses linear translation and shortest-arc rotation", () => {
+  const degrees = (value) => value * Math.PI / 180;
+  const from = { x: 0, y: 10, rotation: degrees(170) };
+  const to = { x: 20, y: -10, rotation: degrees(-170) };
+  assert.deepEqual(interpolateBonePoseDeltas(from, to, 0), from);
+  assert.deepEqual(interpolateBonePoseDeltas(from, to, 1), to);
+  const midpoint = interpolateBonePoseDeltas(from, to, 0.5);
+  assert.deepEqual({ x: midpoint.x, y: midpoint.y }, { x: 10, y: 0 });
+  assert.ok(Math.abs(midpoint.rotation - Math.PI) < 1e-12);
 });
