@@ -13,6 +13,7 @@ import {
   createBonePoseKeyform,
 } from "../src/model/bone.js";
 import { createRigidBoneBinding } from "../src/model/rigid-bone-binding.js";
+import { createBoneRotationConstraint } from "../src/model/bone-rotation-constraint.js";
 import {
   createWarpDeformer,
   defaultWarpKeyformControlPoints,
@@ -295,6 +296,28 @@ test("Morph Bone rotation uses shortest-arc interpolation", () => {
   closeArray(instances(project, 50)[0].mesh.positions.slice(0, 2), [-1, 0]);
 });
 
+test("Transition interpolates authored pose before applying rotation constraint", () => {
+  const project = fixture({ positions: [1, 0, 2, 0, 1, 1] });
+  project.rig.bonePoseKeyforms[1].localDelta.rotation = 2;
+  project.rig.boneRotationConstraints.push(createBoneRotationConstraint({
+    id: "limit", boneId: "bone", minRotation: -0.6, maxRotation: 0.6,
+  }));
+  const point = instances(project, 50)[0].mesh.positions.slice(0, 2);
+  closeArray(point, [Math.cos(0.6), Math.sin(0.6)]);
+});
+
+test("shortest-arc interpolation is constrained after the midpoint is resolved", () => {
+  const project = fixture({ positions: [1, 0, 2, 0, 1, 1] });
+  project.rig.bonePoseKeyforms[0].localDelta.rotation = 170 * Math.PI / 180;
+  project.rig.bonePoseKeyforms[1].localDelta.rotation = -170 * Math.PI / 180;
+  const limit = 175 * Math.PI / 180;
+  project.rig.boneRotationConstraints.push(createBoneRotationConstraint({
+    id: "limit", boneId: "bone", minRotation: -limit, maxRotation: limit,
+  }));
+  closeArray(instances(project, 50)[0].mesh.positions.slice(0, 2),
+    [Math.cos(limit), Math.sin(limit)]);
+});
+
 test("absent BonePoseKeyform is identity and does not mutate Project", () => {
   const project = fixture();
   project.rig.bonePoseKeyforms = [];
@@ -398,13 +421,30 @@ test("preview and export plans share identical evaluated rigid geometry", () => 
   );
 });
 
-test("shared renderer boundary remains Bone and RigidBinding unaware", async () => {
+test("constraint evaluation has Preview PNG/MP4-source frame parity", () => {
+  const project = fixture({ positions: [1, 0, 2, 0, 1, 1] });
+  project.rig.boneRotationConstraints.push(createBoneRotationConstraint({
+    id: "limit", boneId: "bone", minRotation: -0.25, maxRotation: 0.25,
+  }));
+  const preview = evaluateTransition(project, "transition", 50);
+  const sourceFrame = evaluateTransitionExportFrame(project, {
+    transitionId: "transition", frameRate: { numerator: 2400, denominator: 1 },
+    frameIndex: 1,
+  });
+  assert.deepEqual(sourceFrame.evaluatedTransition, preview);
+  assert.deepEqual(createEvaluatedRenderPlan(sourceFrame.evaluatedTransition, {
+    resolveArtwork: () => ({}),
+  }), createEvaluatedRenderPlan(preview, { resolveArtwork: () => ({}) }));
+});
+
+test("shared renderer boundary remains Bone RigidBinding constraint and IK unaware", async () => {
   const sources = await Promise.all([
     "../src/core/evaluated-render.js",
     "../src/core/shared-composition-renderer.js",
     "../src/core/export-frame-renderer.js",
   ].map((path) => readFile(new URL(path, import.meta.url), "utf8")));
   for (const source of sources) {
-    assert.equal(/Bone|RigidBinding|rigidBoneBinding/.test(source), false);
+    assert.equal(/Bone|RigidBinding|rigidBoneBinding|RotationConstraint|TwoBoneIk|IK solve/i
+      .test(source), false);
   }
 });
