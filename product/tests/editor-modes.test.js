@@ -6,6 +6,7 @@ import {
   dragSelectedVertices,
   EDITOR_MODES,
   editModeAvailability,
+  isMeshAuthoringMode,
   objectSelectionForMode,
   updateVertexSelection,
 } from "../src/ui/editor-modes.js";
@@ -16,6 +17,12 @@ test("Object Mode routes PSD canvas input to scene interaction", () => {
     editorMode: EDITOR_MODES.OBJECT,
     button: 0,
   }), "object");
+});
+
+test("IK Mode routes PSD input to authoring handles without becoming mesh authoring", () => {
+  assert.equal(canvasInteractionRoute({ contentMode: "psd", editorMode: EDITOR_MODES.IK }),
+    "object");
+  assert.equal(isMeshAuthoringMode(EDITOR_MODES.IK), false);
 });
 
 test("Deform Topology Weight and Form Correction modes route PSD input to mesh authoring", () => {

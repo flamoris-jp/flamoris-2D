@@ -132,6 +132,7 @@ export function createSceneEditorView({
       elements.transformInputs.forEach((input) => { input.value = ""; });
       elements.deformerControls.hidden = true;
       elements.boneControls.hidden = true;
+      elements.ikControls.hidden = true;
       elements.rigidBindingControls.hidden = true;
       elements.weightAuthoringControls.hidden = true;
       elements.formCorrectionControls.hidden = true;
@@ -186,6 +187,68 @@ export function createSceneEditorView({
       };
       appendParent(state.editor.session.query("scene.get_tree", { includeHidden: true }));
       elements.boneParentSelect.value = bone.selectedBone.parentNodeId;
+    }
+    const ik = state.editor.twoBoneIkAuthoring.getState();
+    elements.ikControls.hidden = state.editorMode !== "ik";
+    if (state.editorMode === "ik") {
+      elements.ikConstraintSelect.replaceChildren();
+      const noConstraint = document.createElement("option");
+      noConstraint.value = "";
+      noConstraint.textContent = "— Select IK —";
+      elements.ikConstraintSelect.append(noConstraint);
+      for (const constraint of ik.constraints) {
+        const option = document.createElement("option");
+        option.value = constraint.id;
+        option.textContent = `${constraint.id}${constraint.enabled ? "" : " (disabled)"}`;
+        elements.ikConstraintSelect.append(option);
+      }
+      elements.ikConstraintSelect.value = ik.activeConstraintId || "";
+      elements.ikKeyArtSelect.replaceChildren();
+      const noKeyArt = document.createElement("option");
+      noKeyArt.value = "";
+      noKeyArt.textContent = "— Select Key Art —";
+      elements.ikKeyArtSelect.append(noKeyArt);
+      for (const keyArt of state.editor.session.query("keyart.list")) {
+        const option = document.createElement("option");
+        option.value = keyArt.id;
+        option.textContent = `${keyArt.displayName} (${keyArt.id})`;
+        elements.ikKeyArtSelect.append(option);
+      }
+      elements.ikKeyArtSelect.value = ik.activeKeyArtId || "";
+      const bones = state.editor.session.query("bone.list");
+      for (const [select, role] of [
+        [elements.ikRootBoneSelect, "Root"],
+        [elements.ikMidBoneSelect, "Mid"],
+        [elements.ikEndBoneSelect, "End"],
+      ]) {
+        const current = ik.activeConstraint
+          ? ik.activeConstraint[`${role.toLowerCase()}BoneId`] : select.value;
+        select.replaceChildren();
+        const empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = `— ${role} —`;
+        select.append(empty);
+        for (const candidate of bones) {
+          const option = document.createElement("option");
+          option.value = candidate.id;
+          option.textContent = `${candidate.displayName} (${candidate.id})`;
+          select.append(option);
+        }
+        select.value = current || "";
+      }
+      elements.ikBendDirectionSelect.value =
+        ik.activeConstraint?.bendDirection || "counterclockwise";
+      elements.ikEnabledInput.checked = Boolean(ik.activeConstraint?.enabled);
+      elements.ikEnabledInput.disabled = !ik.activeConstraint;
+      elements.removeIkConstraintButton.disabled = !ik.activeConstraint;
+      elements.createIkConstraintButton.disabled = Boolean(ik.activeConstraint) ||
+        !elements.ikRootBoneSelect.value || !elements.ikMidBoneSelect.value ||
+        !elements.ikEndBoneSelect.value;
+      elements.ikAuthoringStatus.textContent = ik.dragging
+        ? "Transient analytic solve · release to bake one history unit"
+        : ik.activeConstraint && ik.activeKeyArtId
+          ? "Drag the viewport target handle to bake root/mid Bone poses."
+          : "Select an IK constraint and explicit Key Art.";
     }
     elements.rigidBindingControls.hidden = node.kind !== "part";
     if (node.kind === "part") {

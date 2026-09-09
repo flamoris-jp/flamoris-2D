@@ -85,6 +85,8 @@ export function solveProjectTwoBoneIk(project, { constraintId, keyArtId, target 
     poseForBone: (bone) => byBone.get(bone.id) ||
       bonePoseDeltaForKeyArt(project, bone.id, keyArtId),
   });
+  const rootPose = fk.poses.find((entry) => entry.boneId === constraint.rootBoneId) || null;
+  const midPose = fk.poses.find((entry) => entry.boneId === constraint.midBoneId) || null;
   const endPose = fk.poses.find((entry) => entry.boneId === constraint.endBoneId) || null;
   return {
     solution: {
@@ -98,6 +100,11 @@ export function solveProjectTwoBoneIk(project, { constraintId, keyArtId, target 
           angle(mid) + appliedRootChange, desiredMidAngle),
       poseDeltas,
       end: endPose?.head || analytic.solution.end,
+      joints: rootPose && midPose && endPose ? {
+        root: rootPose.head,
+        mid: midPose.head,
+        end: endPose.head,
+      } : null,
     },
     diagnostics: fk.diagnostics,
   };

@@ -172,6 +172,7 @@ const viewportRenderer = createViewportRenderer({
   weightAuthoringContext: () => state.editor?.weightAuthoring.getState() || null,
   formCorrectionAuthoringContext: () =>
     state.editor?.formCorrectionAuthoring.getState() || null,
+  twoBoneIkAuthoringContext: () => state.editor?.twoBoneIkAuthoring.getState() || null,
 });
 
 const sceneEditorView = createSceneEditorView({
@@ -376,7 +377,15 @@ function setEditorMode(requestedMode) {
     updateEditorModeUi();
     return true;
   }
-  if (isMeshAuthoringMode(requestedMode)) {
+  if (requestedMode === EDITOR_MODES.IK) {
+    if (!state.editor) return false;
+    state.editorMode = EDITOR_MODES.IK;
+    state.editTargetNodeId = null;
+    state.transformGesture = null;
+    state.editor.cancelTransformDrag();
+    autoMeshPreview.clear();
+    setStatus("IK Mode・target handle dragはpointer-upでBone poseへbakeされます");
+  } else if (isMeshAuthoringMode(requestedMode)) {
     const availability = currentEditModeAvailability();
     if (!availability.allowed) {
       state.editorMode = EDITOR_MODES.OBJECT;
@@ -1136,6 +1145,40 @@ elements.createChildBoneButton.addEventListener("click", () => {
 elements.resetBonePoseButton.addEventListener("click", () => {
   commitInspectorEdit(() => state.editor?.boneAuthoring.resetPose());
 });
+function updateIkContext() {
+  state.editor?.twoBoneIkAuthoring.setContext({
+    constraintId: elements.ikConstraintSelect.value || null,
+    keyArtId: elements.ikKeyArtSelect.value || null,
+  });
+}
+elements.ikConstraintSelect.addEventListener("change", updateIkContext);
+elements.ikKeyArtSelect.addEventListener("change", updateIkContext);
+for (const select of [
+  elements.ikRootBoneSelect,
+  elements.ikMidBoneSelect,
+  elements.ikEndBoneSelect,
+]) select.addEventListener("change", () => sceneEditorView.renderInspector());
+elements.createIkConstraintButton.addEventListener("click", () => commitInspectorEdit(() => {
+  state.editor?.twoBoneIkAuthoring.createConstraint({
+    rootBoneId: elements.ikRootBoneSelect.value,
+    midBoneId: elements.ikMidBoneSelect.value,
+    endBoneId: elements.ikEndBoneSelect.value,
+    bendDirection: elements.ikBendDirectionSelect.value,
+    enabled: true,
+  });
+  state.editor.twoBoneIkAuthoring.setContext({
+    constraintId: state.editor.twoBoneIkAuthoring.activeConstraintId,
+    keyArtId: elements.ikKeyArtSelect.value || null,
+  });
+}));
+elements.removeIkConstraintButton.addEventListener("click", () =>
+  commitInspectorEdit(() => state.editor?.twoBoneIkAuthoring.removeConstraint()));
+elements.ikBendDirectionSelect.addEventListener("change", () =>
+  commitInspectorEdit(() => state.editor?.twoBoneIkAuthoring
+    .setBendDirection(elements.ikBendDirectionSelect.value)));
+elements.ikEnabledInput.addEventListener("change", () =>
+  commitInspectorEdit(() => state.editor?.twoBoneIkAuthoring
+    .setEnabled(elements.ikEnabledInput.checked)));
 elements.boneParentSelect.addEventListener("change", () => {
   commitInspectorEdit(() => state.editor?.boneAuthoring.reparent(elements.boneParentSelect.value));
 });
@@ -1320,6 +1363,7 @@ bindViewportInteractions({
   boneAuthoring: () => state.editor?.boneAuthoring || null,
   weightAuthoring: () => state.editor?.weightAuthoring || null,
   formCorrectionAuthoring: () => state.editor?.formCorrectionAuthoring || null,
+  twoBoneIkAuthoring: () => state.editor?.twoBoneIkAuthoring || null,
   loadFile,
 });
 

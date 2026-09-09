@@ -6,6 +6,8 @@ import { boneSceneTransform, createBone } from "../src/model/bone.js";
 import { createTwoBoneIkConstraint } from "../src/model/two-bone-ik-constraint.js";
 import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
 import { TwoBoneIkAuthoringController } from "../src/ui/two-bone-ik-authoring-controller.js";
+import { bindViewportInteractions } from "../src/ui/viewport-input-controller.js";
+import { projectTwoBoneIkOverlay } from "../src/ui/two-bone-ik-viewport-overlay.js";
 
 function addBone(project, id, parentNodeId, x, length) {
   project.scene.nodes[id] = createSceneNode({ id, kind: "bone", displayName: id,
@@ -97,4 +99,45 @@ test("IK constraint creation uses explicit chain IDs and no name inference", () 
     id: "new_ik", rootBoneId: "root", midBoneId: "mid", endBoneId: "end",
     enabled: true, bendDirection: "counterclockwise",
   });
+});
+
+test("viewport target drag previews transiently and commits once on pointer-up", () => {
+  const { session, controller } = authoring();
+  const listeners = new Map();
+  const target = (extra = {}) => ({ ...extra, addEventListener(type, listener) {
+    if (!listeners.has(type)) listeners.set(type, []);
+    listeners.get(type).push(listener);
+  } });
+  const elements = {
+    overlayCanvas: target({ getBoundingClientRect: () => ({ left: 0, top: 0 }),
+      setPointerCapture() {} }),
+    viewportWrap: target({ classList: { add() {}, remove() {} } }),
+  };
+  const state = { mode: "psd", editorMode: "ik", editor: {
+    session, selectedNodeId: "root",
+    transitionPreview: { getState: () => ({ viewMode: "endpoint-a" }) },
+  }, previewMode: false, spacePressed: false,
+  view: { scale: 1, originX: 0, originY: 0 }, psdParts: [] };
+  const viewportRenderer = {
+    projectedTwoBoneIkOverlay() {
+      const projected = session.query("bone.get_two_bone_ik_pose", {
+        constraintId: "ik", keyArtId: "key",
+      });
+      return projectTwoBoneIkOverlay({ authoring: controller.getState(),
+        chain: projected.chain, view: state.view });
+    },
+    projectedDeformerLattice: () => ({ points: [] }),
+  };
+  bindViewportInteractions({ state, elements, viewportRenderer,
+    returnToEdit() {}, zoomAtScreenPoint() {}, panViewBy() {}, setEditorMode() {},
+    undoProject() {}, redoProject() {}, render() {}, setStatus() {}, selectedPart: () => null,
+    twoBoneIkAuthoring: () => controller, loadFile() {}, windowTarget: target() });
+  const dispatch = (type, event) => (listeners.get(type) || []).forEach((listener) =>
+    listener({ preventDefault() {}, shiftKey: false, ...event, type }));
+  dispatch("pointerdown", { button: 0, pointerId: 5, clientX: 20, clientY: 0 });
+  dispatch("pointermove", { pointerId: 5, clientX: 10, clientY: 10 });
+  assert.equal(session.undoStack.length, 0);
+  dispatch("pointerup", { pointerId: 5 });
+  assert.equal(session.undoStack.length, 1);
+  assert.equal(session.project.rig.bonePoseKeyforms.length, 2);
 });
