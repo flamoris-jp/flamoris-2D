@@ -17,6 +17,10 @@ import {
 import { warpDeformerValidationResult } from "../model/warp-deformer-validation.js";
 import { boneValidationResult } from "../model/bone-validation.js";
 import { evaluateBoneFk } from "../core/bone-fk-evaluator.js";
+import {
+  rigidBoneBindingForTarget,
+  rigidBoneBindingValidationResult,
+} from "../model/rigid-bone-binding-validation.js";
 
 function temporalProgram(project, programId) {
   const program = project.temporalPrograms.find((entry) => entry.id === programId);
@@ -199,6 +203,7 @@ export const projectQueries = {
       warpDeformerKeyforms: project.rig.warpDeformerKeyforms.length,
       bones: project.rig.bones.length,
       bonePoseKeyforms: project.rig.bonePoseKeyforms.length,
+      rigidBoneBindings: project.rig.rigidBoneBindings.length,
       transitions: project.transitions.length,
       clips: project.animation.clips.length,
       temporalPrograms: project.temporalPrograms.length,
@@ -270,6 +275,21 @@ export const projectQueries = {
     };
   },
   "bone.validate": (project) => boneValidationResult(project),
+  "bone.list_rigid_bindings": (project) => cloneProject(
+    [...project.rig.rigidBoneBindings]
+      .sort((left, right) => left.id.localeCompare(right.id)),
+  ),
+  "bone.get_rigid_binding": (project, input) => {
+    const binding = project.rig.rigidBoneBindings.find((entry) =>
+      entry.id === input.bindingId);
+    if (!binding) throw new Error(`Unknown RigidBoneBinding ${input.bindingId}.`);
+    return cloneProject(binding);
+  },
+  "bone.get_rigid_binding_for_target": (project, input) => cloneProject(
+    rigidBoneBindingForTarget(project, input.targetNodeId),
+  ),
+  "bone.validate_rigid_bindings": (project) =>
+    rigidBoneBindingValidationResult(project),
   "scene.get_tree": (project, input = {}) =>
     treeNode(project, project.scene.rootId, input.includeHidden !== false),
   "scene.get_node": (project, input) => {

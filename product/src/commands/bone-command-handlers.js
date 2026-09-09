@@ -68,7 +68,7 @@ function descendantBoneIds(project, boneId) {
   return result;
 }
 
-function assertNoPoseKeyforms(project, boneIds) {
+function assertNoDependents(project, boneIds) {
   const locked = collection(project, "bonePoseKeyforms")
     .find((entry) => boneIds.includes(entry.boneId));
   if (locked) {
@@ -76,6 +76,15 @@ function assertNoPoseKeyforms(project, boneIds) {
       "Remove authored Bone pose keyforms before changing rest hierarchy.",
       "bone.rest_locked_by_keyforms",
       { boneId: locked.boneId, keyArtId: locked.keyArtId },
+    );
+  }
+  const binding = collection(project, "rigidBoneBindings")
+    .find((entry) => boneIds.includes(entry.boneId));
+  if (binding) {
+    throw new CommandError(
+      "Remove dependent rigid bindings before changing Bone rest hierarchy.",
+      "bone.rest_locked_by_bindings",
+      { boneId: binding.boneId, bindingId: binding.id, targetNodeId: binding.targetNodeId },
     );
   }
 }
@@ -93,6 +102,7 @@ function removeBone(project, boneId) {
       { boneId, childBoneIds: [...node.children] },
     );
   }
+  assertNoDependents(project, [bone.id]);
   const parent = project.scene.nodes[node.parentId];
   const nodeIndex = parent.children.indexOf(node.id);
   const boneIndex = collection(project, "bones").indexOf(bone);
@@ -224,7 +234,7 @@ export const boneCommandHandlers = {
 
   "bone.set_rest": (project, payload) => {
     const bone = boneFor(project, payload.boneId);
-    assertNoPoseKeyforms(project, [bone.id, ...descendantBoneIds(project, bone.id)]);
+    assertNoDependents(project, [bone.id, ...descendantBoneIds(project, bone.id)]);
     const previous = {
       restLocalTransform: cloneProject(bone.restLocalTransform),
       length: bone.length,
@@ -269,7 +279,7 @@ export const boneCommandHandlers = {
       }
       ancestor = ancestor.parentId ? project.scene.nodes[ancestor.parentId] : null;
     }
-    assertNoPoseKeyforms(project, [bone.id, ...descendantBoneIds(project, bone.id)]);
+    assertNoDependents(project, [bone.id, ...descendantBoneIds(project, bone.id)]);
     const previousParent = project.scene.nodes[node.parentId];
     const previousIndex = previousParent.children.indexOf(node.id);
     previousParent.children.splice(previousIndex, 1);

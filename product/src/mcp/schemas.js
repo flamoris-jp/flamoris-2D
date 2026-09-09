@@ -1,6 +1,6 @@
 export { commandSchemas } from "../commands/schemas.js";
 
-export const MCP_SCHEMA_VERSION = 9;
+export const MCP_SCHEMA_VERSION = 10;
 
 const nodeId = {
   type: "string",
@@ -28,6 +28,10 @@ export const querySchemas = {
     additionalProperties: false,
   },
   "bone.validate": emptyQuery(),
+  "bone.list_rigid_bindings": emptyQuery(),
+  "bone.get_rigid_binding": idQuery("bindingId", nodeId),
+  "bone.get_rigid_binding_for_target": idQuery("targetNodeId", nodeId),
+  "bone.validate_rigid_bindings": emptyQuery(),
   "deformer.list": emptyQuery(),
   "deformer.get": idQuery("deformerId", nodeId),
   "deformer.get_keyform": {

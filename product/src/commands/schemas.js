@@ -73,6 +73,42 @@ const transform = {
 };
 
 export const commandSchemas = {
+  "bone.create_rigid_binding": {
+    type: "object",
+    required: ["binding"],
+    properties: {
+      binding: {
+        type: "object",
+        required: ["id", "targetNodeId", "boneId", "enabled"],
+        properties: {
+          id: nonEmptyString,
+          targetNodeId: nodeId,
+          boneId: nodeId,
+          enabled: { type: "boolean" },
+        },
+        additionalProperties: false,
+      },
+    },
+    additionalProperties: false,
+  },
+  "bone.set_rigid_binding_bone": {
+    type: "object",
+    required: ["bindingId", "boneId"],
+    properties: { bindingId: nonEmptyString, boneId: nodeId },
+    additionalProperties: false,
+  },
+  "bone.set_rigid_binding_enabled": {
+    type: "object",
+    required: ["bindingId", "enabled"],
+    properties: { bindingId: nonEmptyString, enabled: { type: "boolean" } },
+    additionalProperties: false,
+  },
+  "bone.remove_rigid_binding": {
+    type: "object",
+    required: ["bindingId"],
+    properties: { bindingId: nonEmptyString },
+    additionalProperties: false,
+  },
   "bone.create": {
     type: "object",
     required: ["id", "displayName", "parentNodeId", "restLocalTransform", "length"],
@@ -605,6 +641,18 @@ function entityRestoreSchema() {
 }
 
 const internalCommandSchemas = {
+  "bone.remove_rigid_binding_internal": {
+    type: "object",
+    required: ["bindingId"],
+    properties: { bindingId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "bone.restore_rigid_binding": {
+    type: "object",
+    required: ["binding", "index"],
+    properties: { binding: domainObject, index: nonNegativeInteger },
+    additionalProperties: false,
+  },
   "bone.remove_internal": {
     type: "object",
     required: ["boneId"],

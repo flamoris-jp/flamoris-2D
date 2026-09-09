@@ -96,6 +96,22 @@ test("Undo and Redo expose the next history label to the UI", () => {
   assert.equal(adapter.redoLabel, "Rename node");
 });
 
+test("Undo of Bone creation clears stale transient selection before UI notification", () => {
+  const { adapter, session } = fixture();
+  adapter.boneAuthoring.createChild({ displayName: "Temporary Bone", length: 10 });
+  const boneId = adapter.boneAuthoring.selectedBoneId;
+  adapter.selectNode(boneId);
+  let observed = null;
+  adapter.onChange = () => {
+    observed = adapter.boneAuthoring.getState();
+  };
+  adapter.undo();
+  assert.equal(observed.selectedBoneId, null);
+  assert.equal(adapter.selectedNodeId, null);
+  adapter.redo();
+  assert.equal(session.query("bone.get", { boneId }).id, boneId);
+});
+
 test("gizmo preview commits many pointer updates as one undo entry", () => {
   const { adapter, session, groupId, partId } = fixture();
   adapter.selectNode(groupId);
