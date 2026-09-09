@@ -9,6 +9,7 @@ import {
 } from "../src/model/mesh-form-correction.js";
 import { validateMeshFormCorrections } from "../src/model/mesh-form-correction-validation.js";
 import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
+import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
 
 function fixture() {
   const project = createProject({
@@ -106,4 +107,70 @@ test("schema 9 migration adds correction state without changing Phase 7-3 rig st
   assert.equal(migrated.schemaVersion, 10);
   assert.deepEqual(migrated.meshFormCorrectionKeyforms, []);
   assert.equal(migrated.rig.skinBindings[0].id, "disabled");
+});
+
+test("form correction Commands Queries and Undo Redo preserve exact state", () => {
+  const session = new EditorSession(fixture());
+  const adapter = new HeadlessProductAdapter(session);
+  adapter.execute({ type: "mesh_form.create_keyform", payload: { keyform: {
+    id: "correction", topologyId: "topology", keyArtId: "key_a", semanticSlotId: "slot",
+    vertexOffsets: [{ vertexId: "v2", x: 1, y: 2 }],
+  } } });
+  adapter.execute({ type: "mesh_form.set_vertex_offsets", payload: {
+    keyformId: "correction",
+    vertexOffsets: [{ vertexId: "v3", x: -3, y: 4 }, { vertexId: "v1", x: 2, y: 1 }],
+  } });
+  const expected = adapter.query("mesh_form.get_keyform", { keyformId: "correction" });
+  assert.deepEqual(expected.vertexOffsets.map((entry) => entry.vertexId), ["v1", "v3"]);
+  assert.deepEqual(adapter.query("mesh_form.get_for_context", {
+    topologyId: "topology", keyArtId: "key_a", semanticSlotId: "slot",
+  }), expected);
+  session.undo();
+  assert.deepEqual(session.query("mesh_form.get_keyform", {
+    keyformId: "correction",
+  }).vertexOffsets, [{ vertexId: "v2", x: 1, y: 2 }]);
+  session.redo();
+  assert.deepEqual(session.query("mesh_form.get_keyform", { keyformId: "correction" }), expected);
+  adapter.execute({ type: "mesh_form.reset_keyform", payload: { keyformId: "correction" } });
+  assert.equal(adapter.query("mesh_form.get_for_context", {
+    topologyId: "topology", keyArtId: "key_a", semanticSlotId: "slot",
+  }), null);
+  session.undo();
+  assert.deepEqual(session.query("mesh_form.get_keyform", { keyformId: "correction" }), expected);
+});
+
+test("form correction locks stable vertex removal and topology replacement/removal", () => {
+  const session = new EditorSession(fixture());
+  session.execute({ type: "mesh_form.create_keyform", payload: { keyform: {
+    id: "correction", topologyId: "topology", keyArtId: "key_a", semanticSlotId: "slot",
+    vertexOffsets: [{ vertexId: "v2", x: 1, y: 2 }],
+  } } });
+  assert.throws(() => session.execute({ type: "mesh_topology.remove_vertex", payload: {
+    topologyId: "topology", vertexId: "v2",
+  } }), { code: "MESH_TOPOLOGY_LOCKED_BY_FORM_CORRECTION" });
+  assert.throws(() => session.execute({ type: "mesh_topology.update", payload: {
+    topologyId: "topology", topology: {
+      ...session.query("mesh.get_topology", { topologyId: "topology" }),
+      vertexIds: ["v1", "v2", "other"],
+    },
+  } }), { code: "MESH_TOPOLOGY_LOCKED_BY_FORM_CORRECTION" });
+  assert.throws(() => session.execute({ type: "mesh_topology.remove", payload: {
+    topologyId: "topology",
+  } }), { code: "MESH_TOPOLOGY_LOCKED_BY_FORM_CORRECTION" });
+});
+
+test("removing Key Art slot mapping or compatible MeshKeyform rejects dangling correction", () => {
+  const session = new EditorSession(fixture());
+  session.execute({ type: "mesh_form.create_keyform", payload: { keyform: {
+    id: "correction", topologyId: "topology", keyArtId: "key_a", semanticSlotId: "slot",
+    vertexOffsets: [{ vertexId: "v2", x: 1, y: 2 }],
+  } } });
+  for (const command of [
+    { type: "keyart.remove", payload: { keyArtId: "key_a" } },
+    { type: "semantic_slot.unmap_node", payload: { semanticSlotId: "slot", keyArtId: "key_a" } },
+    { type: "mesh_keyform.remove", payload: { keyformId: "mesh" } },
+  ]) {
+    assert.throws(() => session.execute(command), (error) =>
+      error.issues?.some((entry) => entry.code.startsWith("MESH_FORM_CORRECTION_")));
+  }
 });

@@ -27,6 +27,10 @@ import {
 } from "../model/skin-binding-validation.js";
 import { evaluateLinearBlendSkinning } from "../core/linear-blend-skinning-evaluator.js";
 import { evaluateEndpointProjectedBoneFk } from "../core/rigid-bone-evaluator.js";
+import {
+  meshFormCorrectionForContext,
+  meshFormCorrectionValidationResult,
+} from "../model/mesh-form-correction-validation.js";
 
 function temporalProgram(project, programId) {
   const program = project.temporalPrograms.find((entry) => entry.id === programId);
@@ -204,6 +208,7 @@ export const projectQueries = {
       meshes: project.meshes.length,
       meshTopologies: project.meshTopologies.length,
       meshKeyforms: project.meshKeyforms.length,
+      meshFormCorrectionKeyforms: project.meshFormCorrectionKeyforms.length,
       clippingBindings: project.clippingBindings.length,
       deformers: project.rig.deformers.length,
       warpDeformerKeyforms: project.rig.warpDeformerKeyforms.length,
@@ -342,6 +347,23 @@ export const projectQueries = {
     });
     return cloneProject(evaluated);
   },
+  "mesh_form.list_keyforms": (project, input = {}) => cloneProject(
+    [...project.meshFormCorrectionKeyforms]
+      .filter((entry) => !input.topologyId || entry.topologyId === input.topologyId)
+      .filter((entry) => !input.keyArtId || entry.keyArtId === input.keyArtId)
+      .filter((entry) => !input.semanticSlotId || entry.semanticSlotId === input.semanticSlotId)
+      .sort((left, right) => left.id.localeCompare(right.id)),
+  ),
+  "mesh_form.get_keyform": (project, input) => {
+    const value = project.meshFormCorrectionKeyforms.find((entry) =>
+      entry.id === input.keyformId);
+    if (!value) throw new Error(`Unknown MeshFormCorrectionKeyform ${input.keyformId}.`);
+    return cloneProject(value);
+  },
+  "mesh_form.get_for_context": (project, input) => cloneProject(
+    meshFormCorrectionForContext(project, input),
+  ),
+  "mesh_form.validate": (project) => meshFormCorrectionValidationResult(project),
   "scene.get_tree": (project, input = {}) =>
     treeNode(project, project.scene.rootId, input.includeHidden !== false),
   "scene.get_node": (project, input) => {

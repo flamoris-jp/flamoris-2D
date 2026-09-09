@@ -1,5 +1,6 @@
 import { cloneProject } from "../model/project.js";
 import { skinBindingsReferencingTopology } from "../model/skin-binding-validation.js";
+import { meshFormCorrectionsReferencingTopology } from "../model/mesh-form-correction-validation.js";
 import { CommandError } from "./errors.js";
 
 function listFor(project, name) {
@@ -24,7 +25,7 @@ function assertNewId(project, id) {
     ...Object.keys(project.scene?.nodes || {}),
     ...[
       "sourceAssets", "semanticSlots", "keyArts", "meshes", "meshTopologies",
-      "meshKeyforms", "clippingBindings", "transitions", "temporalPrograms",
+      "meshKeyforms", "meshFormCorrectionKeyforms", "clippingBindings", "transitions", "temporalPrograms",
     ].flatMap((name) => (project[name] || []).map((entry) => entry.id)),
   ];
   if (used.includes(id)) throw new CommandError("Stable ID already exists.", "identity.duplicate", { id });
@@ -101,6 +102,16 @@ function assertNoSkinBindingForTopology(project, topologyId) {
     "Remove dependent SkinBindings before changing or removing stable topology vertices.",
     "MESH_TOPOLOGY_LOCKED_BY_SKIN_BINDING",
     { topologyId, bindingId: binding.id, targetNodeId: binding.targetNodeId },
+  );
+}
+
+function assertNoFormCorrectionForTopology(project, topologyId) {
+  const correction = meshFormCorrectionsReferencingTopology(project, topologyId)[0];
+  if (!correction) return;
+  throw new CommandError(
+    "Reset dependent form corrections before changing or removing stable topology vertices.",
+    "MESH_TOPOLOGY_LOCKED_BY_FORM_CORRECTION",
+    { topologyId, correctionId: correction.id },
   );
 }
 
@@ -238,7 +249,10 @@ export const transitionCommandHandlers = {
       JSON.stringify(current.indices) !== JSON.stringify(next.indices);
     const changesVertexIdentity =
       JSON.stringify(current.vertexIds) !== JSON.stringify(next.vertexIds);
-    if (changesVertexIdentity) assertNoSkinBindingForTopology(project, current.id);
+    if (changesVertexIdentity) {
+      assertNoSkinBindingForTopology(project, current.id);
+      assertNoFormCorrectionForTopology(project, current.id);
+    }
     if (hasKeyforms && changesStructure) {
       throw new CommandError(
         "Topology with MeshKeyforms must use an atomic topology mutation command.",
@@ -257,6 +271,7 @@ export const transitionCommandHandlers = {
   },
   "mesh_topology.remove": (project, payload) => {
     assertNoSkinBindingForTopology(project, payload.topologyId);
+    assertNoFormCorrectionForTopology(project, payload.topologyId);
     return removeEntity("meshTopologies", "mesh_topology.restore", "mesh_topology.not_found")(
       project,
       { id: payload.topologyId },

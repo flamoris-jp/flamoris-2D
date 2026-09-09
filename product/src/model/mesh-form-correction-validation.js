@@ -85,6 +85,13 @@ export function validateMeshFormCorrections(project) {
     if (!compatible) issues.push(issue("MESH_FORM_CORRECTION_CONTEXT_INCOMPATIBLE", path,
       "Mesh form correction requires a compatible MeshKeyform context.", value.id || null,
       { topologyId: value.topologyId, keyArtId: value.keyArtId, semanticSlotId: value.semanticSlotId }));
+    const slot = (project.semanticSlots || []).find((entry) => entry.id === value.semanticSlotId);
+    if (slot && keyArts.has(value.keyArtId) && !(slot.mappings || []).some((mapping) =>
+      mapping.keyArtId === value.keyArtId && project.scene?.nodes?.[mapping.nodeId]?.kind === "part")) {
+      issues.push(issue("MESH_FORM_CORRECTION_MAPPING_INCOMPATIBLE", path,
+        "Mesh form correction requires a mapped Part for its Key Art and SemanticSlot.",
+        value.id || null, { keyArtId: value.keyArtId, semanticSlotId: value.semanticSlotId }));
+    }
     if (!Array.isArray(value.vertexOffsets)) {
       issues.push(issue("MESH_FORM_CORRECTION_VERTEX_INVALID", `${path}.vertexOffsets`,
         "Mesh form correction vertexOffsets must be an array.", value.id || null));
