@@ -60,6 +60,7 @@ src/commands/mesh-topology-command-handlers.js
 src/commands/clipping-command-handlers.js
 src/commands/bone-command-handlers.js
 src/commands/rigid-bone-binding-command-handlers.js
+src/commands/skin-binding-command-handlers.js
 src/commands/warp-deformer-command-handlers.js
 src/commands/schemas.js
 src/io/project-json.js

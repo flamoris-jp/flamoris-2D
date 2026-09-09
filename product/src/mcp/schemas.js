@@ -1,6 +1,6 @@
 export { commandSchemas } from "../commands/schemas.js";
 
-export const MCP_SCHEMA_VERSION = 10;
+export const MCP_SCHEMA_VERSION = 11;
 
 const nodeId = {
   type: "string",
@@ -13,6 +13,16 @@ const keyArtId = { ...nodeId };
 const semanticSlotId = { ...nodeId };
 
 export const querySchemas = {
+  "skin.list_bindings": emptyQuery(),
+  "skin.get_binding": idQuery("bindingId", nodeId),
+  "skin.get_binding_for_target": idQuery("targetNodeId", nodeId),
+  "skin.get_vertex_weights": {
+    type: "object",
+    required: ["bindingId", "vertexId"],
+    properties: { bindingId: nodeId, vertexId: nodeId },
+    additionalProperties: false,
+  },
+  "skin.validate": emptyQuery(),
   "bone.list": emptyQuery(),
   "bone.get": idQuery("boneId", nodeId),
   "bone.get_keyform": {

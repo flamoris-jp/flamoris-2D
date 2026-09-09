@@ -19,6 +19,8 @@ import {
   migrateProjectSchema,
   serializeProject,
 } from "../src/io/project-json.js";
+import { EditorSession } from "../src/commands/editor.js";
+import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
 
 function fixture() {
   const project = createProject({
@@ -306,4 +308,94 @@ test("schema 8 migration preserves Phase 7-2 rig state and adds empty skin bindi
   for (const key of Object.keys(previousRig)) {
     assert.deepEqual(migrated.rig[key], previousRig[key]);
   }
+});
+
+test("SkinBinding Commands Queries MCP and Undo Redo share one stable-ID boundary", () => {
+  const project = fixture().project;
+  project.rig.skinBindings = [];
+  const session = new EditorSession(project);
+  const adapter = new HeadlessProductAdapter(session);
+  const weights = ["v3", "v1", "v2"].map((vertexId) => ({
+    vertexId,
+    influences: [{ boneId: "bone_a", weight: 1 }],
+  }));
+  adapter.execute({
+    type: "skin.create_binding",
+    payload: { binding: {
+      id: "skin",
+      targetNodeId: "part",
+      topologyId: "topology",
+      enabled: true,
+      vertexWeights: weights,
+    } },
+  });
+  assert.deepEqual(adapter.query("skin.list_bindings", {}).map((entry) => entry.id), ["skin"]);
+  assert.equal(adapter.query("skin.get_binding", { bindingId: "skin" }).targetNodeId, "part");
+  assert.equal(adapter.query("skin.get_binding_for_target", { targetNodeId: "part" }).id,
+    "skin");
+  assert.equal(adapter.query("skin.validate", {}).valid, true);
+  assert.deepEqual(adapter.query("skin.get_vertex_weights", {
+    bindingId: "skin", vertexId: "v1",
+  }), {
+    vertexId: "v1",
+    influences: [{ boneId: "bone_a", weight: 1 }],
+  });
+
+  const beforeEdit = structuredClone(session.project.rig.skinBindings);
+  adapter.execute({
+    type: "skin.set_vertex_weights",
+    payload: {
+      bindingId: "skin",
+      vertexId: "v1",
+      influences: [
+        { boneId: "bone_b", weight: 0.25 },
+        { boneId: "bone_a", weight: 0.75 },
+      ],
+    },
+  });
+  assert.deepEqual(adapter.query("skin.get_vertex_weights", {
+    bindingId: "skin", vertexId: "v1",
+  }).influences.map((entry) => entry.boneId), ["bone_a", "bone_b"]);
+  const afterEdit = structuredClone(session.project.rig.skinBindings);
+  session.undo();
+  assert.deepEqual(session.project.rig.skinBindings, beforeEdit);
+  session.redo();
+  assert.deepEqual(session.project.rig.skinBindings, afterEdit);
+
+  adapter.execute({
+    type: "skin.set_enabled",
+    payload: { bindingId: "skin", enabled: false },
+  });
+  adapter.execute({
+    type: "skin.clear_vertex_weights",
+    payload: { bindingId: "skin", vertexId: "v1" },
+  });
+  assert.equal(adapter.query("skin.get_vertex_weights", {
+    bindingId: "skin", vertexId: "v1",
+  }), null);
+  session.undo();
+  assert.deepEqual(adapter.query("skin.get_vertex_weights", {
+    bindingId: "skin", vertexId: "v1",
+  }).influences, afterEdit[0].vertexWeights[0].influences);
+
+  const exact = structuredClone(session.project.rig.skinBindings);
+  adapter.execute({ type: "skin.remove_binding", payload: { bindingId: "skin" } });
+  assert.deepEqual(adapter.query("skin.list_bindings", {}), []);
+  session.undo();
+  assert.deepEqual(session.project.rig.skinBindings, exact);
+});
+
+test("enabling an incomplete SkinBinding is rejected without persistent mutation", () => {
+  const project = fixture().project;
+  project.rig.skinBindings[0].enabled = false;
+  project.rig.skinBindings[0].vertexWeights = project.rig.skinBindings[0].vertexWeights.slice(0, 1);
+  const session = new EditorSession(project);
+  const before = structuredClone(session.project);
+  assert.throws(() => session.execute({
+    type: "skin.set_enabled",
+    payload: { bindingId: "skin", enabled: true },
+  }), (error) => error.issues?.some((entry) =>
+    entry.code === "SKIN_BINDING_VERTEX_MISSING"));
+  assert.deepEqual(session.project, before);
+  assert.equal(session.undoStack.length, 0);
 });

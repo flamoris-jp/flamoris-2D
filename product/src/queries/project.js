@@ -21,6 +21,10 @@ import {
   rigidBoneBindingForTarget,
   rigidBoneBindingValidationResult,
 } from "../model/rigid-bone-binding-validation.js";
+import {
+  skinBindingForTarget,
+  skinBindingValidationResult,
+} from "../model/skin-binding-validation.js";
 
 function temporalProgram(project, programId) {
   const program = project.temporalPrograms.find((entry) => entry.id === programId);
@@ -290,6 +294,27 @@ export const projectQueries = {
   ),
   "bone.validate_rigid_bindings": (project) =>
     rigidBoneBindingValidationResult(project),
+  "skin.list_bindings": (project) => cloneProject(
+    [...project.rig.skinBindings]
+      .sort((left, right) => left.id.localeCompare(right.id)),
+  ),
+  "skin.get_binding": (project, input) => {
+    const binding = project.rig.skinBindings.find((entry) =>
+      entry.id === input.bindingId);
+    if (!binding) throw new Error(`Unknown SkinBinding ${input.bindingId}.`);
+    return cloneProject(binding);
+  },
+  "skin.get_binding_for_target": (project, input) => cloneProject(
+    skinBindingForTarget(project, input.targetNodeId),
+  ),
+  "skin.get_vertex_weights": (project, input) => {
+    const binding = project.rig.skinBindings.find((entry) =>
+      entry.id === input.bindingId);
+    if (!binding) throw new Error(`Unknown SkinBinding ${input.bindingId}.`);
+    return cloneProject(binding.vertexWeights.find((entry) =>
+      entry.vertexId === input.vertexId) || null);
+  },
+  "skin.validate": (project) => skinBindingValidationResult(project),
   "scene.get_tree": (project, input = {}) =>
     treeNode(project, project.scene.rootId, input.includeHidden !== false),
   "scene.get_node": (project, input) => {

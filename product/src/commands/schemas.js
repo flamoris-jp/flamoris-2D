@@ -35,6 +35,39 @@ const boneLocalTransform = {
   properties: { x: finiteNumber, y: finiteNumber, rotation: finiteNumber },
   additionalProperties: false,
 };
+const skinInfluence = {
+  type: "object",
+  required: ["boneId", "weight"],
+  properties: {
+    boneId: nodeId,
+    weight: { type: "number", minimum: Number.MIN_VALUE },
+  },
+  additionalProperties: false,
+};
+const skinInfluences = {
+  type: "array",
+  minItems: 1,
+  maxItems: 4,
+  items: skinInfluence,
+};
+const skinVertexWeight = {
+  type: "object",
+  required: ["vertexId", "influences"],
+  properties: { vertexId: nonEmptyString, influences: skinInfluences },
+  additionalProperties: false,
+};
+const skinBinding = {
+  type: "object",
+  required: ["id", "targetNodeId", "topologyId", "enabled", "vertexWeights"],
+  properties: {
+    id: nonEmptyString,
+    targetNodeId: nodeId,
+    topologyId: nonEmptyString,
+    enabled: { type: "boolean" },
+    vertexWeights: { type: "array", items: skinVertexWeight },
+  },
+  additionalProperties: false,
+};
 
 const clippingBinding = {
   type: "object",
@@ -73,6 +106,40 @@ const transform = {
 };
 
 export const commandSchemas = {
+  "skin.create_binding": {
+    type: "object",
+    required: ["binding"],
+    properties: { binding: skinBinding },
+    additionalProperties: false,
+  },
+  "skin.remove_binding": {
+    type: "object",
+    required: ["bindingId"],
+    properties: { bindingId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "skin.set_enabled": {
+    type: "object",
+    required: ["bindingId", "enabled"],
+    properties: { bindingId: nonEmptyString, enabled: { type: "boolean" } },
+    additionalProperties: false,
+  },
+  "skin.set_vertex_weights": {
+    type: "object",
+    required: ["bindingId", "vertexId", "influences"],
+    properties: {
+      bindingId: nonEmptyString,
+      vertexId: nonEmptyString,
+      influences: skinInfluences,
+    },
+    additionalProperties: false,
+  },
+  "skin.clear_vertex_weights": {
+    type: "object",
+    required: ["bindingId", "vertexId"],
+    properties: { bindingId: nonEmptyString, vertexId: nonEmptyString },
+    additionalProperties: false,
+  },
   "bone.create_rigid_binding": {
     type: "object",
     required: ["binding"],
@@ -651,6 +718,18 @@ const internalCommandSchemas = {
     type: "object",
     required: ["binding", "index"],
     properties: { binding: domainObject, index: nonNegativeInteger },
+    additionalProperties: false,
+  },
+  "skin.remove_binding_internal": {
+    type: "object",
+    required: ["bindingId"],
+    properties: { bindingId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "skin.restore_binding": {
+    type: "object",
+    required: ["binding", "index"],
+    properties: { binding: skinBinding, index: nonNegativeInteger },
     additionalProperties: false,
   },
   "bone.remove_internal": {
