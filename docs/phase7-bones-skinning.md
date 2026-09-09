@@ -419,14 +419,13 @@ Phase 8 may later justify persistent/time-varying IK targets, but that is not pa
 
 ### Mirror helpers
 
-Mirror is explicit preview/apply authoring:
+Mirror is an explicit apply-time authoring helper:
 
 - mirror from one explicitly selected existing Bone to another across a chosen
-  common-parent local X axis;
+  vertical line `x = axisX` in their shared parent's local coordinates;
 - keep both stable IDs and the Scene hierarchy unchanged;
 - mirror Key-Art pose deltas only for an explicitly selected source/target pair;
-- show unmapped/ambiguous vertices before Apply;
-- commit through ordinary Commands/Transaction;
+- commit one action through an ordinary Command/history unit;
 - never infer permanent identity from left/right display names alone.
 
 Weight mirroring remains deferred until FLAMORIS has an explicit stable
