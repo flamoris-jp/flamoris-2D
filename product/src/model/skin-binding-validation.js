@@ -36,12 +36,16 @@ function exactKeys(value, expected) {
 }
 
 function targetTopologyIds(project, targetNodeId) {
-  const slotIds = new Set((project.semanticSlots || [])
-    .filter((slot) => (slot.mappings || []).some((mapping) =>
-      mapping.nodeId === targetNodeId))
-    .map((slot) => slot.id));
+  const targetKeyArtIdsBySlot = new Map();
+  for (const slot of project.semanticSlots || []) {
+    const keyArtIds = new Set((slot.mappings || [])
+      .filter((mapping) => mapping.nodeId === targetNodeId)
+      .map((mapping) => mapping.keyArtId));
+    if (keyArtIds.size) targetKeyArtIdsBySlot.set(slot.id, keyArtIds);
+  }
   return new Set((project.meshKeyforms || [])
-    .filter((keyform) => slotIds.has(keyform.semanticSlotId))
+    .filter((keyform) => targetKeyArtIdsBySlot
+      .get(keyform.semanticSlotId)?.has(keyform.keyArtId))
     .map((keyform) => keyform.topologyId));
 }
 
@@ -147,15 +151,22 @@ export function validateSkinBindings(project, register = () => {}) {
         binding.id || null,
         { topologyId: binding.topologyId ?? null },
       ));
-    } else if (target?.kind === "part" &&
-      !targetTopologyIds(project, binding.targetNodeId).has(binding.topologyId)) {
-      issues.push(problem(
-        "SKIN_BINDING_TOPOLOGY_TARGET_MISMATCH",
-        `${path}.topologyId`,
-        "SkinBinding topology does not match the target Part's MeshKeyform contract.",
-        binding.id || null,
-        { targetNodeId: binding.targetNodeId, topologyId: binding.topologyId },
-      ));
+    } else if (target?.kind === "part") {
+      const evaluatedTopologyIds = targetTopologyIds(project, binding.targetNodeId);
+      if (!evaluatedTopologyIds.size ||
+        [...evaluatedTopologyIds].some((topologyId) => topologyId !== binding.topologyId)) {
+        issues.push(problem(
+          "SKIN_BINDING_TOPOLOGY_TARGET_MISMATCH",
+          `${path}.topologyId`,
+          "SkinBinding topology must match every MeshKeyform evaluated for its target Part.",
+          binding.id || null,
+          {
+            targetNodeId: binding.targetNodeId,
+            topologyId: binding.topologyId,
+            evaluatedTopologyIds: [...evaluatedTopologyIds].sort(compareText),
+          },
+        ));
+      }
     }
     if (typeof binding.enabled !== "boolean") {
       issues.push(problem(

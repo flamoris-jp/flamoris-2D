@@ -209,6 +209,47 @@ test("SkinBinding validation diagnoses target and topology contracts determinist
   assert.ok(mismatchCodes.includes("SKIN_BINDING_VERTEX_MISSING"));
 });
 
+test("SkinBinding rejects mixed Key-Art topology contracts for one target", () => {
+  const { project } = fixture();
+  project.keyArts.push({
+    id: "key_b",
+    displayName: "B",
+    rootNodeId: project.scene.rootId,
+    members: [{
+      nodeId: "part",
+      appearanceId: "appearance_b",
+      opacity: 1,
+      presence: "present",
+      drawOrder: 0,
+      clipping: { sourceNodeId: null },
+    }],
+    metadata: {},
+  });
+  project.semanticSlots[0].mappings.push({ keyArtId: "key_b", nodeId: "part" });
+  project.meshTopologies.push({
+    id: "other_topology",
+    vertexIds: ["other_1", "other_2", "other_3"],
+    indices: [0, 1, 2],
+    vertexMetadata: {},
+    nextVertexSequence: 1,
+  });
+  project.meshKeyforms.push({
+    id: "mesh_b",
+    topologyId: "other_topology",
+    keyArtId: "key_b",
+    semanticSlotId: "slot",
+    positions: [0, 0, 10, 0, 0, 10],
+    uvs: [0, 0, 1, 0, 0, 1],
+  });
+  const mismatch = validateSkinBindings(project).find((entry) =>
+    entry.code === "SKIN_BINDING_TOPOLOGY_TARGET_MISMATCH");
+  assert.deepEqual(mismatch?.details, {
+    targetNodeId: "part",
+    topologyId: "topology",
+    evaluatedTopologyIds: ["other_topology", "topology"],
+  });
+});
+
 test("SkinBinding validation diagnoses raw duplicate and dangling stable IDs", () => {
   const { project, binding } = fixture();
   binding.vertexWeights.push(structuredClone(binding.vertexWeights[0]));
