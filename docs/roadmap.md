@@ -299,6 +299,10 @@ Goal: move from isolated A -> B Transitions to reusable short MV shots.
 
 This phase reuses the existing TemporalProgram/timebase/evaluator architecture instead of inventing a second timeline model.
 
+The normative Sequence ownership, ViewLane/ClipInstance boundary, mixer, and
+evaluation-stage contracts are defined in
+[`phase8-animation-sequencing.md`](phase8-animation-sequencing.md).
+
 Work:
 
 - chain `A -> B -> C -> D` Key Arts

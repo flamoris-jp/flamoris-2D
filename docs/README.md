@@ -7,6 +7,7 @@
 - [`roadmap.md`](roadmap.md) — dependency-driven implementation phases and acceptance criteria
 - [`phase6-clipping-group-deformer.md`](phase6-clipping-group-deformer.md) — Phase 6 clipping, Warp/Lattice Deformer, evaluation order, and authoring contract
 - [`phase7-bones-skinning.md`](phase7-bones-skinning.md) — Phase 7 FK Bone, rigid attachment, weighted skinning, form correction, and convenience-tool contract
+- [`phase8-animation-sequencing.md`](phase8-animation-sequencing.md) — Phase 8 Sequence/ViewLane, reusable clips, deterministic mixer, and canonical evaluation-stage contract
 - [`phase3-mesh-topology-contract.md`](phase3-mesh-topology-contract.md) — Phase 3-1 stable identity, mode, mutation, restoration, and query contract
 - [`phase3-key-state-editing-ux.md`](phase3-key-state-editing-ux.md) — Phase 3-2 State Strip, playhead/evaluator, duration, playback, and transient-state contract
 - [`phase3-contour-automesh.md`](phase3-contour-automesh.md) — Phase 3-3 deterministic sparse contour generation, preview/apply, and destructive replacement contract
