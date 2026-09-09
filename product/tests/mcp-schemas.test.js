@@ -7,7 +7,7 @@ import {
 } from "../src/mcp/schemas.js";
 
 test("MCP schema module imports with wired query and command schemas", () => {
-  assert.equal(MCP_SCHEMA_VERSION, 10);
+  assert.equal(MCP_SCHEMA_VERSION, 12);
   assert.equal(
     querySchemas["scene.get_node"].properties.nodeId.type,
     "string",
@@ -36,4 +36,10 @@ test("MCP schema module imports with wired query and command schemas", () => {
     .properties.binding.properties.boneId.type, "string");
   assert.equal(querySchemas["bone.get_rigid_binding_for_target"]
     .properties.targetNodeId.type, "string");
+  assert.equal(commandSchemas["skin.create_binding"]
+    .properties.binding.properties.vertexWeights.items.properties.influences.maxItems, 4);
+  assert.equal(commandSchemas["skin.set_vertex_weights"]
+    .properties.influences.items.properties.weight.type, "number");
+  assert.equal(querySchemas["skin.get_vertex_weights"].properties.vertexId.type, "string");
+  assert.equal(querySchemas["skin.evaluate"].properties.positions.items.type, "number");
 });

@@ -1,4 +1,5 @@
 import { cloneProject } from "../model/project.js";
+import { skinBindingsReferencingTopology } from "../model/skin-binding-validation.js";
 import { CommandError } from "./errors.js";
 
 function listFor(project, name) {
@@ -91,6 +92,16 @@ function assertTopologyVertexIdsAvailable(project, topology) {
       },
     );
   }
+}
+
+function assertNoSkinBindingForTopology(project, topologyId) {
+  const binding = skinBindingsReferencingTopology(project, topologyId)[0];
+  if (!binding) return;
+  throw new CommandError(
+    "Remove dependent SkinBindings before changing or removing stable topology vertices.",
+    "MESH_TOPOLOGY_LOCKED_BY_SKIN_BINDING",
+    { topologyId, bindingId: binding.id, targetNodeId: binding.targetNodeId },
+  );
 }
 
 function createEntity(collection, normalizer, notFoundCode) {
@@ -225,6 +236,9 @@ export const transitionCommandHandlers = {
     const changesStructure =
       JSON.stringify(current.vertexIds) !== JSON.stringify(next.vertexIds) ||
       JSON.stringify(current.indices) !== JSON.stringify(next.indices);
+    const changesVertexIdentity =
+      JSON.stringify(current.vertexIds) !== JSON.stringify(next.vertexIds);
+    if (changesVertexIdentity) assertNoSkinBindingForTopology(project, current.id);
     if (hasKeyforms && changesStructure) {
       throw new CommandError(
         "Topology with MeshKeyforms must use an atomic topology mutation command.",
@@ -241,7 +255,13 @@ export const transitionCommandHandlers = {
       affectedIds: [current.id],
     };
   },
-  "mesh_topology.remove": (project, payload) => removeEntity("meshTopologies", "mesh_topology.restore", "mesh_topology.not_found")(project, { id: payload.topologyId }),
+  "mesh_topology.remove": (project, payload) => {
+    assertNoSkinBindingForTopology(project, payload.topologyId);
+    return removeEntity("meshTopologies", "mesh_topology.restore", "mesh_topology.not_found")(
+      project,
+      { id: payload.topologyId },
+    );
+  },
   "meshTopologies.remove_internal": removeEntity("meshTopologies", "mesh_topology.restore", "mesh_topology.not_found"),
   "mesh_topology.restore": restoreEntity("meshTopologies", "meshTopologies.remove_internal"),
 

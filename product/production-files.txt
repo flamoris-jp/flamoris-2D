@@ -20,6 +20,8 @@ src/model/project.js
 src/model/bone.js
 src/model/bone-validation.js
 src/model/rigid-bone-binding.js
+src/model/skin-binding.js
+src/model/skin-binding-validation.js
 src/model/rigid-bone-binding-validation.js
 src/model/warp-deformer.js
 src/model/warp-deformer-validation.js
@@ -30,7 +32,9 @@ src/model/temporal-validation.js
 src/model/transition-validation.js
 src/core/transforms.js
 src/core/bone-fk-evaluator.js
+src/core/bone-skin-matrix.js
 src/core/rigid-bone-evaluator.js
+src/core/linear-blend-skinning-evaluator.js
 src/core/warp-deformer-evaluator.js
 src/core/temporal.js
 src/core/transition-evaluator.js
@@ -58,6 +62,7 @@ src/commands/mesh-topology-command-handlers.js
 src/commands/clipping-command-handlers.js
 src/commands/bone-command-handlers.js
 src/commands/rigid-bone-binding-command-handlers.js
+src/commands/skin-binding-command-handlers.js
 src/commands/warp-deformer-command-handlers.js
 src/commands/schemas.js
 src/io/project-json.js

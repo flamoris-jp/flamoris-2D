@@ -11,6 +11,7 @@ import { clippingCommandHandlers } from "./clipping-command-handlers.js";
 import { warpDeformerCommandHandlers } from "./warp-deformer-command-handlers.js";
 import { boneCommandHandlers } from "./bone-command-handlers.js";
 import { rigidBoneBindingCommandHandlers } from "./rigid-bone-binding-command-handlers.js";
+import { skinBindingCommandHandlers } from "./skin-binding-command-handlers.js";
 
 export { CommandError, TransactionError } from "./errors.js";
 
@@ -23,6 +24,7 @@ const handlers = {
   ...warpDeformerCommandHandlers,
   ...boneCommandHandlers,
   ...rigidBoneBindingCommandHandlers,
+  ...skinBindingCommandHandlers,
 };
 
 function assertCommand(command, { allowInternal = false } = {}) {

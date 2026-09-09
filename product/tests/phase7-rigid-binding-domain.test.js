@@ -52,18 +52,20 @@ function codes(project) {
   return validateProject(project).map((issue) => issue.code);
 }
 
-test("schema 8 adds an empty persistent rigid binding collection", () => {
+test("schema 8 adds rigid bindings and migrates forward with empty skin bindings", () => {
   const project = projectFixture();
-  assert.equal(PROJECT_SCHEMA_VERSION, 8);
+  assert.equal(PROJECT_SCHEMA_VERSION, 9);
   assert.deepEqual(project.rig.rigidBoneBindings, []);
+  assert.deepEqual(project.rig.skinBindings, []);
   assert.deepEqual(validateProject(project), []);
 
   const schema7 = structuredClone(project);
   schema7.schemaVersion = 7;
   delete schema7.rig.rigidBoneBindings;
   const migrated = migrateProjectSchema(schema7);
-  assert.equal(migrated.schemaVersion, 8);
+  assert.equal(migrated.schemaVersion, 9);
   assert.deepEqual(migrated.rig.rigidBoneBindings, []);
+  assert.deepEqual(migrated.rig.skinBindings, []);
 });
 
 test("RigidBoneBinding validates target, Bone reference, exact shape, and conflicts", () => {
