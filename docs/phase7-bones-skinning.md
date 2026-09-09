@@ -407,6 +407,14 @@ Initial two-bone IK is an analytic authoring helper, not a persistent runtime so
 - commit ordinary BonePoseKeyforms in one transaction;
 - no hidden iterative solver or playback-only state.
 
+The analytic helper is only defined when the existing post-Warp projected root
+and mid frames are orientation-preserving similarities (rotation plus uniform
+scale). A non-affine Warp can instead produce shear, anisotropic scale, or a
+reflection in those frames. Such a chain is rejected deterministically with
+`TWO_BONE_IK_PROJECTED_FRAME_INCOMPATIBLE`; it never treats a document-space
+angle as a Bone-local rotation or bakes a guessed pose. FK remains the only
+projected execution path.
+
 The chain setting stores exactly the explicit root, mid, and end stable Bone
 IDs. The Scene hierarchy remains authoritative and must contain the direct
 root -> mid -> end chain. IK does not run during playback because no target is
