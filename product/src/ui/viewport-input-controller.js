@@ -1,6 +1,7 @@
 import { getDeformedVertices, screenToImage } from "../mesh.js";
 import { nearestDeformerControlPoint, unprojectDeformerDocumentPoint } from "./deformer-viewport-overlay.js";
 import { createBoneAuthoringSpace, nearestBoneHandle } from "./bone-viewport-overlay.js";
+import { hitTwoBoneIkTarget } from "./two-bone-ik-viewport-overlay.js";
 import {
   createTransformGesture,
   pickNodeAtDocumentPoint,
@@ -38,6 +39,7 @@ export function bindViewportInteractions({
   boneAuthoring = () => null,
   weightAuthoring = () => null,
   formCorrectionAuthoring = () => null,
+  twoBoneIkAuthoring = () => null,
   loadFile,
   windowTarget = window,
 }) {
@@ -45,6 +47,7 @@ export function bindViewportInteractions({
   let boneGesture = null;
   let weightGesture = null;
   let formGesture = null;
+  let ikGesture = null;
   function angleDelta(from, to) {
     const fullTurn = Math.PI * 2;
     let delta = (to - from) % fullTurn;
@@ -193,6 +196,23 @@ export function bindViewportInteractions({
     return true;
   }
 
+  function beginIkGesture(event, screenPoint) {
+    if (state.editorMode !== EDITOR_MODES.IK) return false;
+    const authoring = twoBoneIkAuthoring();
+    const overlay = viewportRenderer.projectedTwoBoneIkOverlay();
+    if (!authoring || !hitTwoBoneIkTarget(overlay, screenPoint)) return false;
+    try {
+      authoring.beginTargetDrag(overlay.target.document);
+      ikGesture = { pointerId: event.pointerId };
+      elements.overlayCanvas.setPointerCapture(event.pointerId);
+      event.preventDefault();
+      render();
+    } catch (error) {
+      setStatus(error.message || String(error));
+    }
+    return true;
+  }
+
   elements.overlayCanvas.addEventListener("wheel", (event) => {
     if (!state.view) return;
     event.preventDefault();
@@ -258,7 +278,10 @@ export function bindViewportInteractions({
       return;
     }
 
-    if (route === "object" && state.editor && beginBoneGesture(event, screenPoint)) return;
+    if (route === "object" && state.editor && beginIkGesture(event, screenPoint)) return;
+
+    if (route === "object" && state.editor && state.editorMode !== EDITOR_MODES.IK &&
+      beginBoneGesture(event, screenPoint)) return;
 
     if (["object", "mesh"].includes(route) && state.editor &&
       beginDeformerGesture(event, screenPoint)) return;
@@ -273,7 +296,7 @@ export function bindViewportInteractions({
       const selectedNodeId = state.editor.selectedNodeId;
       const pickedInsideSelection = pickedNodeId && selectedNodeId &&
         state.editor.isDescendantOrSelf(pickedNodeId, selectedNodeId);
-      if (selectedNodeId && pickedInsideSelection) {
+      if (state.editorMode === EDITOR_MODES.OBJECT && selectedNodeId && pickedInsideSelection) {
         const node = state.editor.selectedNode();
         const drag = state.editor.beginTransformDrag(
           `${state.editor.activeTool} ${node.displayName}`,
@@ -402,6 +425,13 @@ export function bindViewportInteractions({
 
     const deformer = deformerAuthoring();
     const bone = boneAuthoring();
+    if (ikGesture?.pointerId === event.pointerId) {
+      const target = screenToImage(screenPoint.x, screenPoint.y, state.view);
+      try { twoBoneIkAuthoring().previewTarget(target); }
+      catch (error) { setStatus(error.message || String(error)); }
+      render();
+      return;
+    }
     if (weightGesture?.pointerId === event.pointerId) {
       const index = nearestVertex(screenPoint);
       const topology = meshTools()?.activeTopology();
@@ -503,6 +533,17 @@ export function bindViewportInteractions({
   });
 
   function endDrag(event) {
+    if (ikGesture?.pointerId === event.pointerId) {
+      const authoring = twoBoneIkAuthoring();
+      if (event.type === "pointercancel") authoring.cancelTargetDrag();
+      else {
+        authoring.commitTargetDrag();
+        setStatus("IK solveをroot/mid Bone poseへ1件のUndo履歴としてbakeしました");
+      }
+      ikGesture = null;
+      render();
+      return;
+    }
     if (weightGesture?.pointerId === event.pointerId) {
       const authoring = weightAuthoring();
       if (event.type === "pointercancel") authoring.cancelStroke();

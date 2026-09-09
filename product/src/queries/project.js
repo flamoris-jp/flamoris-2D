@@ -32,6 +32,15 @@ import {
   meshFormCorrectionValidationResult,
 } from "../model/mesh-form-correction-validation.js";
 import { evaluateMeshFormCorrection } from "../core/mesh-form-correction-evaluator.js";
+import {
+  boneRotationConstraintValidationResult,
+  rotationConstraintForBone,
+} from "../model/bone-rotation-constraint-validation.js";
+import { twoBoneIkValidationResult } from "../model/two-bone-ik-validation.js";
+import {
+  projectTwoBoneIkChain,
+  solveProjectTwoBoneIk,
+} from "../core/two-bone-ik-authoring-solver.js";
 
 function temporalProgram(project, programId) {
   const program = project.temporalPrograms.find((entry) => entry.id === programId);
@@ -217,6 +226,8 @@ export const projectQueries = {
       bonePoseKeyforms: project.rig.bonePoseKeyforms.length,
       rigidBoneBindings: project.rig.rigidBoneBindings.length,
       skinBindings: project.rig.skinBindings.length,
+      boneRotationConstraints: project.rig.boneRotationConstraints.length,
+      twoBoneIkConstraints: project.rig.twoBoneIkConstraints.length,
       transitions: project.transitions.length,
       clips: project.animation.clips.length,
       temporalPrograms: project.temporalPrograms.length,
@@ -288,6 +299,39 @@ export const projectQueries = {
     };
   },
   "bone.validate": (project) => boneValidationResult(project),
+  "bone.list_rotation_constraints": (project) => cloneProject(
+    [...project.rig.boneRotationConstraints]
+      .sort((left, right) => left.id.localeCompare(right.id)),
+  ),
+  "bone.get_rotation_constraint": (project, input) => {
+    const value = project.rig.boneRotationConstraints.find((entry) =>
+      entry.id === input.constraintId);
+    if (!value) throw new Error(`Unknown BoneRotationConstraint ${input.constraintId}.`);
+    return cloneProject(value);
+  },
+  "bone.get_rotation_constraint_for_bone": (project, input) => cloneProject(
+    rotationConstraintForBone(project, input.boneId),
+  ),
+  "bone.validate_rotation_constraints": (project) =>
+    boneRotationConstraintValidationResult(project),
+  "bone.list_two_bone_ik": (project) => cloneProject(
+    [...project.rig.twoBoneIkConstraints].sort((left, right) =>
+      left.id.localeCompare(right.id)),
+  ),
+  "bone.get_two_bone_ik": (project, input) => {
+    const value = project.rig.twoBoneIkConstraints.find((entry) =>
+      entry.id === input.constraintId);
+    if (!value) throw new Error(`Unknown TwoBoneIkConstraint ${input.constraintId}.`);
+    return cloneProject(value);
+  },
+  "bone.validate_two_bone_ik": (project) => twoBoneIkValidationResult(project),
+  "bone.get_two_bone_ik_pose": (project, input) => {
+    const result = projectTwoBoneIkChain(project, input.constraintId, input.keyArtId);
+    return cloneProject(result);
+  },
+  "bone.solve_two_bone_ik": (project, input) => cloneProject(
+    solveProjectTwoBoneIk(project, input),
+  ),
   "bone.list_rigid_bindings": (project) => cloneProject(
     [...project.rig.rigidBoneBindings]
       .sort((left, right) => left.id.localeCompare(right.id)),

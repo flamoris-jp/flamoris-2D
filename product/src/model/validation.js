@@ -12,6 +12,8 @@ import {
   validateSkinBindings,
 } from "./skin-binding-validation.js";
 import { validateMeshFormCorrections } from "./mesh-form-correction-validation.js";
+import { validateBoneRotationConstraints } from "./bone-rotation-constraint-validation.js";
+import { validateTwoBoneIkConstraints } from "./two-bone-ik-validation.js";
 
 function issue(code, path, message, entityId = null, severity = "error") {
   return { code, path, message, entityId, severity };
@@ -142,6 +144,8 @@ export function validateProject(project) {
   issues.push(...validateTransitionClipping(project));
   issues.push(...validateWarpDeformers(project, register));
   issues.push(...validateBones(project));
+  issues.push(...validateBoneRotationConstraints(project, register));
+  issues.push(...validateTwoBoneIkConstraints(project, register));
   issues.push(...validateSkinBindings(project, register));
   issues.push(...validateMeshFormCorrections(project, register));
   issues.push(...validateRigidBoneBindings(project, register, {

@@ -1,6 +1,6 @@
 export { commandSchemas } from "../commands/schemas.js";
 
-export const MCP_SCHEMA_VERSION = 13;
+export const MCP_SCHEMA_VERSION = 14;
 
 const nodeId = {
   type: "string",
@@ -13,6 +13,31 @@ const keyArtId = { ...nodeId };
 const semanticSlotId = { ...nodeId };
 
 export const querySchemas = {
+  "bone.list_two_bone_ik": emptyQuery(),
+  "bone.get_two_bone_ik": idQuery("constraintId", nodeId),
+  "bone.validate_two_bone_ik": emptyQuery(),
+  "bone.get_two_bone_ik_pose": {
+    type: "object",
+    required: ["constraintId", "keyArtId"],
+    properties: { constraintId: nodeId, keyArtId },
+    additionalProperties: false,
+  },
+  "bone.solve_two_bone_ik": {
+    type: "object",
+    required: ["constraintId", "keyArtId", "target"],
+    properties: {
+      constraintId: nodeId,
+      keyArtId,
+      target: { type: "object", required: ["x", "y"],
+        properties: { x: { type: "number" }, y: { type: "number" } },
+        additionalProperties: false },
+    },
+    additionalProperties: false,
+  },
+  "bone.list_rotation_constraints": emptyQuery(),
+  "bone.get_rotation_constraint": idQuery("constraintId", nodeId),
+  "bone.get_rotation_constraint_for_bone": idQuery("boneId", nodeId),
+  "bone.validate_rotation_constraints": emptyQuery(),
   "mesh_form.list_keyforms": {
     type: "object",
     properties: { topologyId: nodeId, keyArtId, semanticSlotId },

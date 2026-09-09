@@ -7,6 +7,7 @@ import { projectDeformerLattice } from "./deformer-viewport-overlay.js";
 import { projectBoneOverlay } from "./bone-viewport-overlay.js";
 import { projectWeightOverlay } from "./weight-viewport-overlay.js";
 import { evaluateMeshFormCorrection } from "../core/mesh-form-correction-evaluator.js";
+import { projectTwoBoneIkOverlay } from "./two-bone-ik-viewport-overlay.js";
 
 export function renderEvaluatedTransitionViewport({
   evaluation,
@@ -137,6 +138,7 @@ export function createViewportRenderer({
   boneAuthoringContext = () => null,
   weightAuthoringContext = () => null,
   formCorrectionAuthoringContext = () => null,
+  twoBoneIkAuthoringContext = () => null,
 }) {
   // This is deliberately viewport-transient. Weight/Form Correction pointer
   // input uses it only to pick the stable vertex corresponding to what is
@@ -639,6 +641,66 @@ export function createViewportRenderer({
     context.restore();
   }
 
+  function projectedIk() {
+    const authoring = twoBoneIkAuthoringContext();
+    if (state.editorMode !== EDITOR_MODES.IK || !authoring?.activeConstraintId ||
+      !authoring.activeKeyArtId || !state.view) {
+      return { joints: [], segments: [], target: null, diagnostics: [] };
+    }
+    const projected = state.editor.session.query("bone.get_two_bone_ik_pose", {
+      constraintId: authoring.activeConstraintId,
+      keyArtId: authoring.activeKeyArtId,
+    });
+    return projectTwoBoneIkOverlay({
+      authoring,
+      chain: projected.chain,
+      view: state.view,
+    });
+  }
+
+  function drawIkOverlay() {
+    const overlay = projectedIk();
+    if (!overlay.target) return;
+    const context = elements.overlayCanvas.getContext("2d");
+    const ratio = window.devicePixelRatio || 1;
+    context.save();
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.lineCap = "round";
+    context.strokeStyle = "#ffca67";
+    context.lineWidth = 3;
+    for (const segment of overlay.segments) {
+      context.beginPath();
+      context.moveTo(segment.from.x, segment.from.y);
+      context.lineTo(segment.to.x, segment.to.y);
+      context.stroke();
+    }
+    for (const joint of overlay.joints) {
+      context.beginPath();
+      context.arc(joint.screen.x, joint.screen.y, joint.kind === "mid" ? 5 : 4, 0, Math.PI * 2);
+      context.fillStyle = joint.kind === "mid" ? "#5be0ff" : "#eafdf9";
+      context.fill();
+      context.stroke();
+    }
+    const target = overlay.target.screen;
+    context.beginPath();
+    context.arc(target.x, target.y, 8, 0, Math.PI * 2);
+    context.fillStyle = "rgba(255, 202, 103, .24)";
+    context.fill();
+    context.stroke();
+    context.beginPath();
+    context.moveTo(target.x - 12, target.y);
+    context.lineTo(target.x + 12, target.y);
+    context.moveTo(target.x, target.y - 12);
+    context.lineTo(target.x, target.y + 12);
+    context.stroke();
+    context.fillStyle = "rgba(12, 26, 25, .9)";
+    context.fillRect(14, 14, 270, 28);
+    context.fillStyle = "#ffca67";
+    context.font = "700 12px ui-monospace, monospace";
+    context.fillText("TWO-BONE IK · DRAG TARGET", 24, 33);
+    context.restore();
+  }
+
   function render() {
     const transitionPreview = transitionPreviewContext();
     if (transitionPreview?.viewMode === "preview") {
@@ -681,6 +743,7 @@ export function createViewportRenderer({
       drawOverlay(new Float32Array());
       drawDeformerOverlay();
       drawBoneOverlay();
+      drawIkOverlay();
       drawTransformGizmo();
       return;
     }
@@ -748,6 +811,7 @@ export function createViewportRenderer({
     drawOverlay(visible ? vertices : new Float32Array());
     drawDeformerOverlay();
     drawBoneOverlay();
+    drawIkOverlay();
     drawTransformGizmo();
   }
 
@@ -770,5 +834,6 @@ export function createViewportRenderer({
         : { points: [], segments: [], diagnostics: [] };
     },
     projectedBoneOverlay: projectedBones,
+    projectedTwoBoneIkOverlay: projectedIk,
   };
 }
