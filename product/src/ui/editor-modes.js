@@ -6,6 +6,7 @@ export const EDITOR_MODES = Object.freeze({
   TOPOLOGY: "topology",
   WEIGHT: "weight",
   FORM_CORRECTION: "form-correction",
+  IK: "ik",
   // Compatibility alias for callers from the Phase 1/2 Edit Mode surface.
   EDIT: "deform",
 });

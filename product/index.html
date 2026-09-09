@@ -115,6 +115,7 @@
               <option value="topology">Topology Edit Mode</option>
               <option value="weight">Weight Authoring Mode</option>
               <option value="form-correction">Form Correction Mode</option>
+              <option value="ik">IK Mode</option>
             </select>
           </label>
           <div class="transform-toolbar" aria-label="変形ツール">
@@ -199,6 +200,48 @@
                 <button id="resetBonePoseButton" type="button" class="secondary">Reset pose</button>
               </div>
               <output id="boneAuthoringStatus" class="deformer-grid-reason"></output>
+            </fieldset>
+            <fieldset id="rotationConstraintControls" hidden>
+              <legend>Rotation Constraint</legend>
+              <label class="clipping-toggle"><input id="rotationConstraintEnabledInput" type="checkbox" /> Enabled</label>
+              <div class="inspector-grid">
+                <label>Min°<input id="rotationConstraintMinInput" type="number" step="0.1" value="-180" /></label>
+                <label>Max°<input id="rotationConstraintMaxInput" type="number" step="0.1" value="180" /></label>
+              </div>
+              <div class="deformer-actions">
+                <button id="createRotationConstraintButton" type="button" class="secondary">Create</button>
+                <button id="removeRotationConstraintButton" type="button" class="secondary">Remove</button>
+              </div>
+            </fieldset>
+            <fieldset id="boneMirrorControls" hidden>
+              <legend>Mirror Helper</legend>
+              <label>Source<select id="mirrorSourceBoneSelect"><option value="">— Source —</option></select></label>
+              <label>Target<select id="mirrorTargetBoneSelect"><option value="">— Target —</option></select></label>
+              <label>Key Art<select id="mirrorKeyArtSelect"><option value="">— Select Key Art —</option></select></label>
+              <label>Parent-local mirror line X<input id="mirrorAxisXInput" type="number" step="0.1" value="0" /></label>
+              <div class="deformer-actions">
+                <button id="mirrorBoneRestButton" type="button" class="secondary">Mirror rest</button>
+                <button id="mirrorBonePoseButton" type="button" class="secondary">Mirror pose</button>
+              </div>
+              <output id="boneMirrorStatus" class="deformer-grid-reason">Explicit pair only · no name guessing.</output>
+            </fieldset>
+            <fieldset id="ikControls" hidden>
+              <legend>Two-Bone IK</legend>
+              <label>Active IK<select id="ikConstraintSelect"><option value="">— Select IK —</option></select></label>
+              <label>Active Key Art<select id="ikKeyArtSelect"><option value="">— Select Key Art —</option></select></label>
+              <div class="inspector-grid">
+                <label>Root<select id="ikRootBoneSelect"><option value="">— Root —</option></select></label>
+                <label>Mid<select id="ikMidBoneSelect"><option value="">— Mid —</option></select></label>
+                <label>End<select id="ikEndBoneSelect"><option value="">— End —</option></select></label>
+                <span></span>
+              </div>
+              <label>Bend<select id="ikBendDirectionSelect"><option value="counterclockwise">Counterclockwise</option><option value="clockwise">Clockwise</option></select></label>
+              <label class="clipping-toggle"><input id="ikEnabledInput" type="checkbox" /> Enabled</label>
+              <div class="deformer-actions">
+                <button id="createIkConstraintButton" type="button" class="secondary">Create IK</button>
+                <button id="removeIkConstraintButton" type="button" class="secondary">Remove IK</button>
+              </div>
+              <output id="ikAuthoringStatus" class="deformer-grid-reason"></output>
             </fieldset>
             <fieldset id="rigidBindingControls" hidden>
               <legend>Rigid Bone Attachment</legend>

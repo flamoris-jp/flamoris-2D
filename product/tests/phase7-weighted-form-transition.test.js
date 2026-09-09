@@ -11,6 +11,9 @@ import { evaluateTransitionExportFrame } from "../src/core/export-frame-evaluato
 import { createEvaluatedRenderPlan } from "../src/core/evaluated-render.js";
 import { createWarpDeformer, defaultWarpKeyformControlPoints } from "../src/model/warp-deformer.js";
 import { transformPoint } from "../src/core/transforms.js";
+import { createTwoBoneIkConstraint } from "../src/model/two-bone-ik-constraint.js";
+import { EditorSession } from "../src/commands/editor.js";
+import { TwoBoneIkAuthoringController } from "../src/ui/two-bone-ik-authoring-controller.js";
 
 function member(nodeId, appearanceId) {
   return { nodeId, appearanceId, opacity: 1, presence: "present", drawOrder: 0,
@@ -132,6 +135,30 @@ function addClippingSource(project) {
   );
 }
 
+function bakeIkPose(project) {
+  const rootBone = project.rig.bones.find((entry) => entry.id === "bone");
+  const addBone = (id, parentNodeId, x, length) => {
+    project.scene.nodes[id] = createSceneNode({ id, kind: "bone", displayName: id,
+      parentId: parentNodeId, transform: boneSceneTransform({ x, y: 0, rotation: 0 }) });
+    project.scene.nodes[parentNodeId].children.push(id);
+    project.rig.bones.push(createBone({ id, parentNodeId,
+      restLocalTransform: { x, y: 0, rotation: 0 }, length }));
+  };
+  addBone("ik_mid", "bone", rootBone.length, 10);
+  addBone("ik_end", "ik_mid", 10, 2);
+  project.rig.twoBoneIkConstraints.push(createTwoBoneIkConstraint({
+    id: "ik", rootBoneId: "bone", midBoneId: "ik_mid", endBoneId: "ik_end",
+    bendDirection: "counterclockwise",
+  }));
+  const session = new EditorSession(project);
+  const controller = new TwoBoneIkAuthoringController(session);
+  controller.setContext({ constraintId: "ik", keyArtId: "key_a" });
+  controller.beginTargetDrag();
+  controller.previewTarget({ x: 10, y: 20 });
+  controller.commitTargetDrag();
+  return session.project;
+}
+
 test("Transition evaluates weighted skinning before form correction at exact endpoints and midpoint", () => {
   const project = fixture();
   assert.deepEqual(firstPosition(project, 0), [10, 1]);
@@ -173,6 +200,37 @@ test("weighted form geometry is finalized before existing clipping resolution", 
     .renderInstances[0];
   assert.deepEqual(target.mesh.positions.slice(0, 2), [15, 2]);
   assert.equal(target.clipping.sourceRenderInstanceId, source.renderInstanceId);
+});
+
+test("baked analytic IK flows through existing FK Skinning Form Correction and clipping", () => {
+  const project = fixture();
+  addClippingSource(project);
+  const baked = bakeIkPose(project);
+  const evaluation = evaluateTransition(baked, "transition", 0);
+  const target = evaluation.evaluatedParts.find((entry) => entry.semanticSlotId === "slot")
+    .renderInstances[0];
+  const source = evaluation.evaluatedParts.find((entry) => entry.semanticSlotId === "mask_slot")
+    .renderInstances[0];
+  assert.deepEqual(target.mesh.positions.slice(0, 4), [10, 1, 10, 1]);
+  assert.equal(target.clipping.sourceRenderInstanceId, source.renderInstanceId);
+
+  const withoutCorrection = fixture({ correctionA: null });
+  const raw = bakeIkPose(withoutCorrection);
+  assert.deepEqual(evaluateTransition(raw, "transition", 0).evaluatedParts[0]
+    .renderInstances[0].mesh.positions.slice(0, 4), [10, 0, 10, 1]);
+});
+
+test("baked IK pose has Preview PNG/MP4-source frame parity", () => {
+  const project = bakeIkPose(fixture());
+  const preview = evaluateTransition(project, "transition", 0);
+  const sourceFrame = evaluateTransitionExportFrame(project, {
+    transitionId: "transition", frameRate: { numerator: 2400, denominator: 1 },
+    frameIndex: 0,
+  });
+  assert.deepEqual(sourceFrame.evaluatedTransition, preview);
+  assert.deepEqual(createEvaluatedRenderPlan(sourceFrame.evaluatedTransition, {
+    resolveArtwork: () => ({}),
+  }), createEvaluatedRenderPlan(preview, { resolveArtwork: () => ({}) }));
 });
 
 test("form correction remains pre-world-transform geometry", () => {

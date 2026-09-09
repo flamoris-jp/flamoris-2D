@@ -19,6 +19,10 @@ src/styles/dialogs.css
 src/model/project.js
 src/model/bone.js
 src/model/bone-validation.js
+src/model/bone-rotation-constraint.js
+src/model/bone-rotation-constraint-validation.js
+src/model/two-bone-ik-constraint.js
+src/model/two-bone-ik-validation.js
 src/model/rigid-bone-binding.js
 src/model/skin-binding.js
 src/model/skin-binding-validation.js
@@ -34,6 +38,10 @@ src/model/temporal-validation.js
 src/model/transition-validation.js
 src/core/transforms.js
 src/core/bone-fk-evaluator.js
+src/core/bone-mirror-helper.js
+src/core/bone-rotation-constraint-evaluator.js
+src/core/two-bone-ik-solver.js
+src/core/two-bone-ik-authoring-solver.js
 src/core/bone-skin-matrix.js
 src/core/rigid-bone-evaluator.js
 src/core/linear-blend-skinning-evaluator.js
@@ -65,6 +73,8 @@ src/commands/transition-command-handlers.js
 src/commands/mesh-topology-command-handlers.js
 src/commands/clipping-command-handlers.js
 src/commands/bone-command-handlers.js
+src/commands/bone-constraint-command-handlers.js
+src/commands/two-bone-ik-command-handlers.js
 src/commands/rigid-bone-binding-command-handlers.js
 src/commands/skin-binding-command-handlers.js
 src/commands/mesh-form-correction-command-handlers.js
@@ -92,8 +102,11 @@ src/ui/correspondence-preview-controller.js
 src/ui/clipping-authoring-controller.js
 src/ui/deformer-authoring-controller.js
 src/ui/bone-authoring-controller.js
+src/ui/bone-mirror-authoring-controller.js
 src/ui/weight-authoring-controller.js
 src/ui/form-correction-authoring-controller.js
+src/ui/two-bone-ik-authoring-controller.js
+src/ui/two-bone-ik-viewport-overlay.js
 src/ui/weight-viewport-overlay.js
 src/ui/bone-viewport-overlay.js
 src/ui/deformer-viewport-overlay.js
