@@ -83,7 +83,17 @@ export function bindViewportInteractions({
 
   function nearestVertex(screenPoint, radius = 12) {
     if (!state.mesh) return -1;
-    const vertices = getDeformedVertices(state.mesh);
+    // Weight and Form Correction are drawn from the canonical endpoint
+    // evaluation (Warp -> Bone/Skin -> Form Correction). Hit testing must use
+    // that same transient display geometry, while the index still resolves
+    // through the stable MeshTopology vertex ID below.
+    const displayed = [EDITOR_MODES.WEIGHT, EDITOR_MODES.FORM_CORRECTION]
+      .includes(state.editorMode)
+      ? viewportRenderer.evaluatedMeshPositions?.()
+      : null;
+    const vertices = displayed?.length === state.mesh.baseVertices.length
+      ? displayed
+      : getDeformedVertices(state.mesh);
     let nearest = -1;
     let nearestDistance = radius;
     for (let index = 0; index < vertices.length / 2; index += 1) {

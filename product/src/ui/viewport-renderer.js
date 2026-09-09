@@ -138,6 +138,11 @@ export function createViewportRenderer({
   weightAuthoringContext = () => null,
   formCorrectionAuthoringContext = () => null,
 }) {
+  // This is deliberately viewport-transient. Weight/Form Correction pointer
+  // input uses it only to pick the stable vertex corresponding to what is
+  // currently drawn; evaluated positions never enter Project state.
+  let evaluatedMeshPositions = new Float32Array();
+
   function viewportRenderTarget() {
     return createViewportDocumentRenderTarget({
       view: state.view,
@@ -637,6 +642,7 @@ export function createViewportRenderer({
   function render() {
     const transitionPreview = transitionPreviewContext();
     if (transitionPreview?.viewMode === "preview") {
+      evaluatedMeshPositions = new Float32Array();
       clearLayerCanvas(elements.backgroundBelowCanvas);
       clearLayerCanvas(elements.foregroundCanvas);
       clearLayerCanvas(elements.overlayCanvas);
@@ -664,6 +670,7 @@ export function createViewportRenderer({
     }
     drawPsdBackgrounds();
     if (!state.mesh || !state.view) {
+      evaluatedMeshPositions = new Float32Array();
       renderer.render(
         new Float32Array(),
         state.view
@@ -736,6 +743,7 @@ export function createViewportRenderer({
     const visible = part?.nodeId && state.editor
       ? state.editor.getNode(part.nodeId).effectiveVisible
       : true;
+    evaluatedMeshPositions = new Float32Array(vertices);
     renderer.render(vertices, viewportRenderTarget(), state.partOffset, world, visible);
     drawOverlay(visible ? vertices : new Float32Array());
     drawDeformerOverlay();
@@ -746,6 +754,9 @@ export function createViewportRenderer({
   return {
     render,
     screenPointForPart,
+    evaluatedMeshPositions() {
+      return evaluatedMeshPositions;
+    },
     projectedDeformerLattice() {
       const authoring = deformerAuthoringContext();
       return authoring?.available && authoring.activeKeyArt && state.view
