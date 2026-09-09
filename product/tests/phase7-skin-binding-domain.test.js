@@ -14,6 +14,11 @@ import { createIdFactory, createProject, createSceneNode } from "../src/model/pr
 import { boneSceneTransform, createBone } from "../src/model/bone.js";
 import { createRigidBoneBinding } from "../src/model/rigid-bone-binding.js";
 import { validateProject } from "../src/model/validation.js";
+import {
+  deserializeProject,
+  migrateProjectSchema,
+  serializeProject,
+} from "../src/io/project-json.js";
 
 function fixture() {
   const project = createProject({
@@ -250,4 +255,55 @@ test("enabled RigidBoneBinding conflicts with enabled SkinBinding only", () => {
     entry.code === "RIGID_BINDING_CONFLICT"));
   binding.enabled = false;
   assert.equal(skinBindingValidationResult(project).valid, true);
+});
+
+test("SkinBinding Save Open preserves stable IDs and canonical ordering", () => {
+  const { project, binding } = fixture();
+  binding.enabled = false;
+  project.rig.skinBindings.push(createSkinBinding({
+    id: "a_skin",
+    targetNodeId: "part",
+    topologyId: "topology",
+    enabled: false,
+    vertexWeights: [{
+      vertexId: "v2",
+      influences: [
+        { boneId: "bone_b", weight: 0.25 },
+        { boneId: "bone_a", weight: 0.75 },
+      ],
+    }],
+  }));
+  const now = () => new Date("2026-09-09T00:00:00.000Z");
+  const serialized = serializeProject(project, 2, { now });
+  const opened = deserializeProject(serialized);
+  assert.deepEqual(opened.rig.skinBindings.map((entry) => entry.id), ["a_skin", "skin"]);
+  assert.deepEqual(opened.rig.skinBindings[0].vertexWeights, [{
+    vertexId: "v2",
+    influences: [
+      { boneId: "bone_a", weight: 0.75 },
+      { boneId: "bone_b", weight: 0.25 },
+    ],
+  }]);
+  assert.deepEqual(opened.meshTopologies[0].vertexIds, ["v1", "v2", "v3"]);
+  assert.equal(serializeProject(opened, 2, { now }), serialized);
+});
+
+test("schema 8 migration preserves Phase 7-2 rig state and adds empty skin bindings", () => {
+  const { project } = fixture();
+  project.rig.skinBindings = [];
+  project.rig.rigidBoneBindings.push(createRigidBoneBinding({
+    id: "rigid",
+    targetNodeId: "part",
+    boneId: "bone_a",
+  }));
+  const schema8 = structuredClone(project);
+  schema8.schemaVersion = 8;
+  delete schema8.rig.skinBindings;
+  const previousRig = structuredClone(schema8.rig);
+  const migrated = migrateProjectSchema(schema8);
+  assert.equal(migrated.schemaVersion, 9);
+  assert.deepEqual(migrated.rig.skinBindings, []);
+  for (const key of Object.keys(previousRig)) {
+    assert.deepEqual(migrated.rig[key], previousRig[key]);
+  }
 });
