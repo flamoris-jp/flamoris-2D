@@ -102,11 +102,12 @@ function createBoneCommand({
 
 test("new schema contains empty typed Bone collections", () => {
   const project = boneProject();
-  assert.equal(PROJECT_SCHEMA_VERSION, 9);
+  assert.equal(PROJECT_SCHEMA_VERSION, 10);
   assert.deepEqual(project.rig.bones, []);
   assert.deepEqual(project.rig.bonePoseKeyforms, []);
   assert.deepEqual(project.rig.rigidBoneBindings, []);
   assert.deepEqual(project.rig.skinBindings, []);
+  assert.deepEqual(project.meshFormCorrectionKeyforms, []);
   assert.deepEqual(validateProject(project), []);
 });
 

@@ -215,6 +215,7 @@ export const projectQueries = {
       bones: project.rig.bones.length,
       bonePoseKeyforms: project.rig.bonePoseKeyforms.length,
       rigidBoneBindings: project.rig.rigidBoneBindings.length,
+      skinBindings: project.rig.skinBindings.length,
       transitions: project.transitions.length,
       clips: project.animation.clips.length,
       temporalPrograms: project.temporalPrograms.length,
