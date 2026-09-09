@@ -419,6 +419,7 @@ export const meshTopologyCommandHandlers = {
   "mesh_topology.apply_generated_mesh": (project, payload) => {
     const topology = topologyFor(project, payload.topologyId);
     assertNoSkinBinding(project, topology.id);
+    assertNoFormCorrection(project, topology.id);
     assertGeneratedMesh(project, topology, payload);
     const inverse = snapshotInverse(project, topology);
     const keyforms = keyformsFor(project, topology.id);

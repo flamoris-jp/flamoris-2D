@@ -171,6 +171,15 @@ export const commandSchemas = {
     },
     additionalProperties: false,
   },
+  "skin.set_weights_bulk": {
+    type: "object",
+    required: ["bindingId", "vertexWeights"],
+    properties: {
+      bindingId: nonEmptyString,
+      vertexWeights: { type: "array", minItems: 1, items: skinVertexWeight },
+    },
+    additionalProperties: false,
+  },
   "skin.clear_vertex_weights": {
     type: "object",
     required: ["bindingId", "vertexId"],
