@@ -63,6 +63,7 @@ export function createProject({ id, name = "Untitled", width, height, idFactory 
       bones: [],
       bonePoseKeyforms: [],
       rigidBoneBindings: [],
+      skinBindings: [],
       constraints: [],
     },
     transitions: [],

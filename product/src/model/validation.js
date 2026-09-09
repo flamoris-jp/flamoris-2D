@@ -7,6 +7,10 @@ import { validateTransitionClipping } from "./clipping-transition-validation.js"
 import { validateWarpDeformers } from "./warp-deformer-validation.js";
 import { validateBones } from "./bone-validation.js";
 import { validateRigidBoneBindings } from "./rigid-bone-binding-validation.js";
+import {
+  enabledSkinTargetIds,
+  validateSkinBindings,
+} from "./skin-binding-validation.js";
 
 function issue(code, path, message, entityId = null, severity = "error") {
   return { code, path, message, entityId, severity };
@@ -136,7 +140,10 @@ export function validateProject(project) {
   issues.push(...validateTransitionClipping(project));
   issues.push(...validateWarpDeformers(project, register));
   issues.push(...validateBones(project));
-  issues.push(...validateRigidBoneBindings(project, register));
+  issues.push(...validateSkinBindings(project, register));
+  issues.push(...validateRigidBoneBindings(project, register, {
+    enabledSkinTargetIds: enabledSkinTargetIds(project),
+  }));
 
   if (nodes[rootId]) {
     const visiting = new Set();

@@ -142,7 +142,9 @@ export function validateRigidBoneBindings(
 }
 
 export function rigidBoneBindingValidationResult(project) {
-  const issues = validateRigidBoneBindings(project);
+  const enabledSkinTargetIds = new Set((project.rig?.skinBindings || [])
+    .filter((binding) => binding?.enabled && nonEmpty(binding.targetNodeId))
+    .map((binding) => binding.targetNodeId));
+  const issues = validateRigidBoneBindings(project, () => {}, { enabledSkinTargetIds });
   return { valid: issues.length === 0, issues };
 }
-

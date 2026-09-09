@@ -6,6 +6,90 @@ import {
   createSkinBinding,
   SKIN_WEIGHT_SUM_TOLERANCE,
 } from "../src/model/skin-binding.js";
+import {
+  skinBindingValidationResult,
+  validateSkinBindings,
+} from "../src/model/skin-binding-validation.js";
+import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
+import { boneSceneTransform, createBone } from "../src/model/bone.js";
+import { createRigidBoneBinding } from "../src/model/rigid-bone-binding.js";
+import { validateProject } from "../src/model/validation.js";
+
+function fixture() {
+  const project = createProject({
+    name: "Skin binding",
+    width: 100,
+    height: 100,
+    idFactory: createIdFactory("skin_binding"),
+  });
+  const rootId = project.scene.rootId;
+  project.scene.nodes.part = createSceneNode({
+    id: "part", displayName: "Part", parentId: rootId,
+  });
+  project.scene.nodes[rootId].children.push("part");
+  for (const [index, boneId] of ["bone_a", "bone_b", "bone_c", "bone_d"].entries()) {
+    project.scene.nodes[boneId] = createSceneNode({
+      id: boneId,
+      kind: "bone",
+      displayName: boneId,
+      parentId: rootId,
+      transform: boneSceneTransform({ x: index * 10, y: 0, rotation: 0 }),
+    });
+    project.scene.nodes[rootId].children.push(boneId);
+    project.rig.bones.push(createBone({
+      id: boneId,
+      parentNodeId: rootId,
+      restLocalTransform: { x: index * 10, y: 0, rotation: 0 },
+      length: 10,
+    }));
+  }
+  project.keyArts.push({
+    id: "key_a",
+    displayName: "A",
+    rootNodeId: rootId,
+    members: [{
+      nodeId: "part",
+      appearanceId: "appearance",
+      opacity: 1,
+      presence: "present",
+      drawOrder: 0,
+      clipping: { sourceNodeId: null },
+    }],
+    metadata: {},
+  });
+  project.semanticSlots.push({
+    id: "slot",
+    displayName: "Slot",
+    mappings: [{ keyArtId: "key_a", nodeId: "part" }],
+    metadata: {},
+  });
+  project.meshTopologies.push({
+    id: "topology",
+    vertexIds: ["v1", "v2", "v3"],
+    indices: [0, 1, 2],
+    vertexMetadata: {},
+    nextVertexSequence: 1,
+  });
+  project.meshKeyforms.push({
+    id: "mesh",
+    topologyId: "topology",
+    keyArtId: "key_a",
+    semanticSlotId: "slot",
+    positions: [0, 0, 10, 0, 0, 10],
+    uvs: [0, 0, 1, 0, 0, 1],
+  });
+  const binding = createSkinBinding({
+    id: "skin",
+    targetNodeId: "part",
+    topologyId: "topology",
+    vertexWeights: ["v1", "v2", "v3"].map((vertexId) => ({
+      vertexId,
+      influences: [{ boneId: "bone_a", weight: 1 }],
+    })),
+  });
+  project.rig.skinBindings.push(binding);
+  return { project, binding };
+}
 
 test("SkinBinding canonicalizes stable vertex and Bone influence order", () => {
   const binding = createSkinBinding({
@@ -69,4 +153,101 @@ test("SkinBinding accepts only positive normalized one-to-four influence weights
     { boneId: "d", weight: 0.2 },
     { boneId: "e", weight: 0.2 },
   ]), { code: "SKIN_BINDING_INFLUENCE_COUNT_INVALID" });
+});
+
+test("SkinBinding validation accepts a complete stable topology contract", () => {
+  const { project } = fixture();
+  assert.deepEqual(validateSkinBindings(project), []);
+  assert.equal(validateProject(project).some((entry) => entry.severity === "error"), false);
+});
+
+test("SkinBinding validation diagnoses target and topology contracts deterministically", () => {
+  const missingTarget = fixture().project;
+  missingTarget.rig.skinBindings[0].targetNodeId = "missing";
+  assert.ok(validateSkinBindings(missingTarget).some((entry) =>
+    entry.code === "SKIN_BINDING_TARGET_MISSING"));
+
+  const invalidTarget = fixture().project;
+  invalidTarget.rig.skinBindings[0].targetNodeId = invalidTarget.scene.rootId;
+  assert.ok(validateSkinBindings(invalidTarget).some((entry) =>
+    entry.code === "SKIN_BINDING_TARGET_INVALID"));
+
+  const missingTopology = fixture().project;
+  missingTopology.rig.skinBindings[0].topologyId = "missing";
+  assert.ok(validateSkinBindings(missingTopology).some((entry) =>
+    entry.code === "SKIN_BINDING_TOPOLOGY_MISSING"));
+
+  const mismatch = fixture().project;
+  mismatch.meshTopologies.push({
+    id: "other", vertexIds: ["other_a", "other_b", "other_c"],
+    indices: [0, 1, 2], vertexMetadata: {}, nextVertexSequence: 1,
+  });
+  mismatch.rig.skinBindings[0].topologyId = "other";
+  mismatch.rig.skinBindings[0].vertexWeights = [];
+  const mismatchCodes = validateSkinBindings(mismatch).map((entry) => entry.code);
+  assert.ok(mismatchCodes.includes("SKIN_BINDING_TOPOLOGY_TARGET_MISMATCH"));
+  assert.ok(mismatchCodes.includes("SKIN_BINDING_VERTEX_MISSING"));
+});
+
+test("SkinBinding validation diagnoses raw duplicate and dangling stable IDs", () => {
+  const { project, binding } = fixture();
+  binding.vertexWeights.push(structuredClone(binding.vertexWeights[0]));
+  binding.vertexWeights[0].influences.push({ boneId: "bone_a", weight: 0.5 });
+  binding.vertexWeights[0].influences[0].weight = 0.5;
+  binding.vertexWeights[1].vertexId = "missing_vertex";
+  binding.vertexWeights[2].influences[0].boneId = "missing_bone";
+  const issues = validateSkinBindings(project);
+  assert.ok(issues.some((entry) => entry.code === "SKIN_BINDING_VERTEX_DUPLICATE"));
+  assert.ok(issues.some((entry) => entry.code === "SKIN_BINDING_INFLUENCE_DUPLICATE"));
+  assert.ok(issues.some((entry) => entry.code === "SKIN_BINDING_VERTEX_MISSING"));
+  assert.ok(issues.some((entry) => entry.code === "BONE_NODE_MISSING"));
+  assert.deepEqual(issues, validateSkinBindings(project));
+});
+
+test("SkinBinding validation rejects invalid count weights ordering and normalization", () => {
+  const { project, binding } = fixture();
+  binding.vertexWeights[0].influences = [
+    { boneId: "bone_d", weight: 0.2 },
+    { boneId: "bone_c", weight: 0.2 },
+    { boneId: "bone_b", weight: 0.2 },
+    { boneId: "bone_a", weight: 0.2 },
+    { boneId: "missing", weight: 0.2 },
+  ];
+  binding.vertexWeights[1].influences = [
+    { boneId: "bone_b", weight: 0.6 },
+    { boneId: "bone_a", weight: 0.3 },
+  ];
+  binding.vertexWeights[2].influences[0].weight = -1;
+  binding.vertexWeights.reverse();
+  const codes = validateSkinBindings(project).map((entry) => entry.code);
+  assert.ok(codes.includes("SKIN_BINDING_INFLUENCE_COUNT_INVALID"));
+  assert.ok(codes.includes("SKIN_BINDING_INFLUENCE_ORDER_INVALID"));
+  assert.ok(codes.includes("SKIN_BINDING_VERTEX_ORDER_INVALID"));
+  assert.ok(codes.includes("SKIN_BINDING_WEIGHT_NOT_NORMALIZED"));
+  assert.ok(codes.includes("SKIN_BINDING_WEIGHT_INVALID"));
+});
+
+test("disabled SkinBinding may be partial but retains structural validation", () => {
+  const { project, binding } = fixture();
+  binding.enabled = false;
+  binding.vertexWeights = [];
+  assert.deepEqual(validateSkinBindings(project), []);
+  binding.topologyId = "missing";
+  assert.ok(validateSkinBindings(project).some((entry) =>
+    entry.code === "SKIN_BINDING_TOPOLOGY_MISSING"));
+});
+
+test("enabled RigidBoneBinding conflicts with enabled SkinBinding only", () => {
+  const { project, binding } = fixture();
+  project.rig.rigidBoneBindings.push(createRigidBoneBinding({
+    id: "rigid",
+    targetNodeId: "part",
+    boneId: "bone_a",
+  }));
+  assert.ok(skinBindingValidationResult(project).issues.some((entry) =>
+    entry.code === "RIGID_BINDING_CONFLICT"));
+  assert.ok(validateProject(project).some((entry) =>
+    entry.code === "RIGID_BINDING_CONFLICT"));
+  binding.enabled = false;
+  assert.equal(skinBindingValidationResult(project).valid, true);
 });
