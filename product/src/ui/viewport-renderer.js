@@ -5,6 +5,8 @@ import { EDITOR_MODES, isMeshAuthoringMode } from "./editor-modes.js";
 import { renderEvaluatedComposition } from "../core/shared-composition-renderer.js";
 import { projectDeformerLattice } from "./deformer-viewport-overlay.js";
 import { projectBoneOverlay } from "./bone-viewport-overlay.js";
+import { projectWeightOverlay } from "./weight-viewport-overlay.js";
+import { evaluateMeshFormCorrection } from "../core/mesh-form-correction-evaluator.js";
 
 export function renderEvaluatedTransitionViewport({
   evaluation,
@@ -133,6 +135,8 @@ export function createViewportRenderer({
   clippingAuthoringContext = () => null,
   deformerAuthoringContext = () => null,
   boneAuthoringContext = () => null,
+  weightAuthoringContext = () => null,
+  formCorrectionAuthoringContext = () => null,
 }) {
   function viewportRenderTarget() {
     return createViewportDocumentRenderTarget({
@@ -189,11 +193,35 @@ export function createViewportRenderer({
     }
     context.stroke();
 
+    let weightByVertex = new Map();
+    if (state.editorMode === EDITOR_MODES.WEIGHT) {
+      const authoring = weightAuthoringContext();
+      const endpoint = endpointContext();
+      if (authoring?.activeBindingId && authoring.activeBoneId && endpoint?.topology) {
+        const binding = state.editor.session.query("skin.get_binding", {
+          bindingId: authoring.activeBindingId,
+        });
+        const preview = new Map(authoring.previewVertexWeights.map((entry) =>
+          [entry.vertexId, entry]));
+        const projected = projectWeightOverlay({
+          topology: endpoint.topology,
+          positions: vertices,
+          binding: { ...binding, vertexWeights: binding.vertexWeights.map((entry) =>
+            preview.get(entry.vertexId) || entry) },
+          boneId: authoring.activeBoneId,
+          view: { originX: 0, originY: 0, scale: 1 },
+        });
+        weightByVertex = new Map(projected.vertices.map((entry) => [entry.vertexId, entry]));
+      }
+    }
+    const endpointForVertices = endpointContext();
     for (let index = 0; index < vertices.length / 2; index += 1) {
       const point = screenPointForPart(vertices[index * 2], vertices[index * 2 + 1]);
+      const vertexId = endpointForVertices?.topology?.vertexIds?.[index];
+      const weight = weightByVertex.get(vertexId);
       context.beginPath();
       context.arc(point.x, point.y, state.selected.has(index) ? 5 : 3.5, 0, Math.PI * 2);
-      context.fillStyle = state.selected.has(index) ? "#ffca67" : "#eafdf9";
+      context.fillStyle = state.selected.has(index) ? "#ffca67" : weight?.color || "#eafdf9";
       context.fill();
       context.strokeStyle = state.selected.has(index) ? "#4f3412" : "#183a37";
       context.stroke();
@@ -226,7 +254,11 @@ export function createViewportRenderer({
       context.font = "700 12px ui-monospace, monospace";
       const mode = state.editorMode === EDITOR_MODES.TOPOLOGY
         ? "TOPOLOGY EDIT"
-        : `DEFORM ENDPOINT ${endpoint.endpoint === "from" ? "A" : "B"}`;
+        : state.editorMode === EDITOR_MODES.WEIGHT
+          ? "WEIGHT AUTHORING"
+          : state.editorMode === EDITOR_MODES.FORM_CORRECTION
+            ? "FORM CORRECTION"
+            : `DEFORM ENDPOINT ${endpoint.endpoint === "from" ? "A" : "B"}`;
       context.fillText(mode, 24, 33);
     }
     drawAutoMeshPreview(context);
@@ -649,9 +681,29 @@ export function createViewportRenderer({
       ? sampleLoop(state.keyframes.a, state.keyframes.b, state.currentTime, duration())
       : state.mesh.vertexOffsets;
     const correspondence = correspondencePreviewContext();
-    const vertices = correspondence?.previewActive
+    let vertices = correspondence?.previewActive
       ? new Float32Array(correspondence.candidatePositions)
       : getDeformedVertices(state.mesh, previewOffsets);
+    if (state.editorMode === EDITOR_MODES.FORM_CORRECTION) {
+      const endpoint = endpointContext();
+      const authoring = formCorrectionAuthoringContext();
+      if (endpoint?.topology && authoring?.keyArtId) {
+        const persistent = state.editor.session.query("mesh_form.get_for_context", {
+          topologyId: authoring.topologyId,
+          keyArtId: authoring.keyArtId,
+          semanticSlotId: authoring.semanticSlotId,
+        });
+        const keyform = authoring.gestureActive
+          ? { ...(persistent || {
+            id: "transient", topologyId: authoring.topologyId,
+            keyArtId: authoring.keyArtId, semanticSlotId: authoring.semanticSlotId,
+          }), vertexOffsets: authoring.previewVertexOffsets }
+          : persistent;
+        vertices = new Float32Array(evaluateMeshFormCorrection({
+          mesh: { positions: [...vertices] }, topology: endpoint.topology, keyform,
+        }).mesh.positions);
+      }
+    }
     const part = selectedPart();
     const world = part?.nodeId && state.editor
       ? state.editor.worldTransform(part.nodeId)

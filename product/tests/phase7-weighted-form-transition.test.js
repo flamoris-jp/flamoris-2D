@@ -9,6 +9,8 @@ import { createMeshFormCorrectionKeyform } from "../src/model/mesh-form-correcti
 import { evaluateTransition } from "../src/core/transition-evaluator.js";
 import { evaluateTransitionExportFrame } from "../src/core/export-frame-evaluator.js";
 import { createEvaluatedRenderPlan } from "../src/core/evaluated-render.js";
+import { createWarpDeformer, defaultWarpKeyformControlPoints } from "../src/model/warp-deformer.js";
+import { transformPoint } from "../src/core/transforms.js";
 
 function member(nodeId, appearanceId) {
   return { nodeId, appearanceId, opacity: 1, presence: "present", drawOrder: 0,
@@ -85,6 +87,51 @@ function firstPosition(project, ticks) {
     .evaluatedParts[0].renderInstances[0].mesh.positions.slice(0, 2);
 }
 
+function wrapWithTranslationWarp(project, id, amount) {
+  const rootId = project.scene.rootId;
+  const children = [...project.scene.nodes[rootId].children];
+  const controlPointIds = ["tl", "tr", "bl", "br"].map((suffix) => `${id}_${suffix}`);
+  const created = createWarpDeformer({ id, displayName: id, parentNodeId: rootId,
+    columns: 2, rows: 2, bounds: { left: -50, top: -50, right: 50, bottom: 50 },
+    controlPointIds });
+  project.scene.nodes[id] = createSceneNode({ id, kind: "deformer", displayName: id,
+    parentId: rootId });
+  project.scene.nodes[id].children = children;
+  project.scene.nodes[rootId].children = [id];
+  for (const childId of children) project.scene.nodes[childId].parentId = id;
+  for (const bone of project.rig.bones) {
+    if (children.includes(bone.id)) bone.parentNodeId = id;
+  }
+  project.rig.deformers.push(created.deformer);
+  project.rig.warpControlPoints.push(...created.controlPoints);
+  const points = defaultWarpKeyformControlPoints(created.deformer, created.controlPoints)
+    .map((entry) => ({ ...entry, x: entry.x + amount }));
+  project.rig.warpDeformerKeyforms.push(
+    { deformerId: id, keyArtId: "key_a", controlPoints: structuredClone(points) },
+    { deformerId: id, keyArtId: "key_b", controlPoints: structuredClone(points) },
+  );
+}
+
+function addClippingSource(project) {
+  const rootId = project.scene.rootId;
+  project.scene.nodes.mask = createSceneNode({ id: "mask", displayName: "Mask",
+    parentId: rootId, bounds: { left: -100, top: -100, right: 100, bottom: 100 } });
+  project.scene.nodes[rootId].children.push("mask");
+  for (const keyArt of project.keyArts) {
+    keyArt.members.push({ ...member("mask", `mask_${keyArt.id}`), drawOrder: 1 });
+  }
+  project.semanticSlots.push({ id: "mask_slot", displayName: "Mask", mappings: [
+    { keyArtId: "key_a", nodeId: "mask" }, { keyArtId: "key_b", nodeId: "mask" },
+  ], metadata: {} });
+  project.transitions[0].partTransitions.push({ id: "mask_transition",
+    semanticSlotId: "mask_slot", mode: "hold", topologyId: null,
+    fromKeyformId: null, toKeyformId: null, configuration: { holdEndpoint: "from" } });
+  project.clippingBindings.push(
+    { id: "clip_a", targetNodeId: "part_a", sourceNodeId: "mask", mode: "inside", enabled: true },
+    { id: "clip_b", targetNodeId: "part_b", sourceNodeId: "mask", mode: "inside", enabled: true },
+  );
+}
+
 test("Transition evaluates weighted skinning before form correction at exact endpoints and midpoint", () => {
   const project = fixture();
   assert.deepEqual(firstPosition(project, 0), [10, 1]);
@@ -104,6 +151,55 @@ test("Hold and Replace use endpoint-specific weighted skin and correction state"
   const positions = evaluateTransition(project, "transition", 50).evaluatedParts[0]
     .renderInstances.map((entry) => entry.mesh.positions.slice(0, 2));
   assert.deepEqual(positions, [[10, 1], [20, 3]]);
+});
+
+test("Warp and nested Warp evaluate before weighted skinning and form correction", () => {
+  const single = fixture();
+  wrapWithTranslationWarp(single, "inner", 2);
+  assert.deepEqual(firstPosition(single, 50), [17, 2]);
+  const nested = fixture();
+  wrapWithTranslationWarp(nested, "inner", 2);
+  wrapWithTranslationWarp(nested, "outer", 3);
+  assert.deepEqual(firstPosition(nested, 50), [20, 2]);
+});
+
+test("weighted form geometry is finalized before existing clipping resolution", () => {
+  const project = fixture();
+  addClippingSource(project);
+  const evaluation = evaluateTransition(project, "transition", 50);
+  const target = evaluation.evaluatedParts.find((entry) => entry.semanticSlotId === "slot")
+    .renderInstances[0];
+  const source = evaluation.evaluatedParts.find((entry) => entry.semanticSlotId === "mask_slot")
+    .renderInstances[0];
+  assert.deepEqual(target.mesh.positions.slice(0, 2), [15, 2]);
+  assert.equal(target.clipping.sourceRenderInstanceId, source.renderInstanceId);
+});
+
+test("form correction remains pre-world-transform geometry", () => {
+  const project = fixture();
+  project.rig.bonePoseKeyforms.forEach((entry) => { entry.localDelta.x = 0; });
+  for (const nodeId of ["part_a", "part_b"]) {
+    project.scene.nodes[nodeId].transform.position.x = 5;
+    project.scene.nodes[nodeId].transform.scale = { x: 2, y: 2 };
+  }
+  const instance = evaluateTransition(project, "transition", 0)
+    .evaluatedParts[0].renderInstances[0];
+  assert.deepEqual(instance.mesh.positions.slice(0, 2), [0, 1]);
+  assert.deepEqual(transformPoint(instance.transform, { x: 0, y: 1 }), { x: 5, y: 2 });
+});
+
+test("incompatible Morph SkinBindings diagnose without guessing weights", () => {
+  const project = fixture();
+  project.rig.skinBindings.find((entry) => entry.targetNodeId === "part_b")
+    .vertexWeights[0].influences = [{ boneId: "bone", weight: 1 }];
+  project.rig.skinBindings.find((entry) => entry.targetNodeId === "part_b")
+    .vertexWeights[1].influences = [{ boneId: "bone", weight: 1 }];
+  // Change stable weight state without invalidating the Project shape by adding
+  // a second Bone pose is unnecessary; endpoint absence itself is incompatible.
+  project.rig.skinBindings.find((entry) => entry.targetNodeId === "part_b").enabled = false;
+  const evaluation = evaluateTransition(project, "transition", 50);
+  assert.ok(evaluation.diagnostics.some((entry) =>
+    entry.code === "SKIN_TRANSITION_INCOMPATIBLE" && entry.severity === "error"));
 });
 
 test("preview export and shared render plan preserve weighted form geometry parity", () => {

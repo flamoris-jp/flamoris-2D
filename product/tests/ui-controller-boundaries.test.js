@@ -213,6 +213,87 @@ test("Topology Edit selects through the stable-ID controller and Add never start
   }]);
 });
 
+test("Weight viewport stroke previews moves and commits once on pointer-up", () => {
+  const mesh = generateGridMesh(
+    { minX: 0, minY: 0, maxX: 10, maxY: 10 }, 10, 10, 1, 1,
+  );
+  const calls = [];
+  const authoring = {
+    setSelectedVertex: (id) => calls.push(["select", id]),
+    beginStroke: () => calls.push(["begin"]),
+    previewStroke: (ids) => calls.push(["preview", ids]),
+    commitStroke: () => calls.push(["commit"]),
+    cancelStroke: () => calls.push(["cancel"]),
+  };
+  const tools = {
+    selectVertexByIndex() {},
+    activeTopology: () => ({ vertexIds: ["v1", "v2", "v3", "v4"] }),
+  };
+  const state = {
+    mode: "psd", editorMode: "weight", editor: null, previewMode: false,
+    spacePressed: false, view: { scale: 1, originX: 0, originY: 0 },
+    mesh, selected: new Set(), partOffset: { x: 0, y: 0 }, drag: null,
+  };
+  const elements = viewportElements();
+  bindViewport(state, elements, {
+    endpointMesh: () => ({ getState: () => ({ editingEnabled: true }) }),
+    meshTools: () => tools,
+    weightAuthoring: () => authoring,
+  });
+  elements.overlayCanvas.dispatch("pointerdown", {
+    button: 0, pointerId: 41, clientX: 0, clientY: 0, shiftKey: false,
+  });
+  elements.overlayCanvas.dispatch("pointermove", {
+    pointerId: 41, clientX: 10, clientY: 0,
+  });
+  assert.equal(calls.some(([name]) => name === "commit"), false);
+  elements.overlayCanvas.dispatch("pointerup", { pointerId: 41 });
+  assert.deepEqual(calls, [
+    ["select", "v1"], ["begin"], ["preview", ["v1"]],
+    ["preview", ["v2"]], ["commit"],
+  ]);
+});
+
+test("Form Correction viewport drag stays transient until one pointer-up commit", () => {
+  const mesh = generateGridMesh(
+    { minX: 0, minY: 0, maxX: 10, maxY: 10 }, 10, 10, 1, 1,
+  );
+  const calls = [];
+  const authoring = {
+    selectVertex: (id, additive) => calls.push(["select", id, additive]),
+    beginGesture: () => calls.push(["begin"]),
+    previewGesture: (delta) => calls.push(["preview", delta]),
+    commitGesture: () => calls.push(["commit"]),
+    cancelGesture: () => calls.push(["cancel"]),
+  };
+  const tools = {
+    selectVertexByIndex() {},
+    activeTopology: () => ({ vertexIds: ["v1", "v2", "v3", "v4"] }),
+  };
+  const state = {
+    mode: "psd", editorMode: "form-correction", editor: null, previewMode: false,
+    spacePressed: false, view: { scale: 1, originX: 0, originY: 0 },
+    mesh, selected: new Set(), partOffset: { x: 0, y: 0 }, drag: null,
+  };
+  const elements = viewportElements();
+  bindViewport(state, elements, {
+    endpointMesh: () => ({ getState: () => ({ editingEnabled: true }) }),
+    meshTools: () => tools,
+    formCorrectionAuthoring: () => authoring,
+  });
+  elements.overlayCanvas.dispatch("pointerdown", {
+    button: 0, pointerId: 42, clientX: 0, clientY: 0, shiftKey: false,
+  });
+  elements.overlayCanvas.dispatch("pointermove", {
+    pointerId: 42, clientX: 4, clientY: 6,
+  });
+  assert.equal(calls.some(([name]) => name === "commit"), false);
+  elements.overlayCanvas.dispatch("pointerup", { pointerId: 42 });
+  assert.deepEqual(calls, [
+    ["select", "v1", false], ["begin"], ["preview", { x: 4, y: 6 }], ["commit"],
+  ]);
+});
+
 test("pending correspondence pin consumes one viewport click in target mesh-local coordinates", () => {
   const mesh = generateGridMesh(
     { minX: 0, minY: 0, maxX: 10, maxY: 10 }, 10, 10, 1, 1,

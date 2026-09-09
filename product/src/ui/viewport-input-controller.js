@@ -36,11 +36,15 @@ export function bindViewportInteractions({
   correspondencePreview = () => null,
   deformerAuthoring = () => null,
   boneAuthoring = () => null,
+  weightAuthoring = () => null,
+  formCorrectionAuthoring = () => null,
   loadFile,
   windowTarget = window,
 }) {
   let deformerGesture = null;
   let boneGesture = null;
+  let weightGesture = null;
+  let formGesture = null;
   function angleDelta(from, to) {
     const fullTurn = Math.PI * 2;
     let delta = (to - from) % fullTurn;
@@ -350,6 +354,31 @@ export function bindViewportInteractions({
       render();
       return;
     }
+    const topology = tools?.activeTopology();
+    const vertexId = topology?.vertexIds?.[vertexIndex] || null;
+    if (state.editorMode === EDITOR_MODES.WEIGHT) {
+      const authoring = weightAuthoring();
+      try {
+        authoring.setSelectedVertex(vertexId);
+        authoring.beginStroke();
+        authoring.previewStroke([vertexId]);
+        weightGesture = { pointerId: event.pointerId };
+        elements.overlayCanvas.setPointerCapture(event.pointerId);
+      } catch (error) { setStatus(error.message || String(error)); }
+      render();
+      return;
+    }
+    if (state.editorMode === EDITOR_MODES.FORM_CORRECTION) {
+      const authoring = formCorrectionAuthoring();
+      try {
+        authoring.selectVertex(vertexId, event.shiftKey);
+        authoring.beginGesture();
+        formGesture = { pointerId: event.pointerId, start: screenToPart(screenPoint) };
+        elements.overlayCanvas.setPointerCapture(event.pointerId);
+      } catch (error) { setStatus(error.message || String(error)); }
+      render();
+      return;
+    }
     const partPoint = screenToPart(screenPoint);
     state.drag = { last: partPoint };
     elements.overlayCanvas.setPointerCapture(event.pointerId);
@@ -363,6 +392,26 @@ export function bindViewportInteractions({
 
     const deformer = deformerAuthoring();
     const bone = boneAuthoring();
+    if (weightGesture?.pointerId === event.pointerId) {
+      const index = nearestVertex(screenPoint);
+      const topology = meshTools()?.activeTopology();
+      const vertexId = topology?.vertexIds?.[index];
+      if (vertexId) {
+        try { weightAuthoring().previewStroke([vertexId]); }
+        catch (error) { setStatus(error.message || String(error)); }
+      }
+      render();
+      return;
+    }
+    if (formGesture?.pointerId === event.pointerId) {
+      const point = screenToPart(screenPoint);
+      try { formCorrectionAuthoring().previewGesture({
+        x: point.x - formGesture.start.x,
+        y: point.y - formGesture.start.y,
+      }); } catch (error) { setStatus(error.message || String(error)); }
+      render();
+      return;
+    }
     if (boneGesture?.pointerId === event.pointerId) {
       const documentPoint = screenToImage(screenPoint.x, screenPoint.y, state.view);
       try {
@@ -444,6 +493,28 @@ export function bindViewportInteractions({
   });
 
   function endDrag(event) {
+    if (weightGesture?.pointerId === event.pointerId) {
+      const authoring = weightAuthoring();
+      if (event.type === "pointercancel") authoring.cancelStroke();
+      else {
+        authoring.commitStroke();
+        setStatus("Weight strokeを1件のUndo履歴として適用しました");
+      }
+      weightGesture = null;
+      render();
+      return;
+    }
+    if (formGesture?.pointerId === event.pointerId) {
+      const authoring = formCorrectionAuthoring();
+      if (event.type === "pointercancel") authoring.cancelGesture();
+      else {
+        authoring.commitGesture();
+        setStatus("Form Correctionを1件のUndo履歴として適用しました");
+      }
+      formGesture = null;
+      render();
+      return;
+    }
     if (boneGesture?.pointerId === event.pointerId) {
       const bone = boneAuthoring();
       if (event.type === "pointercancel") bone.cancelGesture();

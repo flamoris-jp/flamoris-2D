@@ -10,6 +10,8 @@ import { CorrespondencePreviewController } from "./correspondence-preview-contro
 import { ClippingAuthoringController } from "./clipping-authoring-controller.js";
 import { DeformerAuthoringController } from "./deformer-authoring-controller.js";
 import { BoneAuthoringController } from "./bone-authoring-controller.js";
+import { WeightAuthoringController } from "./weight-authoring-controller.js";
+import { FormCorrectionAuthoringController } from "./form-correction-authoring-controller.js";
 
 function filterTree(node, matches) {
   const children = node.children
@@ -61,6 +63,12 @@ export class EditorUiAdapter {
       onChange: (reason) => this.notify(reason),
     });
     this.boneAuthoring = new BoneAuthoringController(session, {
+      onChange: (reason) => this.notify(reason),
+    });
+    this.weightAuthoring = new WeightAuthoringController(session, {
+      onChange: (reason) => this.notify(reason),
+    });
+    this.formCorrectionAuthoring = new FormCorrectionAuthoringController(session, {
       onChange: (reason) => this.notify(reason),
     });
     this.transitionPreview = new TransitionPreviewController(session, this.transitionAuthoring, {
