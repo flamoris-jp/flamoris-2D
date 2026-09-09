@@ -220,11 +220,23 @@ Rules:
 - one target has at most one enabled SkinBinding;
 - each vertex has one to four non-zero influences;
 - every weight is finite and within 0..1;
-- canonical normalized weights sum to 1 within the documented numeric tolerance;
+- every weight is strictly greater than zero;
+- input weights must sum to 1 within the explicit deterministic tolerance of
+  `1e-6`;
+- canonicalization sorts influences by Bone ID, divides each weight by the
+  sorted finite sum, and assigns the final influence the exact residual after
+  the preceding normalized weights so the stored sum is exactly 1;
 - influence lists serialize in stable Bone ID order;
+- vertex-weight entries serialize in stable vertex ID order;
 - duplicate Bone influences are invalid;
+- duplicate vertex entries are invalid;
 - referenced Bones exist and belong to one compatible skeleton space;
 - the SkinBinding topology must match every evaluated MeshKeyform used by that target;
+- an enabled SkinBinding contains exactly one weight entry for every stable
+  vertex ID in its MeshTopology;
+- a disabled SkinBinding does not deform geometry and may retain an incomplete
+  set of weight entries for later explicit authoring, but every retained entry
+  and stable reference remains valid;
 - topology mutation must deterministically extend/migrate weights or be rejected before mutation;
 - deleting a referenced Bone is rejected until bindings are reassigned or removed.
 
