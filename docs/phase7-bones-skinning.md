@@ -205,7 +205,7 @@ Weighted skinning binds stable mesh vertices to stable Bone IDs.
 SkinBinding
 ├── id
 ├── targetNodeId
-├── meshTopologyId
+├── topologyId
 ├── enabled
 └── vertexWeights[]
     ├── vertexId
@@ -226,6 +226,8 @@ Rules:
 - canonicalization sorts influences by Bone ID, divides each weight by the
   sorted finite sum, and assigns the final influence the exact residual after
   the preceding normalized weights so the stored sum is exactly 1;
+- persistent Project state must already use that canonical representation;
+  load/validation diagnoses non-canonical weights instead of silently rewriting them;
 - influence lists serialize in stable Bone ID order;
 - vertex-weight entries serialize in stable vertex ID order;
 - duplicate Bone influences are invalid;

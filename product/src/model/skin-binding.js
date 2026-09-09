@@ -44,9 +44,10 @@ export function canonicalizeSkinInfluences(influences, {
       );
     }
     seen.add(influence.boneId);
-    if (!Number.isFinite(influence.weight) || !(influence.weight > 0)) {
+    if (!Number.isFinite(influence.weight) || !(influence.weight > 0) ||
+      influence.weight > 1) {
       fail(
-        "Skin influence weight must be finite and greater than zero.",
+        "Skin influence weight must be finite, greater than zero, and at most one.",
         "SKIN_BINDING_WEIGHT_INVALID",
         { vertexId, boneId: influence.boneId, weight: influence.weight ?? null },
       );

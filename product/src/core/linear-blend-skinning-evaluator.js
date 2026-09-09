@@ -1,5 +1,8 @@
 import { transformPoint } from "./transforms.js";
+import { boneSkinMatrixInGeometrySpace } from "./bone-skin-matrix.js";
 import { canonicalizeSkinVertexWeights } from "../model/skin-binding.js";
+
+const IDENTITY_AFFINE = Object.freeze([1, 0, 0, 1, 0, 0]);
 
 function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -55,6 +58,7 @@ export function evaluateLinearBlendSkinning({
   topology,
   binding,
   bonePoses,
+  targetWorldTransform = IDENTITY_AFFINE,
 }) {
   if (!binding || binding.enabled === false) return unchanged(mesh);
   const issues = [];
@@ -92,6 +96,16 @@ export function evaluateLinearBlendSkinning({
         topologyId,
         details: { positionCount: mesh?.positions?.length ?? null, vertexCount: vertexIds.length },
       },
+    ));
+  }
+  const geometryTransformValid = finiteAffine(targetWorldTransform) &&
+    Math.abs(targetWorldTransform[0] * targetWorldTransform[3] -
+      targetWorldTransform[1] * targetWorldTransform[2]) >= 1e-12;
+  if (!geometryTransformValid) {
+    issues.push(diagnostic(
+      "SKIN_GEOMETRY_TRANSFORM_INVALID",
+      "Skinning requires an invertible finite target world transform.",
+      { bindingId, topologyId },
     ));
   }
   let vertexWeights = [];
@@ -149,7 +163,17 @@ export function evaluateLinearBlendSkinning({
       ));
       continue;
     }
-    posesByBone.set(pose.boneId, pose);
+    if (!geometryTransformValid) {
+      posesByBone.set(pose.boneId, pose);
+    } else {
+      posesByBone.set(pose.boneId, {
+        ...pose,
+        geometrySkinMatrix: boneSkinMatrixInGeometrySpace(
+          pose.skinMatrix,
+          targetWorldTransform,
+        ),
+      });
+    }
   }
   for (const entry of vertexWeights) {
     for (const influence of entry.influences) {
@@ -176,7 +200,10 @@ export function evaluateLinearBlendSkinning({
     let x = 0;
     let y = 0;
     for (const influence of weightsByVertex.get(vertexId).influences) {
-      const transformed = transformPoint(posesByBone.get(influence.boneId).skinMatrix, point);
+      const transformed = transformPoint(
+        posesByBone.get(influence.boneId).geometrySkinMatrix,
+        point,
+      );
       x += influence.weight * transformed.x;
       y += influence.weight * transformed.y;
     }

@@ -150,6 +150,9 @@ test("SkinBinding accepts only positive normalized one-to-four influence weights
     { boneId: "bone", weight: Number.NaN },
   ]), { code: "SKIN_BINDING_WEIGHT_INVALID" });
   assert.throws(() => canonicalizeSkinInfluences([
+    { boneId: "bone", weight: 1 + SKIN_WEIGHT_SUM_TOLERANCE / 2 },
+  ]), { code: "SKIN_BINDING_WEIGHT_INVALID" });
+  assert.throws(() => canonicalizeSkinInfluences([
     { boneId: "bone_a", weight: 0.4 },
     { boneId: "bone_b", weight: 0.4 },
   ]), { code: "SKIN_BINDING_WEIGHT_NOT_NORMALIZED" });
@@ -166,6 +169,16 @@ test("SkinBinding validation accepts a complete stable topology contract", () =>
   const { project } = fixture();
   assert.deepEqual(validateSkinBindings(project), []);
   assert.equal(validateProject(project).some((entry) => entry.severity === "error"), false);
+});
+
+test("persistent weights must already use the normalized canonical representation", () => {
+  const { project, binding } = fixture();
+  binding.vertexWeights[0].influences = [
+    { boneId: "bone_a", weight: 0.5000001 },
+    { boneId: "bone_b", weight: 0.5 },
+  ];
+  assert.ok(validateSkinBindings(project).some((entry) =>
+    entry.code === "SKIN_BINDING_WEIGHT_NOT_CANONICAL"));
 });
 
 test("SkinBinding validation diagnoses target and topology contracts deterministically", () => {

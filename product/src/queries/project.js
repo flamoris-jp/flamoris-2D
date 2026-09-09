@@ -327,16 +327,20 @@ export const projectQueries = {
     const topology = project.meshTopologies.find((entry) =>
       entry.id === binding.topologyId) || null;
     const fk = evaluateEndpointProjectedBoneFk(project, input.keyArtId);
+    if (fk.diagnostics.length) {
+      return {
+        mesh: { positions: [...input.positions] },
+        diagnostics: cloneProject(fk.diagnostics),
+      };
+    }
     const evaluated = evaluateLinearBlendSkinning({
       mesh: { positions: input.positions },
       topology,
       binding,
       bonePoses: fk.poses,
+      targetWorldTransform: worldTransformMatrix(project, binding.targetNodeId),
     });
-    return {
-      ...cloneProject(evaluated),
-      diagnostics: cloneProject([...fk.diagnostics, ...evaluated.diagnostics]),
-    };
+    return cloneProject(evaluated);
   },
   "scene.get_tree": (project, input = {}) =>
     treeNode(project, project.scene.rootId, input.includeHidden !== false),

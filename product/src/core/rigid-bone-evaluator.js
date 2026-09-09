@@ -5,10 +5,10 @@ import {
 } from "./bone-fk-evaluator.js";
 import {
   invertAffine,
-  multiplyAffine,
   transformPoint,
   worldTransformMatrix,
 } from "./transforms.js";
+import { boneSkinMatrixInGeometrySpace } from "./bone-skin-matrix.js";
 import {
   createInterpolatedWarpEvaluationStages,
   createWarpEvaluationStages,
@@ -175,8 +175,8 @@ function applyPose(mesh, targetWorldTransform, binding, evaluation) {
       { boneId: binding.boneId },
     ), binding)],
   };
-  const localSkinMatrix = multiplyAffine(
-    multiplyAffine(invertAffine(targetWorldTransform), pose.skinMatrix),
+  const localSkinMatrix = boneSkinMatrixInGeometrySpace(
+    pose.skinMatrix,
     targetWorldTransform,
   );
   const positions = [];

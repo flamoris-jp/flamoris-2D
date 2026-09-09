@@ -246,6 +246,7 @@ export function validateSkinBindings(project, register = () => {}) {
       const roots = new Set();
       let previousBoneId = null;
       let sum = 0;
+      let weightsValid = true;
       for (const [influenceIndex, influence] of influences.entries()) {
         const influencePath = `${weightPath}.influences.${influenceIndex}`;
         if (!object(influence) || !exactKeys(influence, ["boneId", "weight"])) {
@@ -289,11 +290,13 @@ export function validateSkinBindings(project, register = () => {}) {
           const root = skeletonRootParentId(project, influence.boneId);
           if (root) roots.add(root);
         }
-        if (!Number.isFinite(influence.weight) || !(influence.weight > 0)) {
+        if (!Number.isFinite(influence.weight) || !(influence.weight > 0) ||
+          influence.weight > 1) {
+          weightsValid = false;
           issues.push(problem(
             "SKIN_BINDING_WEIGHT_INVALID",
             `${influencePath}.weight`,
-            "Skin influence weight must be finite and greater than zero.",
+            "Skin influence weight must be finite, greater than zero, and at most one.",
             binding.id || null,
             { vertexId: vertexWeight.vertexId, boneId: influence.boneId, weight: influence.weight ?? null },
           ));
@@ -307,6 +310,24 @@ export function validateSkinBindings(project, register = () => {}) {
           binding.id || null,
           { vertexId: vertexWeight.vertexId, sum, tolerance: SKIN_WEIGHT_SUM_TOLERANCE },
         ));
+      } else if (weightsValid && Number.isFinite(sum)) {
+        let normalizedSum = 0;
+        const differsFromCanonical = influences.some((influence, index) => {
+          const canonicalWeight = index === influences.length - 1
+            ? 1 - normalizedSum
+            : influence.weight / sum;
+          normalizedSum += canonicalWeight;
+          return influence.weight !== canonicalWeight;
+        });
+        if (differsFromCanonical) {
+          issues.push(problem(
+            "SKIN_BINDING_WEIGHT_NOT_CANONICAL",
+            `${weightPath}.influences`,
+            "Persistent skin weights must use the deterministic normalized representation.",
+            binding.id || null,
+            { vertexId: vertexWeight.vertexId, tolerance: SKIN_WEIGHT_SUM_TOLERANCE },
+          ));
+        }
       }
       if (roots.size > 1) {
         issues.push(problem(

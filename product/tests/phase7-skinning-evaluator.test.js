@@ -104,6 +104,19 @@ test("identity FK skin matrix leaves geometry unchanged", () => {
   assert.notEqual(result.mesh.positions, mesh.positions);
 });
 
+test("LBS converts projected FK skin matrices to pre-world-transform geometry space", () => {
+  const result = evaluateLinearBlendSkinning({
+    mesh: { positions: [1, 0] },
+    topology,
+    binding: binding([{ boneId: "bone_a", weight: 1 }]),
+    // A 90-degree document-space rotation around the target origin (10, 0).
+    bonePoses: [{ boneId: "bone_a", skinMatrix: [0, 1, -1, 0, 10, -10] }],
+    targetWorldTransform: [1, 0, 0, 1, 10, 0],
+  });
+  assert.deepEqual(result.mesh.positions, [0, 1]);
+  assert.deepEqual(result.diagnostics, []);
+});
+
 test("disabled SkinBinding returns unchanged geometry without requiring weights or poses", () => {
   const mesh = { positions: [2, 3] };
   const result = evaluateLinearBlendSkinning({
@@ -236,5 +249,5 @@ test("LBS evaluator remains DOM-independent and uses no parallel Bone evaluator"
     "utf8",
   );
   assert.doesNotMatch(source, /\bdocument\b|\bwindow\b|evaluateBoneFk/);
-  assert.match(source, /pose\.skinMatrix/);
+  assert.match(source, /boneSkinMatrixInGeometrySpace/);
 });
