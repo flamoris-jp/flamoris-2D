@@ -19,6 +19,27 @@ function length(pose) {
   return Math.hypot(pose.tip.x - pose.head.x, pose.tip.y - pose.head.y);
 }
 
+// The analytic two-link solver treats both links as rigid Euclidean segments.
+// A projected Warp bind frame may instead contain shear, non-uniform scale, or
+// a reflection.  In that case a document-space angle is not a Bone-local
+// rotation, so baking a result would not be faithful to the existing FK.
+const FRAME_TOLERANCE = 1e-9;
+
+function compatibleRigidProjectedFrame(pose) {
+  const [a, b, c, d] = pose.poseMatrix;
+  const xLengthSquared = a * a + b * b;
+  const yLengthSquared = c * c + d * d;
+  const scale = Math.max(1, xLengthSquared, yLengthSquared);
+  const dot = a * c + b * d;
+  const determinant = a * d - b * c;
+  return Number.isFinite(xLengthSquared) && Number.isFinite(yLengthSquared) &&
+    Number.isFinite(dot) && Number.isFinite(determinant) &&
+    xLengthSquared > FRAME_TOLERANCE && yLengthSquared > FRAME_TOLERANCE &&
+    Math.abs(dot) <= FRAME_TOLERANCE * scale &&
+    Math.abs(xLengthSquared - yLengthSquared) <= FRAME_TOLERANCE * scale &&
+    determinant > FRAME_TOLERANCE;
+}
+
 function constraintFor(project, id) {
   return project.rig?.twoBoneIkConstraints?.find((entry) => entry.id === id) || null;
 }
@@ -46,6 +67,15 @@ export function solveProjectTwoBoneIk(project, { constraintId, keyArtId, target 
   const { constraint, root, mid } = projected.chain;
   if (!constraint.enabled) return { solution: null, diagnostics: [diagnostic(
     "TWO_BONE_IK_DISABLED", "TwoBoneIkConstraint is disabled.", { constraintId })] };
+  for (const pose of [root, mid]) {
+    if (!compatibleRigidProjectedFrame(pose)) {
+      return { solution: null, diagnostics: [diagnostic(
+        "TWO_BONE_IK_PROJECTED_FRAME_INCOMPATIBLE",
+        "Two-bone IK requires orientation-preserving rigid projected Bone frames.",
+        { constraintId, boneId: pose.boneId, poseMatrix: [...pose.poseMatrix] },
+      )] };
+    }
+  }
   const analytic = solveTwoBoneIk({
     root: root.head,
     target,
