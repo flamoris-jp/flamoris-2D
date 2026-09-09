@@ -684,21 +684,46 @@ export function createViewportRenderer({
     let vertices = correspondence?.previewActive
       ? new Float32Array(correspondence.candidatePositions)
       : getDeformedVertices(state.mesh, previewOffsets);
+    if ([EDITOR_MODES.WEIGHT, EDITOR_MODES.FORM_CORRECTION].includes(state.editorMode)) {
+      const endpoint = endpointContext();
+      const transition = state.editor?.transitionAuthoring.activeTransition();
+      const program = transition
+        ? state.editor.session.query("animation.get_program", {
+          programId: transition.temporalProgramId,
+        }) : null;
+      const evaluation = transition && endpoint
+        ? state.editor.session.query("transition.evaluate", {
+          transitionId: transition.id,
+          timeTicks: endpoint.endpoint === "from" ? 0 : program.durationTicks,
+        }) : null;
+      const evaluatedInstance = evaluation?.evaluatedParts
+        .find((entry) => entry.semanticSlotId === endpoint?.semanticSlotId)
+        ?.renderInstances.find((entry) => entry.sourceNodeId === endpoint.nodeId);
+      if (evaluatedInstance?.mesh.positions.length === vertices.length) {
+        vertices = new Float32Array(evaluatedInstance.mesh.positions);
+      }
+    }
     if (state.editorMode === EDITOR_MODES.FORM_CORRECTION) {
       const endpoint = endpointContext();
       const authoring = formCorrectionAuthoringContext();
-      if (endpoint?.topology && authoring?.keyArtId) {
+      if (endpoint?.topology && authoring?.keyArtId && authoring.gestureActive) {
         const persistent = state.editor.session.query("mesh_form.get_for_context", {
           topologyId: authoring.topologyId,
           keyArtId: authoring.keyArtId,
           semanticSlotId: authoring.semanticSlotId,
         });
-        const keyform = authoring.gestureActive
-          ? { ...(persistent || {
-            id: "transient", topologyId: authoring.topologyId,
-            keyArtId: authoring.keyArtId, semanticSlotId: authoring.semanticSlotId,
-          }), vertexOffsets: authoring.previewVertexOffsets }
-          : persistent;
+        const before = new Map((persistent?.vertexOffsets || []).map((entry) => [entry.vertexId, entry]));
+        const after = new Map(authoring.previewVertexOffsets.map((entry) => [entry.vertexId, entry]));
+        const vertexOffsets = [...new Set([...before.keys(), ...after.keys()])]
+          .map((vertexId) => ({
+            vertexId,
+            x: (after.get(vertexId)?.x || 0) - (before.get(vertexId)?.x || 0),
+            y: (after.get(vertexId)?.y || 0) - (before.get(vertexId)?.y || 0),
+          }))
+          .filter((entry) => entry.x !== 0 || entry.y !== 0);
+        const keyform = { id: "transient", topologyId: authoring.topologyId,
+          keyArtId: authoring.keyArtId, semanticSlotId: authoring.semanticSlotId,
+          vertexOffsets };
         vertices = new Float32Array(evaluateMeshFormCorrection({
           mesh: { positions: [...vertices] }, topology: endpoint.topology, keyform,
         }).mesh.positions);

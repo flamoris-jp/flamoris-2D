@@ -225,3 +225,9 @@ test("shared renderer remains SkinBinding and form-correction unaware", async ()
     assert.doesNotMatch(source, /SkinBinding|MeshFormCorrection|skinning|form correction/i);
   }
 });
+
+test("authoring viewport reuses canonical Transition evaluation for deformed geometry", async () => {
+  const source = await readFile(new URL("../src/ui/viewport-renderer.js", import.meta.url), "utf8");
+  assert.match(source, /session\.query\("transition\.evaluate"/);
+  assert.doesNotMatch(source, /evaluateLinearBlendSkinning|evaluateBoneFk/);
+});

@@ -47,4 +47,5 @@ test("MCP schema module imports with wired query and command schemas", () => {
   assert.equal(commandSchemas["mesh_form.create_keyform"]
     .properties.keyform.properties.vertexOffsets.items.properties.vertexId.type, "string");
   assert.equal(querySchemas["mesh_form.get_for_context"].properties.keyArtId.type, "string");
+  assert.equal(querySchemas["mesh_form.evaluate"].properties.positions.items.type, "number");
 });

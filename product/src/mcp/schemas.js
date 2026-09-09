@@ -26,6 +26,16 @@ export const querySchemas = {
     additionalProperties: false,
   },
   "mesh_form.validate": emptyQuery(),
+  "mesh_form.evaluate": {
+    type: "object",
+    required: ["topologyId", "positions"],
+    properties: {
+      topologyId: nodeId,
+      keyformId: nodeId,
+      positions: { type: "array", items: { type: "number" } },
+    },
+    additionalProperties: false,
+  },
   "skin.list_bindings": emptyQuery(),
   "skin.get_binding": idQuery("bindingId", nodeId),
   "skin.get_binding_for_target": idQuery("targetNodeId", nodeId),

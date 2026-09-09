@@ -125,6 +125,10 @@ test("form correction Commands Queries and Undo Redo preserve exact state", () =
   assert.deepEqual(adapter.query("mesh_form.get_for_context", {
     topologyId: "topology", keyArtId: "key_a", semanticSlotId: "slot",
   }), expected);
+  assert.deepEqual(adapter.query("mesh_form.evaluate", {
+    topologyId: "topology", keyformId: "correction",
+    positions: [0, 0, 10, 0, 0, 10],
+  }).mesh.positions, [2, 1, 10, 0, -3, 14]);
   session.undo();
   assert.deepEqual(session.query("mesh_form.get_keyform", {
     keyformId: "correction",

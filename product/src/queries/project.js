@@ -31,6 +31,7 @@ import {
   meshFormCorrectionForContext,
   meshFormCorrectionValidationResult,
 } from "../model/mesh-form-correction-validation.js";
+import { evaluateMeshFormCorrection } from "../core/mesh-form-correction-evaluator.js";
 
 function temporalProgram(project, programId) {
   const program = project.temporalPrograms.find((entry) => entry.id === programId);
@@ -365,6 +366,18 @@ export const projectQueries = {
     meshFormCorrectionForContext(project, input),
   ),
   "mesh_form.validate": (project) => meshFormCorrectionValidationResult(project),
+  "mesh_form.evaluate": (project, input) => {
+    const topology = project.meshTopologies.find((entry) => entry.id === input.topologyId) || null;
+    const keyform = input.keyformId
+      ? project.meshFormCorrectionKeyforms.find((entry) => entry.id === input.keyformId) || null
+      : null;
+    if (input.keyformId && !keyform) {
+      throw new Error(`Unknown MeshFormCorrectionKeyform ${input.keyformId}.`);
+    }
+    return cloneProject(evaluateMeshFormCorrection({
+      mesh: { positions: input.positions }, topology, keyform,
+    }));
+  },
   "scene.get_tree": (project, input = {}) =>
     treeNode(project, project.scene.rootId, input.includeHidden !== false),
   "scene.get_node": (project, input) => {
