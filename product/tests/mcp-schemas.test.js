@@ -7,7 +7,7 @@ import {
 } from "../src/mcp/schemas.js";
 
 test("MCP schema module imports with wired query and command schemas", () => {
-  assert.equal(MCP_SCHEMA_VERSION, 13);
+  assert.equal(MCP_SCHEMA_VERSION, 14);
   assert.equal(
     querySchemas["scene.get_node"].properties.nodeId.type,
     "string",
@@ -48,4 +48,8 @@ test("MCP schema module imports with wired query and command schemas", () => {
     .properties.keyform.properties.vertexOffsets.items.properties.vertexId.type, "string");
   assert.equal(querySchemas["mesh_form.get_for_context"].properties.keyArtId.type, "string");
   assert.equal(querySchemas["mesh_form.evaluate"].properties.positions.items.type, "number");
+  assert.equal(commandSchemas["bone.create_rotation_constraint"]
+    .properties.constraint.properties.minRotation.type, "number");
+  assert.equal(querySchemas["bone.get_rotation_constraint_for_bone"]
+    .properties.boneId.type, "string");
 });

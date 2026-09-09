@@ -8,6 +8,7 @@ import {
   createBonePoseKeyform,
 } from "../model/bone.js";
 import { skinBindingsReferencingBones } from "../model/skin-binding-validation.js";
+import { rotationConstraintsReferencingBones } from "../model/bone-rotation-constraint-validation.js";
 import { CommandError } from "./errors.js";
 
 function collection(project, name) {
@@ -117,6 +118,12 @@ function removeBone(project, boneId) {
     );
   }
   assertNoDependents(project, [bone.id]);
+  const constraint = rotationConstraintsReferencingBones(project, [bone.id])[0];
+  if (constraint) throw new CommandError(
+    "Remove the Bone rotation constraint before deleting its Bone.",
+    "bone.delete_locked_by_rotation_constraint",
+    { boneId: bone.id, constraintId: constraint.id },
+  );
   const parent = project.scene.nodes[node.parentId];
   const nodeIndex = parent.children.indexOf(node.id);
   const boneIndex = collection(project, "bones").indexOf(bone);

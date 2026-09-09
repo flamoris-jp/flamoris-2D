@@ -13,6 +13,7 @@ import { boneCommandHandlers } from "./bone-command-handlers.js";
 import { rigidBoneBindingCommandHandlers } from "./rigid-bone-binding-command-handlers.js";
 import { skinBindingCommandHandlers } from "./skin-binding-command-handlers.js";
 import { meshFormCorrectionCommandHandlers } from "./mesh-form-correction-command-handlers.js";
+import { boneConstraintCommandHandlers } from "./bone-constraint-command-handlers.js";
 
 export { CommandError, TransactionError } from "./errors.js";
 
@@ -27,6 +28,7 @@ const handlers = {
   ...rigidBoneBindingCommandHandlers,
   ...skinBindingCommandHandlers,
   ...meshFormCorrectionCommandHandlers,
+  ...boneConstraintCommandHandlers,
 };
 
 function assertCommand(command, { allowInternal = false } = {}) {

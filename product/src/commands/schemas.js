@@ -35,6 +35,18 @@ const boneLocalTransform = {
   properties: { x: finiteNumber, y: finiteNumber, rotation: finiteNumber },
   additionalProperties: false,
 };
+const boneRotationConstraint = {
+  type: "object",
+  required: ["id", "boneId", "enabled", "minRotation", "maxRotation"],
+  properties: {
+    id: nonEmptyString,
+    boneId: nodeId,
+    enabled: { type: "boolean" },
+    minRotation: finiteNumber,
+    maxRotation: finiteNumber,
+  },
+  additionalProperties: false,
+};
 const skinInfluence = {
   type: "object",
   required: ["boneId", "weight"],
@@ -125,6 +137,31 @@ const transform = {
 };
 
 export const commandSchemas = {
+  "bone.create_rotation_constraint": {
+    type: "object",
+    required: ["constraint"],
+    properties: { constraint: boneRotationConstraint },
+    additionalProperties: false,
+  },
+  "bone.remove_rotation_constraint": {
+    type: "object",
+    required: ["constraintId"],
+    properties: { constraintId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "bone.set_rotation_constraint_enabled": {
+    type: "object",
+    required: ["constraintId", "enabled"],
+    properties: { constraintId: nonEmptyString, enabled: { type: "boolean" } },
+    additionalProperties: false,
+  },
+  "bone.set_rotation_constraint_bounds": {
+    type: "object",
+    required: ["constraintId", "minRotation", "maxRotation"],
+    properties: { constraintId: nonEmptyString, minRotation: finiteNumber,
+      maxRotation: finiteNumber },
+    additionalProperties: false,
+  },
   "mesh_form.create_keyform": {
     type: "object",
     required: ["keyform"],
@@ -754,6 +791,18 @@ function entityRestoreSchema() {
 }
 
 const internalCommandSchemas = {
+  "bone.remove_rotation_constraint_internal": {
+    type: "object",
+    required: ["constraintId"],
+    properties: { constraintId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "bone.restore_rotation_constraint": {
+    type: "object",
+    required: ["constraint", "index"],
+    properties: { constraint: boneRotationConstraint, index: nonNegativeInteger },
+    additionalProperties: false,
+  },
   "mesh_form.remove_keyform_internal": {
     type: "object",
     required: ["keyformId"],

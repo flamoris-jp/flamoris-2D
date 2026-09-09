@@ -67,6 +67,7 @@ src/commands/transition-command-handlers.js
 src/commands/mesh-topology-command-handlers.js
 src/commands/clipping-command-handlers.js
 src/commands/bone-command-handlers.js
+src/commands/bone-constraint-command-handlers.js
 src/commands/rigid-bone-binding-command-handlers.js
 src/commands/skin-binding-command-handlers.js
 src/commands/mesh-form-correction-command-handlers.js

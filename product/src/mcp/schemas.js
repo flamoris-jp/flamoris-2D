@@ -1,6 +1,6 @@
 export { commandSchemas } from "../commands/schemas.js";
 
-export const MCP_SCHEMA_VERSION = 13;
+export const MCP_SCHEMA_VERSION = 14;
 
 const nodeId = {
   type: "string",
@@ -13,6 +13,10 @@ const keyArtId = { ...nodeId };
 const semanticSlotId = { ...nodeId };
 
 export const querySchemas = {
+  "bone.list_rotation_constraints": emptyQuery(),
+  "bone.get_rotation_constraint": idQuery("constraintId", nodeId),
+  "bone.get_rotation_constraint_for_bone": idQuery("boneId", nodeId),
+  "bone.validate_rotation_constraints": emptyQuery(),
   "mesh_form.list_keyforms": {
     type: "object",
     properties: { topologyId: nodeId, keyArtId, semanticSlotId },
