@@ -16,6 +16,16 @@ import {
   evaluateEndpointRigidBoneMesh,
   evaluateMorphRigidBoneMesh,
 } from "./rigid-bone-evaluator.js";
+import {
+  evaluateEndpointSkinMesh,
+  evaluateMorphSkinMesh,
+} from "./skin-mesh-evaluator.js";
+import { skinBindingForTarget } from "../model/skin-binding-validation.js";
+import { meshFormCorrectionForContext } from "../model/mesh-form-correction-validation.js";
+import {
+  evaluateInterpolatedMeshFormCorrection,
+  evaluateMeshFormCorrection,
+} from "./mesh-form-correction-evaluator.js";
 
 function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -67,6 +77,7 @@ function keyformMesh(project, keyformId, fallbackNode) {
   const keyform = entity(project, "meshKeyforms", keyformId, "MeshKeyform");
   const topology = entity(project, "meshTopologies", keyform.topologyId, "MeshTopology");
   return {
+    topologyId: topology.id,
     positions: [...keyform.positions],
     indices: [...topology.indices],
     uvs: [...keyform.uvs],
@@ -115,6 +126,46 @@ function endpointRigidMesh(project, state, keyArtId, mesh, semanticSlotId, issue
     mesh,
     targetWorldTransform: state.worldTransform,
   }), semanticSlotId);
+}
+
+function endpointBoneMesh(project, state, keyArtId, mesh, semanticSlotId, issues) {
+  if (!state || !mesh) return mesh;
+  const skin = skinBindingForTarget(project, state.node.id);
+  if (!skin) return endpointRigidMesh(project, state, keyArtId, mesh, semanticSlotId, issues);
+  const topology = (project.meshTopologies || []).find((entry) =>
+    entry.id === mesh.topologyId) || null;
+  return collectRigidIssues(issues, evaluateEndpointSkinMesh(project, {
+    targetNodeId: state.node.id,
+    keyArtId,
+    topology,
+    mesh,
+    targetWorldTransform: state.worldTransform,
+  }), semanticSlotId);
+}
+
+function endpointCorrectedMesh(project, keyArtId, semanticSlotId, mesh, issues) {
+  if (!mesh?.topologyId) return mesh;
+  const topology = (project.meshTopologies || []).find((entry) => entry.id === mesh.topologyId) || null;
+  const keyform = meshFormCorrectionForContext(project, {
+    topologyId: mesh.topologyId, keyArtId, semanticSlotId,
+  });
+  return collectRigidIssues(issues, evaluateMeshFormCorrection({
+    mesh, topology, keyform,
+  }), semanticSlotId);
+}
+
+function morphCorrectedMesh(project, topology, slot, fromKeyArtId, toKeyArtId,
+  geometryWeight, mesh, issues) {
+  const context = { topologyId: topology.id, semanticSlotId: slot.id };
+  const fromKeyform = meshFormCorrectionForContext(project, {
+    ...context, keyArtId: fromKeyArtId,
+  });
+  const toKeyform = meshFormCorrectionForContext(project, {
+    ...context, keyArtId: toKeyArtId,
+  });
+  return collectRigidIssues(issues, evaluateInterpolatedMeshFormCorrection({
+    mesh, topology, fromKeyform, toKeyform, geometryWeight,
+  }), slot.id);
 }
 
 function endpointWarpMesh(project, state, keyArtId, mesh, semanticSlotId, issues) {
@@ -331,7 +382,7 @@ function instance({
 }
 
 function endpointPartState(project, transition, part, slot, endpoint, fromKeyArt, toKeyArt,
-  warpIssues, rigidIssues) {
+  warpIssues, rigidIssues, correctionIssues) {
   const keyArt = endpoint === "from" ? fromKeyArt : toKeyArt;
   const mapping = semanticMappingFor(slot, keyArt.id);
   const state = memberState(project, keyArt, mapping);
@@ -343,7 +394,8 @@ function endpointPartState(project, transition, part, slot, endpoint, fromKeyArt
   let mesh = endpointWarpMesh(
     project, state, keyArt.id, keyformMesh(project, keyformId, state.node), slot.id, warpIssues,
   );
-  mesh = endpointRigidMesh(project, state, keyArt.id, mesh, slot.id, rigidIssues);
+  mesh = endpointBoneMesh(project, state, keyArt.id, mesh, slot.id, rigidIssues);
+  mesh = endpointCorrectedMesh(project, keyArt.id, slot.id, mesh, correctionIssues);
   return {
     semanticSlotId: slot.id,
     presence,
@@ -367,7 +419,7 @@ function endpointPartState(project, transition, part, slot, endpoint, fromKeyArt
 }
 
 function evaluateMorph(project, transition, part, slot, from, to, fromMesh, toMesh,
-  fromKeyArtId, toKeyArtId, sample, u, warpIssues, rigidIssues) {
+  fromKeyArtId, toKeyArtId, sample, u, warpIssues, rigidIssues, correctionIssues) {
   const geometryWeight = clamp(sampledValue(sample, "GeometryBlendTrack", "geometryWeight", slot.id) ?? u, 0, 1);
   const appearanceWeights = sampledValue(sample, "AppearanceTrack", "appearance", slot.id) ||
     endpointWeights(from, to, u);
@@ -386,15 +438,30 @@ function evaluateMorph(project, transition, part, slot, from, to, fromMesh, toMe
     project, from, to, fromKeyArtId, toKeyArtId, mesh, geometryWeight, transform,
     slot.id, warpIssues,
   );
-  mesh = collectRigidIssues(rigidIssues, evaluateMorphRigidBoneMesh(project, {
-    fromTargetNodeId: from.node.id,
-    toTargetNodeId: to.node.id,
-    fromKeyArtId,
-    toKeyArtId,
-    geometryWeight,
-    mesh,
-    targetWorldTransform: transform,
-  }), slot.id);
+  const hasSkin = skinBindingForTarget(project, from.node.id) ||
+    skinBindingForTarget(project, to.node.id);
+  mesh = collectRigidIssues(rigidIssues, hasSkin
+    ? evaluateMorphSkinMesh(project, {
+      fromTargetNodeId: from.node.id,
+      toTargetNodeId: to.node.id,
+      fromKeyArtId,
+      toKeyArtId,
+      geometryWeight,
+      topology,
+      mesh,
+      targetWorldTransform: transform,
+    })
+    : evaluateMorphRigidBoneMesh(project, {
+      fromTargetNodeId: from.node.id,
+      toTargetNodeId: to.node.id,
+      fromKeyArtId,
+      toKeyArtId,
+      geometryWeight,
+      mesh,
+      targetWorldTransform: transform,
+    }), slot.id);
+  mesh = morphCorrectedMesh(project, topology, slot, fromKeyArtId, toKeyArtId,
+    geometryWeight, mesh, correctionIssues);
   return {
     semanticSlotId: slot.id,
     presence,
@@ -412,20 +479,23 @@ function evaluateMorph(project, transition, part, slot, from, to, fromMesh, toMe
 }
 
 function sourceInstance(project, transition, part, slot, endpoint, state, keyArtId, mesh,
-  weight, sample, warpIssues, rigidIssues, compositeGroupId = null) {
+  weight, sample, warpIssues, rigidIssues, correctionIssues, compositeGroupId = null) {
   const opacityValue = sampledValue(sample, "OpacityTrack", "opacity", slot.id, state.node.id);
   const sourceWeight = compositeGroupId ? 1 : weight;
   const opacity = clamp(state.member.opacity * sourceWeight * (opacityValue ?? 1), 0, 1);
   const drawOrder = sampledValue(sample, "DrawOrderTrack", "drawOrder", slot.id, state.node.id) ?? state.member.drawOrder;
   const clipping = sampledClipping(project, sample, slot.id, state);
   const warpedMesh = endpointWarpMesh(project, state, keyArtId, mesh, slot.id, warpIssues);
-  const rigidMesh = endpointRigidMesh(
+  const boneMesh = endpointBoneMesh(
     project, state, keyArtId, warpedMesh, slot.id, rigidIssues,
+  );
+  const correctedMesh = endpointCorrectedMesh(
+    project, keyArtId, slot.id, boneMesh, correctionIssues,
   );
   return instance({
     id: transition.id + ":" + slot.id + ":" + endpoint,
     source: state,
-    mesh: rigidMesh,
+    mesh: correctedMesh,
     appearance: appearanceSamples({ [state.member.appearanceId]: 1 }, endpoint === "from" ? state : null, endpoint === "to" ? state : null, mesh, mesh),
     opacity,
     drawOrder,
@@ -437,7 +507,7 @@ function sourceInstance(project, transition, part, slot, endpoint, state, keyArt
 }
 
 function evaluateReplace(project, transition, part, slot, from, to, fromMesh, toMesh,
-  sample, u, warpIssues, rigidIssues) {
+  sample, u, warpIssues, rigidIssues, correctionIssues) {
   const authored = sampledValue(sample, "AppearanceTrack", "appearance", slot.id);
   const weights = normalizedWeights(authored || endpointWeights(from, to, u));
   const weightFor = (appearanceId) => weights.find((entry) => entry.appearanceId === appearanceId)?.weight ?? 0;
@@ -447,17 +517,17 @@ function evaluateReplace(project, transition, part, slot, from, to, fromMesh, to
   const toWeight = to ? weightFor(to.member.appearanceId) : 0;
   if (from && fromWeight > 0) renderInstances.push(sourceInstance(
     project, transition, part, slot, "from", from, transition.fromKeyArtId, fromMesh,
-    fromWeight, sample, warpIssues, rigidIssues, compositeGroupId));
+    fromWeight, sample, warpIssues, rigidIssues, correctionIssues, compositeGroupId));
   if (to && toWeight > 0) renderInstances.push(sourceInstance(
     project, transition, part, slot, "to", to, transition.toKeyArtId, toMesh,
-    toWeight, sample, warpIssues, rigidIssues, compositeGroupId));
+    toWeight, sample, warpIssues, rigidIssues, correctionIssues, compositeGroupId));
   const authoredPresence = sampledValue(sample, "PresenceTrack", "presence", slot.id);
   const presence = authoredPresence ?? (renderInstances.length ? "present" : "absent");
   return { semanticSlotId: slot.id, presence, renderInstances: presence === "present" ? renderInstances : [] };
 }
 
 function evaluateSingle(project, transition, part, slot, endpoint, state, keyArtId, mesh,
-  sample, opacity, presence, warpIssues, rigidIssues) {
+  sample, opacity, presence, warpIssues, rigidIssues, correctionIssues) {
   const authoredPresence = sampledValue(sample, "PresenceTrack", "presence", slot.id, state?.node.id);
   const resolvedPresence = authoredPresence ?? presence;
   if (!state || resolvedPresence !== "present") return { semanticSlotId: slot.id, presence: resolvedPresence, renderInstances: [] };
@@ -468,8 +538,11 @@ function evaluateSingle(project, transition, part, slot, endpoint, state, keyArt
   const warpedMesh = endpointWarpMesh(
     project, state, keyArtId, mesh, slot.id, warpIssues,
   );
-  const rigidMesh = endpointRigidMesh(
+  const boneMesh = endpointBoneMesh(
     project, state, keyArtId, warpedMesh, slot.id, rigidIssues,
+  );
+  const correctedMesh = endpointCorrectedMesh(
+    project, keyArtId, slot.id, boneMesh, correctionIssues,
   );
   return {
     semanticSlotId: slot.id,
@@ -477,7 +550,7 @@ function evaluateSingle(project, transition, part, slot, endpoint, state, keyArt
     renderInstances: [instance({
       id: transition.id + ":" + slot.id + ":" + part.mode,
       source: state,
-      mesh: rigidMesh,
+      mesh: correctedMesh,
       appearance: appearanceSamples({ [state.member.appearanceId]: 1 }, endpoint === "from" ? state : null, endpoint === "to" ? state : null, mesh, mesh),
       opacity: resolvedOpacity,
       drawOrder,
@@ -791,19 +864,20 @@ export function evaluateTransition(project, transitionId, timeTicks) {
   const evaluatedParts = [];
   const warpIssues = [];
   const rigidIssues = [];
+  const correctionIssues = [];
   for (const slot of slots) {
     const part = partBySlot.get(slot.id) || null;
     if (clampedTicks === 0) {
       evaluatedParts.push(endpointPartState(
         project, transition, part, slot, "from", fromKeyArt, toKeyArt,
-        warpIssues, rigidIssues,
+        warpIssues, rigidIssues, correctionIssues,
       ));
       continue;
     }
     if (clampedTicks === program.durationTicks) {
       evaluatedParts.push(endpointPartState(
         project, transition, part, slot, "to", fromKeyArt, toKeyArt,
-        warpIssues, rigidIssues,
+        warpIssues, rigidIssues, correctionIssues,
       ));
       continue;
     }
@@ -820,10 +894,11 @@ export function evaluateTransition(project, transitionId, timeTicks) {
     if (part.mode === "morph") evaluatedParts.push(evaluateMorph(
       project, transition, part, slot, from, to, fromMesh, toMesh,
       fromKeyArt.id, toKeyArt.id, sample, normalizedTime, warpIssues, rigidIssues,
+      correctionIssues,
     ));
     else if (part.mode === "replace") evaluatedParts.push(evaluateReplace(
       project, transition, part, slot, from, to, fromMesh, toMesh,
-      sample, normalizedTime, warpIssues, rigidIssues,
+      sample, normalizedTime, warpIssues, rigidIssues, correctionIssues,
     ));
     else if (part.mode === "hold") {
       const holdTo = part.configuration?.holdEndpoint === "to";
@@ -834,23 +909,26 @@ export function evaluateTransition(project, transitionId, timeTicks) {
         project, transition, part, slot, endpoint, state,
         endpoint === "to" ? toKeyArt.id : fromKeyArt.id, mesh, sample,
         state?.member.opacity ?? 0, state?.member.presence ?? "absent",
-        warpIssues, rigidIssues,
+        warpIssues, rigidIssues, correctionIssues,
       ));
     } else if (part.mode === "appear") {
       evaluatedParts.push(evaluateSingle(
         project, transition, part, slot, "to", to, toKeyArt.id, toMesh, sample,
         (to?.member.opacity ?? 0) * normalizedTime, "present", warpIssues, rigidIssues,
+        correctionIssues,
       ));
     } else if (part.mode === "disappear") {
       evaluatedParts.push(evaluateSingle(
         project, transition, part, slot, "from", from, fromKeyArt.id, fromMesh, sample,
         (from?.member.opacity ?? 0) * (1 - normalizedTime), "present", warpIssues, rigidIssues,
+        correctionIssues,
       ));
     } else if (part.mode === "occlusion") {
       const defaultPresence = normalizedTime < 0.5 ? from?.member.presence ?? "present" : "occluded";
       evaluatedParts.push(evaluateSingle(
         project, transition, part, slot, "from", from, fromKeyArt.id, fromMesh, sample,
         from?.member.opacity ?? 0, defaultPresence, warpIssues, rigidIssues,
+        correctionIssues,
       ));
     }
   }
@@ -881,6 +959,14 @@ export function evaluateTransition(project, transitionId, timeTicks) {
       entry.details,
     )),
     ...rigidIssues.map((entry) => diagnostic(
+      transition.id,
+      entry.code,
+      "error",
+      entry.semanticSlotId,
+      clampedTicks,
+      entry.details,
+    )),
+    ...correctionIssues.map((entry) => diagnostic(
       transition.id,
       entry.code,
       "error",

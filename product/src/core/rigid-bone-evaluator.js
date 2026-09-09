@@ -135,7 +135,9 @@ export function evaluateEndpointProjectedBoneFk(project, keyArtId, {
   }
 }
 
-function fkMorph(project, fromKeyArtId, toKeyArtId, geometryWeight) {
+export function evaluateMorphProjectedBoneFk(
+  project, fromKeyArtId, toKeyArtId, geometryWeight,
+) {
   try {
     return evaluateBoneFk(project, fromKeyArtId, {
       projectPoint: projectedWarpPoint(
@@ -237,6 +239,6 @@ export function evaluateMorphRigidBoneMesh(project, {
     mesh,
     targetWorldTransform,
     fromBinding,
-    fkMorph(project, fromKeyArtId, toKeyArtId, geometryWeight),
+    evaluateMorphProjectedBoneFk(project, fromKeyArtId, toKeyArtId, geometryWeight),
   );
 }
