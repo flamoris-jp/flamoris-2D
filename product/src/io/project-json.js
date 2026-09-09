@@ -111,6 +111,19 @@ export function createFl2dDocument(
       localDelta: cloneProject(keyform.localDelta),
     }));
   body.rig.rigidBoneBindings = [...body.rig.rigidBoneBindings].sort(byId);
+  body.rig.skinBindings = [...body.rig.skinBindings]
+    .sort(byId)
+    .map((binding) => ({
+      ...binding,
+      vertexWeights: [...binding.vertexWeights]
+        .sort((left, right) => left.vertexId < right.vertexId ? -1 :
+          left.vertexId > right.vertexId ? 1 : 0)
+        .map((entry) => ({
+          ...entry,
+          influences: [...entry.influences].sort((left, right) =>
+            left.boneId < right.boneId ? -1 : left.boneId > right.boneId ? 1 : 0),
+        })),
+    }));
   body.transitions = [...body.transitions].sort(byId).map((transition) => ({
     ...transition,
     partTransitions: [...transition.partTransitions].sort(byId),
@@ -232,6 +245,13 @@ export function migrateProjectSchema(value) {
       : { bones: [], bonePoseKeyforms: [], constraints: [] };
     project.rig.rigidBoneBindings = [];
     project.schemaVersion = 8;
+  }
+  if (project?.schemaVersion === 8) {
+    project.rig = project.rig && typeof project.rig === "object"
+      ? project.rig
+      : { rigidBoneBindings: [], constraints: [] };
+    project.rig.skinBindings = [];
+    project.schemaVersion = 9;
   }
   if (project?.schemaVersion !== PROJECT_SCHEMA_VERSION) {
     throw new ProjectFormatError(

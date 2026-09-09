@@ -21,6 +21,12 @@ import {
   rigidBoneBindingForTarget,
   rigidBoneBindingValidationResult,
 } from "../model/rigid-bone-binding-validation.js";
+import {
+  skinBindingForTarget,
+  skinBindingValidationResult,
+} from "../model/skin-binding-validation.js";
+import { evaluateLinearBlendSkinning } from "../core/linear-blend-skinning-evaluator.js";
+import { evaluateEndpointProjectedBoneFk } from "../core/rigid-bone-evaluator.js";
 
 function temporalProgram(project, programId) {
   const program = project.temporalPrograms.find((entry) => entry.id === programId);
@@ -290,6 +296,52 @@ export const projectQueries = {
   ),
   "bone.validate_rigid_bindings": (project) =>
     rigidBoneBindingValidationResult(project),
+  "skin.list_bindings": (project) => cloneProject(
+    [...project.rig.skinBindings]
+      .sort((left, right) => left.id.localeCompare(right.id)),
+  ),
+  "skin.get_binding": (project, input) => {
+    const binding = project.rig.skinBindings.find((entry) =>
+      entry.id === input.bindingId);
+    if (!binding) throw new Error(`Unknown SkinBinding ${input.bindingId}.`);
+    return cloneProject(binding);
+  },
+  "skin.get_binding_for_target": (project, input) => cloneProject(
+    skinBindingForTarget(project, input.targetNodeId),
+  ),
+  "skin.get_vertex_weights": (project, input) => {
+    const binding = project.rig.skinBindings.find((entry) =>
+      entry.id === input.bindingId);
+    if (!binding) throw new Error(`Unknown SkinBinding ${input.bindingId}.`);
+    return cloneProject(binding.vertexWeights.find((entry) =>
+      entry.vertexId === input.vertexId) || null);
+  },
+  "skin.validate": (project) => skinBindingValidationResult(project),
+  "skin.evaluate": (project, input) => {
+    const binding = project.rig.skinBindings.find((entry) =>
+      entry.id === input.bindingId);
+    if (!binding) throw new Error(`Unknown SkinBinding ${input.bindingId}.`);
+    if (!project.keyArts.some((entry) => entry.id === input.keyArtId)) {
+      throw new Error(`Unknown KeyArt ${input.keyArtId}.`);
+    }
+    const topology = project.meshTopologies.find((entry) =>
+      entry.id === binding.topologyId) || null;
+    const fk = evaluateEndpointProjectedBoneFk(project, input.keyArtId);
+    if (fk.diagnostics.length) {
+      return {
+        mesh: { positions: [...input.positions] },
+        diagnostics: cloneProject(fk.diagnostics),
+      };
+    }
+    const evaluated = evaluateLinearBlendSkinning({
+      mesh: { positions: input.positions },
+      topology,
+      binding,
+      bonePoses: fk.poses,
+      targetWorldTransform: worldTransformMatrix(project, binding.targetNodeId),
+    });
+    return cloneProject(evaluated);
+  },
   "scene.get_tree": (project, input = {}) =>
     treeNode(project, project.scene.rootId, input.includeHidden !== false),
   "scene.get_node": (project, input) => {

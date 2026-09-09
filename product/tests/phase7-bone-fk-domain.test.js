@@ -102,10 +102,11 @@ function createBoneCommand({
 
 test("new schema contains empty typed Bone collections", () => {
   const project = boneProject();
-  assert.equal(PROJECT_SCHEMA_VERSION, 8);
+  assert.equal(PROJECT_SCHEMA_VERSION, 9);
   assert.deepEqual(project.rig.bones, []);
   assert.deepEqual(project.rig.bonePoseKeyforms, []);
   assert.deepEqual(project.rig.rigidBoneBindings, []);
+  assert.deepEqual(project.rig.skinBindings, []);
   assert.deepEqual(validateProject(project), []);
 });
 
@@ -236,6 +237,7 @@ test("schema 6 migration initializes typed Bone state and preserves Phase 6 Warp
   assert.deepEqual(migrated.rig.bones, []);
   assert.deepEqual(migrated.rig.bonePoseKeyforms, []);
   assert.deepEqual(migrated.rig.rigidBoneBindings, []);
+  assert.deepEqual(migrated.rig.skinBindings, []);
   assert.deepEqual(migrated.rig.deformers, warpState.deformers);
   assert.deepEqual(migrated.rig.warpControlPoints, warpState.warpControlPoints);
   assert.deepEqual(migrated.rig.warpDeformerKeyforms, warpState.warpDeformerKeyforms);
