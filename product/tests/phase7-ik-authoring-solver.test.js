@@ -8,6 +8,10 @@ import { boneSceneTransform, createBone } from "../src/model/bone.js";
 import { createBoneRotationConstraint } from "../src/model/bone-rotation-constraint.js";
 import { createTwoBoneIkConstraint } from "../src/model/two-bone-ik-constraint.js";
 import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
+import {
+  createWarpDeformer,
+  defaultWarpKeyformControlPoints,
+} from "../src/model/warp-deformer.js";
 import { EditorSession } from "../src/commands/editor.js";
 import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
 
@@ -37,6 +41,30 @@ function fixture() {
 function closePoint(actual, expected) {
   assert.ok(Math.hypot(actual.x - expected.x, actual.y - expected.y) < 1e-9,
     `${JSON.stringify(actual)} != ${JSON.stringify(expected)}`);
+}
+
+function addShearedWarpAncestor(project) {
+  const rootId = project.scene.rootId;
+  const created = createWarpDeformer({
+    id: "warp", displayName: "Warp", parentNodeId: rootId,
+    columns: 2, rows: 2,
+    bounds: { left: 0, top: 0, right: 100, bottom: 100 },
+    controlPointIds: ["warp_tl", "warp_tr", "warp_bl", "warp_br"],
+  });
+  project.scene.nodes.warp = createSceneNode({ id: "warp", kind: "deformer",
+    displayName: "Warp", parentId: rootId });
+  project.scene.nodes.warp.children = ["root"];
+  project.scene.nodes[rootId].children = ["warp"];
+  project.scene.nodes.root.parentId = "warp";
+  project.rig.bones.find((bone) => bone.id === "root").parentNodeId = "warp";
+  project.rig.deformers.push(created.deformer);
+  project.rig.warpControlPoints.push(...created.controlPoints);
+  const points = defaultWarpKeyformControlPoints(created.deformer, created.controlPoints)
+    .map((point) => point.controlPointId === "warp_tr"
+      ? { ...point, y: point.y + 25 } : point);
+  project.rig.warpDeformerKeyforms.push({
+    deformerId: "warp", keyArtId: "key", controlPoints: points,
+  });
 }
 
 test("project IK solve outputs ordinary local pose deltas consumed by existing FK", () => {
@@ -73,6 +101,20 @@ test("headless IK solve Query is deterministic and history-free", () => {
   assert.deepEqual(first, second);
   assert.equal(session.undoStack.length, 0);
   assert.equal(session.isDirty, false);
+});
+
+test("IK rejects a sheared post-Warp projected frame instead of baking document angles", () => {
+  const project = fixture();
+  addShearedWarpAncestor(project);
+  const before = structuredClone(project.rig.bonePoseKeyforms);
+  const result = solveProjectTwoBoneIk(project, {
+    constraintId: "ik", keyArtId: "key", target: { x: 10, y: 10 },
+  });
+  assert.equal(result.solution, null);
+  assert.deepEqual(result.diagnostics.map((entry) => entry.code),
+    ["TWO_BONE_IK_PROJECTED_FRAME_INCOMPATIBLE"]);
+  assert.equal(result.diagnostics[0].details.boneId, "root");
+  assert.deepEqual(project.rig.bonePoseKeyforms, before);
 });
 
 test("project IK authoring solver reuses projected FK and analytic solver", async () => {
