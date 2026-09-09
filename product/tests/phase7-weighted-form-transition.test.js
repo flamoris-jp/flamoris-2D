@@ -202,6 +202,23 @@ test("incompatible Morph SkinBindings diagnose without guessing weights", () => 
     entry.code === "SKIN_TRANSITION_INCOMPATIBLE" && entry.severity === "error"));
 });
 
+test("incompatible Morph correction topology emits a deterministic diagnostic", () => {
+  const project = fixture({ correctionB: null });
+  project.meshTopologies.push({ id: "other", vertexIds: ["o1", "o2", "o3"],
+    indices: [0, 1, 2], vertexMetadata: {}, nextVertexSequence: 1 });
+  project.meshKeyforms.push({ id: "other_mesh", topologyId: "other", keyArtId: "key_b",
+    semanticSlotId: "slot", positions: [0, 0, 1, 0, 0, 1], uvs: [0, 0, 1, 0, 0, 1] });
+  project.meshFormCorrectionKeyforms.push(createMeshFormCorrectionKeyform({
+    id: "other_correction", topologyId: "other", keyArtId: "key_b",
+    semanticSlotId: "slot", vertexOffsets: [{ vertexId: "o1", x: 1, y: 1 }],
+  }));
+  const first = evaluateTransition(project, "transition", 50);
+  const second = evaluateTransition(project, "transition", 50);
+  assert.ok(first.diagnostics.some((entry) =>
+    entry.code === "MESH_FORM_CORRECTION_TRANSITION_INCOMPATIBLE"));
+  assert.deepEqual(first, second);
+});
+
 test("preview export and shared render plan preserve weighted form geometry parity", () => {
   const project = fixture();
   const preview = evaluateTransition(project, "transition", 50);

@@ -163,6 +163,22 @@ function morphCorrectedMesh(project, topology, slot, fromKeyArtId, toKeyArtId,
   const toKeyform = meshFormCorrectionForContext(project, {
     ...context, keyArtId: toKeyArtId,
   });
+  const incompatible = [fromKeyArtId, toKeyArtId].flatMap((keyArtId) =>
+    (project.meshFormCorrectionKeyforms || []).filter((entry) =>
+      entry.keyArtId === keyArtId && entry.semanticSlotId === slot.id &&
+      entry.topologyId !== topology.id));
+  if ((!fromKeyform || !toKeyform) && incompatible.length) {
+    issues.push({
+      code: "MESH_FORM_CORRECTION_TRANSITION_INCOMPATIBLE",
+      semanticSlotId: slot.id,
+      details: {
+        topologyId: topology.id,
+        correctionIds: incompatible.map((entry) => entry.id).sort(compareText),
+        reason: "Morph endpoint form correction uses an incompatible topology.",
+      },
+    });
+    return mesh;
+  }
   return collectRigidIssues(issues, evaluateInterpolatedMeshFormCorrection({
     mesh, topology, fromKeyform, toKeyform, geometryWeight,
   }), slot.id);
