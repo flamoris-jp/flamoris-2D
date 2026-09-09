@@ -33,6 +33,7 @@ src/model/transition-validation.js
 src/core/transforms.js
 src/core/bone-fk-evaluator.js
 src/core/rigid-bone-evaluator.js
+src/core/linear-blend-skinning-evaluator.js
 src/core/warp-deformer-evaluator.js
 src/core/temporal.js
 src/core/transition-evaluator.js

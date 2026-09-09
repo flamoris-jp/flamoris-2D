@@ -1,6 +1,6 @@
 export { commandSchemas } from "../commands/schemas.js";
 
-export const MCP_SCHEMA_VERSION = 11;
+export const MCP_SCHEMA_VERSION = 12;
 
 const nodeId = {
   type: "string",
@@ -23,6 +23,16 @@ export const querySchemas = {
     additionalProperties: false,
   },
   "skin.validate": emptyQuery(),
+  "skin.evaluate": {
+    type: "object",
+    required: ["bindingId", "keyArtId", "positions"],
+    properties: {
+      bindingId: nodeId,
+      keyArtId,
+      positions: { type: "array", items: { type: "number" } },
+    },
+    additionalProperties: false,
+  },
   "bone.list": emptyQuery(),
   "bone.get": idQuery("boneId", nodeId),
   "bone.get_keyform": {

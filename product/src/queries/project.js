@@ -25,6 +25,8 @@ import {
   skinBindingForTarget,
   skinBindingValidationResult,
 } from "../model/skin-binding-validation.js";
+import { evaluateLinearBlendSkinning } from "../core/linear-blend-skinning-evaluator.js";
+import { evaluateEndpointProjectedBoneFk } from "../core/rigid-bone-evaluator.js";
 
 function temporalProgram(project, programId) {
   const program = project.temporalPrograms.find((entry) => entry.id === programId);
@@ -315,6 +317,27 @@ export const projectQueries = {
       entry.vertexId === input.vertexId) || null);
   },
   "skin.validate": (project) => skinBindingValidationResult(project),
+  "skin.evaluate": (project, input) => {
+    const binding = project.rig.skinBindings.find((entry) =>
+      entry.id === input.bindingId);
+    if (!binding) throw new Error(`Unknown SkinBinding ${input.bindingId}.`);
+    if (!project.keyArts.some((entry) => entry.id === input.keyArtId)) {
+      throw new Error(`Unknown KeyArt ${input.keyArtId}.`);
+    }
+    const topology = project.meshTopologies.find((entry) =>
+      entry.id === binding.topologyId) || null;
+    const fk = evaluateEndpointProjectedBoneFk(project, input.keyArtId);
+    const evaluated = evaluateLinearBlendSkinning({
+      mesh: { positions: input.positions },
+      topology,
+      binding,
+      bonePoses: fk.poses,
+    });
+    return {
+      ...cloneProject(evaluated),
+      diagnostics: cloneProject([...fk.diagnostics, ...evaluated.diagnostics]),
+    };
+  },
   "scene.get_tree": (project, input = {}) =>
     treeNode(project, project.scene.rootId, input.includeHidden !== false),
   "scene.get_node": (project, input) => {
