@@ -4,6 +4,7 @@ import {
   multiplyAffine,
   transformPoint,
 } from "./transforms.js";
+import { constrainedBonePoseDelta } from "./bone-rotation-constraint-evaluator.js";
 
 const IDENTITY_AFFINE = Object.freeze([1, 0, 0, 1, 0, 0]);
 const TWO_PI = Math.PI * 2;
@@ -270,7 +271,9 @@ export function evaluateBoneFk(project, keyArtId, {
           { boneId: bone.id, keyArtId },
         );
       }
-      const delta = bone.enabled ? resolvedDelta : identityBonePoseDelta();
+      const delta = bone.enabled
+        ? constrainedBonePoseDelta(project, bone.id, resolvedDelta)
+        : identityBonePoseDelta();
       const deltaMatrix = localMatrix(delta);
       const pose = parentBoneId
         ? multiplyAffine(

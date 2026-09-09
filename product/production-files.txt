@@ -36,6 +36,7 @@ src/model/temporal-validation.js
 src/model/transition-validation.js
 src/core/transforms.js
 src/core/bone-fk-evaluator.js
+src/core/bone-rotation-constraint-evaluator.js
 src/core/bone-skin-matrix.js
 src/core/rigid-bone-evaluator.js
 src/core/linear-blend-skinning-evaluator.js
