@@ -1,6 +1,6 @@
 # Phase 8: Multi-Key-Art Animation and Clip Sequencing
 
-Status: proposed design for Issue #70
+Status: design reviewed against `main` at `710879fac1eed76ee87abf2c1b096a99ca609dd4`; ready for implementation review
 
 ## 1. Goal
 
@@ -57,6 +57,36 @@ Phase 8 must not add:
 - UI-only persistent animation data;
 - hidden AI-only animation state.
 
+### 2.1 Baseline evaluator seams verified by design review
+
+The merged Phase 6/7 implementation already evaluates each Transition render
+instance in this order:
+
+```text
+MeshKeyform / Transition interpolation
+-> create/evaluate Warp stages
+-> constrained Bone pose -> projected FK -> rigid attachment or Skinning
+-> MeshFormCorrectionKeyform
+-> node/world transform on the render instance
+-> resolveEvaluatedClipping
+-> evaluatedParts / compositeGroups
+-> SharedCompositionRenderer
+```
+
+The current evaluator reaches those stages through
+`transition-evaluator.js`, `warp-deformer-evaluator.js`,
+`bone-fk-evaluator.js`, `rigid-bone-evaluator.js`,
+`skin-mesh-evaluator.js`, and `mesh-form-correction-evaluator.js`.
+`evaluateBoneFk` already accepts a transient `poseForBone` provider, but the
+Transition wrappers do not yet thread a Phase 8 provider through. Warp cage
+construction likewise has no animation-control-point provider yet. These are
+shared-stage extension seams, not permission to create a Sequence-only Warp,
+Bone, Skinning, form, or Transition evaluator.
+
+The baseline `TemporalProgram` typed union already reserves TransformTrack,
+CameraTrack, and MeshDeformationTrack. BoneTrack and DeformerTrack are not yet
+production definitions and must be added to that same union in Phase 8-3.
+
 ## 3. Product concepts
 
 Phase 8 separates three concepts that were already anticipated by the earlier animation model:
@@ -67,18 +97,29 @@ MOTION = reusable time-varying delta
 SHOT   = when poses, transitions, and motions happen
 ```
 
-Persistent top-level concepts become:
+The Phase 8 persistent collection shape becomes:
 
 ```text
 Project
 ├── KeyArt[]
 ├── Transition[]
 ├── TemporalProgram[]
-├── AnimationClip[]
-└── Sequence[]
+├── animation
+│   ├── clips: AnimationClip[]
+│   └── deformationSamples: MeshDeformationSample[]
+└── sequences: Sequence[]
 ```
 
 `TemporalProgram` stays the one typed finite-time primitive shared by Transition, AnimationClip, and the Sequence's shot-level program.
+
+Schema 12's `animation` object (including `clips`, `tracks`, and `keyframes`)
+and singular `sequence` array are untyped future placeholders. They are not an
+alternate animation authority. Phase 8 retains the `animation.clips` collection
+name, adds `animation.deformationSamples` and typed `sequences`, and removes the
+obsolete parallel `animation.tracks`, `animation.keyframes`, and `sequence`
+fields. As with the earlier untyped Warp/Bone placeholders, migration resets
+untyped placeholder entries to empty collections instead of promoting them;
+schema 12 had no Phase 8 authoring or evaluation contract to preserve.
 
 ## 4. Sequence domain
 
@@ -98,7 +139,11 @@ Sequence
 
 The Sequence owns exactly one existing `TemporalProgram` through `temporalProgramId`.
 
-That program provides the Sequence duration and may contain shot-level tracks/events/regions, initially including CameraTrack. Sequence does not duplicate `durationTicks`.
+That program provides the Sequence duration and may initially contain one
+absolute CameraTrack plus shot-level events/regions. It does not contain
+ClipInstances or reusable character motion tracks; those remain in the
+Sequence and AnimationClip collections respectively. Sequence does not
+duplicate `durationTicks`.
 
 Ownership rules match Transition ownership:
 
@@ -106,6 +151,13 @@ Ownership rules match Transition ownership:
 - one TemporalProgram may not be multiply owned by Transition, AnimationClip, or Sequence;
 - ownership is explicit and validated;
 - creation/removal that affects both objects is transactional and one Undo/Redo unit.
+
+The existing Transition-only program-owner check must become one project-wide
+ownership check covering Transition, AnimationClip, and Sequence. Owner-aware
+validation also constrains legal track kinds/targets. In particular,
+`transitionDefault` remains valid only in a Transition-owned program,
+CameraTrack is valid only in a Sequence-owned program initially, and a
+Sequence program may not smuggle in clip motion or a second ViewLane.
 
 The Sequence's program duration defines the legal shot domain:
 
@@ -182,7 +234,23 @@ resolves the last ViewLane item at its authored terminal state.
 
 A KeyArtHold evaluates one existing KeyArt as the base visual state. It does not create a fake zero-duration Transition.
 
-The evaluator should share the same Key-Art base-state resolution helpers used by Transition rather than introducing a second Key-Art rendering model.
+The evaluator must extract/share the Key-Art base-state resolution used by the
+existing Transition evaluator rather than introducing a second Key-Art
+rendering model. The current Project does not store a canonical MeshKeyform ID
+on each KeyArt member, while a Transition's PartTransition does. Therefore the
+initial standalone hold rule is strict:
+
+- resolve members through confirmed SemanticSlot mappings, never names;
+- no compatible MeshKeyform for a present member uses the same bounds fallback
+  as an endpoint without an authored keyform;
+- exactly one compatible MeshKeyform for `(keyArtId, semanticSlotId)` uses that
+  keyform;
+- more than one candidate topology/keyform is structurally ambiguous and emits
+  `SEQUENCE_KEYART_BASE_AMBIGUOUS` rather than choosing by array order.
+
+This restriction may later be replaced by an explicit canonical KeyArt mesh
+binding, but no adjacency or display-name heuristic may silently become that
+authority.
 
 ### 5.4 TransitionInstance
 
@@ -192,10 +260,9 @@ Instance-local transition time is derived directly from placement:
 
 ```text
 localTransitionTick =
-  roundHalfUp(
-    (sequenceTick - startTicks)
-    * transitionDurationTicks
-    / (endTicks - startTicks)
+  roundHalfUpRatio(
+    (sequenceTick - startTicks) * transitionDurationTicks,
+    endTicks - startTicks
   )
 ```
 
@@ -208,11 +275,12 @@ sequenceTick == endTicks   -> transitionDurationTicks
 
 for terminal evaluation only. At an internal ViewLane boundary, the next item owns the Sequence tick and must be semantically compatible with the Transition endpoint.
 
-This gives deterministic per-instance retiming without persisting floating-point speed.
+This gives deterministic per-instance retiming without persisting floating-point speed. The multiplication/division uses exact integer arithmetic before the existing non-negative round-half-up rule; it must not pass through a JavaScript `Number` product that may exceed the safe integer range. `roundHalfUpRatio` denotes one shared temporal helper extracted from the existing `temporal.js` convention, not a Sequence-specific rounding implementation.
 
 ### 5.5 View continuity validation
 
-For adjacent ViewLane items, validate endpoint continuity where it can be known structurally.
+For adjacent ViewLane items, validate endpoint continuity structurally and at
+the existing evaluated endpoint boundary.
 
 Examples:
 
@@ -223,7 +291,16 @@ Transition(A,B) -> Transition(B,C)
 
 are valid.
 
-Mismatched chains diagnose before render-authority is claimed.
+Matching KeyArt IDs are necessary but not sufficient. The outgoing item's
+terminal base state and the incoming item's initial base state must resolve to
+compatible source-node/SemanticSlot membership, selected MeshTopology and
+MeshKeyform, Warp/Bone/form state, appearance, presence, draw order, and
+clipping intent. This catches, for example, two Transitions that both name
+KeyArt B but select different B MeshKeyforms. A mismatch emits
+`SEQUENCE_VIEW_ENDPOINT_INCOMPATIBLE` and the Sequence is non-authoritative.
+
+Mismatched chains diagnose before render-authority is claimed. Validation may
+reuse deterministic endpoint evaluation; it must not raster-compare pixels.
 
 No automatic name-based KeyArt matching is allowed.
 
@@ -288,6 +365,11 @@ Rules:
 - `layer` is an explicit integer priority for discrete override resolution;
 - canonical evaluation order never depends on array insertion order.
 
+Clip placement remains half-open even when `endTicks` equals Sequence
+duration. Terminal Sequence inspection resolves the last ViewLane endpoint and
+Sequence camera, but an instance ending there is inactive; no special terminal
+clip sample is invented.
+
 ## 8. Clip local-time projection
 
 For an active ClipInstance:
@@ -296,25 +378,50 @@ For an active ClipInstance:
 elapsed = sequenceTick - startTicks
 
 rawLocal = sourceOffsetTicks
-  + roundHalfUp(elapsed * rateNumerator / rateDenominator)
+  + roundHalfUpRatio(elapsed * rateNumerator, rateDenominator)
 ```
 
-No accumulated floating-point delta is allowed.
+The product and division use exact integer arithmetic before conversion back to
+a safe integer tick. No accumulated floating-point delta is allowed.
 
 ### 8.1 once
 
-For `loopMode = once`, the instance is valid only while its active placement maps to the clip program domain.
+For `loopMode = once`, `sourceOffsetTicks` is in
+`[0, clipDurationTicks]`. The instance is valid only while every active
+Sequence tick maps to the inclusive clip program domain.
 
-An instance whose authored range runs beyond the available clip source time is invalid rather than silently holding or wrapping.
+Because placement is half-open, the last active Sequence tick is
+`endTicks - 1`. Validation uses the exact bound:
+
+```text
+lastRawLocal = sourceOffsetTicks
+  + roundHalfUpRatio(
+      (endTicks - startTicks - 1) * rateNumerator,
+      rateDenominator
+    )
+
+lastRawLocal <= clipDurationTicks
+```
+
+An instance whose authored range violates that bound is invalid rather than
+silently holding or wrapping.
 
 Trimming shorter than the source clip is valid.
 
+`endTicks` is not an implicit Clip sample. Therefore a half-open one-shot
+instance does not promise to sample the source terminal key automatically. The
+terminal key remains directly inspectable through inclusive TemporalProgram
+sampling, and it is sampled by a Sequence instance only when an active mapped
+tick equals `clipDurationTicks`.
+
 ### 8.2 loop
 
-For `loopMode = loop`, repetition uses the clip program duration as the period:
+For `loopMode = loop`, `sourceOffsetTicks` uses the canonical range
+`[0, clipDurationTicks)`. Repetition uses the clip program duration as the
+period:
 
 ```text
-phase = rawLocal mod clipDurationTicks
+phase = euclideanModulo(rawLocal, clipDurationTicks)
 ```
 
 The repeating phase domain is:
@@ -327,9 +434,14 @@ Therefore an exact positive multiple of the clip duration maps to phase 0, not t
 
 This avoids duplicate seam samples.
 
-The terminal clip key at `clipDurationTicks` remains directly inspectable in clip editing and one-shot playback.
+The terminal clip key at `clipDurationTicks` remains directly inspectable in clip editing and may be sampled by a valid one-shot instance, but it is never sampled as a loop phase.
 
-A loop whose values differ materially between tick 0 and `durationTicks` may be legal but must surface a loop-seam diagnostic for affected continuous channels. Seam correction is never silently invented.
+A loop whose render-affecting channel values differ between tick 0 and
+`durationTicks` is legal but surfaces `ANIMATION_LOOP_ENDPOINT_MISMATCH`.
+Numeric channel comparison uses the explicit `1e-9` tolerance already used by
+temporal validation conventions; discrete/reference values use canonical deep
+equality. Events/regions are metadata and are not seam-compared. Seam
+correction is never silently invented.
 
 ## 9. Typed animation contribution model
 
@@ -339,7 +451,18 @@ The initial reusable-motion model intentionally prefers deltas over absolute ove
 
 This makes one Blink/Breath/HairSway clip usable across compatible Key Arts without rewriting their authored base pose.
 
-Continuous clip contributions are mixed in a deterministic canonical order such as `(layer, clipInstanceId, trackId, channel)` before numeric accumulation. The mathematical rules below are designed to be commutative where practical; canonical ordering additionally fixes floating-point accumulation order.
+Continuous clip contributions are mixed in ascending canonical
+`(layer, clipInstanceId, trackId, channel, targetStableId)` order before
+numeric accumulation. IDs are stable Project identities and track/keyframe IDs
+remain globally registered as in the existing validator. The mathematical
+rules below are designed to be commutative where practical; canonical ordering
+additionally fixes floating-point accumulation order.
+
+Track meaning is owner-aware but never inferred from UI context. For example,
+a Transition-owned OpacityTrack retains its existing absolute-opacity meaning,
+while an AnimationClip-owned OpacityTrack is validated/evaluated as an opacity
+multiplier around identity. Exclusive TemporalProgram ownership makes that
+scope unambiguous in persistent data.
 
 ## 10. TransformTrack
 
@@ -347,8 +470,7 @@ Initial general TransformTrack targets one stable Scene node in node-local space
 
 ```text
 TransformTrack
-├── targetNodeId
-├── coordinateSpace: node-local
+├── target: { nodeId, coordinateSpace: node-local }
 └── delta channels
     ├── positionX
     ├── positionY
@@ -380,6 +502,13 @@ rotation = baseRotation + sum(weighted deltas)
 scale    = baseScale * product(weighted factors)
 ```
 
+Transform contribution applies to the targeted Scene node before descendant
+world transforms are resolved. For Transition modes with two endpoint nodes,
+the evaluator resolves contributed endpoint world transforms and then reuses
+the existing endpoint-transform selection/interpolation rule. Applying one
+matrix to a completed render instance would lose parent/group semantics and is
+not allowed.
+
 Absolute Transform override tracks are deferred until production evidence requires them.
 
 ## 11. BoneTrack
@@ -388,14 +517,18 @@ BoneTrack targets one existing stable Bone ID and animates a delta relative to t
 
 ```text
 BoneTrack
-├── boneId
-└── localDelta channels
+├── target: { boneId }
+└── local-delta channels
     ├── x
     ├── y
     └── rotation
 ```
 
-The base pose is the already-authored Key-Art/Transition `BonePoseKeyform` result.
+The base pose is the already-authored Key-Art/Transition `BonePoseKeyform`
+result. For Morph it is the existing shortest-arc endpoint interpolation; for
+Hold/Appear/Disappear/Occlusion it is the selected endpoint; for Replace each
+endpoint render instance receives the same mixed clip delta over its own
+endpoint base pose.
 
 Phase 8 adds reusable clip motion on top:
 
@@ -416,6 +549,12 @@ mixed local pose
 
 BoneTrack does not persist IK targets and does not create runtime IK solver state. Existing analytic IK remains an authoring helper that bakes ordinary pose data.
 
+Implementation threads the mixed transient pose through the existing
+`evaluateBoneFk(..., { poseForBone })` seam and through the existing
+rigid/Skinning wrappers. It does not write BonePoseKeyform or clamp each clip
+before mixing. The single existing constraint clamp runs once on the final
+mixed local delta immediately before FK.
+
 Keyframe interpolation of a Bone rotation channel uses shortest-arc interpolation between authored keys. Clip-to-clip mixing adds the resulting local rotation deltas after sampling.
 
 ## 12. DeformerTrack
@@ -426,12 +565,13 @@ Initial conceptual target:
 
 ```text
 DeformerTrack
-├── deformerId
-├── controlPointId
+├── target: { deformerId, controlPointId }
 └── deltaX / deltaY channels
 ```
 
 Values are additive deltas in the Warp Deformer's authored local lattice space.
+For nested Warp, the delta is added to the child cage before that cage is
+projected through its parent Warp stages.
 
 Evaluation order:
 
@@ -442,6 +582,11 @@ Key-Art/Transition WarpDeformerKeyform
 ```
 
 Playback never rewrites WarpDeformerKeyform.
+
+The same transient overlaid cage must be used both for mesh deformation and
+for the existing post-Warp Bone bind-frame projection. Supplying the overlay to
+only one path would make skin matrices disagree with the warped mesh and is an
+evaluation error.
 
 If a target control point does not exist in the active compatible deformer state, evaluation diagnoses the incompatibility rather than guessing by array index or geometry proximity.
 
@@ -454,6 +599,7 @@ Initial persistent sample form:
 ```text
 MeshDeformationSample
 ├── id
+├── meshId
 ├── topologyId
 └── offsets[]
     ├── vertexId
@@ -461,7 +607,19 @@ MeshDeformationSample
     └── dy
 ```
 
-A MeshDeformationTrack references compatible samples and optional weights using stable vertex IDs only.
+A MeshDeformationTrack preserves the already-reserved typed target/value shape:
+`target: { meshId }` and a deformation value containing
+`{ deformationSampleId, weight }`. The referenced sample adds the required
+`topologyId` and sparse stable-vertex offsets. The active evaluated topology
+must equal the sample topology; array-index, position, and name matching are
+forbidden.
+
+For each referenced offset, the contribution is
+`offset * sampledDeformationWeight * clipInstanceWeight`. Multiple compatible
+contributions add in the canonical mixer order. Continuous interpolation may
+retain the existing rule that both endpoint values reference the same sample;
+changing `deformationSampleId` requires a step or a separately authored
+compatible typed morph contract.
 
 Phase 8 evaluation order is:
 
@@ -486,13 +644,17 @@ It lives in the Sequence-owned TemporalProgram and evaluates absolute 2D camera 
 
 ```text
 CameraTrack
+├── target: { cameraId: main }
 ├── positionX
 ├── positionY
 ├── rotation
 └── scale
 ```
 
-Only one authoritative CameraTrack set may resolve for one Sequence tick. Same-scope conflicting camera tracks are validation errors.
+Only one CameraTrack may exist in a Sequence-owned TemporalProgram. Same-scope
+conflicts are validation errors. Missing channels use the identity shot camera
+defaults `(positionX=0, positionY=0, rotation=0, scale=1)`; scale must be finite
+and greater than zero.
 
 Reusable camera clips and camera-layer mixing are deferred.
 
@@ -535,7 +697,7 @@ This order is compatibility-critical.
 ```text
 1. Validate Sequence references and tick
 2. Resolve active ViewLane item
-3. Resolve Key-Art/Transition semantic base state
+3. Resolve Key-Art/Transition semantic intent and unflattened rig base state
 4. Resolve active ClipInstances and deterministic local clip ticks
 5. Sample Sequence/Clip TemporalPrograms
 6. Mix typed animation contributions
@@ -550,8 +712,8 @@ This order is compatibility-critical.
 14. MeshDeformationTrack animation correction
 15. Base node transform + TransformTrack deltas
 16. Resolve node/world transforms
-17. Resolve opacity / appearance / presence / draw order
-18. Resolve clipping using final evaluated geometry/alpha
+17. Resolve opacity / appearance / presence / draw order and clip discrete intent
+18. Run the existing clipping resolver using final evaluated geometry/alpha
 19. Evaluate Sequence CameraTrack
 20. Emit ordinary EvaluatedFrame
 21. Shared renderer consumes EvaluatedFrame unchanged
@@ -562,6 +724,22 @@ Important implementation constraint:
 > Sequence evaluation must not take a fully flattened Transition render result and then invent post-hoc Bone/Warp semantics on top.
 
 The existing Transition evaluator remains the semantic authority for Key-Art correspondence, PartTransition mode, endpoint interpolation, appearance, presence, draw order, and clipping intent. Phase 8 may refactor shared evaluation stages so Sequence can insert reusable animation contributions at the correct existing Warp/Bone/Form/Transform boundaries, but it must not create a parallel Transition implementation.
+
+Required shared seams are explicit:
+
+| Existing stage | Phase 8 transient input | Required behavior |
+| --- | --- | --- |
+| KeyArt/Transition base | active ViewLane item | reuse correspondence, mode, endpoint, and appearance rules |
+| Warp stage creation | mixed control-point deltas | overlay before nested parent projection and reuse for mesh plus Bone-frame projection |
+| Bone pose resolution | mixed local Bone delta provider | one constraint clamp after mixing, then existing projected FK |
+| Skin/rigid wrappers | the same evaluated Bone poses | no Sequence-only skin path |
+| Form correction | existing Key-Art/Transition correction | apply first, then post-skin MeshDeformationTrack |
+| Scene transform resolution | mixed node-local Transform deltas | resolve ancestry before emitting final world transforms |
+| Clipping resolver | final parts plus mixed discrete clipping intent | resolve sourceRenderInstanceId only after all deformation/transforms |
+
+This refactor may introduce an internal, typed unflattened evaluation context,
+but that context is transient and shared by Transition and Sequence evaluation.
+It is not persisted and is not a second semantic model.
 
 ## 17. Deterministic mixer rules
 
@@ -584,7 +762,7 @@ Initial rules:
 | camera | Sequence-owned absolute state |
 | events | stable merge |
 
-For continuous contributions, `layer` does not suppress lower layers in the initial model. It participates in canonical sort order and remains available for future explicit override modes.
+For continuous contributions, `layer` does not suppress lower layers in the initial model. It participates in the ascending canonical accumulation order and remains available for future explicit override modes.
 
 No continuous `override` mode is added in initial Phase 8. Adding one later requires a typed persisted composition mode and migration review.
 
@@ -592,7 +770,12 @@ No continuous `override` mode is added in initial Phase 8. Adding one later requ
 
 Existing MotionEvent and MotionRegion remain metadata/semantic editing primitives.
 
-Sequence evaluation merges events from active programs in stable source order with explicit source identity.
+Sequence evaluation reports exact-tick events from active programs in stable
+`(sequenceTick, sourceScope, clipInstanceId, programId, eventId)` order with
+explicit source identity. `sourceScope` is the fixed literal order `sequence`
+then `clip`; Sequence events have no clipInstanceId. Playback side-effect/event
+dispatch across a time interval is separate from pure frame evaluation and may
+not mutate Project/history.
 
 Events do not directly mutate pixels.
 
@@ -691,6 +874,8 @@ SEQUENCE_INVALID_TIME
 SEQUENCE_VIEW_GAP
 SEQUENCE_VIEW_OVERLAP
 SEQUENCE_VIEW_CONTINUITY_MISMATCH
+SEQUENCE_KEYART_BASE_AMBIGUOUS
+SEQUENCE_VIEW_ENDPOINT_INCOMPATIBLE
 SEQUENCE_TRANSITION_REFERENCE_INVALID
 SEQUENCE_TRANSITION_ENDPOINT_MISMATCH
 
@@ -720,6 +905,10 @@ Rules:
 - DeformerTrack targets stable Deformer/control-point ID;
 - MeshDeformationTrack targets stable topology/vertex IDs;
 - old projects load with empty/default Sequence/AnimationClip collections;
+- schema 12's untyped `animation`/`sequence` placeholder entries are not
+  reinterpreted as Phase 8 authored state;
+- canonical serialization orders AnimationClips, Sequences, ViewLane items,
+  ClipInstances, deformation samples, and nested stable-ID entries explicitly;
 - migrations never synthesize authored motion from names or geometry heuristics;
 - Save/Open preserves evaluation-equivalent state.
 
@@ -741,6 +930,15 @@ planned frame tick
 
 The renderer remains Sequence/Clip/BoneTrack/DeformerTrack unaware.
 
+At the reviewed baseline, preview/export adapters and result properties are
+Transition-named (`evaluateTransitionExportFrame`, `evaluatedTransition`) even
+though the shared renderer consumes only `evaluatedParts`/`compositeGroups`.
+Phase 8 may generalize that adapter/envelope to an ordinary EvaluatedFrame, but
+the frame planner, render plan, offscreen renderer, PNG writer, and MP4
+source-frame path remain shared. Preview and every export format must call the
+same `sequence.evaluate` source-frame function; format-specific evaluators are
+not allowed.
+
 The same Project + Sequence + tick must produce equivalent EvaluatedFrame output before/after Save/Open and in preview/export paths.
 
 ## 24. Implementation split
@@ -750,6 +948,8 @@ The same Project + Sequence + tick must produce equivalent EvaluatedFrame output
 - Sequence + owned TemporalProgram;
 - KeyArtHold / TransitionInstance;
 - strict contiguous ViewLane validation;
+- deterministic standalone KeyArtHold resolution and ambiguity diagnostics;
+- evaluated endpoint compatibility validation between adjacent ViewLane items;
 - deterministic local Transition tick mapping;
 - Commands / Queries / persistence / migration / Undo-Redo;
 - headless base-state resolution.
@@ -812,13 +1012,13 @@ Cover at least:
 4. overlap rejection;
 5. deterministic ViewLane resolution independent of insertion order;
 6. A -> B -> C boundary continuity;
-7. TransitionInstance exact start/end local mapping;
+7. TransitionInstance exact rational local mapping and internal later-item boundary ownership;
 8. terminal Sequence tick behavior;
 9. AnimationClip stable identity and owned-program persistence;
 10. ClipInstance Save/Open and Undo/Redo;
 11. rational playback-rate mapping without accumulated drift;
 12. one-shot trimming;
-13. invalid one-shot source overrun rejection;
+13. one-shot last-active-tick bound and source-overrun rejection;
 14. loop exact-period wrap maps to phase zero;
 15. loop endpoint mismatch diagnostic;
 16. multiple active clip resolution independent of insertion order;
@@ -828,7 +1028,7 @@ Cover at least:
 20. Bone rotation constraints after clip mixing;
 21. DeformerTrack before Warp;
 22. MeshDeformationTrack after skin/form base correction;
-23. stable vertex/control-point identity after save/reload;
+23. stable vertex/control-point identity and topology compatibility after save/reload;
 24. opacity multiplicative composition;
 25. highest-layer discrete override;
 26. same-layer discrete conflict diagnostic;
@@ -841,7 +1041,9 @@ Cover at least:
 33. Preview / PNG evaluated-plan parity;
 34. Preview / MP4 source-frame parity;
 35. headless sequence evaluation without DOM;
-36. full existing Phase 1-7 regression suite remains green.
+36. standalone KeyArtHold ambiguity rejection;
+37. same-KeyArt/different-keyform ViewLane endpoint incompatibility rejection;
+38. full existing Phase 1-7 regression suite remains green.
 
 ## 26. Acceptance criteria
 
@@ -889,4 +1091,17 @@ Before Phase 8-1 implementation begins, this document and the general-animation 
 - post-skin mesh animation order;
 - renderer boundary.
 
-If an implementation discovers a contradiction with the actual Phase 6/7 merged architecture, update the design explicitly before inventing a compatibility-breaking behavior in code.
+The repository review resolved the previously open architecture questions:
+
+- Sequence duration authority is its exclusively owned TemporalProgram;
+- ViewLane and ClipInstance boundary rules are explicit and different where required;
+- Transition retiming and clip playback use exact rational projection;
+- Warp, Bone, form, transform, clipping, camera, and renderer stages have fixed insertion points;
+- canonical mixer order and same-layer discrete conflicts do not use insertion order;
+- schema 12 placeholders are not silently promoted into typed Phase 8 state;
+- renderer and Preview/PNG/MP4 source-frame parity remain downstream of one shared evaluation result.
+
+No unresolved architecture question remains for Phase 8-1. If implementation
+discovers a contradiction with the actual Phase 6/7 merged architecture,
+update this design explicitly before inventing a compatibility-breaking
+behavior in code.
