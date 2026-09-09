@@ -1,6 +1,6 @@
 # FLAMORIS 2D Animation Data Model
 
-Status: draft for Phase 2 design review
+Status: Phase 2 temporal foundation implemented; general animation contracts reconciled for Phase 8 design review
 
 ## 1. Purpose
 
@@ -16,7 +16,7 @@ SHOT   = when poses, transitions, and motions happen
 
 Internally, FLAMORIS 2D still needs deterministic typed data for transforms, mesh deformation, appearance, visibility, draw order, camera motion, events, and easing. The model below keeps those details editable and testable without exposing them as one large user-facing control surface.
 
-This model is intentionally introduced before the full timeline UI. Phase 2 needs enough temporal infrastructure to evaluate Key-Art transitions correctly. Phase 6 can then build reusable clips, timeline authoring, looping, mixing, and graph editing on the same primitives instead of replacing the project schema.
+This model was intentionally introduced before the full timeline UI. Phase 2 implemented the temporal infrastructure required by Key-Art transitions. Phase 6 then implemented clipping and Warp/Lattice Deformers, and Phase 7 implemented Bones/Skinning and post-skin form correction. Phase 8 builds reusable clips, multi-Key-Art sequencing, looping, retiming, and deterministic mixing on those same primitives. A graph editor remains deferred until the Phase 8 typed track semantics are proven in production.
 
 ## 2. Empirical basis
 
@@ -39,19 +39,16 @@ The generated reference data is research input only. Accepted suggestions must c
 ```text
 Project
 ├── KeyArt[]
-├── Transition[]
-│   └── TemporalProgram
+├── Transition[] -> temporalProgramId
+├── TemporalProgram[]
 ├── Rig
 ├── Animation
-│   ├── Clip[]
-│   │   └── TemporalProgram
-│   ├── PoseState[]
+│   ├── Clip[] -> temporalProgramId
 │   └── DeformationSample[]
-└── Sequence
-    ├── ViewLane
+└── Sequence[] -> temporalProgramId
+    ├── ViewLaneItem[]
     ├── ClipInstance[]
-    ├── ShotTrack[]
-    └── Marker/Event metadata
+    └── shot-level CameraTrack / Event / Region data in its TemporalProgram
 ```
 
 The critical architectural rule is:
@@ -74,7 +71,7 @@ Back3Q
 Back
 ```
 
-A `PoseState` is a lightweight reusable override that does not imply a new source drawing.
+A `PoseState` was an early conceptual name for a lightweight reusable override that does not imply a new source drawing.
 
 Examples:
 
@@ -85,7 +82,7 @@ LookLeft
 HandOpen
 ```
 
-Large viewpoint or silhouette changes belong in Key Arts. Small reusable form/expression changes may be Pose States.
+Large viewpoint or silhouette changes belong in Key Arts. Phase 8 represents small reusable form/expression motion through typed `AnimationClip` contributions over Key-Art-specific Warp, Bone, and form state; it does not add a separate persistent `PoseState` schema in the initial implementation.
 
 ## 5. Timebase
 
@@ -138,7 +135,7 @@ Required rules:
 
 ## 6. TemporalProgram
 
-`TemporalProgram` is the common finite-time container used by transitions and clips.
+`TemporalProgram` is the common finite-time container used by Transitions, AnimationClips, and Sequences.
 
 ```text
 TemporalProgram
@@ -148,11 +145,17 @@ TemporalProgram
 └── regions[]
 ```
 
-The owning object does not duplicate `durationTicks`. A `Transition` or
-future `AnimationClip` obtains its duration from `program.durationTicks`,
+The owning object does not duplicate `durationTicks`. A `Transition`,
+`AnimationClip`, or `Sequence` obtains its duration from `program.durationTicks`,
 which is the single source of truth. `durationTicks` must be a positive
 integer. Track keys and events must lie in `0..durationTicks`; regions use
 `0 <= startTicks <= endTicks <= durationTicks`.
+
+Ownership is by stable `temporalProgramId`. One TemporalProgram may have at
+most one owner across all three owner kinds. Project-wide ownership validation
+must centralize this rule rather than adding separate, potentially divergent
+Transition/Clip/Sequence checks. Creation and removal of an owner and its
+program are atomic transactions and one Undo/Redo unit.
 
 Example:
 
@@ -242,15 +245,20 @@ Transition default or one `semanticSlotId`; its scalar value is the endpoint
 geometry weight `0..1`. `ClippingTrack` is discrete and selects an explicit
 validated clipping state/reference.
 
-Phase 2 implements the Transition subset: GeometryBlend, Appearance, Opacity,
-Presence, DrawOrder, and Clipping. The Clipping track initially selects and
-evaluates endpoint clipping references only; mask authoring, mask morphing, and
-the clipping-aware render pass remain Phase 4. Transform and Camera may be
-serialized only when required by Transition evaluation; general animation
-authoring for those
-tracks, plus MeshDeformation/Bone/Deformer/Parameter, belongs to Phase 6 or its
-own later feature phase. Defining the union now does not put all track editors
-into Phase 2.
+Phase 2 implemented the Transition subset: GeometryBlend, Appearance, Opacity,
+Presence, DrawOrder, and Clipping, plus the shared sampling/validation core.
+Phase 6 implemented clipping rasterization and Warp/Lattice evaluation. Phase 7
+implemented Bone/FK/Skinning and MeshFormCorrectionKeyform evaluation without a
+general timeline. Phase 8 owns general Transform, Camera, MeshDeformation,
+Bone, and Deformer animation authoring and deterministic clip mixing. The
+existing typed union remains the extension point; Phase 8 adds missing typed
+definitions and owner-aware validation rather than a parallel clip schema.
+
+Program ownership constrains valid track families. Transition-owned programs
+retain Transition semantic tracks. AnimationClip-owned programs contain
+reusable motion contributions and may not use `transitionDefault` targets.
+Sequence-owned programs initially contain at most one absolute CameraTrack,
+plus events and regions; reusable camera mixing is not part of initial Phase 8.
 
 Two broad categories are sufficient conceptually:
 
@@ -298,7 +306,12 @@ Pivot is primarily Scene/Rig configuration and is not an ordinary animation chan
 
 Each channel is independently keyframed so a simple Y movement does not require redundant X/rotation/scale keys.
 
-Transform animation is evaluated on top of the appropriate Key-Art/rig base state according to the evaluation pipeline below.
+Phase 8 Transform values are node-local contributions: position and rotation
+are additive deltas and scale is a multiplicative factor around identity `1`.
+Clip weight scales position/rotation and exponentiates scale toward identity as
+specified by `docs/phase8-animation-sequencing.md`. Contributions are resolved
+through the Scene hierarchy before final render-instance world transforms are
+emitted; they are not multiplied onto already-flattened render output.
 
 ## 10. MeshDeformationTrack
 
@@ -320,6 +333,7 @@ Large arrays of full vertex positions should not be duplicated into every keyfra
 DeformationSample
 ├── id
 ├── meshId
+├── topologyId
 └── offsets[]
     ├── vertexId
     ├── dx
@@ -328,19 +342,23 @@ DeformationSample
 
 Vertices with zero displacement may be omitted.
 
-A mesh-deformation keyframe references a sample and optionally a weight:
+A mesh-deformation keyframe uses the already-reserved typed value and target:
 
 ```text
 MeshDeformationTrack
-├── targetMeshId
-└── keyframes[]
+├── target: { meshId }
+└── deformation keyframes[]
     ├── timeTicks
     ├── deformationSampleId
     ├── weight
     └── interpolationToNext
 ```
 
-The exact order between bone skinning, deformer output, transition geometry, and mesh animation correction is a compatibility-critical evaluation rule and must be covered by tests.
+The sample's `topologyId` must match the active evaluated topology. Offsets use
+stable `vertexId`, never array index. A missing or incompatible topology is a
+diagnostic rather than a geometry/name-based guess. The exact order is frozen:
+Transition geometry -> Warp -> constrained Bone/FK/Skinning ->
+MeshFormCorrectionKeyform -> MeshDeformationTrack -> node/world transform.
 
 ## 11. AppearanceTrack
 
@@ -440,7 +458,7 @@ CameraTrack
 
 This is sufficient for locked camera, pan, small rotation, and zoom. Parallax/depth/focus are future extensions.
 
-A locked camera is represented by the absence of changing camera keys, not by baking inverse camera motion into every character part.
+A locked camera is represented by the absence of changing camera keys, not by baking inverse camera motion into every character part. Initial Phase 8 CameraTrack is an absolute shot camera in the Sequence-owned TemporalProgram. AnimationClip-owned camera tracks and reusable camera mixing are out of scope.
 
 ## 15. MotionEvent
 
@@ -524,7 +542,7 @@ Reusable animation is represented as a clip containing a TemporalProgram.
 AnimationClip
 ├── id
 ├── displayName
-├── program
+├── temporalProgramId
 ├── defaultLoopMode
 └── metadata
 ```
@@ -540,7 +558,9 @@ LookLeft
 RaiseArm
 ```
 
-A clip definition is reusable. Timeline placement uses instances rather than duplicating the clip definition.
+A clip definition is reusable and owns exactly one existing TemporalProgram by
+stable ID. Timeline placement uses instances rather than duplicating the clip
+definition or its track/keyframe data.
 
 ## 18. ClipInstance
 
@@ -549,10 +569,12 @@ ClipInstance
 ├── id
 ├── clipId
 ├── startTicks
-├── speed
+├── endTicks
+├── sourceOffsetTicks
+├── playbackRate: { numerator, denominator }
 ├── weight
 ├── layer
-├── loop
+├── loopMode: once | loop
 └── enabled
 ```
 
@@ -565,7 +587,16 @@ Idle
 + HairSway
 ```
 
-The animation mixer resolves their contributions according to typed composition rules.
+Placement uses integer Sequence ticks and half-open `[startTicks, endTicks)`
+ranges. Playback rate is a positive reduced rational; local time is projected
+from absolute elapsed ticks with non-negative round-half-up and no accumulated
+floating-point delta. `once` source-range validation, loop modulo behavior, and
+the fact that an instance endpoint is not an implicit sample are defined
+normatively in `docs/phase8-animation-sequencing.md`.
+
+The animation mixer resolves overlapping instances according to typed
+composition rules and a canonical stable-ID order, never collection insertion
+order.
 
 ## 19. Composition rules
 
@@ -578,19 +609,24 @@ Initial composition semantics:
 | Scale | multiplicative |
 | Mesh offset | additive |
 | Bone/deformer delta | type-specific additive/weighted |
-| Opacity | multiplicative unless explicit override mode is selected |
-| Appearance | weighted blend |
-| Presence | discrete override by priority |
-| Draw order | discrete override by priority |
+| Opacity contribution | multiplicative |
+| Appearance | Transition-owned initially; reusable appearance mixing deferred |
+| Presence | highest-layer discrete override |
+| Draw order | highest-layer discrete override |
+| Clipping | highest-layer discrete override |
+| Camera | Sequence-owned absolute state |
 | Events | merge |
 
 Override conflicts are not resolved by accidental insertion order.
 
-Proposed priority rule:
+Initial priority rule:
 
-1. higher `layer` wins for discrete override tracks;
-2. same-layer incompatible overrides produce validation warning `ANIMATION_TRACK_CONFLICT`;
-3. deterministic tie-break metadata may be introduced only if necessary and must be explicit.
+1. disabled and zero-weight instances do not contribute;
+2. higher `layer` wins for discrete override tracks;
+3. same-layer identical discrete values are compatible;
+4. same-layer incompatible values produce a structured `ANIMATION_TRACK_CONFLICT` error and no winner is invented;
+5. an instance with an active discrete contribution has weight exactly `1`;
+6. continuous contributions accumulate in canonical `(layer, clipInstanceId, trackId, channel)` order to fix floating-point order.
 
 ## 20. Sequence model
 
@@ -598,13 +634,15 @@ Separate major visual state selection from ordinary motion layering.
 
 ```text
 Sequence
+├── id
+├── displayName
+├── temporalProgramId
 ├── ViewLane
 │   ├── KeyArtHold
 │   └── TransitionInstance
 ├── AnimationLayers
 │   └── ClipInstance[]
-├── ShotTrack[]
-└── Camera
+└── shot-level CameraTrack / Event / Region data in the owned TemporalProgram
 ```
 
 Example turn:
@@ -626,28 +664,36 @@ This lets a view transition select/reshape artwork while reusable motion adds se
 
 The evaluation core must return the same result for the same project state and time.
 
-Conceptual pipeline:
+Canonical Phase 8 pipeline:
 
 ```text
-1. Resolve Sequence/ViewLane at time t
-2. Evaluate active Key Art / Transition base state
-3. Evaluate clip/shot TemporalPrograms
-4. Mix node/bone/deformer animation
-5. Evaluate rig deformation
-6. Apply mesh animation/form corrections
-7. Resolve node/world transforms
-8. Resolve appearance and opacity
-9. Resolve presence, draw order, and clipping
-10. Evaluate camera transform
-11. Produce renderer-ready evaluated state
+1. Resolve Sequence/ViewLane and active ClipInstances at integer tick t
+2. Resolve the active Key-Art/Transition semantic base without flattening rig stages
+3. Sample the Sequence/Clip TemporalPrograms and mix typed contributions
+4. Resolve MeshKeyform base + Transition geometry
+5. Add DeformerTrack deltas to Key-Art/Transition Warp keyforms, then evaluate Warp
+6. Add BoneTrack deltas to Key-Art/Transition BonePoseKeyforms
+7. Apply existing rotation constraints, parent-first FK, rigid attachment/Skinning
+8. Apply Key-Art/Transition MeshFormCorrectionKeyform
+9. Apply post-skin MeshDeformationTrack offsets
+10. Resolve TransformTrack deltas through node/world transforms
+11. Resolve appearance, opacity, presence, and draw order
+12. Resolve clipping from final evaluated geometry/alpha
+13. Evaluate the Sequence-owned absolute camera
+14. Produce ordinary renderer-ready EvaluatedFrame
 ```
 
-The exact mathematical order is compatibility-critical. Once implemented and shipped, order changes require migration/version review.
+The exact mathematical order is compatibility-critical. The existing Phase 6/7
+Transition evaluator already performs Warp -> constrained Bone/FK/Skinning ->
+form correction -> world transform -> clipping. Phase 8 must expose typed
+inputs at those existing seams; it must not deform a completed render instance
+or create a parallel Transition evaluator. Once implemented and shipped, order
+changes require migration/version review.
 
 Recommended headless query boundary:
 
 ```text
-evaluateFrame(project, timeTicks)
+sequence.evaluate(project, sequenceId, timeTicks)
 ```
 
 The renderer consumes evaluated state rather than reinterpreting authored transition/animation semantics independently.
@@ -788,17 +834,25 @@ Out of scope for Phase 2:
 - production bone animation UI
 - Runway/motion-analyzer integration
 
-### Phase 6: build general Animation on the same primitives
+### Phase 8: build general Animation and sequencing on the same primitives
 
 Add:
 
 - clip authoring and instances
+- Sequence-owned TemporalProgram and contiguous KeyArtHold/TransitionInstance ViewLane
 - timeline layers/mixer
 - reusable animation library
 - looping/retiming UI
-- graph editor after data model stability
-- pose/form state authoring
+- Transform/Bone/Deformer/post-skin mesh contribution authoring
 - normal rig animation combined with Key-Art transitions
+- absolute Sequence camera and existing preview/PNG/MP4 source-frame parity
+
+Deferred beyond initial Phase 8:
+
+- graph editor until typed track semantics are stable in production
+- parallel PoseState schema
+- reusable camera clip mixing
+- runtime IK/physics/AI motion generation
 
 ## 27. Initial acceptance criteria
 
@@ -806,7 +860,7 @@ The temporal data model is ready for Phase 2 implementation when tests can prove
 
 1. integer-tick times serialize/reload exactly;
 2. step, linear, and Bezier sampling is deterministic;
-3. a Transition and AnimationClip can both own a `TemporalProgram` without schema duplication;
+3. a Transition, AnimationClip, and Sequence can each exclusively own a `TemporalProgram` without schema duplication or cross-owner sharing;
 4. Transition tracks for geometry blend, appearance, opacity, presence, draw
    order, and clipping are typed and validated; future track kinds cannot be
    smuggled in through arbitrary property paths;
