@@ -6,6 +6,8 @@ import { createTwoBoneIkConstraint } from "../src/model/two-bone-ik-constraint.j
 import { createIdFactory, createProject, createSceneNode, PROJECT_SCHEMA_VERSION } from "../src/model/project.js";
 import { validateProject } from "../src/model/validation.js";
 import { deserializeProject, migrateProjectSchema, serializeProject } from "../src/io/project-json.js";
+import { EditorSession } from "../src/commands/editor.js";
+import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
 
 function addBone(project, id, parentNodeId, x, length) {
   project.scene.nodes[id] = createSceneNode({ id, kind: "bone", displayName: id,
@@ -80,4 +82,49 @@ test("IK settings Save/Open canonically and schema 11 migration preserves constr
   assert.equal(migrated.schemaVersion, 12);
   assert.deepEqual(migrated.rig.twoBoneIkConstraints, []);
   assert.deepEqual(migrated.rig.boneRotationConstraints, limits);
+});
+
+test("two-bone IK Commands Queries and Undo Redo preserve exact state", () => {
+  const session = new EditorSession(fixture());
+  const adapter = new HeadlessProductAdapter(session);
+  adapter.execute({ type: "bone.create_two_bone_ik", payload: { constraint: chain() } });
+  assert.equal(adapter.query("bone.get_two_bone_ik", { constraintId: "ik" }).endBoneId, "end");
+  assert.equal(adapter.query("bone.validate_two_bone_ik", {}).valid, true);
+  adapter.execute({ type: "bone.set_two_bone_ik_bend_direction", payload: {
+    constraintId: "ik", bendDirection: "clockwise",
+  } });
+  adapter.execute({ type: "bone.set_two_bone_ik_enabled", payload: {
+    constraintId: "ik", enabled: false,
+  } });
+  const exact = structuredClone(session.project.rig.twoBoneIkConstraints);
+  session.undo();
+  session.redo();
+  assert.deepEqual(session.project.rig.twoBoneIkConstraints, exact);
+  adapter.execute({ type: "bone.remove_two_bone_ik", payload: { constraintId: "ik" } });
+  assert.deepEqual(adapter.query("bone.list_two_bone_ik", {}), []);
+  session.undo();
+  assert.deepEqual(session.project.rig.twoBoneIkConstraints, exact);
+});
+
+test("IK root mid end deletion rest edit and reparent are locked", () => {
+  for (const boneId of ["root", "mid", "end"]) {
+    const project = fixture();
+    project.rig.twoBoneIkConstraints.push(chain());
+    const session = new EditorSession(project);
+    if (boneId === "end") assert.throws(() => session.execute({
+      type: "bone.remove", payload: { boneId },
+    }), { code: "bone.rest_locked_by_two_bone_ik" });
+    assert.throws(() => session.execute({ type: "bone.set_rest", payload: {
+      boneId, restLocalTransform: structuredClone(
+        project.rig.bones.find((entry) => entry.id === boneId).restLocalTransform),
+      length: project.rig.bones.find((entry) => entry.id === boneId).length,
+    } }), { code: "bone.rest_locked_by_two_bone_ik" });
+    assert.equal(session.undoStack.length, 0);
+  }
+  const project = fixture();
+  project.rig.twoBoneIkConstraints.push(chain());
+  const session = new EditorSession(project);
+  assert.throws(() => session.execute({ type: "bone.reparent", payload: {
+    boneId: "mid", parentNodeId: project.scene.rootId,
+  } }), { code: "bone.rest_locked_by_two_bone_ik" });
 });

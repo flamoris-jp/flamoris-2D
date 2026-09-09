@@ -36,6 +36,7 @@ import {
   boneRotationConstraintValidationResult,
   rotationConstraintForBone,
 } from "../model/bone-rotation-constraint-validation.js";
+import { twoBoneIkValidationResult } from "../model/two-bone-ik-validation.js";
 
 function temporalProgram(project, programId) {
   const program = project.temporalPrograms.find((entry) => entry.id === programId);
@@ -222,6 +223,7 @@ export const projectQueries = {
       rigidBoneBindings: project.rig.rigidBoneBindings.length,
       skinBindings: project.rig.skinBindings.length,
       boneRotationConstraints: project.rig.boneRotationConstraints.length,
+      twoBoneIkConstraints: project.rig.twoBoneIkConstraints.length,
       transitions: project.transitions.length,
       clips: project.animation.clips.length,
       temporalPrograms: project.temporalPrograms.length,
@@ -308,6 +310,17 @@ export const projectQueries = {
   ),
   "bone.validate_rotation_constraints": (project) =>
     boneRotationConstraintValidationResult(project),
+  "bone.list_two_bone_ik": (project) => cloneProject(
+    [...project.rig.twoBoneIkConstraints].sort((left, right) =>
+      left.id.localeCompare(right.id)),
+  ),
+  "bone.get_two_bone_ik": (project, input) => {
+    const value = project.rig.twoBoneIkConstraints.find((entry) =>
+      entry.id === input.constraintId);
+    if (!value) throw new Error(`Unknown TwoBoneIkConstraint ${input.constraintId}.`);
+    return cloneProject(value);
+  },
+  "bone.validate_two_bone_ik": (project) => twoBoneIkValidationResult(project),
   "bone.list_rigid_bindings": (project) => cloneProject(
     [...project.rig.rigidBoneBindings]
       .sort((left, right) => left.id.localeCompare(right.id)),

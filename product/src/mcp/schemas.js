@@ -13,6 +13,9 @@ const keyArtId = { ...nodeId };
 const semanticSlotId = { ...nodeId };
 
 export const querySchemas = {
+  "bone.list_two_bone_ik": emptyQuery(),
+  "bone.get_two_bone_ik": idQuery("constraintId", nodeId),
+  "bone.validate_two_bone_ik": emptyQuery(),
   "bone.list_rotation_constraints": emptyQuery(),
   "bone.get_rotation_constraint": idQuery("constraintId", nodeId),
   "bone.get_rotation_constraint_for_bone": idQuery("boneId", nodeId),

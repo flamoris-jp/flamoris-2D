@@ -47,6 +47,19 @@ const boneRotationConstraint = {
   },
   additionalProperties: false,
 };
+const twoBoneIkConstraint = {
+  type: "object",
+  required: ["id", "rootBoneId", "midBoneId", "endBoneId", "enabled", "bendDirection"],
+  properties: {
+    id: nonEmptyString,
+    rootBoneId: nodeId,
+    midBoneId: nodeId,
+    endBoneId: nodeId,
+    enabled: { type: "boolean" },
+    bendDirection: { type: "string", enum: ["clockwise", "counterclockwise"] },
+  },
+  additionalProperties: false,
+};
 const skinInfluence = {
   type: "object",
   required: ["boneId", "weight"],
@@ -137,6 +150,31 @@ const transform = {
 };
 
 export const commandSchemas = {
+  "bone.create_two_bone_ik": {
+    type: "object",
+    required: ["constraint"],
+    properties: { constraint: twoBoneIkConstraint },
+    additionalProperties: false,
+  },
+  "bone.remove_two_bone_ik": {
+    type: "object",
+    required: ["constraintId"],
+    properties: { constraintId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "bone.set_two_bone_ik_enabled": {
+    type: "object",
+    required: ["constraintId", "enabled"],
+    properties: { constraintId: nonEmptyString, enabled: { type: "boolean" } },
+    additionalProperties: false,
+  },
+  "bone.set_two_bone_ik_bend_direction": {
+    type: "object",
+    required: ["constraintId", "bendDirection"],
+    properties: { constraintId: nonEmptyString,
+      bendDirection: { type: "string", enum: ["clockwise", "counterclockwise"] } },
+    additionalProperties: false,
+  },
   "bone.create_rotation_constraint": {
     type: "object",
     required: ["constraint"],
@@ -791,6 +829,18 @@ function entityRestoreSchema() {
 }
 
 const internalCommandSchemas = {
+  "bone.remove_two_bone_ik_internal": {
+    type: "object",
+    required: ["constraintId"],
+    properties: { constraintId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "bone.restore_two_bone_ik": {
+    type: "object",
+    required: ["constraint", "index"],
+    properties: { constraint: twoBoneIkConstraint, index: nonNegativeInteger },
+    additionalProperties: false,
+  },
   "bone.remove_rotation_constraint_internal": {
     type: "object",
     required: ["constraintId"],

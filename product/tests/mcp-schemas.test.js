@@ -52,4 +52,8 @@ test("MCP schema module imports with wired query and command schemas", () => {
     .properties.constraint.properties.minRotation.type, "number");
   assert.equal(querySchemas["bone.get_rotation_constraint_for_bone"]
     .properties.boneId.type, "string");
+  assert.deepEqual(commandSchemas["bone.create_two_bone_ik"]
+    .properties.constraint.properties.bendDirection.enum,
+  ["clockwise", "counterclockwise"]);
+  assert.equal(querySchemas["bone.get_two_bone_ik"].properties.constraintId.type, "string");
 });
