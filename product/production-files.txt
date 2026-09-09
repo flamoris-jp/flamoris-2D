@@ -40,6 +40,7 @@ src/core/transforms.js
 src/core/bone-fk-evaluator.js
 src/core/bone-rotation-constraint-evaluator.js
 src/core/two-bone-ik-solver.js
+src/core/two-bone-ik-authoring-solver.js
 src/core/bone-skin-matrix.js
 src/core/rigid-bone-evaluator.js
 src/core/linear-blend-skinning-evaluator.js

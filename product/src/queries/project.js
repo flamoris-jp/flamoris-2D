@@ -37,6 +37,10 @@ import {
   rotationConstraintForBone,
 } from "../model/bone-rotation-constraint-validation.js";
 import { twoBoneIkValidationResult } from "../model/two-bone-ik-validation.js";
+import {
+  projectTwoBoneIkChain,
+  solveProjectTwoBoneIk,
+} from "../core/two-bone-ik-authoring-solver.js";
 
 function temporalProgram(project, programId) {
   const program = project.temporalPrograms.find((entry) => entry.id === programId);
@@ -321,6 +325,13 @@ export const projectQueries = {
     return cloneProject(value);
   },
   "bone.validate_two_bone_ik": (project) => twoBoneIkValidationResult(project),
+  "bone.get_two_bone_ik_pose": (project, input) => {
+    const result = projectTwoBoneIkChain(project, input.constraintId, input.keyArtId);
+    return cloneProject(result);
+  },
+  "bone.solve_two_bone_ik": (project, input) => cloneProject(
+    solveProjectTwoBoneIk(project, input),
+  ),
   "bone.list_rigid_bindings": (project) => cloneProject(
     [...project.rig.rigidBoneBindings]
       .sort((left, right) => left.id.localeCompare(right.id)),

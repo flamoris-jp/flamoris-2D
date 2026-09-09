@@ -182,7 +182,7 @@ export function bonePoseDeltaForKeyArt(project, boneId, keyArtId) {
     : identityBonePoseDelta();
 }
 
-function shortestAngleDelta(from, to) {
+export function shortestBoneRotationDelta(from, to) {
   let delta = (to - from) % TWO_PI;
   if (delta > Math.PI) delta -= TWO_PI;
   if (delta < -Math.PI) delta += TWO_PI;
@@ -202,7 +202,7 @@ export function interpolateBonePoseDeltas(from, to, amount) {
   return {
     x: from.x + (to.x - from.x) * amount,
     y: from.y + (to.y - from.y) * amount,
-    rotation: from.rotation + shortestAngleDelta(from.rotation, to.rotation) * amount,
+    rotation: from.rotation + shortestBoneRotationDelta(from.rotation, to.rotation) * amount,
   };
 }
 

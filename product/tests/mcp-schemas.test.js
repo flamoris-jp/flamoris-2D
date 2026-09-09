@@ -56,4 +56,6 @@ test("MCP schema module imports with wired query and command schemas", () => {
     .properties.constraint.properties.bendDirection.enum,
   ["clockwise", "counterclockwise"]);
   assert.equal(querySchemas["bone.get_two_bone_ik"].properties.constraintId.type, "string");
+  assert.equal(querySchemas["bone.solve_two_bone_ik"].properties.target.properties.x.type,
+    "number");
 });
