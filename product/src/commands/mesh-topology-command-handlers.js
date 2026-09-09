@@ -1,4 +1,5 @@
 import { cloneProject } from "../model/project.js";
+import { skinBindingsReferencingTopology } from "../model/skin-binding-validation.js";
 import { CommandError } from "./errors.js";
 
 const TRIANGLE_AREA_EPSILON = 2e-4;
@@ -34,6 +35,16 @@ function keyformFor(project, keyformId) {
 
 function keyformsFor(project, topologyId) {
   return project.meshKeyforms.filter((entry) => entry.topologyId === topologyId);
+}
+
+function assertNoSkinBinding(project, topologyId) {
+  const binding = skinBindingsReferencingTopology(project, topologyId)[0];
+  if (!binding) return;
+  throw new CommandError(
+    "Remove dependent SkinBindings before changing stable topology vertices.",
+    "MESH_TOPOLOGY_LOCKED_BY_SKIN_BINDING",
+    { topologyId, bindingId: binding.id, targetNodeId: binding.targetNodeId },
+  );
 }
 
 function vertexIndex(topology, vertexId) {
@@ -249,6 +260,7 @@ export const meshTopologyCommandHandlers = {
 
   "mesh_topology.add_vertex": (project, payload) => {
     const topology = topologyFor(project, payload.topologyId);
+    assertNoSkinBinding(project, topology.id);
     assertNewVertexId(project, topology, payload.vertexId);
     assertFinitePoint(payload.position, "Position");
     assertFinitePoint(payload.uv, "UV");
@@ -277,6 +289,7 @@ export const meshTopologyCommandHandlers = {
 
   "mesh_topology.remove_vertex": (project, payload) => {
     const topology = topologyFor(project, payload.topologyId);
+    assertNoSkinBinding(project, topology.id);
     const removedIndex = vertexIndex(topology, payload.vertexId);
     if (topology.vertexIds.length <= 3) {
       throw new CommandError("Removing this vertex would leave fewer than three vertices.",
@@ -336,6 +349,7 @@ export const meshTopologyCommandHandlers = {
 
   "mesh_topology.subdivide_edge": (project, payload) => {
     const topology = topologyFor(project, payload.topologyId);
+    assertNoSkinBinding(project, topology.id);
     if (payload.vertexIds.length !== 2 || new Set(payload.vertexIds).size !== 2) {
       throw new CommandError("Edge subdivision requires two distinct stable vertex IDs.",
         "MESH_TOPOLOGY_EDGE_INVALID");
@@ -392,6 +406,7 @@ export const meshTopologyCommandHandlers = {
 
   "mesh_topology.apply_generated_mesh": (project, payload) => {
     const topology = topologyFor(project, payload.topologyId);
+    assertNoSkinBinding(project, topology.id);
     assertGeneratedMesh(project, topology, payload);
     const inverse = snapshotInverse(project, topology);
     const keyforms = keyformsFor(project, topology.id);

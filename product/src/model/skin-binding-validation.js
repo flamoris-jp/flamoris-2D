@@ -68,6 +68,20 @@ export function skinBindingForTarget(project, targetNodeId) {
     .sort((left, right) => compareText(left.id, right.id))[0] || null;
 }
 
+export function skinBindingsReferencingTopology(project, topologyId) {
+  return [...(project.rig?.skinBindings || [])]
+    .filter((binding) => binding?.topologyId === topologyId)
+    .sort((left, right) => compareText(left.id, right.id));
+}
+
+export function skinBindingsReferencingBones(project, boneIds) {
+  const requested = new Set(boneIds);
+  return [...(project.rig?.skinBindings || [])]
+    .filter((binding) => (binding?.vertexWeights || []).some((entry) =>
+      (entry?.influences || []).some((influence) => requested.has(influence?.boneId))))
+    .sort((left, right) => compareText(left.id, right.id));
+}
+
 export function validateSkinBindings(project, register = () => {}) {
   const bindings = project.rig?.skinBindings;
   if (!Array.isArray(bindings)) {

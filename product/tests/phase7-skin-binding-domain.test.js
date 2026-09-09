@@ -399,3 +399,72 @@ test("enabling an incomplete SkinBinding is rejected without persistent mutation
   assert.deepEqual(session.project, before);
   assert.equal(session.undoStack.length, 0);
 });
+
+test("stable vertex deletion and replacement are locked while SkinBinding exists", () => {
+  const session = new EditorSession(fixture().project);
+  const before = structuredClone(session.project);
+  assert.throws(() => session.execute({
+    type: "mesh_topology.remove_vertex",
+    payload: { topologyId: "topology", vertexId: "v1" },
+  }), { code: "MESH_TOPOLOGY_LOCKED_BY_SKIN_BINDING" });
+
+  const replacement = structuredClone(session.project.meshTopologies[0]);
+  replacement.vertexIds = ["v1", "v2", "replacement"];
+  assert.throws(() => session.execute({
+    type: "mesh_topology.update",
+    payload: { topologyId: "topology", topology: replacement },
+  }), { code: "MESH_TOPOLOGY_LOCKED_BY_SKIN_BINDING" });
+  assert.deepEqual(session.project, before);
+  assert.equal(session.undoStack.length, 0);
+});
+
+test("disabled SkinBinding still protects stable topology identity", () => {
+  const project = fixture().project;
+  project.rig.skinBindings[0].enabled = false;
+  const session = new EditorSession(project);
+  assert.throws(() => session.execute({
+    type: "mesh_topology.add_vertex",
+    payload: {
+      topologyId: "topology",
+      vertexId: "v4",
+      position: { x: 10, y: 10 },
+      uv: { x: 1, y: 1 },
+    },
+  }), { code: "MESH_TOPOLOGY_LOCKED_BY_SKIN_BINDING" });
+});
+
+test("topology removal is rejected while persistent skin weights reference it", () => {
+  const session = new EditorSession(fixture().project);
+  const before = structuredClone(session.project);
+  assert.throws(() => session.execute({
+    type: "mesh_topology.remove",
+    payload: { topologyId: "topology" },
+  }), { code: "MESH_TOPOLOGY_LOCKED_BY_SKIN_BINDING" });
+  assert.deepEqual(session.project, before);
+});
+
+test("Bone removal is rejected while a SkinBinding influence references it", () => {
+  const session = new EditorSession(fixture().project);
+  const before = structuredClone(session.project);
+  assert.throws(() => session.execute({
+    type: "bone.remove",
+    payload: { boneId: "bone_a" },
+  }), { code: "bone.rest_locked_by_skin_bindings" });
+  assert.deepEqual(session.project, before);
+});
+
+test("target removal cannot commit a dangling SkinBinding", () => {
+  const session = new EditorSession(fixture().project);
+  const before = structuredClone(session.project);
+  const reimported = structuredClone(session.project);
+  delete reimported.scene.nodes.part;
+  reimported.scene.nodes[reimported.scene.rootId].children =
+    reimported.scene.nodes[reimported.scene.rootId].children.filter((id) => id !== "part");
+  assert.throws(() => session.execute({
+    type: "source.apply_psd_reimport",
+    payload: { project: reimported },
+  }), (error) => error.code === "command.payload_invalid" &&
+    error.details?.issues?.some((entry) =>
+      entry.path.includes("rig.skinBindings.0.targetNodeId")));
+  assert.deepEqual(session.project, before);
+});

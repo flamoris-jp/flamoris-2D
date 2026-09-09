@@ -7,6 +7,7 @@ import {
   createBone,
   createBonePoseKeyform,
 } from "../model/bone.js";
+import { skinBindingsReferencingBones } from "../model/skin-binding-validation.js";
 import { CommandError } from "./errors.js";
 
 function collection(project, name) {
@@ -85,6 +86,19 @@ function assertNoDependents(project, boneIds) {
       "Remove dependent rigid bindings before changing Bone rest hierarchy.",
       "bone.rest_locked_by_bindings",
       { boneId: binding.boneId, bindingId: binding.id, targetNodeId: binding.targetNodeId },
+    );
+  }
+  const skinBinding = skinBindingsReferencingBones(project, boneIds)[0];
+  if (skinBinding) {
+    const boneId = skinBinding.vertexWeights
+      .flatMap((entry) => entry.influences)
+      .map((influence) => influence.boneId)
+      .sort()
+      .find((candidate) => boneIds.includes(candidate));
+    throw new CommandError(
+      "Remove dependent SkinBindings before changing Bone rest hierarchy.",
+      "bone.rest_locked_by_skin_bindings",
+      { boneId, bindingId: skinBinding.id, targetNodeId: skinBinding.targetNodeId },
     );
   }
 }
