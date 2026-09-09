@@ -113,6 +113,8 @@
               <option value="object">Object Mode</option>
               <option value="deform">Deform Mode</option>
               <option value="topology">Topology Edit Mode</option>
+              <option value="weight">Weight Authoring Mode</option>
+              <option value="form-correction">Form Correction Mode</option>
             </select>
           </label>
           <div class="transform-toolbar" aria-label="変形ツール">
@@ -205,6 +207,30 @@
               </label>
               <label class="clipping-toggle"><input id="rigidBindingEnabledInput" type="checkbox" /> Enabled</label>
               <button id="removeRigidBindingButton" type="button" class="secondary">Remove attachment</button>
+            </fieldset>
+            <fieldset id="weightAuthoringControls" hidden>
+              <legend>Weight Authoring</legend>
+              <label>SkinBinding<select id="weightBindingSelect"><option value="">— Select binding —</option></select></label>
+              <button id="createSkinBindingButton" type="button" class="secondary">Create binding for Part</button>
+              <label>Active Bone<select id="weightBoneSelect"><option value="">— Select Bone —</option></select></label>
+              <label>Active Key Art<select id="weightKeyArtSelect"><option value="">— Select Key Art —</option></select></label>
+              <label>Brush<select id="weightBrushOperationSelect"><option value="add">Add</option><option value="subtract">Subtract</option></select></label>
+              <label>Strength<input id="weightBrushStrengthInput" type="number" min="0.001" max="1" step="0.05" value="0.1" /></label>
+              <label>Selected vertex<output id="weightSelectedVertexOutput">—</output></label>
+              <label>Numeric weight<input id="weightNumericInput" type="number" min="0" max="1" step="0.01" value="0" /></label>
+              <div class="deformer-actions">
+                <button id="setNumericWeightButton" type="button" class="secondary">Set</button>
+                <button id="normalizeWeightButton" type="button" class="secondary">Normalize</button>
+                <button id="clearWeightInfluenceButton" type="button" class="secondary">Clear Bone</button>
+              </div>
+              <output id="weightAuthoringStatus" class="deformer-grid-reason"></output>
+            </fieldset>
+            <fieldset id="formCorrectionControls" hidden>
+              <legend>Form Correction</legend>
+              <label>Active Key Art<output id="formCorrectionKeyArtOutput">—</output></label>
+              <label>Selected vertex<output id="formCorrectionVertexOutput">—</output></label>
+              <button id="resetFormCorrectionButton" type="button" class="secondary">Reset correction</button>
+              <output id="formCorrectionStatus" class="deformer-grid-reason"></output>
             </fieldset>
             <fieldset id="deformerControls" hidden>
               <legend>Warp Deformer</legend>

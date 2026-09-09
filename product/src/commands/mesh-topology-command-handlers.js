@@ -1,5 +1,6 @@
 import { cloneProject } from "../model/project.js";
 import { skinBindingsReferencingTopology } from "../model/skin-binding-validation.js";
+import { meshFormCorrectionsReferencingTopology } from "../model/mesh-form-correction-validation.js";
 import { CommandError } from "./errors.js";
 
 const TRIANGLE_AREA_EPSILON = 2e-4;
@@ -44,6 +45,16 @@ function assertNoSkinBinding(project, topologyId) {
     "Remove dependent SkinBindings before changing stable topology vertices.",
     "MESH_TOPOLOGY_LOCKED_BY_SKIN_BINDING",
     { topologyId, bindingId: binding.id, targetNodeId: binding.targetNodeId },
+  );
+}
+
+function assertNoFormCorrection(project, topologyId) {
+  const correction = meshFormCorrectionsReferencingTopology(project, topologyId)[0];
+  if (!correction) return;
+  throw new CommandError(
+    "Reset dependent form corrections before removing stable topology vertices.",
+    "MESH_TOPOLOGY_LOCKED_BY_FORM_CORRECTION",
+    { topologyId, correctionId: correction.id },
   );
 }
 
@@ -290,6 +301,7 @@ export const meshTopologyCommandHandlers = {
   "mesh_topology.remove_vertex": (project, payload) => {
     const topology = topologyFor(project, payload.topologyId);
     assertNoSkinBinding(project, topology.id);
+    assertNoFormCorrection(project, topology.id);
     const removedIndex = vertexIndex(topology, payload.vertexId);
     if (topology.vertexIds.length <= 3) {
       throw new CommandError("Removing this vertex would leave fewer than three vertices.",
@@ -407,6 +419,7 @@ export const meshTopologyCommandHandlers = {
   "mesh_topology.apply_generated_mesh": (project, payload) => {
     const topology = topologyFor(project, payload.topologyId);
     assertNoSkinBinding(project, topology.id);
+    assertNoFormCorrection(project, topology.id);
     assertGeneratedMesh(project, topology, payload);
     const inverse = snapshotInverse(project, topology);
     const keyforms = keyformsFor(project, topology.id);

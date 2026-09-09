@@ -5,6 +5,8 @@ import { EDITOR_MODES, isMeshAuthoringMode } from "./editor-modes.js";
 import { renderEvaluatedComposition } from "../core/shared-composition-renderer.js";
 import { projectDeformerLattice } from "./deformer-viewport-overlay.js";
 import { projectBoneOverlay } from "./bone-viewport-overlay.js";
+import { projectWeightOverlay } from "./weight-viewport-overlay.js";
+import { evaluateMeshFormCorrection } from "../core/mesh-form-correction-evaluator.js";
 
 export function renderEvaluatedTransitionViewport({
   evaluation,
@@ -133,7 +135,14 @@ export function createViewportRenderer({
   clippingAuthoringContext = () => null,
   deformerAuthoringContext = () => null,
   boneAuthoringContext = () => null,
+  weightAuthoringContext = () => null,
+  formCorrectionAuthoringContext = () => null,
 }) {
+  // This is deliberately viewport-transient. Weight/Form Correction pointer
+  // input uses it only to pick the stable vertex corresponding to what is
+  // currently drawn; evaluated positions never enter Project state.
+  let evaluatedMeshPositions = new Float32Array();
+
   function viewportRenderTarget() {
     return createViewportDocumentRenderTarget({
       view: state.view,
@@ -189,11 +198,35 @@ export function createViewportRenderer({
     }
     context.stroke();
 
+    let weightByVertex = new Map();
+    if (state.editorMode === EDITOR_MODES.WEIGHT) {
+      const authoring = weightAuthoringContext();
+      const endpoint = endpointContext();
+      if (authoring?.activeBindingId && authoring.activeBoneId && endpoint?.topology) {
+        const binding = state.editor.session.query("skin.get_binding", {
+          bindingId: authoring.activeBindingId,
+        });
+        const preview = new Map(authoring.previewVertexWeights.map((entry) =>
+          [entry.vertexId, entry]));
+        const projected = projectWeightOverlay({
+          topology: endpoint.topology,
+          positions: vertices,
+          binding: { ...binding, vertexWeights: binding.vertexWeights.map((entry) =>
+            preview.get(entry.vertexId) || entry) },
+          boneId: authoring.activeBoneId,
+          view: { originX: 0, originY: 0, scale: 1 },
+        });
+        weightByVertex = new Map(projected.vertices.map((entry) => [entry.vertexId, entry]));
+      }
+    }
+    const endpointForVertices = endpointContext();
     for (let index = 0; index < vertices.length / 2; index += 1) {
       const point = screenPointForPart(vertices[index * 2], vertices[index * 2 + 1]);
+      const vertexId = endpointForVertices?.topology?.vertexIds?.[index];
+      const weight = weightByVertex.get(vertexId);
       context.beginPath();
       context.arc(point.x, point.y, state.selected.has(index) ? 5 : 3.5, 0, Math.PI * 2);
-      context.fillStyle = state.selected.has(index) ? "#ffca67" : "#eafdf9";
+      context.fillStyle = state.selected.has(index) ? "#ffca67" : weight?.color || "#eafdf9";
       context.fill();
       context.strokeStyle = state.selected.has(index) ? "#4f3412" : "#183a37";
       context.stroke();
@@ -226,7 +259,11 @@ export function createViewportRenderer({
       context.font = "700 12px ui-monospace, monospace";
       const mode = state.editorMode === EDITOR_MODES.TOPOLOGY
         ? "TOPOLOGY EDIT"
-        : `DEFORM ENDPOINT ${endpoint.endpoint === "from" ? "A" : "B"}`;
+        : state.editorMode === EDITOR_MODES.WEIGHT
+          ? "WEIGHT AUTHORING"
+          : state.editorMode === EDITOR_MODES.FORM_CORRECTION
+            ? "FORM CORRECTION"
+            : `DEFORM ENDPOINT ${endpoint.endpoint === "from" ? "A" : "B"}`;
       context.fillText(mode, 24, 33);
     }
     drawAutoMeshPreview(context);
@@ -605,6 +642,7 @@ export function createViewportRenderer({
   function render() {
     const transitionPreview = transitionPreviewContext();
     if (transitionPreview?.viewMode === "preview") {
+      evaluatedMeshPositions = new Float32Array();
       clearLayerCanvas(elements.backgroundBelowCanvas);
       clearLayerCanvas(elements.foregroundCanvas);
       clearLayerCanvas(elements.overlayCanvas);
@@ -632,6 +670,7 @@ export function createViewportRenderer({
     }
     drawPsdBackgrounds();
     if (!state.mesh || !state.view) {
+      evaluatedMeshPositions = new Float32Array();
       renderer.render(
         new Float32Array(),
         state.view
@@ -649,9 +688,54 @@ export function createViewportRenderer({
       ? sampleLoop(state.keyframes.a, state.keyframes.b, state.currentTime, duration())
       : state.mesh.vertexOffsets;
     const correspondence = correspondencePreviewContext();
-    const vertices = correspondence?.previewActive
+    let vertices = correspondence?.previewActive
       ? new Float32Array(correspondence.candidatePositions)
       : getDeformedVertices(state.mesh, previewOffsets);
+    if ([EDITOR_MODES.WEIGHT, EDITOR_MODES.FORM_CORRECTION].includes(state.editorMode)) {
+      const endpoint = endpointContext();
+      const transition = state.editor?.transitionAuthoring.activeTransition();
+      const program = transition
+        ? state.editor.session.query("animation.get_program", {
+          programId: transition.temporalProgramId,
+        }) : null;
+      const evaluation = transition && endpoint
+        ? state.editor.session.query("transition.evaluate", {
+          transitionId: transition.id,
+          timeTicks: endpoint.endpoint === "from" ? 0 : program.durationTicks,
+        }) : null;
+      const evaluatedInstance = evaluation?.evaluatedParts
+        .find((entry) => entry.semanticSlotId === endpoint?.semanticSlotId)
+        ?.renderInstances.find((entry) => entry.sourceNodeId === endpoint.nodeId);
+      if (evaluatedInstance?.mesh.positions.length === vertices.length) {
+        vertices = new Float32Array(evaluatedInstance.mesh.positions);
+      }
+    }
+    if (state.editorMode === EDITOR_MODES.FORM_CORRECTION) {
+      const endpoint = endpointContext();
+      const authoring = formCorrectionAuthoringContext();
+      if (endpoint?.topology && authoring?.keyArtId && authoring.gestureActive) {
+        const persistent = state.editor.session.query("mesh_form.get_for_context", {
+          topologyId: authoring.topologyId,
+          keyArtId: authoring.keyArtId,
+          semanticSlotId: authoring.semanticSlotId,
+        });
+        const before = new Map((persistent?.vertexOffsets || []).map((entry) => [entry.vertexId, entry]));
+        const after = new Map(authoring.previewVertexOffsets.map((entry) => [entry.vertexId, entry]));
+        const vertexOffsets = [...new Set([...before.keys(), ...after.keys()])]
+          .map((vertexId) => ({
+            vertexId,
+            x: (after.get(vertexId)?.x || 0) - (before.get(vertexId)?.x || 0),
+            y: (after.get(vertexId)?.y || 0) - (before.get(vertexId)?.y || 0),
+          }))
+          .filter((entry) => entry.x !== 0 || entry.y !== 0);
+        const keyform = { id: "transient", topologyId: authoring.topologyId,
+          keyArtId: authoring.keyArtId, semanticSlotId: authoring.semanticSlotId,
+          vertexOffsets };
+        vertices = new Float32Array(evaluateMeshFormCorrection({
+          mesh: { positions: [...vertices] }, topology: endpoint.topology, keyform,
+        }).mesh.positions);
+      }
+    }
     const part = selectedPart();
     const world = part?.nodeId && state.editor
       ? state.editor.worldTransform(part.nodeId)
@@ -659,6 +743,7 @@ export function createViewportRenderer({
     const visible = part?.nodeId && state.editor
       ? state.editor.getNode(part.nodeId).effectiveVisible
       : true;
+    evaluatedMeshPositions = new Float32Array(vertices);
     renderer.render(vertices, viewportRenderTarget(), state.partOffset, world, visible);
     drawOverlay(visible ? vertices : new Float32Array());
     drawDeformerOverlay();
@@ -669,6 +754,9 @@ export function createViewportRenderer({
   return {
     render,
     screenPointForPart,
+    evaluatedMeshPositions() {
+      return evaluatedMeshPositions;
+    },
     projectedDeformerLattice() {
       const authoring = deformerAuthoringContext();
       return authoring?.available && authoring.activeKeyArt && state.view

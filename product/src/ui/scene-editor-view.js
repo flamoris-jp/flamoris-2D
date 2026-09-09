@@ -133,6 +133,8 @@ export function createSceneEditorView({
       elements.deformerControls.hidden = true;
       elements.boneControls.hidden = true;
       elements.rigidBindingControls.hidden = true;
+      elements.weightAuthoringControls.hidden = true;
+      elements.formCorrectionControls.hidden = true;
       return;
     }
     elements.displayNameInput.value = node.displayName;
@@ -204,6 +206,83 @@ export function createSceneEditorView({
       elements.rigidBindingEnabledInput.checked = Boolean(binding?.enabled);
       elements.rigidBindingEnabledInput.disabled = !binding;
       elements.removeRigidBindingButton.disabled = !binding;
+    }
+    const weight = state.editor.weightAuthoring.getState();
+    elements.weightAuthoringControls.hidden = state.editorMode !== "weight";
+    if (state.editorMode === "weight") {
+      const bindings = state.editor.session.query("skin.list_bindings")
+        .filter((entry) => entry.targetNodeId === node.id);
+      elements.weightBindingSelect.replaceChildren();
+      const empty = document.createElement("option");
+      empty.value = "";
+      empty.textContent = "— Select binding —";
+      elements.weightBindingSelect.append(empty);
+      for (const binding of bindings) {
+        const option = document.createElement("option");
+        option.value = binding.id;
+        option.textContent = `${binding.id}${binding.enabled ? "" : " (disabled)"}`;
+        elements.weightBindingSelect.append(option);
+      }
+      elements.weightBindingSelect.value = weight.activeBindingId || "";
+      elements.createSkinBindingButton.disabled = Boolean(weight.activeBindingId) ||
+        !weight.activeBoneId || !state.editor.endpointMesh.getState().selectedTopologyId;
+      elements.weightBoneSelect.replaceChildren();
+      const noBone = document.createElement("option");
+      noBone.value = "";
+      noBone.textContent = "— Select Bone —";
+      elements.weightBoneSelect.append(noBone);
+      for (const boneEntry of state.editor.session.query("bone.list")) {
+        const option = document.createElement("option");
+        option.value = boneEntry.id;
+        option.textContent = `${boneEntry.displayName} (${boneEntry.id})`;
+        elements.weightBoneSelect.append(option);
+      }
+      elements.weightBoneSelect.value = weight.activeBoneId || "";
+      elements.weightKeyArtSelect.replaceChildren();
+      const noKeyArt = document.createElement("option");
+      noKeyArt.value = "";
+      noKeyArt.textContent = "— Select Key Art —";
+      elements.weightKeyArtSelect.append(noKeyArt);
+      for (const keyArt of state.editor.session.query("keyart.list")) {
+        const option = document.createElement("option");
+        option.value = keyArt.id;
+        option.textContent = `${keyArt.displayName} (${keyArt.id})`;
+        elements.weightKeyArtSelect.append(option);
+      }
+      elements.weightKeyArtSelect.value = weight.activeKeyArtId || "";
+      elements.weightBrushOperationSelect.value = weight.operation;
+      elements.weightBrushStrengthInput.value = String(weight.strength);
+      elements.weightSelectedVertexOutput.textContent = weight.selectedVertexId || "—";
+      const selectedWeight = weight.activeBindingId && weight.selectedVertexId && weight.activeBoneId
+        ? state.editor.session.query("skin.get_vertex_weights", {
+          bindingId: weight.activeBindingId, vertexId: weight.selectedVertexId,
+        })?.influences.find((entry) => entry.boneId === weight.activeBoneId)?.weight || 0
+        : 0;
+      elements.weightNumericInput.value = String(selectedWeight);
+      const editable = Boolean(weight.activeBindingId && weight.activeBoneId && weight.selectedVertexId);
+      elements.setNumericWeightButton.disabled = !editable;
+      elements.normalizeWeightButton.disabled = !editable;
+      elements.clearWeightInfluenceButton.disabled = !editable || selectedWeight === 0;
+      elements.weightAuthoringStatus.textContent = weight.strokeActive
+        ? `Transient stroke · ${weight.previewVertexWeights.length} vertices`
+        : "Add/Subtract strokes commit on pointer-up as one history unit.";
+    }
+    const form = state.editor.formCorrectionAuthoring.getState();
+    elements.formCorrectionControls.hidden = state.editorMode !== "form-correction";
+    if (state.editorMode === "form-correction") {
+      const keyArt = state.editor.session.query("keyart.list")
+        .find((entry) => entry.id === form.keyArtId);
+      elements.formCorrectionKeyArtOutput.textContent = keyArt
+        ? `${keyArt.displayName} (${keyArt.id})` : "—";
+      elements.formCorrectionVertexOutput.textContent = form.selectedVertexIds.join(", ") || "—";
+      elements.resetFormCorrectionButton.disabled = !state.editor.session.query(
+        "mesh_form.get_for_context", {
+          topologyId: form.topologyId, keyArtId: form.keyArtId,
+          semanticSlotId: form.semanticSlotId,
+        });
+      elements.formCorrectionStatus.textContent = form.gestureActive
+        ? "Transient drag preview"
+        : "Post-skin correction · one drag is one history unit.";
     }
     const deformer = state.editor.deformerAuthoring.getState();
     elements.deformerControls.hidden = !deformer.available;

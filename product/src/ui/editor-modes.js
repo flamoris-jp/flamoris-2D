@@ -4,12 +4,15 @@ export const EDITOR_MODES = Object.freeze({
   OBJECT: "object",
   DEFORM: "deform",
   TOPOLOGY: "topology",
+  WEIGHT: "weight",
+  FORM_CORRECTION: "form-correction",
   // Compatibility alias for callers from the Phase 1/2 Edit Mode surface.
   EDIT: "deform",
 });
 
 export function isMeshAuthoringMode(editorMode) {
-  return [EDITOR_MODES.DEFORM, EDITOR_MODES.TOPOLOGY, "edit"].includes(editorMode);
+  return [EDITOR_MODES.DEFORM, EDITOR_MODES.TOPOLOGY, EDITOR_MODES.WEIGHT,
+    EDITOR_MODES.FORM_CORRECTION, "edit"].includes(editorMode);
 }
 
 export function canvasInteractionRoute({

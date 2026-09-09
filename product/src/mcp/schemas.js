@@ -1,6 +1,6 @@
 export { commandSchemas } from "../commands/schemas.js";
 
-export const MCP_SCHEMA_VERSION = 12;
+export const MCP_SCHEMA_VERSION = 13;
 
 const nodeId = {
   type: "string",
@@ -13,6 +13,29 @@ const keyArtId = { ...nodeId };
 const semanticSlotId = { ...nodeId };
 
 export const querySchemas = {
+  "mesh_form.list_keyforms": {
+    type: "object",
+    properties: { topologyId: nodeId, keyArtId, semanticSlotId },
+    additionalProperties: false,
+  },
+  "mesh_form.get_keyform": idQuery("keyformId", nodeId),
+  "mesh_form.get_for_context": {
+    type: "object",
+    required: ["topologyId", "keyArtId", "semanticSlotId"],
+    properties: { topologyId: nodeId, keyArtId, semanticSlotId },
+    additionalProperties: false,
+  },
+  "mesh_form.validate": emptyQuery(),
+  "mesh_form.evaluate": {
+    type: "object",
+    required: ["topologyId", "positions"],
+    properties: {
+      topologyId: nodeId,
+      keyformId: nodeId,
+      positions: { type: "array", items: { type: "number" } },
+    },
+    additionalProperties: false,
+  },
   "skin.list_bindings": emptyQuery(),
   "skin.get_binding": idQuery("bindingId", nodeId),
   "skin.get_binding_for_target": idQuery("targetNodeId", nodeId),

@@ -169,6 +169,9 @@ const viewportRenderer = createViewportRenderer({
   },
   deformerAuthoringContext: () => state.editor?.deformerAuthoring.getState() || null,
   boneAuthoringContext: () => state.editor?.boneAuthoring.getState() || null,
+  weightAuthoringContext: () => state.editor?.weightAuthoring.getState() || null,
+  formCorrectionAuthoringContext: () =>
+    state.editor?.formCorrectionAuthoring.getState() || null,
 });
 
 const sceneEditorView = createSceneEditorView({
@@ -279,6 +282,7 @@ function activeEndpointContext() {
     endpoint,
     nodeId: mapping.nodeId,
     keyArt,
+    semanticSlotId: endpointState.selectedSemanticSlot.id,
     keyform: endpointState.activeKeyform,
     topology: endpointState.topologies.find((entry) =>
       entry.id === endpointState.selectedTopologyId) || null,
@@ -321,7 +325,9 @@ function syncEndpointMeshViewport() {
     renderer.setMesh(state.mesh);
   } else createMesh();
   if (!isMeshAuthoringMode(state.editorMode)) state.editorMode = EDITOR_MODES.DEFORM;
-  state.editor?.meshTools.setMode(state.editorMode);
+  if ([EDITOR_MODES.DEFORM, EDITOR_MODES.TOPOLOGY].includes(state.editorMode)) {
+    state.editor?.meshTools.setMode(state.editorMode);
+  }
   state.editTargetNodeId = context.nodeId;
   const selectedIds = new Set(state.editor?.meshTools.getState().selectedVertexIds || []);
   state.selected = new Set((context.topology?.vertexIds || [])
@@ -390,15 +396,49 @@ function setEditorMode(requestedMode) {
       render();
       return false;
     }
-    state.editorMode = requestedMode === EDITOR_MODES.TOPOLOGY
-      ? EDITOR_MODES.TOPOLOGY
-      : EDITOR_MODES.DEFORM;
-    state.editor.meshTools.setMode(state.editorMode);
+    state.editorMode = requestedMode;
+    if ([EDITOR_MODES.DEFORM, EDITOR_MODES.TOPOLOGY].includes(state.editorMode)) {
+      state.editor.meshTools.setMode(state.editorMode);
+    }
+    const endpoint = activeEndpointContext();
+    if ([EDITOR_MODES.WEIGHT, EDITOR_MODES.FORM_CORRECTION].includes(state.editorMode) &&
+      (!endpoint?.keyform || !endpoint?.topology)) {
+      state.editorMode = EDITOR_MODES.OBJECT;
+      updateEditorModeUi();
+      setStatus("Weight/Form Correctionにはactive endpoint MeshKeyformが必要です。");
+      renderEditorUi();
+      render();
+      return false;
+    }
+    if (state.editorMode === EDITOR_MODES.WEIGHT) {
+      const binding = state.editor.session.query("skin.get_binding_for_target", {
+        targetNodeId: endpoint.nodeId,
+      });
+      state.editor.weightAuthoring.setContext({
+        bindingId: binding?.id || null,
+        targetNodeId: endpoint.nodeId,
+        boneId: state.editor.weightAuthoring.activeBoneId,
+        keyArtId: endpoint.keyArt.id,
+      });
+    } else if (state.editorMode === EDITOR_MODES.FORM_CORRECTION) {
+      state.editor.formCorrectionAuthoring.setContext({
+        topologyId: endpoint.topology.id,
+        keyArtId: endpoint.keyArt.id,
+        semanticSlotId: endpoint.semanticSlotId,
+        targetNodeId: endpoint.nodeId,
+      });
+    }
     if (requestedMode !== EDITOR_MODES.TOPOLOGY) autoMeshPreview.clear();
     state.editTargetNodeId = activeEndpointContext()?.nodeId || state.editor.selectedNodeId;
     state.transformGesture = null;
     state.editor.cancelTransformDrag();
-    setStatus(`${state.editor.getNode(state.editTargetNodeId).displayName}・${state.editorMode === EDITOR_MODES.TOPOLOGY ? "Topology Edit" : "Deform"} Mode`);
+    const label = {
+      [EDITOR_MODES.TOPOLOGY]: "Topology Edit",
+      [EDITOR_MODES.DEFORM]: "Deform",
+      [EDITOR_MODES.WEIGHT]: "Weight Authoring",
+      [EDITOR_MODES.FORM_CORRECTION]: "Form Correction",
+    }[state.editorMode];
+    setStatus(`${state.editor.getNode(state.editTargetNodeId).displayName}・${label} Mode`);
   } else {
     state.editorMode = EDITOR_MODES.OBJECT;
     state.editTargetNodeId = null;
@@ -1134,6 +1174,67 @@ elements.removeRigidBindingButton.addEventListener("click", () => {
     }, { label: "Remove rigid Bone attachment" });
   });
 });
+elements.weightBindingSelect.addEventListener("change", () => {
+  const endpoint = activeEndpointContext();
+  state.editor?.weightAuthoring.setContext({
+    bindingId: elements.weightBindingSelect.value || null,
+    targetNodeId: endpoint?.nodeId || null,
+    boneId: elements.weightBoneSelect.value || null,
+    keyArtId: elements.weightKeyArtSelect.value || endpoint?.keyArt.id || null,
+  });
+});
+elements.createSkinBindingButton.addEventListener("click", () => commitInspectorEdit(() => {
+  const endpoint = activeEndpointContext();
+  return state.editor?.weightAuthoring.createBinding({
+    targetNodeId: endpoint?.nodeId,
+    topologyId: endpoint?.topology?.id,
+    boneId: elements.weightBoneSelect.value || null,
+  });
+}));
+elements.weightBoneSelect.addEventListener("change", () => {
+  const current = state.editor?.weightAuthoring.getState();
+  state.editor?.weightAuthoring.setContext({
+    bindingId: current?.activeBindingId || null,
+    targetNodeId: current?.targetNodeId || null,
+    boneId: elements.weightBoneSelect.value || null,
+    keyArtId: current?.activeKeyArtId || null,
+  });
+});
+elements.weightKeyArtSelect.addEventListener("change", () => {
+  const current = state.editor?.weightAuthoring.getState();
+  state.editor?.weightAuthoring.setContext({
+    bindingId: current?.activeBindingId || null,
+    targetNodeId: current?.targetNodeId || null,
+    boneId: current?.activeBoneId || null,
+    keyArtId: elements.weightKeyArtSelect.value || null,
+  });
+});
+function updateWeightBrush() {
+  try {
+    state.editor?.weightAuthoring.setBrush({
+      operation: elements.weightBrushOperationSelect.value,
+      strength: Number(elements.weightBrushStrengthInput.value),
+    });
+  } catch (error) { setStatus(error.message || String(error)); }
+}
+elements.weightBrushOperationSelect.addEventListener("change", updateWeightBrush);
+elements.weightBrushStrengthInput.addEventListener("change", updateWeightBrush);
+elements.setNumericWeightButton.addEventListener("click", () => commitInspectorEdit(() => {
+  const current = state.editor.weightAuthoring.getState();
+  return state.editor.weightAuthoring.setNumericWeight(
+    current.selectedVertexId, Number(elements.weightNumericInput.value),
+  );
+}));
+elements.normalizeWeightButton.addEventListener("click", () => commitInspectorEdit(() => {
+  const current = state.editor.weightAuthoring.getState();
+  return state.editor.weightAuthoring.normalize(current.selectedVertexId);
+}));
+elements.clearWeightInfluenceButton.addEventListener("click", () => commitInspectorEdit(() => {
+  const current = state.editor.weightAuthoring.getState();
+  return state.editor.weightAuthoring.clearActiveInfluence(current.selectedVertexId);
+}));
+elements.resetFormCorrectionButton.addEventListener("click", () =>
+  commitInspectorEdit(() => state.editor?.formCorrectionAuthoring.reset()));
 elements.deformerGridSelect.addEventListener("change", () => {
   commitInspectorEdit(() => {
     state.editor?.deformerAuthoring.setGrid(Number(elements.deformerGridSelect.value));
@@ -1217,6 +1318,8 @@ bindViewportInteractions({
   correspondencePreview: () => state.editor?.correspondencePreview || null,
   deformerAuthoring: () => state.editor?.deformerAuthoring || null,
   boneAuthoring: () => state.editor?.boneAuthoring || null,
+  weightAuthoring: () => state.editor?.weightAuthoring || null,
+  formCorrectionAuthoring: () => state.editor?.formCorrectionAuthoring || null,
   loadFile,
 });
 

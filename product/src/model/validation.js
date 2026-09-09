@@ -11,6 +11,7 @@ import {
   enabledSkinTargetIds,
   validateSkinBindings,
 } from "./skin-binding-validation.js";
+import { validateMeshFormCorrections } from "./mesh-form-correction-validation.js";
 
 function issue(code, path, message, entityId = null, severity = "error") {
   return { code, path, message, entityId, severity };
@@ -124,6 +125,7 @@ export function validateProject(project) {
     ["meshes", project.meshes],
     ["meshTopologies", project.meshTopologies],
     ["meshKeyforms", project.meshKeyforms],
+    ["meshFormCorrectionKeyforms", project.meshFormCorrectionKeyforms],
     ["transitions", project.transitions],
     ["animation.clips", project.animation?.clips],
     ["animation.tracks", project.animation?.tracks],
@@ -141,6 +143,7 @@ export function validateProject(project) {
   issues.push(...validateWarpDeformers(project, register));
   issues.push(...validateBones(project));
   issues.push(...validateSkinBindings(project, register));
+  issues.push(...validateMeshFormCorrections(project, register));
   issues.push(...validateRigidBoneBindings(project, register, {
     enabledSkinTargetIds: enabledSkinTargetIds(project),
   }));

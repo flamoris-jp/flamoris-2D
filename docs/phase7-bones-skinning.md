@@ -278,14 +278,26 @@ Large bends often need a small elbow, shoulder, clothing, or silhouette correcti
 
 ~~~text
 MeshFormCorrectionKeyform
-├── targetNodeId
-├── meshTopologyId
+├── id
+├── topologyId
 ├── keyArtId
-└── offsets[]
+├── semanticSlotId
+└── vertexOffsets[]
     ├── vertexId
     ├── x
     └── y
 ~~~
+
+The representation is sparse: a missing keyform or missing vertex entry means
+the exact zero offset, and explicit zero entries are omitted. Entries serialize
+in stable vertex-ID order. Persistent offsets must be finite, unique by stable
+vertex ID, and compatible with the MeshKeyform identified by topology, Key Art,
+and SemanticSlot. Form correction never mutates the rest MeshKeyform.
+
+Weight authoring uses the existing SkinBinding canonicalizer at commit. Brush
+preview may temporarily contain unnormalized values, but pointer-up emits one
+bulk Command and one history unit. Adding a fifth influence is rejected
+deterministically; the author must explicitly replace or clear an influence.
 
 The correction is an optional additive offset in the post-Skinning, pre-node-transform geometry space. Absence means zero correction.
 
