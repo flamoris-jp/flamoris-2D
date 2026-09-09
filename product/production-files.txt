@@ -19,6 +19,8 @@ src/styles/dialogs.css
 src/model/project.js
 src/model/bone.js
 src/model/bone-validation.js
+src/model/bone-rotation-constraint.js
+src/model/bone-rotation-constraint-validation.js
 src/model/rigid-bone-binding.js
 src/model/skin-binding.js
 src/model/skin-binding-validation.js

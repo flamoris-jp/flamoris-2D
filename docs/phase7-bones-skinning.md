@@ -389,18 +389,31 @@ Exact naming should follow current repository conventions. Query and MCP-facing 
 
 ### Rotation constraints
 
-A Bone rotation constraint stores finite minimum and maximum local delta angles. Pose Commands and authoring helpers must honor it. Loaded out-of-range state is diagnosed rather than silently rewritten during evaluation.
+A Bone rotation constraint stores finite minimum and maximum local delta angles.
+The persistent BonePoseKeyform remains the authored intent even when it lies
+outside that interval. Evaluation clamps the interpolated/selected local delta
+after pose resolution and before FK, without rewriting the Project. Disabled
+constraints are exact identity behavior. One Bone may have at most one enabled
+rotation constraint.
 
 ### Two-bone IK
 
 Initial two-bone IK is an analytic authoring helper, not a persistent runtime solver graph.
 
-- transient target and bend direction;
+- persistent chain identity and bend direction, but a transient target handle;
 - solve shoulder/elbow rotation deterministically;
 - handle reachable, fully extended, and too-close targets;
 - apply rotation constraints;
 - commit ordinary BonePoseKeyforms in one transaction;
 - no hidden iterative solver or playback-only state.
+
+The chain setting stores exactly the explicit root, mid, and end stable Bone
+IDs. The Scene hierarchy remains authoritative and must contain the direct
+root -> mid -> end chain. IK does not run during playback because no target is
+persisted: pointer-up bakes the root/mid solution atomically into the active
+Key Art's ordinary BonePoseKeyforms. Existing Transition endpoint, Hold,
+Replace, shortest-arc interpolation, Preview, and Export semantics therefore
+remain the only runtime path.
 
 Phase 8 may later justify persistent/time-varying IK targets, but that is not part of Phase 7.
 
@@ -408,12 +421,18 @@ Phase 8 may later justify persistent/time-varying IK targets, but that is not pa
 
 Mirror is explicit preview/apply authoring:
 
-- mirror selected Bone rest structure across a chosen rig-space axis;
-- allocate new stable IDs;
-- optionally mirror selected bindings/weights using explicit vertex correspondence;
+- mirror from one explicitly selected existing Bone to another across a chosen
+  common-parent local X axis;
+- keep both stable IDs and the Scene hierarchy unchanged;
+- mirror Key-Art pose deltas only for an explicitly selected source/target pair;
 - show unmapped/ambiguous vertices before Apply;
 - commit through ordinary Commands/Transaction;
 - never infer permanent identity from left/right display names alone.
+
+Weight mirroring remains deferred until FLAMORIS has an explicit stable
+left/right vertex-correspondence domain. Key-Art correspondence does not imply
+bilateral vertex correspondence, so array-index or geometric guessing is not
+used.
 
 ## 14. Validation and diagnostics
 

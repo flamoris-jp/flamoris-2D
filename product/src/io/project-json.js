@@ -131,6 +131,7 @@ export function createFl2dDocument(
             left.boneId < right.boneId ? -1 : left.boneId > right.boneId ? 1 : 0),
         })),
     }));
+  body.rig.boneRotationConstraints = [...body.rig.boneRotationConstraints].sort(byId);
   body.transitions = [...body.transitions].sort(byId).map((transition) => ({
     ...transition,
     partTransitions: [...transition.partTransitions].sort(byId),
@@ -263,6 +264,10 @@ export function migrateProjectSchema(value) {
   if (project?.schemaVersion === 9) {
     project.meshFormCorrectionKeyforms = [];
     project.schemaVersion = 10;
+  }
+  if (project?.schemaVersion === 10) {
+    project.rig.boneRotationConstraints = [];
+    project.schemaVersion = 11;
   }
   if (project?.schemaVersion !== PROJECT_SCHEMA_VERSION) {
     throw new ProjectFormatError(
