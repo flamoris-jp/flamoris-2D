@@ -9,6 +9,7 @@ import { KeyStateStripController } from "./key-state-strip-controller.js";
 import { CorrespondencePreviewController } from "./correspondence-preview-controller.js";
 import { ClippingAuthoringController } from "./clipping-authoring-controller.js";
 import { DeformerAuthoringController } from "./deformer-authoring-controller.js";
+import { BoneAuthoringController } from "./bone-authoring-controller.js";
 
 function filterTree(node, matches) {
   const children = node.children
@@ -59,6 +60,9 @@ export class EditorUiAdapter {
     this.deformerAuthoring = new DeformerAuthoringController(session, this.endpointMesh, {
       onChange: (reason) => this.notify(reason),
     });
+    this.boneAuthoring = new BoneAuthoringController(session, {
+      onChange: (reason) => this.notify(reason),
+    });
     this.transitionPreview = new TransitionPreviewController(session, this.transitionAuthoring, {
       onChange: (reason) => this.notify(reason),
     });
@@ -86,6 +90,7 @@ export class EditorUiAdapter {
     const sessionOnChange = session.onChange;
     session.onChange = (...args) => {
       sessionOnChange?.(...args);
+      this.boneAuthoring.projectChanged();
       this.transitionPreview.projectChanged();
       this.correspondencePreview.projectChanged();
       this.notify("project");
@@ -99,7 +104,7 @@ export class EditorUiAdapter {
   expandAllGroups() {
     const tree = this.session.query("scene.get_tree", { includeHidden: true });
     const walk = (node) => {
-      if (["group", "deformer"].includes(node.kind)) this.expandedNodeIds.add(node.id);
+      if (["group", "deformer", "bone"].includes(node.kind)) this.expandedNodeIds.add(node.id);
       node.children.forEach(walk);
     };
     walk(tree);
@@ -135,6 +140,9 @@ export class EditorUiAdapter {
     this.selectedNodeId = nodeId;
     this.deformerAuthoring.selectDeformer(
       nodeId && this.session.project.scene.nodes[nodeId]?.kind === "deformer" ? nodeId : null,
+    );
+    this.boneAuthoring.selectBone(
+      nodeId && this.session.project.scene.nodes[nodeId]?.kind === "bone" ? nodeId : null,
     );
     this.cancelTransformDrag();
     this.notify("selection");

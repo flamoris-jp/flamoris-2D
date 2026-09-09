@@ -64,7 +64,7 @@ export function createSceneEditorView({
       const toggle = document.createElement("button");
       toggle.type = "button";
       toggle.className = "tree-toggle";
-      const expandable = ["group", "deformer"].includes(node.kind);
+      const expandable = ["group", "deformer", "bone"].includes(node.kind);
       toggle.textContent = expandable
         ? (state.editor.expandedNodeIds.has(node.id) ? "▾" : "▸")
         : "·";
@@ -91,7 +91,8 @@ export function createSceneEditorView({
       const lock = document.createElement("span");
       lock.className = node.locked ? "tree-lock" : "tree-kind";
       lock.textContent = node.locked ? "◆" :
-        (node.kind === "group" ? "G" : node.kind === "deformer" ? "D" : "P");
+        (node.kind === "group" ? "G" : node.kind === "deformer" ? "D" :
+          node.kind === "bone" ? "B" : "P");
       const clipping = document.createElement("span");
       clipping.className = "tree-clipping";
       clipping.textContent = clippingTargets.has(node.id) ? "⊂" : "";
@@ -130,11 +131,80 @@ export function createSceneEditorView({
       elements.parentOutput.textContent = "";
       elements.transformInputs.forEach((input) => { input.value = ""; });
       elements.deformerControls.hidden = true;
+      elements.boneControls.hidden = true;
+      elements.rigidBindingControls.hidden = true;
       return;
     }
     elements.displayNameInput.value = node.displayName;
     elements.visibilityInput.checked = node.visible;
     elements.lockedInput.checked = node.locked;
+    elements.nodeTransformControls.hidden = node.kind === "bone";
+    const bone = state.editor.boneAuthoring.getState();
+    elements.boneControls.hidden = node.kind !== "bone";
+    if (node.kind === "bone" && bone.selectedBone) {
+      elements.boneModeSelect.value = bone.mode;
+      for (const select of [elements.boneActiveKeyArtSelect, elements.boneGhostKeyArtSelect]) {
+        const current = select === elements.boneActiveKeyArtSelect
+          ? bone.activeKeyArt?.id || "" : bone.ghostKeyArtId || "";
+        select.replaceChildren();
+        const empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = select === elements.boneActiveKeyArtSelect
+          ? "— Select Key Art —" : "— Off —";
+        select.append(empty);
+        for (const keyArt of bone.keyArts) {
+          const option = document.createElement("option");
+          option.value = keyArt.id;
+          option.textContent = `${keyArt.displayName} (${keyArt.id})`;
+          select.append(option);
+        }
+        select.value = current;
+      }
+      const value = bone.editableValue;
+      elements.boneXInput.value = String(value.x);
+      elements.boneYInput.value = String(value.y);
+      elements.boneRotationInput.value = String(Number((value.rotation * 180 / Math.PI).toFixed(4)));
+      elements.boneLengthInput.value = bone.mode === "edit" ? String(value.length) : "";
+      elements.boneLengthLabel.hidden = bone.mode !== "edit";
+      elements.resetBonePoseButton.disabled = bone.mode !== "pose" || !bone.keyform;
+      elements.boneAuthoringStatus.textContent = bone.mode === "pose"
+        ? bone.activeKeyArt
+          ? `${bone.activeKeyArt.displayName} · ${bone.keyform ? "authored localDelta" : "identity delta"}`
+          : "Pose mode requires an explicit active Key Art."
+        : "Rest head / rotation / length";
+      elements.boneParentSelect.replaceChildren();
+      const appendParent = (entry, depth = 0) => {
+        if (["group", "deformer", "bone"].includes(entry.kind) && entry.id !== node.id) {
+          const option = document.createElement("option");
+          option.value = entry.id;
+          option.textContent = `${"  ".repeat(depth)}${entry.displayName} (${entry.kind})`;
+          elements.boneParentSelect.append(option);
+        }
+        entry.children.forEach((child) => appendParent(child, depth + 1));
+      };
+      appendParent(state.editor.session.query("scene.get_tree", { includeHidden: true }));
+      elements.boneParentSelect.value = bone.selectedBone.parentNodeId;
+    }
+    elements.rigidBindingControls.hidden = node.kind !== "part";
+    if (node.kind === "part") {
+      const bindings = state.editor.session.query("bone.list_rigid_bindings");
+      const binding = bindings.find((entry) => entry.targetNodeId === node.id) || null;
+      elements.rigidBindingBoneSelect.replaceChildren();
+      const empty = document.createElement("option");
+      empty.value = "";
+      empty.textContent = "— No attachment —";
+      elements.rigidBindingBoneSelect.append(empty);
+      for (const candidate of state.editor.session.query("bone.list")) {
+        const option = document.createElement("option");
+        option.value = candidate.id;
+        option.textContent = `${candidate.displayName} (${candidate.id})`;
+        elements.rigidBindingBoneSelect.append(option);
+      }
+      elements.rigidBindingBoneSelect.value = binding?.boneId || "";
+      elements.rigidBindingEnabledInput.checked = Boolean(binding?.enabled);
+      elements.rigidBindingEnabledInput.disabled = !binding;
+      elements.removeRigidBindingButton.disabled = !binding;
+    }
     const deformer = state.editor.deformerAuthoring.getState();
     elements.deformerControls.hidden = !deformer.available;
     if (deformer.available) {

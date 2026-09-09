@@ -7,7 +7,7 @@ import {
 } from "../src/mcp/schemas.js";
 
 test("MCP schema module imports with wired query and command schemas", () => {
-  assert.equal(MCP_SCHEMA_VERSION, 9);
+  assert.equal(MCP_SCHEMA_VERSION, 10);
   assert.equal(
     querySchemas["scene.get_node"].properties.nodeId.type,
     "string",
@@ -32,4 +32,8 @@ test("MCP schema module imports with wired query and command schemas", () => {
   assert.equal(commandSchemas["clipping.create"].properties.binding.properties.mode.const, "inside");
   assert.equal(commandSchemas["bone.create"].properties.restLocalTransform.type, "object");
   assert.equal(querySchemas["bone.get_evaluated_pose"].properties.boneId.type, "string");
+  assert.equal(commandSchemas["bone.create_rigid_binding"]
+    .properties.binding.properties.boneId.type, "string");
+  assert.equal(querySchemas["bone.get_rigid_binding_for_target"]
+    .properties.targetNodeId.type, "string");
 });

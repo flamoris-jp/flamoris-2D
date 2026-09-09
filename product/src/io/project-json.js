@@ -110,6 +110,7 @@ export function createFl2dDocument(
       ...keyform,
       localDelta: cloneProject(keyform.localDelta),
     }));
+  body.rig.rigidBoneBindings = [...body.rig.rigidBoneBindings].sort(byId);
   body.transitions = [...body.transitions].sort(byId).map((transition) => ({
     ...transition,
     partTransitions: [...transition.partTransitions].sort(byId),
@@ -224,6 +225,13 @@ export function migrateProjectSchema(value) {
     project.rig.bonePoseKeyforms = [];
     project.rig.constraints = Array.isArray(project.rig.constraints) ? project.rig.constraints : [];
     project.schemaVersion = 7;
+  }
+  if (project?.schemaVersion === 7) {
+    project.rig = project.rig && typeof project.rig === "object"
+      ? project.rig
+      : { bones: [], bonePoseKeyforms: [], constraints: [] };
+    project.rig.rigidBoneBindings = [];
+    project.schemaVersion = 8;
   }
   if (project?.schemaVersion !== PROJECT_SCHEMA_VERSION) {
     throw new ProjectFormatError(
