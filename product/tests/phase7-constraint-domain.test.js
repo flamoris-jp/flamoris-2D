@@ -22,9 +22,9 @@ function fixture() {
   return project;
 }
 
-test("schema 11 initializes typed Bone rotation constraints", () => {
+test("current schema initializes typed Bone rotation constraints", () => {
   const project = fixture();
-  assert.equal(PROJECT_SCHEMA_VERSION, 11);
+  assert.equal(PROJECT_SCHEMA_VERSION, 12);
   assert.deepEqual(project.rig.boneRotationConstraints, []);
   assert.deepEqual(validateProject(project), []);
 });
@@ -74,7 +74,7 @@ test("rotation constraints Save/Open canonically and schema 10 migrates without 
   schema10.meshFormCorrectionKeyforms.push({ id: "kept", topologyId: "t",
     keyArtId: "k", semanticSlotId: "s", vertexOffsets: [] });
   const migrated = migrateProjectSchema(schema10);
-  assert.equal(migrated.schemaVersion, 11);
+  assert.equal(migrated.schemaVersion, 12);
   assert.deepEqual(migrated.rig.boneRotationConstraints, []);
   assert.equal(migrated.meshFormCorrectionKeyforms[0].id, "kept");
 });

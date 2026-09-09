@@ -132,6 +132,7 @@ export function createFl2dDocument(
         })),
     }));
   body.rig.boneRotationConstraints = [...body.rig.boneRotationConstraints].sort(byId);
+  body.rig.twoBoneIkConstraints = [...body.rig.twoBoneIkConstraints].sort(byId);
   body.transitions = [...body.transitions].sort(byId).map((transition) => ({
     ...transition,
     partTransitions: [...transition.partTransitions].sort(byId),
@@ -268,6 +269,10 @@ export function migrateProjectSchema(value) {
   if (project?.schemaVersion === 10) {
     project.rig.boneRotationConstraints = [];
     project.schemaVersion = 11;
+  }
+  if (project?.schemaVersion === 11) {
+    project.rig.twoBoneIkConstraints = [];
+    project.schemaVersion = 12;
   }
   if (project?.schemaVersion !== PROJECT_SCHEMA_VERSION) {
     throw new ProjectFormatError(
