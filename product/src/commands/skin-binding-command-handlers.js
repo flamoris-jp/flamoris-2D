@@ -1,6 +1,7 @@
 import { cloneProject } from "../model/project.js";
 import {
   canonicalizeSkinInfluences,
+  canonicalizeSkinVertexWeights,
   createSkinBinding,
 } from "../model/skin-binding.js";
 import { CommandError } from "./errors.js";
@@ -159,6 +160,38 @@ export const skinBindingCommandHandlers = {
         payload.vertexId,
         ...influences.map((influence) => influence.boneId),
       ],
+    };
+  },
+
+  "skin.set_weights_bulk": (project, payload) => {
+    const current = binding(project, payload.bindingId);
+    const updates = canonicalizeSkinVertexWeights(payload.vertexWeights);
+    const requested = new Set();
+    const previous = [];
+    for (const update of updates) {
+      if (requested.has(update.vertexId)) {
+        throw new CommandError("Bulk weight edit contains a duplicate stable vertex ID.",
+          "SKIN_BINDING_VERTEX_DUPLICATE", { vertexId: update.vertexId });
+      }
+      requested.add(update.vertexId);
+      const index = current.vertexWeights.findIndex((entry) => entry.vertexId === update.vertexId);
+      if (index < 0) throw new CommandError(
+        "Bulk weight authoring requires an existing weighted stable vertex.",
+        "skin_binding.vertex_weights_not_found",
+        { bindingId: current.id, vertexId: update.vertexId },
+      );
+      previous.push(cloneProject(current.vertexWeights[index]));
+      current.vertexWeights[index] = update;
+    }
+    current.vertexWeights.sort((left, right) => left.vertexId < right.vertexId ? -1 :
+      left.vertexId > right.vertexId ? 1 : 0);
+    return {
+      inverse: { type: "skin.set_weights_bulk", payload: {
+        bindingId: current.id, vertexWeights: previous,
+      } },
+      affectedIds: [current.id, current.targetNodeId, current.topologyId,
+        ...updates.flatMap((entry) => [entry.vertexId,
+          ...entry.influences.map((influence) => influence.boneId)])],
     };
   },
 

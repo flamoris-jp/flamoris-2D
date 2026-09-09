@@ -22,6 +22,8 @@ src/model/bone-validation.js
 src/model/rigid-bone-binding.js
 src/model/skin-binding.js
 src/model/skin-binding-validation.js
+src/model/mesh-form-correction.js
+src/model/mesh-form-correction-validation.js
 src/model/rigid-bone-binding-validation.js
 src/model/warp-deformer.js
 src/model/warp-deformer-validation.js
@@ -38,6 +40,8 @@ src/core/linear-blend-skinning-evaluator.js
 src/core/warp-deformer-evaluator.js
 src/core/temporal.js
 src/core/transition-evaluator.js
+src/core/mesh-form-correction-evaluator.js
+src/core/skin-mesh-evaluator.js
 src/core/clipping-evaluator.js
 src/core/clipping-raster-plan.js
 src/core/evaluated-render.js
@@ -63,6 +67,7 @@ src/commands/clipping-command-handlers.js
 src/commands/bone-command-handlers.js
 src/commands/rigid-bone-binding-command-handlers.js
 src/commands/skin-binding-command-handlers.js
+src/commands/mesh-form-correction-command-handlers.js
 src/commands/warp-deformer-command-handlers.js
 src/commands/schemas.js
 src/io/project-json.js
@@ -87,6 +92,9 @@ src/ui/correspondence-preview-controller.js
 src/ui/clipping-authoring-controller.js
 src/ui/deformer-authoring-controller.js
 src/ui/bone-authoring-controller.js
+src/ui/weight-authoring-controller.js
+src/ui/form-correction-authoring-controller.js
+src/ui/weight-viewport-overlay.js
 src/ui/bone-viewport-overlay.js
 src/ui/deformer-viewport-overlay.js
 src/ui/correspondence-view.js

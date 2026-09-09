@@ -7,7 +7,7 @@ import {
 } from "../src/mcp/schemas.js";
 
 test("MCP schema module imports with wired query and command schemas", () => {
-  assert.equal(MCP_SCHEMA_VERSION, 12);
+  assert.equal(MCP_SCHEMA_VERSION, 13);
   assert.equal(
     querySchemas["scene.get_node"].properties.nodeId.type,
     "string",
@@ -42,4 +42,10 @@ test("MCP schema module imports with wired query and command schemas", () => {
     .properties.influences.items.properties.weight.type, "number");
   assert.equal(querySchemas["skin.get_vertex_weights"].properties.vertexId.type, "string");
   assert.equal(querySchemas["skin.evaluate"].properties.positions.items.type, "number");
+  assert.equal(commandSchemas["skin.set_weights_bulk"]
+    .properties.vertexWeights.items.properties.vertexId.type, "string");
+  assert.equal(commandSchemas["mesh_form.create_keyform"]
+    .properties.keyform.properties.vertexOffsets.items.properties.vertexId.type, "string");
+  assert.equal(querySchemas["mesh_form.get_for_context"].properties.keyArtId.type, "string");
+  assert.equal(querySchemas["mesh_form.evaluate"].properties.positions.items.type, "number");
 });

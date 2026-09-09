@@ -27,6 +27,11 @@ import {
 } from "../model/skin-binding-validation.js";
 import { evaluateLinearBlendSkinning } from "../core/linear-blend-skinning-evaluator.js";
 import { evaluateEndpointProjectedBoneFk } from "../core/rigid-bone-evaluator.js";
+import {
+  meshFormCorrectionForContext,
+  meshFormCorrectionValidationResult,
+} from "../model/mesh-form-correction-validation.js";
+import { evaluateMeshFormCorrection } from "../core/mesh-form-correction-evaluator.js";
 
 function temporalProgram(project, programId) {
   const program = project.temporalPrograms.find((entry) => entry.id === programId);
@@ -204,12 +209,14 @@ export const projectQueries = {
       meshes: project.meshes.length,
       meshTopologies: project.meshTopologies.length,
       meshKeyforms: project.meshKeyforms.length,
+      meshFormCorrectionKeyforms: project.meshFormCorrectionKeyforms.length,
       clippingBindings: project.clippingBindings.length,
       deformers: project.rig.deformers.length,
       warpDeformerKeyforms: project.rig.warpDeformerKeyforms.length,
       bones: project.rig.bones.length,
       bonePoseKeyforms: project.rig.bonePoseKeyforms.length,
       rigidBoneBindings: project.rig.rigidBoneBindings.length,
+      skinBindings: project.rig.skinBindings.length,
       transitions: project.transitions.length,
       clips: project.animation.clips.length,
       temporalPrograms: project.temporalPrograms.length,
@@ -341,6 +348,35 @@ export const projectQueries = {
       targetWorldTransform: worldTransformMatrix(project, binding.targetNodeId),
     });
     return cloneProject(evaluated);
+  },
+  "mesh_form.list_keyforms": (project, input = {}) => cloneProject(
+    [...project.meshFormCorrectionKeyforms]
+      .filter((entry) => !input.topologyId || entry.topologyId === input.topologyId)
+      .filter((entry) => !input.keyArtId || entry.keyArtId === input.keyArtId)
+      .filter((entry) => !input.semanticSlotId || entry.semanticSlotId === input.semanticSlotId)
+      .sort((left, right) => left.id.localeCompare(right.id)),
+  ),
+  "mesh_form.get_keyform": (project, input) => {
+    const value = project.meshFormCorrectionKeyforms.find((entry) =>
+      entry.id === input.keyformId);
+    if (!value) throw new Error(`Unknown MeshFormCorrectionKeyform ${input.keyformId}.`);
+    return cloneProject(value);
+  },
+  "mesh_form.get_for_context": (project, input) => cloneProject(
+    meshFormCorrectionForContext(project, input),
+  ),
+  "mesh_form.validate": (project) => meshFormCorrectionValidationResult(project),
+  "mesh_form.evaluate": (project, input) => {
+    const topology = project.meshTopologies.find((entry) => entry.id === input.topologyId) || null;
+    const keyform = input.keyformId
+      ? project.meshFormCorrectionKeyforms.find((entry) => entry.id === input.keyformId) || null
+      : null;
+    if (input.keyformId && !keyform) {
+      throw new Error(`Unknown MeshFormCorrectionKeyform ${input.keyformId}.`);
+    }
+    return cloneProject(evaluateMeshFormCorrection({
+      mesh: { positions: input.positions }, topology, keyform,
+    }));
   },
   "scene.get_tree": (project, input = {}) =>
     treeNode(project, project.scene.rootId, input.includeHidden !== false),

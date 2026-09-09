@@ -18,8 +18,9 @@ test("Object Mode routes PSD canvas input to scene interaction", () => {
   }), "object");
 });
 
-test("Deform and Topology Edit modes route PSD input to mesh authoring", () => {
-  for (const editorMode of [EDITOR_MODES.DEFORM, EDITOR_MODES.TOPOLOGY]) {
+test("Deform Topology Weight and Form Correction modes route PSD input to mesh authoring", () => {
+  for (const editorMode of [EDITOR_MODES.DEFORM, EDITOR_MODES.TOPOLOGY,
+    EDITOR_MODES.WEIGHT, EDITOR_MODES.FORM_CORRECTION]) {
     assert.equal(canvasInteractionRoute({
       contentMode: "psd",
       editorMode,

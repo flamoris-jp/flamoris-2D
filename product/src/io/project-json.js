@@ -76,6 +76,13 @@ export function createFl2dDocument(
     };
   });
   body.meshKeyforms = [...body.meshKeyforms].sort(byId);
+  body.meshFormCorrectionKeyforms = [...body.meshFormCorrectionKeyforms]
+    .sort(byId)
+    .map((keyform) => ({
+      ...keyform,
+      vertexOffsets: [...keyform.vertexOffsets].sort((left, right) =>
+        left.vertexId < right.vertexId ? -1 : left.vertexId > right.vertexId ? 1 : 0),
+    }));
   body.clippingBindings = [...body.clippingBindings].sort(byId);
   body.rig.deformers = [...body.rig.deformers].sort(byId).map((deformer) => ({
     ...deformer,
@@ -252,6 +259,10 @@ export function migrateProjectSchema(value) {
       : { rigidBoneBindings: [], constraints: [] };
     project.rig.skinBindings = [];
     project.schemaVersion = 9;
+  }
+  if (project?.schemaVersion === 9) {
+    project.meshFormCorrectionKeyforms = [];
+    project.schemaVersion = 10;
   }
   if (project?.schemaVersion !== PROJECT_SCHEMA_VERSION) {
     throw new ProjectFormatError(

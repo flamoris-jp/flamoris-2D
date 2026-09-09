@@ -68,6 +68,25 @@ const skinBinding = {
   },
   additionalProperties: false,
 };
+const meshFormVertexOffset = {
+  type: "object",
+  required: ["vertexId", "x", "y"],
+  properties: { vertexId: nonEmptyString, x: finiteNumber, y: finiteNumber },
+  additionalProperties: false,
+};
+const meshFormVertexOffsets = { type: "array", items: meshFormVertexOffset };
+const meshFormCorrectionKeyform = {
+  type: "object",
+  required: ["id", "topologyId", "keyArtId", "semanticSlotId", "vertexOffsets"],
+  properties: {
+    id: nonEmptyString,
+    topologyId: nonEmptyString,
+    keyArtId: nonEmptyString,
+    semanticSlotId: nonEmptyString,
+    vertexOffsets: meshFormVertexOffsets,
+  },
+  additionalProperties: false,
+};
 
 const clippingBinding = {
   type: "object",
@@ -106,6 +125,24 @@ const transform = {
 };
 
 export const commandSchemas = {
+  "mesh_form.create_keyform": {
+    type: "object",
+    required: ["keyform"],
+    properties: { keyform: meshFormCorrectionKeyform },
+    additionalProperties: false,
+  },
+  "mesh_form.set_vertex_offsets": {
+    type: "object",
+    required: ["keyformId", "vertexOffsets"],
+    properties: { keyformId: nonEmptyString, vertexOffsets: meshFormVertexOffsets },
+    additionalProperties: false,
+  },
+  "mesh_form.reset_keyform": {
+    type: "object",
+    required: ["keyformId"],
+    properties: { keyformId: nonEmptyString },
+    additionalProperties: false,
+  },
   "skin.create_binding": {
     type: "object",
     required: ["binding"],
@@ -131,6 +168,15 @@ export const commandSchemas = {
       bindingId: nonEmptyString,
       vertexId: nonEmptyString,
       influences: skinInfluences,
+    },
+    additionalProperties: false,
+  },
+  "skin.set_weights_bulk": {
+    type: "object",
+    required: ["bindingId", "vertexWeights"],
+    properties: {
+      bindingId: nonEmptyString,
+      vertexWeights: { type: "array", minItems: 1, items: skinVertexWeight },
     },
     additionalProperties: false,
   },
@@ -708,6 +754,18 @@ function entityRestoreSchema() {
 }
 
 const internalCommandSchemas = {
+  "mesh_form.remove_keyform_internal": {
+    type: "object",
+    required: ["keyformId"],
+    properties: { keyformId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "mesh_form.restore_keyform": {
+    type: "object",
+    required: ["keyform", "index"],
+    properties: { keyform: meshFormCorrectionKeyform, index: nonNegativeInteger },
+    additionalProperties: false,
+  },
   "bone.remove_rigid_binding_internal": {
     type: "object",
     required: ["bindingId"],
