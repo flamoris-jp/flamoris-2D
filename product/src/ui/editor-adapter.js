@@ -13,6 +13,7 @@ import { BoneAuthoringController } from "./bone-authoring-controller.js";
 import { WeightAuthoringController } from "./weight-authoring-controller.js";
 import { FormCorrectionAuthoringController } from "./form-correction-authoring-controller.js";
 import { TwoBoneIkAuthoringController } from "./two-bone-ik-authoring-controller.js";
+import { BoneMirrorAuthoringController } from "./bone-mirror-authoring-controller.js";
 
 function filterTree(node, matches) {
   const children = node.children
@@ -75,6 +76,9 @@ export class EditorUiAdapter {
     this.twoBoneIkAuthoring = new TwoBoneIkAuthoringController(session, {
       onChange: (reason) => this.notify(reason),
     });
+    this.boneMirrorAuthoring = new BoneMirrorAuthoringController(session, {
+      onChange: (reason) => this.notify(reason),
+    });
     this.transitionPreview = new TransitionPreviewController(session, this.transitionAuthoring, {
       onChange: (reason) => this.notify(reason),
     });
@@ -104,6 +108,7 @@ export class EditorUiAdapter {
       sessionOnChange?.(...args);
       this.boneAuthoring.projectChanged();
       this.twoBoneIkAuthoring.projectChanged();
+      this.boneMirrorAuthoring.projectChanged();
       this.transitionPreview.projectChanged();
       this.correspondencePreview.projectChanged();
       this.notify("project");

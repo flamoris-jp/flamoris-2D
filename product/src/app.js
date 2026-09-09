@@ -1145,6 +1145,81 @@ elements.createChildBoneButton.addEventListener("click", () => {
 elements.resetBonePoseButton.addEventListener("click", () => {
   commitInspectorEdit(() => state.editor?.boneAuthoring.resetPose());
 });
+function selectedRotationConstraint() {
+  const boneId = state.editor?.selectedNode()?.kind === "bone"
+    ? state.editor.selectedNodeId : null;
+  return boneId ? state.editor.session.query("bone.get_rotation_constraint_for_bone", {
+    boneId,
+  }) : null;
+}
+elements.createRotationConstraintButton.addEventListener("click", () =>
+  commitInspectorEdit(() => {
+    const boneId = state.editor?.selectedNodeId;
+    if (!boneId) return;
+    const minRotation = Number(elements.rotationConstraintMinInput.value) * Math.PI / 180;
+    const maxRotation = Number(elements.rotationConstraintMaxInput.value) * Math.PI / 180;
+    const nextId = createIdFactory(`rotation-constraint-${Date.now()}`)(
+      "bone_rotation_constraint");
+    state.editor.session.execute({ type: "bone.create_rotation_constraint", payload: {
+      constraint: { id: nextId, boneId, enabled: true, minRotation, maxRotation },
+    } }, { label: "Create Bone rotation constraint" });
+  }));
+elements.removeRotationConstraintButton.addEventListener("click", () =>
+  commitInspectorEdit(() => {
+    const constraint = selectedRotationConstraint();
+    if (constraint) state.editor.session.execute({
+      type: "bone.remove_rotation_constraint",
+      payload: { constraintId: constraint.id },
+    }, { label: "Remove Bone rotation constraint" });
+  }));
+elements.rotationConstraintEnabledInput.addEventListener("change", () =>
+  commitInspectorEdit(() => {
+    const constraint = selectedRotationConstraint();
+    if (constraint) state.editor.session.execute({
+      type: "bone.set_rotation_constraint_enabled",
+      payload: { constraintId: constraint.id,
+        enabled: elements.rotationConstraintEnabledInput.checked },
+    }, { label: "Set Bone rotation constraint enabled" });
+  }));
+function commitRotationConstraintBounds() {
+  commitInspectorEdit(() => {
+    const constraint = selectedRotationConstraint();
+    if (!constraint) return;
+    state.editor.session.execute({ type: "bone.set_rotation_constraint_bounds", payload: {
+      constraintId: constraint.id,
+      minRotation: Number(elements.rotationConstraintMinInput.value) * Math.PI / 180,
+      maxRotation: Number(elements.rotationConstraintMaxInput.value) * Math.PI / 180,
+    } }, { label: "Edit Bone rotation constraint" });
+  });
+}
+elements.rotationConstraintMinInput.addEventListener("change", commitRotationConstraintBounds);
+elements.rotationConstraintMaxInput.addEventListener("change", commitRotationConstraintBounds);
+function syncMirrorPair() {
+  state.editor?.boneMirrorAuthoring.setPair({
+    sourceBoneId: elements.mirrorSourceBoneSelect.value || null,
+    targetBoneId: elements.mirrorTargetBoneSelect.value || null,
+    activeKeyArtId: elements.mirrorKeyArtSelect.value || null,
+    axisX: Number(elements.mirrorAxisXInput.value),
+  });
+}
+for (const control of [elements.mirrorSourceBoneSelect, elements.mirrorTargetBoneSelect,
+  elements.mirrorKeyArtSelect, elements.mirrorAxisXInput]) {
+  control.addEventListener("change", () => {
+    try { syncMirrorPair(); }
+    catch (error) {
+      setStatus(error.message || String(error));
+      sceneEditorView.renderInspector();
+    }
+  });
+}
+elements.mirrorBoneRestButton.addEventListener("click", () => commitInspectorEdit(() => {
+  syncMirrorPair();
+  return state.editor?.boneMirrorAuthoring.mirrorRest();
+}));
+elements.mirrorBonePoseButton.addEventListener("click", () => commitInspectorEdit(() => {
+  syncMirrorPair();
+  return state.editor?.boneMirrorAuthoring.mirrorPose();
+}));
 function updateIkContext() {
   state.editor?.twoBoneIkAuthoring.setContext({
     constraintId: elements.ikConstraintSelect.value || null,

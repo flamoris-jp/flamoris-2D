@@ -132,6 +132,8 @@ export function createSceneEditorView({
       elements.transformInputs.forEach((input) => { input.value = ""; });
       elements.deformerControls.hidden = true;
       elements.boneControls.hidden = true;
+      elements.rotationConstraintControls.hidden = true;
+      elements.boneMirrorControls.hidden = true;
       elements.ikControls.hidden = true;
       elements.rigidBindingControls.hidden = true;
       elements.weightAuthoringControls.hidden = true;
@@ -187,6 +189,61 @@ export function createSceneEditorView({
       };
       appendParent(state.editor.session.query("scene.get_tree", { includeHidden: true }));
       elements.boneParentSelect.value = bone.selectedBone.parentNodeId;
+    }
+    elements.rotationConstraintControls.hidden = node.kind !== "bone";
+    elements.boneMirrorControls.hidden = node.kind !== "bone";
+    if (node.kind === "bone") {
+      const rotationConstraint = state.editor.session.query(
+        "bone.get_rotation_constraint_for_bone", { boneId: node.id });
+      elements.rotationConstraintEnabledInput.checked = Boolean(rotationConstraint?.enabled);
+      elements.rotationConstraintEnabledInput.disabled = !rotationConstraint;
+      elements.rotationConstraintMinInput.value = String(Number((
+        (rotationConstraint?.minRotation ?? -Math.PI) * 180 / Math.PI).toFixed(4)));
+      elements.rotationConstraintMaxInput.value = String(Number((
+        (rotationConstraint?.maxRotation ?? Math.PI) * 180 / Math.PI).toFixed(4)));
+      elements.rotationConstraintMinInput.disabled = !rotationConstraint;
+      elements.rotationConstraintMaxInput.disabled = !rotationConstraint;
+      elements.createRotationConstraintButton.disabled = Boolean(rotationConstraint);
+      elements.removeRotationConstraintButton.disabled = !rotationConstraint;
+
+      const mirror = state.editor.boneMirrorAuthoring.getState();
+      const bones = state.editor.session.query("bone.list");
+      for (const [select, emptyLabel, current] of [
+        [elements.mirrorSourceBoneSelect, "Source", mirror.sourceBoneId || node.id],
+        [elements.mirrorTargetBoneSelect, "Target", mirror.targetBoneId],
+      ]) {
+        select.replaceChildren();
+        const empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = `— ${emptyLabel} —`;
+        select.append(empty);
+        for (const candidate of bones) {
+          const option = document.createElement("option");
+          option.value = candidate.id;
+          option.textContent = `${candidate.displayName} (${candidate.id})`;
+          select.append(option);
+        }
+        select.value = current || "";
+      }
+      elements.mirrorKeyArtSelect.replaceChildren();
+      const noKeyArt = document.createElement("option");
+      noKeyArt.value = "";
+      noKeyArt.textContent = "— Select Key Art —";
+      elements.mirrorKeyArtSelect.append(noKeyArt);
+      for (const keyArt of state.editor.session.query("keyart.list")) {
+        const option = document.createElement("option");
+        option.value = keyArt.id;
+        option.textContent = `${keyArt.displayName} (${keyArt.id})`;
+        elements.mirrorKeyArtSelect.append(option);
+      }
+      elements.mirrorKeyArtSelect.value = mirror.activeKeyArtId ||
+        bone.activeKeyArt?.id || "";
+      elements.mirrorAxisXInput.value = String(mirror.axisX);
+      const hasPair = Boolean(elements.mirrorSourceBoneSelect.value &&
+        elements.mirrorTargetBoneSelect.value &&
+        elements.mirrorSourceBoneSelect.value !== elements.mirrorTargetBoneSelect.value);
+      elements.mirrorBoneRestButton.disabled = !hasPair;
+      elements.mirrorBonePoseButton.disabled = !hasPair || !elements.mirrorKeyArtSelect.value;
     }
     const ik = state.editor.twoBoneIkAuthoring.getState();
     elements.ikControls.hidden = state.editorMode !== "ik";

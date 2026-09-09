@@ -201,6 +201,30 @@
               </div>
               <output id="boneAuthoringStatus" class="deformer-grid-reason"></output>
             </fieldset>
+            <fieldset id="rotationConstraintControls" hidden>
+              <legend>Rotation Constraint</legend>
+              <label class="clipping-toggle"><input id="rotationConstraintEnabledInput" type="checkbox" /> Enabled</label>
+              <div class="inspector-grid">
+                <label>Min°<input id="rotationConstraintMinInput" type="number" step="0.1" value="-180" /></label>
+                <label>Max°<input id="rotationConstraintMaxInput" type="number" step="0.1" value="180" /></label>
+              </div>
+              <div class="deformer-actions">
+                <button id="createRotationConstraintButton" type="button" class="secondary">Create</button>
+                <button id="removeRotationConstraintButton" type="button" class="secondary">Remove</button>
+              </div>
+            </fieldset>
+            <fieldset id="boneMirrorControls" hidden>
+              <legend>Mirror Helper</legend>
+              <label>Source<select id="mirrorSourceBoneSelect"><option value="">— Source —</option></select></label>
+              <label>Target<select id="mirrorTargetBoneSelect"><option value="">— Target —</option></select></label>
+              <label>Key Art<select id="mirrorKeyArtSelect"><option value="">— Select Key Art —</option></select></label>
+              <label>Parent-local X axis<input id="mirrorAxisXInput" type="number" step="0.1" value="0" /></label>
+              <div class="deformer-actions">
+                <button id="mirrorBoneRestButton" type="button" class="secondary">Mirror rest</button>
+                <button id="mirrorBonePoseButton" type="button" class="secondary">Mirror pose</button>
+              </div>
+              <output id="boneMirrorStatus" class="deformer-grid-reason">Explicit pair only · no name guessing.</output>
+            </fieldset>
             <fieldset id="ikControls" hidden>
               <legend>Two-Bone IK</legend>
               <label>Active IK<select id="ikConstraintSelect"><option value="">— Select IK —</option></select></label>

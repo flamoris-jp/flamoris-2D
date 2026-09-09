@@ -38,6 +38,7 @@ src/model/temporal-validation.js
 src/model/transition-validation.js
 src/core/transforms.js
 src/core/bone-fk-evaluator.js
+src/core/bone-mirror-helper.js
 src/core/bone-rotation-constraint-evaluator.js
 src/core/two-bone-ik-solver.js
 src/core/two-bone-ik-authoring-solver.js
@@ -101,6 +102,7 @@ src/ui/correspondence-preview-controller.js
 src/ui/clipping-authoring-controller.js
 src/ui/deformer-authoring-controller.js
 src/ui/bone-authoring-controller.js
+src/ui/bone-mirror-authoring-controller.js
 src/ui/weight-authoring-controller.js
 src/ui/form-correction-authoring-controller.js
 src/ui/two-bone-ik-authoring-controller.js
