@@ -296,12 +296,14 @@ State changes sampled by step:
 
 ## 9. TransformTrack
 
-A node transform track targets a stable scene node and states its coordinate space explicitly.
+A transform track targets either a stable Scene node or a stable SemanticSlot
+and states its coordinate space explicitly.
 
 ```text
 TransformTrack
-├── targetNodeId
-├── coordinateSpace: node-local
+├── target
+│   ├── { nodeId, coordinateSpace: node-local }
+│   └── { semanticSlotId, coordinateSpace: node-local }
 └── channels
     ├── positionX
     ├── positionY
@@ -320,6 +322,16 @@ Clip weight scales position/rotation and exponentiates scale toward identity as
 specified by `docs/phase8-animation-sequencing.md`. Contributions are resolved
 through the Scene hierarchy before final render-instance world transforms are
 emitted; they are not multiplied onto already-flattened render output.
+
+Node targets are intentionally local: the same `nodeId` must remain the active
+mapped source throughout the ClipInstance's intersected ViewLane range or the
+instance is incompatible. Reusable motion spanning Key Arts with different
+mapped nodes targets the SemanticSlot instead. A semantic target applies the
+same sampled local delta independently to the existing mode-resolved endpoint
+node(s): both endpoints before Morph transform interpolation, every active
+Replace instance, or the selected endpoint for single-endpoint modes. Missing
+present mappings and ambiguous mappings diagnose; an authored absent endpoint
+has no render instance to transform.
 
 ## 10. MeshDeformationTrack
 

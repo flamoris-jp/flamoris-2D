@@ -483,11 +483,14 @@ scope unambiguous in persistent data.
 
 ## 10. TransformTrack
 
-Initial general TransformTrack targets one stable Scene node in node-local space.
+Initial general TransformTrack supports either one stable Scene node or one
+stable SemanticSlot, always in the resolved node's local space.
 
 ```text
 TransformTrack
-├── target: { nodeId, coordinateSpace: node-local }
+├── target
+│   ├── { nodeId, coordinateSpace: node-local }
+│   └── { semanticSlotId, coordinateSpace: node-local }
 └── delta channels
     ├── positionX
     ├── positionY
@@ -519,12 +522,29 @@ rotation = baseRotation + sum(weighted deltas)
 scale    = baseScale * product(weighted factors)
 ```
 
-Transform contribution applies to the targeted Scene node before descendant
-world transforms are resolved. For Transition modes with two endpoint nodes,
-the evaluator resolves contributed endpoint world transforms and then reuses
-the existing endpoint-transform selection/interpolation rule. Applying one
-matrix to a completed render instance would lose parent/group semantics and is
-not allowed.
+Target resolution is part of Sequence evaluation, not clip authoring UI state:
+
+- a `nodeId` target applies only to that exact Scene node;
+- a node-targeted ClipInstance is compatible only when that same node is the
+  active mapped source for every present ViewLane state intersected by the
+  instance; crossing a Transition to a different mapped node emits
+  `ANIMATION_CLIP_TARGET_INCOMPATIBLE` and makes evaluation non-authoritative;
+- a reusable clip intended to span A/B/C Key Arts targets a `semanticSlotId`;
+- on a KeyArtHold or single-endpoint Transition mode, a semantic target resolves
+  to the present mapped node for that Key Art;
+- on Morph, the same sampled local delta is applied independently to both
+  endpoint mapped nodes before their world transforms are resolved, after
+  which the existing endpoint-transform interpolation remains authoritative;
+- on Replace, the delta is applied independently to every active endpoint
+  render instance for the slot, including the dual-instance interval;
+- on Appear/Disappear/Occlusion/Hold, it applies to the endpoint node selected
+  by the existing Transition mode;
+- an absent semantic endpoint contributes no render instance and therefore no
+  transform, while an unknown or structurally ambiguous mapping diagnoses.
+
+In every case the contribution applies before descendant world transforms are
+resolved. Applying one matrix to a completed render instance would lose
+parent/group semantics and is not allowed.
 
 Absolute Transform override tracks are deferred until production evidence requires them.
 
@@ -903,6 +923,7 @@ ANIMATION_INSTANCE_SOURCE_RANGE_INVALID
 ANIMATION_PLAYBACK_RATE_INVALID
 ANIMATION_LOOP_ENDPOINT_MISMATCH
 ANIMATION_TRACK_TARGET_INVALID
+ANIMATION_CLIP_TARGET_INCOMPATIBLE
 ANIMATION_TRACK_CONFLICT
 ANIMATION_DISCRETE_WEIGHT_INVALID
 ANIMATION_TOPOLOGY_INCOMPATIBLE
@@ -1041,7 +1062,8 @@ Cover at least:
 14. loop exact-period wrap maps to phase zero;
 15. loop endpoint mismatch diagnostic;
 16. multiple active clip resolution independent of insertion order;
-17. TransformTrack additive/multiplicative numeric proof;
+17. TransformTrack additive/multiplicative numeric proof, including a
+    SemanticSlot target across A/B/C and Replace dual instances;
 18. ClipInstance weight identity behavior;
 19. BoneTrack over Key-Art pose;
 20. Bone rotation constraints after clip mixing;
@@ -1065,7 +1087,9 @@ Cover at least:
 36. headless sequence evaluation without DOM;
 37. standalone KeyArtHold ambiguity rejection;
 38. same-KeyArt/different-keyform ViewLane endpoint incompatibility rejection;
-39. full existing Phase 1-7 regression suite remains green.
+39. node-targeted TransformTrack crossing a differently mapped Key Art emits
+    `ANIMATION_CLIP_TARGET_INCOMPATIBLE` independent of insertion order;
+40. full existing Phase 1-7 regression suite remains green.
 
 ## 26. Acceptance criteria
 
