@@ -55,6 +55,34 @@ test("TemporalProgram ownership conflicts span Transition, Sequence, and Animati
   ]);
 });
 
+test("TemporalProgram ownership rejects every Clip cross-owner pairing", () => {
+  const ownerCases = [
+    ["Transition", (project) => project.transitions.push({
+      id: "transition_a", displayName: "Transition", fromKeyArtId: "missing_a",
+      toKeyArtId: "missing_b", temporalProgramId: "program_shared", partTransitions: [],
+      diagnosticOverrides: [], metadata: {},
+    })],
+    ["Sequence", (project) => project.sequences.push({
+      id: "sequence_a", displayName: "Sequence", temporalProgramId: "program_shared",
+      viewLaneItems: [], clipInstances: [], metadata: {},
+    })],
+    ["AnimationClip", (project) => project.animation.clips.push(createAnimationClip({
+      id: "clip_b", displayName: "B", temporalProgramId: "program_shared",
+    }))],
+  ];
+  for (const [kind, addOwner] of ownerCases) {
+    const project = projectFixture();
+    project.temporalPrograms.push(program("program_shared"));
+    project.animation.clips.push(createAnimationClip({ id: "clip_a", displayName: "A",
+      temporalProgramId: "program_shared" }));
+    addOwner(project);
+    const owners = temporalProgramOwners(project).get("program_shared");
+    assert.equal(owners.length, 2, kind);
+    assert.equal(validateProject(project).filter((issue) =>
+      issue.code === "TEMPORAL_PROGRAM_OWNERSHIP_CONFLICT").length, 2, kind);
+  }
+});
+
 test("schema 13 migration starts typed clip state empty without promoting placeholders", () => {
   const legacy = projectFixture();
   legacy.schemaVersion = 13;

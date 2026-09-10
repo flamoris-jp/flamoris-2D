@@ -82,7 +82,8 @@ export function validateAnimationClips(project) {
   }
 
   [...project.animation.clips]
-    .sort((left, right) => String(left?.id).localeCompare(String(right?.id)))
+    .sort((left, right) => String(left?.id) < String(right?.id) ? -1 :
+      String(left?.id) > String(right?.id) ? 1 : 0)
     .forEach((clip, clipIndex) => {
       const path = "animation.clips." + clipIndex;
       if (!object(clip)) {
@@ -120,7 +121,8 @@ export function validateAnimationClips(project) {
       if (!program || !looping.has(clip.id) || !Number.isSafeInteger(program.durationTicks) ||
         program.durationTicks <= 0 || !Array.isArray(program.tracks)) return;
       [...program.tracks]
-        .sort((left, right) => String(left?.trackId).localeCompare(String(right?.trackId)))
+        .sort((left, right) => String(left?.trackId) < String(right?.trackId) ? -1 :
+          String(left?.trackId) > String(right?.trackId) ? 1 : 0)
         .forEach((track) => {
           const definition = TEMPORAL_TRACK_DEFINITIONS[track?.kind];
           if (!definition || !object(track.channels)) return;

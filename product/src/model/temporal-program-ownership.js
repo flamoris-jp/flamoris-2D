@@ -170,7 +170,8 @@ export function validateTemporalProgramOwnershipChange(beforeProject, afterProje
       ));
     }
     for (const owner of [...lifecycle.after]
-      .sort((left, right) => String(left.id).localeCompare(String(right.id)))) {
+      .sort((left, right) => String(left.id) < String(right.id) ? -1 :
+        String(left.id) > String(right.id) ? 1 : 0)) {
       if (beforeById.has(owner.id) || !beforeProgramIds.has(owner.temporalProgramId)) continue;
       issues.push(problem(
         lifecycle.codePrefix + "_CREATION_NOT_ATOMIC",
@@ -182,7 +183,8 @@ export function validateTemporalProgramOwnershipChange(beforeProject, afterProje
       ));
     }
     for (const owner of [...lifecycle.before]
-      .sort((left, right) => String(left.id).localeCompare(String(right.id)))) {
+      .sort((left, right) => String(left.id) < String(right.id) ? -1 :
+        String(left.id) > String(right.id) ? 1 : 0)) {
       if (afterById.has(owner.id) || !afterProgramIds.has(owner.temporalProgramId)) continue;
       issues.push(problem(
         lifecycle.codePrefix + "_REMOVAL_NOT_ATOMIC",

@@ -55,11 +55,11 @@ test("ClipInstance exact projection uses BigInt before rational rounding", () =>
   const instance = clipInstance({
     startTicks: 0,
     endTicks: 4_000_000_001,
-    playbackRate: { numerator: 4_000_000_000, denominator: 4_000_000_000 },
+    playbackRate: { numerator: 4_000_000_001, denominator: 4_000_000_000 },
   });
   assert.equal(
     rawClipLocalTick(instance, 4_000_000_000),
-    4_000_000_000,
+    4_000_000_001,
   );
 });
 
@@ -128,6 +128,23 @@ test("ClipInstance validation rejects references, placement, rate, weight, and l
   assert.ok(codes.includes("ANIMATION_CLIP_WEIGHT_INVALID"));
   assert.ok(codes.includes("ANIMATION_CLIP_LAYER_INVALID"));
   assert.ok(codes.includes("ANIMATION_CLIP_INSTANCE_INVALID"));
+});
+
+test("ClipInstance placement and rational positivity boundaries reject independently", () => {
+  const cases = [
+    [clipInstance({ startTicks: -1 }), "ANIMATION_CLIP_INSTANCE_PLACEMENT_INVALID"],
+    [clipInstance({ endTicks: 11 }), "ANIMATION_CLIP_INSTANCE_PLACEMENT_INVALID"],
+    [clipInstance({ playbackRate: { numerator: 0, denominator: 1 } }),
+      "ANIMATION_CLIP_PLAYBACK_RATE_INVALID"],
+    [clipInstance({ playbackRate: { numerator: 1, denominator: 0 } }),
+      "ANIMATION_CLIP_PLAYBACK_RATE_INVALID"],
+    [clipInstance({ weight: -0.01 }), "ANIMATION_CLIP_WEIGHT_INVALID"],
+    [clipInstance({ weight: Number.NaN }), "ANIMATION_CLIP_WEIGHT_INVALID"],
+  ];
+  for (const [instance, code] of cases) {
+    assert.ok(validateProject(projectWithInstance(instance)).some((issue) => issue.code === code),
+      code);
+  }
 });
 
 test("ClipInstance canonical validation is independent of array insertion order", () => {
