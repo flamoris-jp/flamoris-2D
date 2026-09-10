@@ -48,12 +48,12 @@ function hasExactKeys(value, expected) {
   return actual.length === sorted.length && actual.every((key, index) => key === sorted[index]);
 }
 
-function validateInterpolation(value, path, issues, discrete) {
+function validateInterpolation(value, path, issues, channelDefinition) {
   if (!object(value) || !["step", "linear", "bezier"].includes(value.kind)) {
     issues.push(problem("ANIMATION_INVALID_CURVE", path, "Interpolation kind must be step, linear, or bezier."));
     return;
   }
-  if (discrete && value.kind !== "step") {
+  if (channelDefinition.discrete && value.kind !== "step") {
     issues.push(problem("ANIMATION_INVALID_CURVE", path, "Discrete channels require step interpolation."));
   }
   const keys = Object.keys(value).sort();
@@ -71,6 +71,14 @@ function validateInterpolation(value, path, issues, discrete) {
         "ANIMATION_INVALID_CURVE",
         path,
         "Bezier controls must be finite and x1/x2 must be within 0..1.",
+      ));
+    }
+    if (channelDefinition.value === "positive-number" &&
+      (value.y1 < 0 || value.y1 > 1 || value.y2 < 0 || value.y2 > 1)) {
+      issues.push(problem(
+        "ANIMATION_INVALID_CURVE",
+        path,
+        "Positive scale channels require Bezier y1/y2 within 0..1 so sampling remains positive.",
       ));
     }
   }
@@ -267,7 +275,7 @@ function validateTrack(track, program, project, path, issues, register) {
       const channelDefinition = temporalChannelDefinition(track.kind, channelName);
       validateValue(keyframe.value, channelDefinition.value, keyPath + ".value", issues, project, track);
       validateInterpolation(keyframe.interpolationToNext, keyPath + ".interpolationToNext", issues,
-        channelDefinition.discrete);
+        channelDefinition);
     });
     if (temporalChannelDefinition(track.kind, channelName).value === "deformation") {
       const ordered = [...channel.keyframes].sort((a, b) => a.timeTicks - b.timeTicks);
