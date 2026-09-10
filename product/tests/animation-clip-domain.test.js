@@ -5,7 +5,7 @@ import { createAnimationClip } from "../src/model/animation-clip.js";
 import { createIdFactory, createProject, PROJECT_SCHEMA_VERSION } from "../src/model/project.js";
 import { validateProject } from "../src/model/validation.js";
 import { temporalProgramOwners } from "../src/model/temporal-program-ownership.js";
-import { migrateProjectSchema } from "../src/io/project-json.js";
+import { migrateProjectSchema, ProjectFormatError } from "../src/io/project-json.js";
 
 function projectFixture() {
   return createProject({ name: "Clip Domain", width: 64, height: 64,
@@ -99,11 +99,16 @@ test("schema 13 migration starts typed clip state empty without promoting placeh
   assert.equal(migrated.temporalPrograms[0].id, "unowned_program");
 });
 
-test("schema 13 migration discards a non-array Sequence placeholder", () => {
+test("schema 13 migration rejects a non-array authoritative Sequence collection", () => {
   const legacy = projectFixture();
   legacy.schemaVersion = 13;
   legacy.sequences = { unsupported: true };
-  assert.deepEqual(migrateProjectSchema(legacy).sequences, []);
+  assert.throws(
+    () => migrateProjectSchema(legacy),
+    (error) => error instanceof ProjectFormatError &&
+      error.code === "project.schema_invalid" &&
+      error.details?.path === "sequences",
+  );
 });
 
 test("AnimationClip rejects unknown fields and missing owned programs", () => {
@@ -178,4 +183,22 @@ test("AnimationClip ownership cannot smuggle Transition-only track families", ()
   }] });
   assert.ok(validateProject(project).some((issue) =>
     issue.code === "ANIMATION_TRACK_OWNER_INVALID" && issue.entityId === "track_geometry"));
+});
+
+test("AnimationClip ownership rejects deferred MeshDeformationTrack state", () => {
+  const project = projectFixture();
+  project.meshes.push({ id: "mesh_face" });
+  project.animation.clips.push(createAnimationClip({ id: "clip_mesh_deform",
+    displayName: "Invalid", temporalProgramId: "program_mesh_deform" }));
+  project.temporalPrograms.push({ ...program("program_mesh_deform"), tracks: [{
+    trackId: "track_mesh_deform", version: 1, kind: "MeshDeformationTrack",
+    target: { meshId: "mesh_face" },
+    channels: { deformation: { keyframes: [{
+      id: "key_mesh_deform", timeTicks: 0,
+      value: { deformationSampleId: "sample_future", weight: 1 },
+      interpolationToNext: { kind: "step" },
+    }] } },
+  }] });
+  assert.ok(validateProject(project).some((issue) =>
+    issue.code === "ANIMATION_TRACK_OWNER_INVALID" && issue.entityId === "track_mesh_deform"));
 });

@@ -106,11 +106,17 @@ export function validateTemporalProgramOwnerTracks(project) {
             trackKind: track?.kind,
           },
         ));
-      } else if (clipOwner && ["GeometryBlendTrack", "AppearanceTrack"].includes(track?.kind)) {
+      } else if (clipOwner && [
+        "GeometryBlendTrack",
+        "AppearanceTrack",
+        "MeshDeformationTrack",
+      ].includes(track?.kind)) {
         issues.push(problem(
           "ANIMATION_TRACK_OWNER_INVALID",
           path + ".kind",
-          track.kind + " remains Transition-owned and cannot be authored in an AnimationClip.",
+          track.kind === "MeshDeformationTrack"
+            ? "MeshDeformationTrack is deferred until its deformation-sample domain is introduced."
+            : track.kind + " remains Transition-owned and cannot be authored in an AnimationClip.",
           track?.trackId || program?.id,
           {
             temporalProgramId: program?.id,

@@ -300,15 +300,21 @@ export function migrateProjectSchema(value) {
     project.schemaVersion = 13;
   }
   if (project?.schemaVersion === 13) {
-    // Schema 13 exposed both collections only as unsupported placeholders.
-    // Phase 8-2 starts their typed lifetime from empty state rather than
-    // reinterpreting arbitrary legacy placeholder objects.
+    // Schema 13 exposed animation collections and nested clipInstances only
+    // as unsupported placeholders. The Sequence collection itself was already
+    // authoritative Phase 8-1 data and must never be silently repaired away.
+    if (!Array.isArray(project.sequences)) {
+      throw new ProjectFormatError(
+        "Schema 13 sequences must be an array.",
+        "project.schema_invalid",
+        { schemaVersion: 13, path: "sequences" },
+      );
+    }
     project.animation = {
       clips: [],
       deformationSamples: [],
     };
-    const schema13Sequences = Array.isArray(project.sequences) ? project.sequences : [];
-    project.sequences = schema13Sequences.map((sequence) => ({
+    project.sequences = project.sequences.map((sequence) => ({
       ...sequence,
       clipInstances: [],
     }));
