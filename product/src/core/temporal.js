@@ -57,6 +57,16 @@ function safeNumber(value, label) {
   return number;
 }
 
+export function roundHalfUpRatio(numerator, denominator) {
+  if ((typeof numerator !== "bigint" && (!Number.isSafeInteger(numerator) || numerator < 0)) ||
+    (typeof denominator !== "bigint" && (!Number.isSafeInteger(denominator) || denominator <= 0))) {
+    throw new RangeError("Temporal ratio values must be non-negative safe integers or BigInts.");
+  }
+  const left = typeof numerator === "bigint" ? numerator : BigInt(numerator);
+  const right = typeof denominator === "bigint" ? denominator : BigInt(denominator);
+  return safeNumber(roundHalfUp(left, right), "Rounded ratio");
+}
+
 export function frameToTicks(frameIndex, frameRate) {
   if (!Number.isSafeInteger(frameIndex) || frameIndex < 0) {
     throw new RangeError("Frame index must be a non-negative safe integer.");

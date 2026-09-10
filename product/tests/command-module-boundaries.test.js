@@ -13,6 +13,7 @@ import { sceneCommandHandlers } from "../src/commands/scene-command-handlers.js"
 import { temporalCommandHandlers } from "../src/commands/temporal-command-handlers.js";
 import { transitionCommandHandlers } from "../src/commands/transition-command-handlers.js";
 import { boneCommandHandlers } from "../src/commands/bone-command-handlers.js";
+import { sequenceCommandHandlers } from "../src/commands/sequence-command-handlers.js";
 
 test("command handler modules keep their domain boundaries and public errors", () => {
   assert.equal(PublicCommandError, CommandError);
@@ -22,10 +23,12 @@ test("command handler modules keep their domain boundaries and public errors", (
   const sceneTypes = Object.keys(sceneCommandHandlers);
   const transitionTypes = Object.keys(transitionCommandHandlers);
   const boneTypes = Object.keys(boneCommandHandlers);
+  const sequenceTypes = Object.keys(sequenceCommandHandlers);
   assert.ok(temporalTypes.length > 0);
   assert.ok(sceneTypes.length > 0);
   assert.ok(transitionTypes.length > 0);
   assert.ok(boneTypes.length > 0);
+  assert.ok(sequenceTypes.length > 0);
   assert.ok(temporalTypes.every((type) => type.startsWith("animation.temporal.")));
   assert.ok(sceneTypes.every((type) =>
     type.startsWith("scene.") || type === "source.apply_psd_reimport"));
@@ -50,4 +53,8 @@ test("command handler modules keep their domain boundaries and public errors", (
       transitionTypes.includes(type)),
     [],
   );
+  assert.ok(sequenceTypes.every((type) => type.startsWith("sequence.")));
+  assert.deepEqual(sequenceTypes.filter((type) =>
+    temporalTypes.includes(type) || sceneTypes.includes(type) || transitionTypes.includes(type) ||
+    boneTypes.includes(type)), []);
 });

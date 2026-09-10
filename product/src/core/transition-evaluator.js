@@ -605,6 +605,7 @@ function stableFingerprint(value) {
 }
 
 const DIAGNOSTIC_MESSAGES = Object.freeze({
+  SEQUENCE_KEYART_BASE_AMBIGUOUS: "Standalone KeyArt base state has multiple compatible MeshKeyforms.",
   TRANSITION_MISSING_CORRESPONDENCE: "SemanticSlot correspondence is incomplete for this Transition.",
   TRANSITION_INVALID_MODE_FOR_MAPPING: "PartTransition mode is incompatible with the available endpoint mappings.",
   TRANSITION_TOPOLOGY_INCOMPATIBLE: "Morph endpoints do not share a compatible MeshTopology.",
@@ -638,6 +639,20 @@ const DIAGNOSTIC_MESSAGES = Object.freeze({
   BONE_PROJECTED_FRAME_DEGENERATE: "A post-Warp Bone bind frame is degenerate.",
   BONE_TRANSITION_INCOMPATIBLE: "Morph endpoints have incompatible rigid Bone state.",
 });
+
+function keyArtBaseDiagnostic(keyArtId, code, semanticSlotId = null, details = {}, severity = "error") {
+  const evidenceFingerprint = stableFingerprint({ keyArtId, code, semanticSlotId, details });
+  return {
+    key: [code, keyArtId, semanticSlotId || "-", evidenceFingerprint].join("|"),
+    code,
+    severity,
+    message: DIAGNOSTIC_MESSAGES[code] || code,
+    keyArtId,
+    ...(semanticSlotId ? { semanticSlotId } : {}),
+    details,
+    evidenceFingerprint,
+  };
+}
 
 function diagnostic(transitionId, code, severity, semanticSlotId = null, timeTicks = null, details = {}) {
   const evidenceFingerprint = stableFingerprint({ transitionId, code, semanticSlotId, timeTicks, details });
@@ -852,6 +867,73 @@ function compositeGroups(evaluatedParts) {
   return [...groups.values()]
     .map((group) => ({ ...group, members: group.members.sort((a, b) => compareText(a.renderInstanceId, b.renderInstanceId)) }))
     .sort((a, b) => compareText(a.compositeGroupId, b.compositeGroupId));
+}
+
+export function evaluateKeyArtBaseState(project, keyArtId, {
+  evaluationId = "keyart:" + keyArtId,
+} = {}) {
+  const keyArt = entity(project, "keyArts", keyArtId, "KeyArt");
+  const slots = [...(project.semanticSlots || [])]
+    .filter((slot) => semanticMappingFor(slot, keyArtId))
+    .sort((left, right) => compareText(left.id, right.id));
+  const pseudoTransition = { id: evaluationId };
+  const evaluatedParts = [];
+  const selections = [];
+  const ambiguityIssues = [];
+  const warpIssues = [];
+  const rigidIssues = [];
+  const correctionIssues = [];
+  for (const slot of slots) {
+    const candidates = (project.meshKeyforms || [])
+      .filter((keyform) => keyform.keyArtId === keyArtId && keyform.semanticSlotId === slot.id)
+      .sort((left, right) => compareText(left.id, right.id));
+    const keyform = candidates.length === 1 ? candidates[0] : null;
+    selections.push({
+      semanticSlotId: slot.id,
+      keyformId: keyform?.id ?? null,
+      topologyId: keyform?.topologyId ?? null,
+    });
+    if (candidates.length > 1) {
+      ambiguityIssues.push(keyArtBaseDiagnostic(
+        keyArtId,
+        "SEQUENCE_KEYART_BASE_AMBIGUOUS",
+        slot.id,
+        { keyformIds: candidates.map((entry) => entry.id) },
+      ));
+    }
+    evaluatedParts.push(endpointPartState(
+      project,
+      pseudoTransition,
+      { fromKeyformId: keyform?.id ?? null },
+      slot,
+      "from",
+      keyArt,
+      keyArt,
+      warpIssues,
+      rigidIssues,
+      correctionIssues,
+    ));
+  }
+  const orderedParts = evaluatedParts.sort((left, right) => compareText(left.semanticSlotId, right.semanticSlotId));
+  const clipping = resolveEvaluatedClipping(project, orderedParts);
+  const derived = [
+    ...clipping.diagnostics.map((entry) => keyArtBaseDiagnostic(
+      keyArtId, entry.code, entry.semanticSlotId, {
+        renderInstanceId: entry.renderInstanceId,
+        targetNodeId: entry.targetNodeId,
+        sourceNodeId: entry.sourceNodeId,
+        ...entry.details,
+      }, entry.severity)),
+    ...[...warpIssues, ...rigidIssues, ...correctionIssues].map((entry) =>
+      keyArtBaseDiagnostic(keyArtId, entry.code, entry.semanticSlotId, entry.details)),
+  ];
+  return {
+    keyArtId,
+    evaluatedParts: clipping.evaluatedParts,
+    compositeGroups: compositeGroups(clipping.evaluatedParts),
+    baseSelections: selections,
+    diagnostics: sortDiagnostics([...ambiguityIssues, ...derived]),
+  };
 }
 
 export function getTransitionDiagnostics(project, transitionId) {

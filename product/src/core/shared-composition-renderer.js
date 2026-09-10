@@ -2,7 +2,8 @@ import { createEvaluatedRenderPlan } from "./evaluated-render.js";
 
 /**
  * Shared projection and backend boundary for preview and export composition.
- * The canonical Transition evaluator remains the sole source of render state.
+ * A canonical evaluator remains the sole source of ordinary EvaluatedFrame render state.
+ * This boundary intentionally knows nothing about Transition or Sequence domain semantics.
  */
 export class SharedCompositionRenderer {
   constructor(renderer) {

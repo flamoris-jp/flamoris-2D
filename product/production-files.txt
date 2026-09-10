@@ -17,6 +17,9 @@ src/styles/editor-panels.css
 src/styles/viewport.css
 src/styles/dialogs.css
 src/model/project.js
+src/model/sequence.js
+src/model/sequence-validation.js
+src/model/temporal-program-ownership.js
 src/model/bone.js
 src/model/bone-validation.js
 src/model/bone-rotation-constraint.js
@@ -48,6 +51,7 @@ src/core/linear-blend-skinning-evaluator.js
 src/core/warp-deformer-evaluator.js
 src/core/temporal.js
 src/core/transition-evaluator.js
+src/core/sequence-evaluator.js
 src/core/mesh-form-correction-evaluator.js
 src/core/skin-mesh-evaluator.js
 src/core/clipping-evaluator.js
@@ -75,6 +79,7 @@ src/commands/clipping-command-handlers.js
 src/commands/bone-command-handlers.js
 src/commands/bone-constraint-command-handlers.js
 src/commands/two-bone-ik-command-handlers.js
+src/commands/sequence-command-handlers.js
 src/commands/rigid-bone-binding-command-handlers.js
 src/commands/skin-binding-command-handlers.js
 src/commands/mesh-form-correction-command-handlers.js

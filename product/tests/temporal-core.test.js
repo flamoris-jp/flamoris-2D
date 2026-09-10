@@ -255,13 +255,25 @@ test("Phase 2A typed track families validate without arbitrary property paths", 
         nodeId: project.scene.rootId,
         coordinateSpace: "node-local",
       }, "positionX", 12),
-      scalar("camera", "CameraTrack", { cameraId: "main" }, "scale", 1),
       scalar("mesh", "MeshDeformationTrack", { meshId: "mesh_face" }, "deformation", {
         deformationSampleId: "sample_face",
         weight: 0.5,
       }),
     ],
   });
+  project.keyArts.push({ id: "keyart_camera", displayName: "Camera Base",
+    rootNodeId: project.scene.rootId, members: [], metadata: {} });
+  project.temporalPrograms.push({
+    id: "program_camera",
+    durationTicks: 100,
+    events: [],
+    regions: [],
+    tracks: [scalar("camera", "CameraTrack", { cameraId: "main" }, "scale", 1)],
+  });
+  project.sequences.push({ id: "sequence_camera", displayName: "Camera Shot",
+    temporalProgramId: "program_camera", viewLaneItems: [{ id: "hold_camera",
+      kind: "KeyArtHold", keyArtId: "keyart_camera", startTicks: 0, endTicks: 100 }],
+    clipInstances: [], metadata: {} });
   assert.deepEqual(validateProject(project), []);
 });
 
@@ -404,7 +416,7 @@ test("Phase 1 schema migrates to an empty Temporal Core", () => {
     numerator: 24000,
     denominator: 1001,
   });
-  assert.equal(migrated.renderSettings.durationTicks, 300000);
+  assert.equal(Object.hasOwn(migrated.renderSettings, "durationTicks"), false);
   assert.equal(migrated.renderSettings.alpha, false);
   assert.deepEqual(migrated.temporalPrograms, []);
 });

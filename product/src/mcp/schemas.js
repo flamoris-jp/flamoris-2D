@@ -1,6 +1,6 @@
 export { commandSchemas } from "../commands/schemas.js";
 
-export const MCP_SCHEMA_VERSION = 14;
+export const MCP_SCHEMA_VERSION = 15;
 
 const nodeId = {
   type: "string",
@@ -9,6 +9,7 @@ const nodeId = {
 
 const programId = { ...nodeId };
 const transitionId = { ...nodeId };
+const sequenceId = { ...nodeId };
 const keyArtId = { ...nodeId };
 const semanticSlotId = { ...nodeId };
 
@@ -153,6 +154,15 @@ export const querySchemas = {
     additionalProperties: false,
   },
   "transition.get_diagnostics": idQuery("transitionId", transitionId),
+  "sequence.get": idQuery("sequenceId", sequenceId),
+  "sequence.list": emptyQuery(),
+  "sequence.get_diagnostics": idQuery("sequenceId", sequenceId),
+  "sequence.evaluate": {
+    type: "object",
+    required: ["sequenceId", "timeTicks"],
+    properties: { sequenceId, timeTicks: { type: "integer", minimum: 0 } },
+    additionalProperties: false,
+  },
   "animation.get_program": {
     type: "object",
     required: ["programId"],

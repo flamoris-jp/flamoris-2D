@@ -14,6 +14,11 @@ import {
 import { validateMeshFormCorrections } from "./mesh-form-correction-validation.js";
 import { validateBoneRotationConstraints } from "./bone-rotation-constraint-validation.js";
 import { validateTwoBoneIkConstraints } from "./two-bone-ik-validation.js";
+import { validateSequences } from "./sequence-validation.js";
+import {
+  validateTemporalProgramOwnership,
+  validateTemporalProgramOwnerTracks,
+} from "./temporal-program-ownership.js";
 
 function issue(code, path, message, entityId = null, severity = "error") {
   return { code, path, message, entityId, severity };
@@ -21,6 +26,13 @@ function issue(code, path, message, entityId = null, severity = "error") {
 
 function finite(value) {
   return typeof value === "number" && Number.isFinite(value);
+}
+
+function hasExactKeys(value, expected) {
+  const actual = Object.keys(value).sort();
+  const sorted = [...expected].sort();
+  return actual.length === sorted.length &&
+    actual.every((key, index) => key === sorted[index]);
 }
 
 export function validateProject(project) {
@@ -50,8 +62,32 @@ export function validateProject(project) {
   } catch {
     issues.push(issue("ANIMATION_INVALID_FRAME_RATE", "renderSettings.frameRate", "Frame rate must be a reduced positive rational."));
   }
-  if (!Number.isSafeInteger(project.renderSettings?.durationTicks) || project.renderSettings.durationTicks <= 0) {
-    issues.push(issue("ANIMATION_INVALID_DURATION", "renderSettings.durationTicks", "Render duration must be a positive integer tick value."));
+  if (Object.hasOwn(project.renderSettings || {}, "durationTicks")) {
+    issues.push(issue("ANIMATION_SECOND_DURATION_AUTHORITY", "renderSettings.durationTicks", "Duration belongs only to an owned TemporalProgram."));
+  }
+  if (!project.animation || typeof project.animation !== "object" ||
+    Array.isArray(project.animation) ||
+    !hasExactKeys(project.animation, ["clips", "deformationSamples"])) {
+    issues.push(issue(
+      "ANIMATION_SCHEMA_INVALID",
+      "animation",
+      "Schema 13 animation must contain exactly the reserved clips and deformationSamples collections.",
+    ));
+  }
+  if (Array.isArray(project.animation?.clips) && project.animation.clips.length > 0) {
+    issues.push(issue(
+      "ANIMATION_CLIP_UNSUPPORTED",
+      "animation.clips",
+      "AnimationClip entries are reserved for Phase 8-2 and must be empty in schema 13.",
+    ));
+  }
+  if (Array.isArray(project.animation?.deformationSamples) &&
+    project.animation.deformationSamples.length > 0) {
+    issues.push(issue(
+      "ANIMATION_DEFORMATION_SAMPLE_UNSUPPORTED",
+      "animation.deformationSamples",
+      "Animation deformation samples are not authored in Phase 8-1 and must be empty in schema 13.",
+    ));
   }
 
   const nodes = project.scene?.nodes;
@@ -130,8 +166,8 @@ export function validateProject(project) {
     ["meshFormCorrectionKeyforms", project.meshFormCorrectionKeyforms],
     ["transitions", project.transitions],
     ["animation.clips", project.animation?.clips],
-    ["animation.tracks", project.animation?.tracks],
-    ["animation.keyframes", project.animation?.keyframes],
+    ["animation.deformationSamples", project.animation?.deformationSamples],
+    ["sequences", project.sequences],
   ];
   for (const [path, values] of collections) {
     if (!Array.isArray(values)) issues.push(issue("collection.invalid", path, path + " must be an array."));
@@ -140,6 +176,9 @@ export function validateProject(project) {
 
   issues.push(...validateTemporalPrograms(project, register));
   issues.push(...validateTransitionDomain(project, register));
+  issues.push(...validateSequences(project, register));
+  issues.push(...validateTemporalProgramOwnership(project));
+  issues.push(...validateTemporalProgramOwnerTracks(project));
   issues.push(...validateClippingBindings(project, register));
   issues.push(...validateTransitionClipping(project));
   issues.push(...validateWarpDeformers(project, register));
