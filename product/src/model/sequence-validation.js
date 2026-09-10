@@ -2,6 +2,10 @@ import {
   VIEW_LANE_ITEM_KINDS,
   canonicalizeViewLaneItems,
 } from "./sequence.js";
+import {
+  evaluateKeyArtBaseState,
+  evaluateTransition,
+} from "../core/transition-evaluator.js";
 
 function problem(code, path, message, entityId = null, details = null) {
   return {
@@ -37,6 +41,61 @@ function endpointKeyArtIds(item, transitionById) {
   return transition
     ? { start: transition.fromKeyArtId, end: transition.toKeyArtId }
     : { start: null, end: null };
+}
+
+function baseSelectionsForTransition(project, transition, endpoint) {
+  const keyArtId = endpoint === "start" ? transition.fromKeyArtId : transition.toKeyArtId;
+  return [...(project.semanticSlots || [])]
+    .filter((slot) => (slot.mappings || []).some((mapping) => mapping.keyArtId === keyArtId) ||
+      transition.partTransitions.some((part) => part.semanticSlotId === slot.id))
+    .sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0)
+    .map((slot) => {
+      const part = transition.partTransitions.find((entry) => entry.semanticSlotId === slot.id);
+      const keyformId = endpoint === "start" ? part?.fromKeyformId : part?.toKeyformId;
+      const keyform = (project.meshKeyforms || []).find((entry) => entry.id === keyformId);
+      return { semanticSlotId: slot.id, keyformId: keyform?.id ?? null,
+        topologyId: keyform?.topologyId ?? null };
+    });
+}
+
+function normalizedEvaluatedParts(parts) {
+  return parts.map((part) => ({
+    semanticSlotId: part.semanticSlotId,
+    presence: part.presence,
+    renderInstances: part.renderInstances.map((renderInstance) => {
+      const { renderInstanceId: ignored, clipping, ...rest } = renderInstance;
+      return {
+        ...rest,
+        clipping: clipping ? {
+          sourceNodeId: clipping.sourceNodeId ?? null,
+          mode: clipping.mode,
+        } : null,
+      };
+    }),
+  }));
+}
+
+function endpointSignature(project, item, endpoint, transitionById) {
+  if (item.kind === VIEW_LANE_ITEM_KINDS.KEY_ART_HOLD) {
+    const base = evaluateKeyArtBaseState(project, item.keyArtId, { evaluationId: "sequence-validation" });
+    return JSON.stringify({
+      keyArtId: item.keyArtId,
+      selections: base.baseSelections,
+      evaluatedParts: normalizedEvaluatedParts(base.evaluatedParts),
+    });
+  }
+  const transition = transitionById.get(item.transitionId);
+  if (!transition) return null;
+  const program = (project.temporalPrograms || []).find((entry) =>
+    entry.id === transition.temporalProgramId);
+  if (!program) return null;
+  const timeTicks = endpoint === "start" ? 0 : program.durationTicks;
+  const base = evaluateTransition(project, transition.id, timeTicks);
+  return JSON.stringify({
+    keyArtId: endpoint === "start" ? transition.fromKeyArtId : transition.toKeyArtId,
+    selections: baseSelectionsForTransition(project, transition, endpoint),
+    evaluatedParts: normalizedEvaluatedParts(base.evaluatedParts),
+  });
 }
 
 export function sequenceForId(project, sequenceId) {
@@ -136,6 +195,24 @@ export function validateSequences(project, register = () => {}) {
       if (hold && !keyArtById.has(item.keyArtId)) {
         issues.push(problem("SEQUENCE_KEYART_REFERENCE_INVALID", itemPath + ".keyArtId", "KeyArtHold KeyArt does not exist.", item.id));
       }
+      if (hold && keyArtById.has(item.keyArtId)) {
+        for (const slot of project.semanticSlots || []) {
+          if (!(slot.mappings || []).some((mapping) => mapping.keyArtId === item.keyArtId)) continue;
+          const candidates = (project.meshKeyforms || [])
+            .filter((keyform) => keyform.keyArtId === item.keyArtId && keyform.semanticSlotId === slot.id)
+            .map((keyform) => keyform.id)
+            .sort();
+          if (candidates.length > 1) {
+            issues.push(problem(
+              "SEQUENCE_KEYART_BASE_AMBIGUOUS",
+              itemPath + ".keyArtId",
+              "Standalone KeyArt base state has multiple compatible MeshKeyforms.",
+              item.id,
+              { keyArtId: item.keyArtId, semanticSlotId: slot.id, keyformIds: candidates },
+            ));
+          }
+        }
+      }
       if (instance && !transitionById.has(item.transitionId)) {
         issues.push(problem("SEQUENCE_TRANSITION_REFERENCE_INVALID", itemPath + ".transitionId", "TransitionInstance Transition does not exist.", item.id));
       }
@@ -175,6 +252,23 @@ export function validateSequences(project, register = () => {}) {
           sequence.id,
           { previousItemId: previous.id, nextItemId: current.id, outgoingKeyArtId: outgoing, incomingKeyArtId: incoming },
         ));
+      } else if (outgoing && incoming) {
+        try {
+          const outgoingSignature = endpointSignature(project, previous, "end", transitionById);
+          const incomingSignature = endpointSignature(project, current, "start", transitionById);
+          if (outgoingSignature && incomingSignature && outgoingSignature !== incomingSignature) {
+            issues.push(problem(
+              "SEQUENCE_VIEW_ENDPOINT_INCOMPATIBLE",
+              path + ".viewLaneItems",
+              "Adjacent ViewLane items resolve incompatible evaluated endpoint state.",
+              sequence.id,
+              { previousItemId: previous.id, nextItemId: current.id, keyArtId: outgoing },
+            ));
+          }
+        } catch {
+          // Reference/domain diagnostics remain authoritative when endpoint
+          // evaluation cannot be formed from an already-invalid Project.
+        }
       }
     }
     if (items.at(-1)?.endTicks !== program.durationTicks) {

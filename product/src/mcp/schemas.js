@@ -157,6 +157,12 @@ export const querySchemas = {
   "sequence.get": idQuery("sequenceId", sequenceId),
   "sequence.list": emptyQuery(),
   "sequence.get_diagnostics": idQuery("sequenceId", sequenceId),
+  "sequence.evaluate": {
+    type: "object",
+    required: ["sequenceId", "timeTicks"],
+    properties: { sequenceId, timeTicks: { type: "integer", minimum: 0 } },
+    additionalProperties: false,
+  },
   "animation.get_program": {
     type: "object",
     required: ["programId"],

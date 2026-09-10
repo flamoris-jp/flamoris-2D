@@ -43,6 +43,7 @@ import {
 } from "../core/two-bone-ik-authoring-solver.js";
 import { canonicalizeViewLaneItems } from "../model/sequence.js";
 import { sequenceDurationTicks, validateSequences } from "../model/sequence-validation.js";
+import { evaluateSequence } from "../core/sequence-evaluator.js";
 
 function temporalProgram(project, programId) {
   const program = project.temporalPrograms.find((entry) => entry.id === programId);
@@ -595,6 +596,8 @@ export const projectQueries = {
       entry.entityId === sequence.id || itemIds.has(entry.entityId) || entry.path.startsWith(prefix));
     return { valid: !issues.some((entry) => entry.severity === "error"), issues };
   },
+  "sequence.evaluate": (project, input) =>
+    evaluateSequence(project, input.sequenceId, input.timeTicks),
   "export.get_frame_plan": (project, input) =>
     planTransitionExportFrames(project, input.transitionId, input.frameRate).describe(),
   "export.evaluate_frame": (project, input) =>

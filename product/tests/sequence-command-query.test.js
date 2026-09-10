@@ -96,6 +96,9 @@ test("Sequence queries are MCP-ready, derived from program duration, and DOM-ind
   assert.deepEqual(adapter.query("sequence.list", {}).map((entry) => entry.id), ["sequence_shot"]);
   assert.deepEqual(adapter.query("sequence.get_diagnostics", { sequenceId: "sequence_shot" }),
     { valid: true, issues: [] });
+  assert.equal(adapter.query("sequence.evaluate", {
+    sequenceId: "sequence_shot", timeTicks: 100,
+  }).activeViewLaneItem.id, "hold_a");
   assert.equal(adapter.query("project.get_summary", {}).counts.sequences, 1);
   assert.equal(Object.hasOwn(globalThis, "document"), false);
 });
