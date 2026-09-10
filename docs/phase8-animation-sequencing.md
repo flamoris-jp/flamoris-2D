@@ -165,6 +165,23 @@ The Sequence's program duration defines the legal shot domain:
 0 <= sequenceTick <= sequenceProgram.durationTicks
 ```
 
+Schema 12 also persists `project.renderSettings.durationTicks`, but production
+Transition export already ignores it and plans from the Transition-owned
+program. Phase 8 removes that field during schema migration rather than leaving
+an ambiguous second shot clock. It has no Phase 8 replacement:
+
+- `renderSettings.frameRate` and `renderSettings.alpha` remain render settings;
+- every Transition, AnimationClip, and Sequence duration comes only from its
+  exclusively owned `TemporalProgram`;
+- creation commands require an explicit `durationTicks`; an editor may suggest
+  a non-persistent eight-second default, but that suggestion is not Project
+  authority;
+- migration drops legacy `renderSettings.durationTicks` after existing
+  TemporalPrograms have been migrated; it does not copy that value over an
+  already-authored program duration;
+- validation rejects the removed field in the new exact schema shape so it
+  cannot silently regain authority.
+
 Export remains half-open in frame planning as already defined by Phase 4. The inclusive terminal Sequence tick exists for deterministic scrub/end-state evaluation, not as an extra exported frame.
 
 ## 5. ViewLane
@@ -907,6 +924,8 @@ Rules:
 - old projects load with empty/default Sequence/AnimationClip collections;
 - schema 12's untyped `animation`/`sequence` placeholder entries are not
   reinterpreted as Phase 8 authored state;
+- schema 12's `renderSettings.durationTicks` is removed without replacing or
+  overriding any owned TemporalProgram duration;
 - canonical serialization orders AnimationClips, Sequences, ViewLane items,
   ClipInstances, deformation samples, and nested stable-ID entries explicitly;
 - migrations never synthesize authored motion from names or geometry heuristics;
@@ -1038,12 +1057,15 @@ Cover at least:
 30. repeated same Sequence/tick -> equivalent EvaluatedFrame;
 31. scrub does not mutate Project/history;
 32. Save/Open preserves equivalent Sequence evaluation;
-33. Preview / PNG evaluated-plan parity;
-34. Preview / MP4 source-frame parity;
-35. headless sequence evaluation without DOM;
-36. standalone KeyArtHold ambiguity rejection;
-37. same-KeyArt/different-keyform ViewLane endpoint incompatibility rejection;
-38. full existing Phase 1-7 regression suite remains green.
+33. Sequence export frame planning uses only the Sequence-owned program even
+    when loading a schema 12 fixture with a different legacy
+    `renderSettings.durationTicks`;
+34. Preview / PNG evaluated-plan parity;
+35. Preview / MP4 source-frame parity;
+36. headless sequence evaluation without DOM;
+37. standalone KeyArtHold ambiguity rejection;
+38. same-KeyArt/different-keyform ViewLane endpoint incompatibility rejection;
+39. full existing Phase 1-7 regression suite remains green.
 
 ## 26. Acceptance criteria
 

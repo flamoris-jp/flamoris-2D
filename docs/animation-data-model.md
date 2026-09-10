@@ -151,6 +151,14 @@ which is the single source of truth. `durationTicks` must be a positive
 integer. Track keys and events must lie in `0..durationTicks`; regions use
 `0 <= startTicks <= endTicks <= durationTicks`.
 
+Schema 12's project-level `renderSettings.durationTicks` is not another owner
+or export duration. Phase 8 migration removes it with no persistent
+replacement. Existing program durations win; migration must never overwrite
+them from the legacy field. `renderSettings.frameRate` and
+`renderSettings.alpha` remain, while new owner/program creation receives an
+explicit duration through its Command/Transaction. An editor may offer a
+non-persistent initial suggestion such as eight seconds.
+
 Ownership is by stable `temporalProgramId`. One TemporalProgram may have at
 most one owner across all three owner kinds. Project-wide ownership validation
 must centralize this rule rather than adding separate, potentially divergent
