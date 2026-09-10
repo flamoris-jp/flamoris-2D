@@ -188,6 +188,18 @@ test("node Transform spanning incompatible mapped Key Arts diagnoses instead of 
   assert.equal(result.authoritative, false);
 });
 
+test("node Transform remains compatible when Transition Hold keeps that mapped source", () => {
+  const project = fixture({ transitionMode: "hold" });
+  addClip(project, "node", [track("node_transform", "TransformTrack",
+    { nodeId: "node_a", coordinateSpace: "node-local" }, {
+      positionX: channel("node_x", 10),
+    })]);
+  const result = evaluateSequence(project, "sequence", 50);
+  assert.equal(result.evaluatedParts[0].renderInstances[0].transform[4], 10);
+  assert.ok(!result.diagnostics.some((entry) =>
+    entry.code === "ANIMATION_CLIP_TARGET_INCOMPATIBLE"));
+});
+
 test("clip opacity is a weighted multiplier around identity", () => {
   const project = fixture();
   addClip(project, "opacity", [track("opacity", "OpacityTrack",
@@ -262,6 +274,39 @@ test("disabled, zero-weight, and terminal-ending ClipInstances contribute no vis
   assert.equal(terminal.evaluatedParts[0].renderInstances[0].transform[4], 0);
 });
 
+test("mixer reuses Once endpoint and Loop exact-period local ticks without a terminal sample", () => {
+  const once = fixture();
+  const onceInstance = addClip(once, "once", [track("once_transform", "TransformTrack",
+    { semanticSlotId: "slot", coordinateSpace: "node-local" }, {
+      positionX: { keyframes: [
+        { id: "once_start", timeTicks: 0, value: 1, interpolationToNext: step },
+        { id: "once_end", timeTicks: 100, value: 9, interpolationToNext: step },
+      ] },
+    })], { endTicks: 1, sourceOffsetTicks: 100 });
+  assert.equal(evaluateSequence(once, "sequence", 0)
+    .evaluatedParts[0].renderInstances[0].transform[4], 9);
+  assert.equal(onceInstance.loopMode, "once");
+
+  const loop = fixture();
+  const loopInstance = addClip(loop, "loop", [track("loop_transform", "TransformTrack",
+    { semanticSlotId: "slot", coordinateSpace: "node-local" }, {
+      positionX: { keyframes: [
+        { id: "loop_start", timeTicks: 0, value: 2, interpolationToNext: step },
+        { id: "loop_end", timeTicks: 100, value: 99, interpolationToNext: step },
+      ] },
+    })], { loopMode: "loop" });
+  const wrapped = evaluateSequence(loop, "sequence", 100);
+  assert.equal(wrapped.activeClipInstances.length, 0);
+  loopInstance.endTicks = 100;
+  const atPeriod = evaluateSequence(loop, "sequence", 50);
+  assert.equal(atPeriod.activeClipInstances[0].localTick, 50);
+  loopInstance.playbackRate = { numerator: 2, denominator: 1 };
+  const exactWrap = evaluateSequence(loop, "sequence", 50);
+  assert.equal(exactWrap.activeClipInstances[0].rawLocalTick, 100);
+  assert.equal(exactWrap.activeClipInstances[0].localTick, 0);
+  assert.equal(exactWrap.evaluatedParts[0].renderInstances[0].transform[4], 2);
+});
+
 test("MeshDeformationTrack applies after existing MeshFormCorrection by stable vertex ID", () => {
   const project = fixture();
   project.meshFormCorrectionKeyforms.push(createMeshFormCorrectionKeyform({
@@ -291,6 +336,21 @@ test("topology mismatch is structural and does not silently remap offsets", () =
   assert.ok(result.diagnostics.some((entry) =>
     entry.code === "ANIMATION_TOPOLOGY_INCOMPATIBLE"));
   assert.deepEqual(result.evaluatedParts[0].renderInstances[0].mesh.positions.slice(0, 2), [0, 0]);
+});
+
+test("invalid active targets and fractional discrete weights are non-authoritative diagnostics", () => {
+  const project = fixture();
+  addClip(project, "invalid_target", [track("missing_bone", "BoneTrack",
+    { boneId: "missing" }, { rotation: channel("missing_bone_key", 1) })]);
+  addClip(project, "invalid_weight", [track("presence", "PresenceTrack",
+    { semanticSlotId: "slot" }, { presence: channel("presence_key", "absent") })],
+  { weight: 0.5 });
+  const result = evaluateSequence(project, "sequence", 50);
+  assert.ok(result.diagnostics.some((entry) =>
+    entry.code === "ANIMATION_TRACK_TARGET_INVALID"));
+  assert.ok(result.diagnostics.some((entry) =>
+    entry.code === "ANIMATION_DISCRETE_WEIGHT_INVALID"));
+  assert.equal(result.authoritative, false);
 });
 
 test("Sequence camera and exact-tick events are deterministic metadata", () => {

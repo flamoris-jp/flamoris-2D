@@ -102,8 +102,48 @@ function activeClipProjection(active) {
   };
 }
 
+function nodeTargetCompatibility(project, sequence, instance, nodeId) {
+  const slots = project.semanticSlots.filter((slot) =>
+    slot.mappings.some((mapping) => mapping.nodeId === nodeId))
+    .sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
+  if (!slots.length) return null;
+  for (const viewItem of canonicalizeViewLaneItems(sequence.viewLaneItems)) {
+    const start = Math.max(instance.startTicks, viewItem.startTicks);
+    const end = Math.min(instance.endTicks, viewItem.endTicks);
+    if (start >= end) continue;
+    const ticks = [...new Set([start, Math.floor((start + end - 1) / 2), end - 1])];
+    for (const tick of ticks) {
+      let localTimeTicks = tick - viewItem.startTicks;
+      let transitionDurationTicks = null;
+      if (viewItem.kind === VIEW_LANE_ITEM_KINDS.TRANSITION_INSTANCE) {
+        const transition = project.transitions.find((entry) =>
+          entry.id === viewItem.transitionId);
+        const program = project.temporalPrograms.find((entry) =>
+          entry.id === transition?.temporalProgramId);
+        if (!transition || !program) continue;
+        transitionDurationTicks = program.durationTicks;
+        localTimeTicks = projectTransitionInstanceTick(
+          tick, viewItem, transitionDurationTicks,
+        );
+      }
+      const nodesBySlot = activeSemanticNodes(
+        project, viewItem, localTimeTicks, transitionDurationTicks,
+      );
+      for (const slot of slots) {
+        const mappedNodeId = [...(nodesBySlot.get(slot.id) || [])]
+          .sort().find((candidate) => candidate !== nodeId);
+        if (mappedNodeId) {
+          return { semanticSlotId: slot.id, mappedNodeId, sequenceTick: tick };
+        }
+      }
+    }
+  }
+  return null;
+}
+
 function finalizeSequenceFrame(sequence, timeTicks, viewItem, localTimeTicks, base,
   activeSamples, animation, camera, events) {
+  animation.finalize();
   const diagnostics = sortSequenceDiagnostics([
     ...base.diagnostics,
     ...animation.diagnostics,
@@ -137,6 +177,8 @@ export function evaluateSequence(project, sequenceId, timeTicks) {
     const localTimeTicks = timeTicks - viewItem.startTicks;
     const animation = createSequenceAnimationContext(project, sequence, activeSamples, {
       activeSemanticNodes: activeSemanticNodes(project, viewItem, localTimeTicks),
+      nodeTargetCompatibility: (instance, nodeId) =>
+        nodeTargetCompatibility(project, sequence, instance, nodeId),
     });
     const base = evaluateKeyArtBaseState(project, viewItem.keyArtId, {
       evaluationId: sequence.id + ":" + viewItem.id,
@@ -160,6 +202,8 @@ export function evaluateSequence(project, sequenceId, timeTicks) {
       activeSemanticNodes: activeSemanticNodes(
         project, viewItem, localTimeTicks, transitionProgram.durationTicks,
       ),
+      nodeTargetCompatibility: (instance, nodeId) =>
+        nodeTargetCompatibility(project, sequence, instance, nodeId),
     });
     const base = evaluateTransition(project, transition.id, localTimeTicks, { animation });
     return finalizeSequenceFrame(

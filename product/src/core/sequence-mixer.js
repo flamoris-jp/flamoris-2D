@@ -1,7 +1,6 @@
 import { projectClipInstanceTick } from "./clip-time.js";
 import { sampleTemporalProgram } from "./temporal.js";
 import { canonicalizeClipInstances } from "../model/clip-instance.js";
-import { semanticMappingFor } from "../model/transition-validation.js";
 
 function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -127,28 +126,6 @@ export function collectClipContributions(activeSamples) {
   return result.sort(compareContribution);
 }
 
-function keyArtIdsForViewItem(project, viewItem) {
-  if (viewItem.kind === "KeyArtHold") return [viewItem.keyArtId];
-  const transition = project.transitions.find((entry) => entry.id === viewItem.transitionId);
-  return transition ? [transition.fromKeyArtId, transition.toKeyArtId] : [];
-}
-
-function incompatibleNodeTarget(project, sequence, instance, nodeId) {
-  const slots = project.semanticSlots.filter((slot) =>
-    slot.mappings.some((mapping) => mapping.nodeId === nodeId));
-  if (!slots.length) return null;
-  const keyArtIds = new Set(sequence.viewLaneItems
-    .filter((item) => item.startTicks < instance.endTicks && item.endTicks > instance.startTicks)
-    .flatMap((item) => keyArtIdsForViewItem(project, item)));
-  for (const slot of [...slots].sort((a, b) => compareText(a.id, b.id))) {
-    const incompatible = [...keyArtIds].sort(compareText)
-      .map((keyArtId) => semanticMappingFor(slot, keyArtId))
-      .find((mapping) => mapping && mapping.nodeId !== nodeId);
-    if (incompatible) return { semanticSlotId: slot.id, mappedNodeId: incompatible.nodeId };
-  }
-  return null;
-}
-
 function semanticNodeIds(activeSemanticNodes, semanticSlotId) {
   return [...(activeSemanticNodes.get(semanticSlotId) || [])].sort(compareText);
 }
@@ -253,6 +230,7 @@ function contributionTargetIsValid(project, entry) {
 
 export function createSequenceAnimationContext(project, sequence, activeSamples, {
   activeSemanticNodes,
+  nodeTargetCompatibility = () => null,
 } = {}) {
   const nodesBySlot = activeSemanticNodes || new Map();
   const diagnostics = [];
@@ -269,6 +247,7 @@ export function createSequenceAnimationContext(project, sequence, activeSamples,
   const deformerY = new Map();
   const opacity = new Map();
   const meshEntries = [];
+  const deformerEntries = [];
 
   for (const entry of contributions) {
     if (!contributionTargetIsValid(project, entry)) {
@@ -283,9 +262,7 @@ export function createSequenceAnimationContext(project, sequence, activeSamples,
     if (entry.kind === "TransformTrack") {
       const active = activeSamples.find((sample) => sample.instance.id === entry.clipInstanceId);
       if (entry.target.nodeId) {
-        const incompatible = incompatibleNodeTarget(
-          project, sequence, active.instance, entry.target.nodeId,
-        );
+        const incompatible = nodeTargetCompatibility(active.instance, entry.target.nodeId);
         if (incompatible) {
           diagnostics.push(diagnostic(sequence.id, "ANIMATION_CLIP_TARGET_INCOMPATIBLE", {
             clipInstanceId: entry.clipInstanceId,
@@ -312,6 +289,7 @@ export function createSequenceAnimationContext(project, sequence, activeSamples,
         add(boneRotation, entry.target.boneId, entry.value * entry.weight);
       }
     } else if (entry.kind === "DeformerTrack") {
+      deformerEntries.push(entry);
       const key = entry.target.deformerId + "\0" + entry.target.controlPointId;
       if (entry.channel === "deltaX") add(deformerX, key, entry.value * entry.weight);
       if (entry.channel === "deltaY") add(deformerY, key, entry.value * entry.weight);
@@ -355,12 +333,16 @@ export function createSequenceAnimationContext(project, sequence, activeSamples,
   };
 
   const warpKeyformCache = new Map();
+  const activeDeformerIds = new Set();
+  const appliedMeshEntries = new Set();
+  let finalized = false;
   return {
     contributions,
     diagnostics,
     transformOverrides,
     warpKeyformForDeformer: (context) => {
       const { deformer, keyform } = context;
+      activeDeformerIds.add(deformer.id);
       const cacheKey = JSON.stringify(canonicalize({
         deformerId: deformer.id,
         keyArtId: context.keyArtId || null,
@@ -393,6 +375,7 @@ export function createSequenceAnimationContext(project, sequence, activeSamples,
       let result = mesh;
       for (const entry of meshEntries) {
         if (!meshMatchesNode(project, entry.target.meshId, nodeId)) continue;
+        appliedMeshEntries.add(entry);
         const deformation = project.animation.deformationSamples.find((sample) =>
           sample.id === entry.value.deformationSampleId);
         const topology = project.meshTopologies.find((candidate) =>
@@ -438,6 +421,30 @@ export function createSequenceAnimationContext(project, sequence, activeSamples,
     applyClipping: (baseValue, identity) => {
       const value = applyDiscrete("ClippingTrack", "clipping", baseValue, identity);
       return value === baseValue ? value : { ...baseValue, ...value };
+    },
+    finalize() {
+      if (finalized) return;
+      finalized = true;
+      for (const entry of deformerEntries) {
+        if (activeDeformerIds.has(entry.target.deformerId)) continue;
+        diagnostics.push(diagnostic(sequence.id, "ANIMATION_TRACK_TARGET_INVALID", {
+          clipInstanceId: entry.clipInstanceId,
+          trackId: entry.trackId,
+          kind: entry.kind,
+          target: entry.target,
+          reason: "deformer-not-active",
+        }));
+      }
+      for (const entry of meshEntries) {
+        if (appliedMeshEntries.has(entry)) continue;
+        diagnostics.push(diagnostic(sequence.id, "ANIMATION_TRACK_TARGET_INVALID", {
+          clipInstanceId: entry.clipInstanceId,
+          trackId: entry.trackId,
+          kind: entry.kind,
+          target: entry.target,
+          reason: "mesh-not-active",
+        }));
+      }
     },
   };
 }
