@@ -1,4 +1,7 @@
 import { CLIP_LOOP_MODES } from "./animation-clip.js";
+import { TEMPORAL_TRACK_DEFINITIONS, sampleKeyframes } from "../core/temporal.js";
+
+const LOOP_NUMERIC_TOLERANCE = 1e-9;
 
 function problem(code, path, message, entityId = null, severity = "error", details = null) {
   return {
@@ -22,9 +25,58 @@ function exactKeys(value, expected) {
     actual.every((key, index) => key === canonical[index]);
 }
 
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (object(value)) {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]));
+  }
+  return value;
+}
+
+function numericEqual(left, right) {
+  if (typeof left === "number" && typeof right === "number") {
+    return Number.isFinite(left) && Number.isFinite(right) &&
+      Math.abs(left - right) <= LOOP_NUMERIC_TOLERANCE;
+  }
+  if (Array.isArray(left) && Array.isArray(right) && left.length === right.length) {
+    return left.every((value, index) => numericEqual(value, right[index]));
+  }
+  if (object(left) && object(right)) {
+    const leftKeys = Object.keys(left).sort();
+    const rightKeys = Object.keys(right).sort();
+    return leftKeys.length === rightKeys.length &&
+      leftKeys.every((key, index) => key === rightKeys[index] &&
+        numericEqual(left[key], right[key]));
+  }
+  return Object.is(left, right);
+}
+
+function endpointValuesEqual(left, right, definition) {
+  if (["number", "unit-number", "weights"].includes(definition?.value)) {
+    return numericEqual(left, right);
+  }
+  return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
+}
+
+function loopedClipIds(project) {
+  const result = new Set((project.animation?.clips || [])
+    .filter((clip) => clip?.defaultLoopMode === CLIP_LOOP_MODES.LOOP)
+    .map((clip) => clip.id));
+  for (const sequence of project.sequences || []) {
+    for (const instance of sequence?.clipInstances || []) {
+      if (instance?.loopMode === CLIP_LOOP_MODES.LOOP && typeof instance.clipId === "string") {
+        result.add(instance.clipId);
+      }
+    }
+  }
+  return result;
+}
+
 export function validateAnimationClips(project) {
   const issues = [];
   const programs = new Set((project.temporalPrograms || []).map((program) => program?.id));
+  const programById = new Map((project.temporalPrograms || []).map((program) => [program?.id, program]));
+  const looping = loopedClipIds(project);
   if (!Array.isArray(project.animation?.clips)) {
     return [problem("collection.invalid", "animation.clips", "animation.clips must be an array.")];
   }
@@ -64,6 +116,43 @@ export function validateAnimationClips(project) {
         issues.push(problem("ANIMATION_CLIP_INVALID", path + ".metadata",
           "AnimationClip metadata must be an object.", clip.id));
       }
+
+      const program = programById.get(clip.temporalProgramId);
+      if (!program || !looping.has(clip.id) || !Number.isSafeInteger(program.durationTicks) ||
+        program.durationTicks <= 0 || !Array.isArray(program.tracks)) return;
+      [...program.tracks]
+        .sort((left, right) => String(left?.trackId).localeCompare(String(right?.trackId)))
+        .forEach((track) => {
+          const definition = TEMPORAL_TRACK_DEFINITIONS[track?.kind];
+          if (!definition || !object(track.channels)) return;
+          Object.keys(track.channels).sort().forEach((channelName) => {
+            const channel = track.channels[channelName];
+            if (!Array.isArray(channel?.keyframes)) return;
+            try {
+              const startValue = sampleKeyframes(channel.keyframes, 0);
+              const endValue = sampleKeyframes(channel.keyframes, program.durationTicks);
+              if (endpointValuesEqual(startValue, endValue, definition)) return;
+              issues.push(problem(
+                "ANIMATION_LOOP_ENDPOINT_MISMATCH",
+                path + ".temporalProgramId",
+                "Loop endpoints differ; the seam is diagnosed and is not corrected.",
+                clip.id,
+                "warning",
+                {
+                  temporalProgramId: program.id,
+                  trackId: track.trackId,
+                  channel: channelName,
+                  tolerance: LOOP_NUMERIC_TOLERANCE,
+                  startValue,
+                  endValue,
+                },
+              ));
+            } catch {
+              // Existing TemporalProgram diagnostics remain authoritative for
+              // malformed channels that cannot be sampled safely.
+            }
+          });
+        });
     });
   return issues;
 }

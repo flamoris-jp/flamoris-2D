@@ -82,3 +82,51 @@ test("AnimationClip rejects unknown fields and missing owned programs", () => {
   assert.ok(issues.some((issue) => issue.code === "ANIMATION_CLIP_INVALID"));
   assert.ok(issues.some((issue) => issue.code === "ANIMATION_CLIP_PROGRAM_REFERENCE_INVALID"));
 });
+
+function scalarTrack(trackId, values) {
+  return {
+    trackId,
+    version: 1,
+    kind: "OpacityTrack",
+    target: { nodeId: "node_clip_domain_0002" },
+    channels: { opacity: { keyframes: values.map((value, index) => ({
+      id: trackId + "_key_" + index,
+      timeTicks: index * 100,
+      value,
+      interpolationToNext: { kind: "linear" },
+    })) } },
+  };
+}
+
+test("loop endpoint mismatch is a warning and uses the documented numeric tolerance", () => {
+  const project = projectFixture();
+  const clip = createAnimationClip({ id: "clip_loop", displayName: "Loop",
+    temporalProgramId: "program_loop", defaultLoopMode: "loop" });
+  project.animation.clips.push(clip);
+  project.temporalPrograms.push({ ...program("program_loop"),
+    tracks: [scalarTrack("track_opacity", [0.5, 0.75])],
+    events: [{ id: "event_terminal", type: "marker", timeTicks: 100,
+      participants: [], payload: {} }],
+  });
+  const issues = validateProject(project);
+  const mismatch = issues.find((issue) => issue.code === "ANIMATION_LOOP_ENDPOINT_MISMATCH");
+  assert.equal(mismatch.severity, "warning");
+  assert.equal(mismatch.details.tolerance, 1e-9);
+  assert.equal(issues.some((issue) => issue.severity === "error"), false);
+
+  project.temporalPrograms[0].tracks = [scalarTrack("track_opacity", [0.5, 0.5000000005])];
+  assert.equal(validateProject(project).some((issue) =>
+    issue.code === "ANIMATION_LOOP_ENDPOINT_MISMATCH"), false);
+});
+
+test("AnimationClip ownership preserves existing owner-aware target validation", () => {
+  const project = projectFixture();
+  project.animation.clips.push(createAnimationClip({ id: "clip_camera", displayName: "Camera",
+    temporalProgramId: "program_camera" }));
+  project.temporalPrograms.push({ ...program("program_camera"), tracks: [{
+    trackId: "track_camera", version: 1, kind: "CameraTrack", target: { cameraId: "main" },
+    channels: { positionX: { keyframes: [] } },
+  }] });
+  assert.ok(validateProject(project).some((issue) =>
+    issue.code === "ANIMATION_TRACK_OWNER_INVALID" && issue.entityId === "track_camera"));
+});
