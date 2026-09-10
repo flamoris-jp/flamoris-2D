@@ -124,10 +124,31 @@ export function validateTemporalProgramOwnerTracks(project) {
 
 export function validateTemporalProgramOwnershipChange(beforeProject, afterProject) {
   const issues = [];
-  const beforeSequenceIds = new Set((beforeProject.sequences || []).map((entry) => entry.id));
+  const beforeSequenceById = new Map((beforeProject.sequences || [])
+    .map((entry) => [entry.id, entry]));
+  const afterSequenceById = new Map((afterProject.sequences || [])
+    .map((entry) => [entry.id, entry]));
+  const beforeSequenceIds = new Set(beforeSequenceById.keys());
   const beforeProgramIds = new Set((beforeProject.temporalPrograms || []).map((entry) => entry.id));
-  const afterSequenceIds = new Set((afterProject.sequences || []).map((entry) => entry.id));
+  const afterSequenceIds = new Set(afterSequenceById.keys());
   const afterProgramIds = new Set((afterProject.temporalPrograms || []).map((entry) => entry.id));
+
+  for (const sequenceId of [...beforeSequenceIds]
+    .filter((id) => afterSequenceIds.has(id)).sort()) {
+    const beforeSequence = beforeSequenceById.get(sequenceId);
+    const afterSequence = afterSequenceById.get(sequenceId);
+    if (beforeSequence.temporalProgramId === afterSequence.temporalProgramId) continue;
+    issues.push(problem(
+      "SEQUENCE_PROGRAM_OWNERSHIP_REASSIGNED",
+      "sequences",
+      "Sequence TemporalProgram ownership is immutable in Phase 8-1.",
+      sequenceId,
+      {
+        temporalProgramId: beforeSequence.temporalProgramId,
+        requestedTemporalProgramId: afterSequence.temporalProgramId,
+      },
+    ));
+  }
 
   for (const sequence of [...(afterProject.sequences || [])]
     .sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0)) {

@@ -129,6 +129,28 @@ test("sequence.update cannot rebind ownership to a pre-existing TemporalProgram"
   assert.equal(session.undoStack.length, historyLength);
 });
 
+test("same-ID remove and recreate cannot bypass immutable Sequence ownership", () => {
+  const session = new EditorSession(baseProject());
+  session.executeTransaction(createCommands());
+  session.execute({ type: "animation.temporal.create_program",
+    payload: { programId: "program_replacement", durationTicks: 100 } });
+  const before = structuredClone(session.project);
+  const historyLength = session.undoStack.length;
+
+  assert.throws(
+    () => session.executeTransaction([
+      { type: "sequence.remove", payload: { sequenceId: "sequence_shot" } },
+      { type: "sequence.create", payload: { sequence: {
+        ...sequence(), temporalProgramId: "program_replacement",
+      } } },
+    ]),
+    (error) => error instanceof TransactionError &&
+      error.issues.some((entry) => entry.code === "SEQUENCE_PROGRAM_OWNERSHIP_REASSIGNED"),
+  );
+  assert.deepEqual(session.project, before);
+  assert.equal(session.undoStack.length, historyLength);
+});
+
 test("Sequence queries are MCP-ready, derived from program duration, and DOM-independent", () => {
   const session = new EditorSession(baseProject());
   session.executeTransaction(createCommands());
