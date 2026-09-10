@@ -17,12 +17,13 @@ function owners(project) {
       temporalProgramId: entity?.temporalProgramId,
       path: "transitions." + index + ".temporalProgramId",
     })),
-    ...(project.animation?.clips || []).map((entity, index) => ({
+    ...(Array.isArray(project.animation?.clips) ? project.animation.clips : [])
+      .map((entity, index) => ({
       kind: "AnimationClip",
       id: entity?.id,
       temporalProgramId: entity?.temporalProgramId,
       path: "animation.clips." + index + ".temporalProgramId",
-    })),
+      })),
     ...(project.sequences || []).map((entity, index) => ({
       kind: "Sequence",
       id: entity?.id,

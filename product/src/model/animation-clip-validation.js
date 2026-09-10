@@ -59,11 +59,13 @@ function endpointValuesEqual(left, right, definition) {
 }
 
 function loopedClipIds(project) {
-  const result = new Set((project.animation?.clips || [])
+  const clips = Array.isArray(project.animation?.clips) ? project.animation.clips : [];
+  const result = new Set(clips
     .filter((clip) => clip?.defaultLoopMode === CLIP_LOOP_MODES.LOOP)
     .map((clip) => clip.id));
   for (const sequence of project.sequences || []) {
-    for (const instance of sequence?.clipInstances || []) {
+    const instances = Array.isArray(sequence?.clipInstances) ? sequence.clipInstances : [];
+    for (const instance of instances) {
       if (instance?.loopMode === CLIP_LOOP_MODES.LOOP && typeof instance.clipId === "string") {
         result.add(instance.clipId);
       }
