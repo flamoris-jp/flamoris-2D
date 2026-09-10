@@ -14,6 +14,8 @@ import {
 import { validateMeshFormCorrections } from "./mesh-form-correction-validation.js";
 import { validateBoneRotationConstraints } from "./bone-rotation-constraint-validation.js";
 import { validateTwoBoneIkConstraints } from "./two-bone-ik-validation.js";
+import { validateSequences } from "./sequence-validation.js";
+import { validateTemporalProgramOwnership } from "./temporal-program-ownership.js";
 
 function issue(code, path, message, entityId = null, severity = "error") {
   return { code, path, message, entityId, severity };
@@ -50,8 +52,8 @@ export function validateProject(project) {
   } catch {
     issues.push(issue("ANIMATION_INVALID_FRAME_RATE", "renderSettings.frameRate", "Frame rate must be a reduced positive rational."));
   }
-  if (!Number.isSafeInteger(project.renderSettings?.durationTicks) || project.renderSettings.durationTicks <= 0) {
-    issues.push(issue("ANIMATION_INVALID_DURATION", "renderSettings.durationTicks", "Render duration must be a positive integer tick value."));
+  if (Object.hasOwn(project.renderSettings || {}, "durationTicks")) {
+    issues.push(issue("ANIMATION_SECOND_DURATION_AUTHORITY", "renderSettings.durationTicks", "Duration belongs only to an owned TemporalProgram."));
   }
 
   const nodes = project.scene?.nodes;
@@ -130,8 +132,8 @@ export function validateProject(project) {
     ["meshFormCorrectionKeyforms", project.meshFormCorrectionKeyforms],
     ["transitions", project.transitions],
     ["animation.clips", project.animation?.clips],
-    ["animation.tracks", project.animation?.tracks],
-    ["animation.keyframes", project.animation?.keyframes],
+    ["animation.deformationSamples", project.animation?.deformationSamples],
+    ["sequences", project.sequences],
   ];
   for (const [path, values] of collections) {
     if (!Array.isArray(values)) issues.push(issue("collection.invalid", path, path + " must be an array."));
@@ -140,6 +142,8 @@ export function validateProject(project) {
 
   issues.push(...validateTemporalPrograms(project, register));
   issues.push(...validateTransitionDomain(project, register));
+  issues.push(...validateSequences(project, register));
+  issues.push(...validateTemporalProgramOwnership(project));
   issues.push(...validateClippingBindings(project, register));
   issues.push(...validateTransitionClipping(project));
   issues.push(...validateWarpDeformers(project, register));

@@ -203,7 +203,7 @@ test("shared TemporalProgram ownership is rejected", () => {
     partTransitions: [],
   });
   assert.throws(() => new EditorSession(project), (error) =>
-    error instanceof TransactionError && error.issues.some((entry) => entry.code === "TRANSITION_PROGRAM_SHARED"));
+    error instanceof TransactionError && error.issues.some((entry) => entry.code === "TEMPORAL_PROGRAM_OWNERSHIP_CONFLICT"));
 });
 
 test("Morph interpolates shared topology and differing positions", () => {

@@ -139,6 +139,14 @@ export function createFl2dDocument(
     diagnosticOverrides: [...transition.diagnosticOverrides].sort((a, b) =>
       a.key < b.key ? -1 : a.key > b.key ? 1 : 0),
   }));
+  body.animation.clips = [...body.animation.clips].sort(byId);
+  body.animation.deformationSamples = [...body.animation.deformationSamples].sort(byId);
+  body.sequences = [...body.sequences].sort(byId).map((sequence) => ({
+    ...sequence,
+    viewLaneItems: [...sequence.viewLaneItems].sort((left, right) =>
+      left.startTicks - right.startTicks || left.endTicks - right.endTicks || byId(left, right)),
+    clipInstances: [...sequence.clipInstances].sort(byId),
+  }));
   delete body.id;
   delete body.displayName;
   return {
@@ -273,6 +281,22 @@ export function migrateProjectSchema(value) {
   if (project?.schemaVersion === 11) {
     project.rig.twoBoneIkConstraints = [];
     project.schemaVersion = 12;
+  }
+  if (project?.schemaVersion === 12) {
+    // Schema 12 reserved these as untyped future placeholders. No authored
+    // Phase 8 contract existed, so placeholder entries must not be promoted.
+    project.animation = {
+      clips: [],
+      deformationSamples: [],
+    };
+    project.sequences = [];
+    delete project.sequence;
+    if (project.renderSettings && typeof project.renderSettings === "object") {
+      // Existing TemporalProgram durations are already authoritative. The
+      // project-level legacy field is deliberately dropped, never copied.
+      delete project.renderSettings.durationTicks;
+    }
+    project.schemaVersion = 13;
   }
   if (project?.schemaVersion !== PROJECT_SCHEMA_VERSION) {
     throw new ProjectFormatError(

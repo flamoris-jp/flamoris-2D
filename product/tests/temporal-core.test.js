@@ -404,7 +404,7 @@ test("Phase 1 schema migrates to an empty Temporal Core", () => {
     numerator: 24000,
     denominator: 1001,
   });
-  assert.equal(migrated.renderSettings.durationTicks, 300000);
+  assert.equal(Object.hasOwn(migrated.renderSettings, "durationTicks"), false);
   assert.equal(migrated.renderSettings.alpha, false);
   assert.deepEqual(migrated.temporalPrograms, []);
 });

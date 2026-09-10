@@ -357,7 +357,7 @@ test("schema 8 migration preserves Phase 7-2 rig state and adds empty skin bindi
   delete schema8.rig.skinBindings;
   const previousRig = structuredClone(schema8.rig);
   const migrated = migrateProjectSchema(schema8);
-  assert.equal(migrated.schemaVersion, 12);
+  assert.equal(migrated.schemaVersion, 13);
   assert.deepEqual(migrated.rig.skinBindings, []);
   assert.deepEqual(migrated.meshFormCorrectionKeyforms, []);
   assert.deepEqual(migrated.rig.boneRotationConstraints, []);

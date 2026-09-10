@@ -34,7 +34,7 @@ function chain(overrides = {}) {
 
 test("schema 12 initializes an empty typed two-bone IK collection", () => {
   const project = fixture();
-  assert.equal(PROJECT_SCHEMA_VERSION, 12);
+  assert.equal(PROJECT_SCHEMA_VERSION, 13);
   assert.deepEqual(project.rig.twoBoneIkConstraints, []);
   assert.deepEqual(validateProject(project), []);
 });
@@ -79,7 +79,7 @@ test("IK settings Save/Open canonically and schema 11 migration preserves constr
   delete schema11.rig.twoBoneIkConstraints;
   const limits = structuredClone(schema11.rig.boneRotationConstraints);
   const migrated = migrateProjectSchema(schema11);
-  assert.equal(migrated.schemaVersion, 12);
+  assert.equal(migrated.schemaVersion, 13);
   assert.deepEqual(migrated.rig.twoBoneIkConstraints, []);
   assert.deepEqual(migrated.rig.boneRotationConstraints, limits);
 });

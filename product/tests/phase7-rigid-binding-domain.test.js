@@ -54,7 +54,7 @@ function codes(project) {
 
 test("schema 8 adds rigid bindings and migrates forward with empty skin bindings", () => {
   const project = projectFixture();
-  assert.equal(PROJECT_SCHEMA_VERSION, 12);
+  assert.equal(PROJECT_SCHEMA_VERSION, 13);
   assert.deepEqual(project.rig.rigidBoneBindings, []);
   assert.deepEqual(project.rig.skinBindings, []);
   assert.deepEqual(project.meshFormCorrectionKeyforms, []);
@@ -66,7 +66,7 @@ test("schema 8 adds rigid bindings and migrates forward with empty skin bindings
   schema7.schemaVersion = 7;
   delete schema7.rig.rigidBoneBindings;
   const migrated = migrateProjectSchema(schema7);
-  assert.equal(migrated.schemaVersion, 12);
+  assert.equal(migrated.schemaVersion, 13);
   assert.deepEqual(migrated.rig.rigidBoneBindings, []);
   assert.deepEqual(migrated.rig.skinBindings, []);
   assert.deepEqual(migrated.meshFormCorrectionKeyforms, []);
