@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { EditorSession, TransactionError } from "../src/commands/editor.js";
+import { sampleBezier } from "../src/core/temporal.js";
 import { createWarpDeformer } from "../src/model/warp-deformer.js";
 import { boneSceneTransform, createBone } from "../src/model/bone.js";
 import { createAnimationClip } from "../src/model/animation-clip.js";
@@ -83,7 +84,8 @@ test("Phase 8-3 typed tracks validate in an AnimationClip and sample through the
   ]);
   assert.equal(validateProject(project).some((issue) => issue.severity === "error"), false);
   const before = structuredClone(project);
-  const sampled = new EditorSession(project).query("animation.sample_program",
+  const session = new EditorSession(project);
+  const sampled = session.query("animation.sample_program",
     { programId: "program", timeTicks: 50 });
   const values = Object.fromEntries(sampled.tracks.map((entry) => [entry.trackId, entry.values]));
   assert.equal(values.transform.positionX, 5);
@@ -95,6 +97,11 @@ test("Phase 8-3 typed tracks validate in an AnimationClip and sample through the
   assert.deepEqual(values.mesh_track.deformation,
     { deformationSampleId: "sample", weight: 0.5 });
   assert.deepEqual(project, before);
+  assert.equal(session.history.length, 0);
+  const reversed = structuredClone(project);
+  reversed.temporalPrograms[0].tracks.reverse();
+  assert.deepEqual(new EditorSession(reversed).query("animation.sample_program",
+    { programId: "program", timeTicks: 50 }), sampled);
 });
 
 test("Bone-compatible angular tie direction is shared without changing endpoint values", () => {
@@ -126,6 +133,10 @@ test("typed targets and positive scale channels reject malformed references dete
       { rotation: channel(key("k2", 0, Number.NaN, step)) }),
     track("deformer_track", "DeformerTrack", { deformerId: "missing", controlPointId: "cp1" },
       { deltaX: channel(key("k3", 0, 1, step)) }),
+    track("coordinate", "TransformTrack", { nodeId: "part", coordinateSpace: "world" },
+      { positionX: channel(key("k4", 0, 1, step)) }),
+    track("point", "DeformerTrack", { deformerId: "warp", controlPointId: "missing" },
+      { deltaY: channel(key("k5", 0, 1, step)) }),
   ];
   for (const value of cases) {
     const project = fixture();
@@ -136,6 +147,49 @@ test("typed targets and positive scale channels reject malformed references dete
   const project = fixture();
   ownClipProgram(project, [cases[0]]);
   assert.ok(validateProject(project).some((issue) => issue.code === "ANIMATION_INVALID_VALUE"));
+});
+
+test("CameraTrack is Sequence-owned and shares scalar Bezier and angular sampling", () => {
+  const project = fixture();
+  const ease = { kind: "bezier", x1: 0.25, y1: 0.1, x2: 0.25, y2: 1 };
+  project.keyArts.push({ id: "key", displayName: "Key", rootNodeId: project.scene.rootId,
+    members: [], metadata: {} });
+  project.temporalPrograms.push({ id: "camera_program", durationTicks: 100, events: [], regions: [],
+    tracks: [track("camera", "CameraTrack", { cameraId: "main" }, {
+      positionX: channel(key("cx0", 0, 0, ease), key("cx1", 100, 10, step)),
+      rotation: channel(key("cr0", 0, 0, ease), key("cr1", 100, Math.PI, step)),
+      scale: channel(key("cs0", 0, 1), key("cs1", 100, 2, step)),
+    })] });
+  project.sequences.push({ id: "sequence", displayName: "Sequence",
+    temporalProgramId: "camera_program", viewLaneItems: [{ id: "hold", kind: "KeyArtHold",
+      keyArtId: "key", startTicks: 0, endTicks: 100 }], clipInstances: [], metadata: {} });
+  const session = new EditorSession(project);
+  const values = session.query("animation.sample_program",
+    { programId: "camera_program", timeTicks: 50 }).tracks[0].values;
+  const eased = sampleBezier(0.5, ease);
+  assert.ok(Math.abs(values.positionX - 10 * eased) < 1e-12);
+  assert.ok(Math.abs(values.rotation - Math.PI * eased) < 1e-12);
+  assert.equal(values.scale, 1.5);
+
+  project.temporalPrograms[0].tracks[0].channels.scale.keyframes[0].value = 0;
+  assert.ok(validateProject(project).some((issue) => issue.code === "ANIMATION_INVALID_VALUE"));
+});
+
+test("clip discrete and opacity tracks accept exact node and SemanticSlot targets", () => {
+  const project = fixture();
+  const targets = [{ nodeId: "part" }, { semanticSlotId: "slot" }];
+  const families = [
+    ["OpacityTrack", "opacity", 0.5, linear],
+    ["PresenceTrack", "presence", "present", step],
+    ["DrawOrderTrack", "drawOrder", 1, step],
+    ["ClippingTrack", "clipping", { sourceNodeId: null }, step],
+  ];
+  ownClipProgram(project, families.flatMap(([kind, channelName, value, interpolation]) =>
+    targets.map((targetValue, index) => track(kind + index, kind, targetValue, {
+      [channelName]: channel(key(kind + index + "_key", 0,
+        kind === "DrawOrderTrack" ? value + index : value, interpolation)),
+    }))));
+  assert.equal(validateProject(project).some((issue) => issue.severity === "error"), false);
 });
 
 test("MeshDeformationTrack validates sample identity mesh and continuous sample compatibility", () => {
