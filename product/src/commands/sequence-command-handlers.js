@@ -3,6 +3,7 @@ import {
   canonicalizeViewLaneItems,
   normalizeSequence,
 } from "../model/sequence.js";
+import { canonicalizeClipInstances } from "../model/clip-instance.js";
 import { CommandError } from "./errors.js";
 
 function sequenceIndex(project, sequenceId) {
@@ -18,6 +19,13 @@ function sequenceFor(project, sequenceId) {
 function viewItemIndex(sequence, viewItemId) {
   const index = sequence.viewLaneItems.findIndex((entry) => entry.id === viewItemId);
   if (index < 0) throw new CommandError("Unknown ViewLane item.", "sequence.view_item_not_found", { viewItemId });
+  return index;
+}
+
+function clipInstanceIndex(sequence, clipInstanceId) {
+  const index = sequence.clipInstances.findIndex((entry) => entry.id === clipInstanceId);
+  if (index < 0) throw new CommandError("Unknown ClipInstance.",
+    "sequence.clip_instance_not_found", { clipInstanceId });
   return index;
 }
 
@@ -144,6 +152,69 @@ export const sequenceCommandHandlers = {
         sequenceId: sequence.id, viewItemId: payload.viewItem.id,
       } },
       affectedIds: [sequence.id, payload.viewItem.id],
+    };
+  },
+
+  "sequence.add_clip_instance": (project, payload) => {
+    const sequence = sequenceFor(project, payload.sequenceId);
+    if (sequence.clipInstances.some((entry) => entry.id === payload.clipInstance.id)) {
+      throw new CommandError("ClipInstance ID already exists.", "identity.duplicate",
+        { clipInstanceId: payload.clipInstance.id });
+    }
+    sequence.clipInstances.push(cloneProject(payload.clipInstance));
+    sequence.clipInstances = canonicalizeClipInstances(sequence.clipInstances);
+    return {
+      inverse: { type: "sequence.remove_clip_instance_internal", payload: {
+        sequenceId: sequence.id, clipInstanceId: payload.clipInstance.id,
+      } },
+      affectedIds: [sequence.id, payload.clipInstance.id, payload.clipInstance.clipId],
+    };
+  },
+
+  "sequence.update_clip_instance": (project, payload) => {
+    const sequence = sequenceFor(project, payload.sequenceId);
+    const index = clipInstanceIndex(sequence, payload.clipInstanceId);
+    const previous = cloneProject(sequence.clipInstances[index]);
+    if (payload.clipInstance.id !== payload.clipInstanceId) {
+      throw new CommandError("ClipInstance updates must preserve stable identity.",
+        "identity.changed");
+    }
+    sequence.clipInstances[index] = cloneProject(payload.clipInstance);
+    sequence.clipInstances = canonicalizeClipInstances(sequence.clipInstances);
+    return {
+      inverse: { type: "sequence.update_clip_instance", payload: {
+        sequenceId: sequence.id,
+        clipInstanceId: previous.id,
+        clipInstance: previous,
+      } },
+      affectedIds: [sequence.id, previous.id, previous.clipId, payload.clipInstance.clipId],
+    };
+  },
+
+  "sequence.remove_clip_instance": (project, payload) => {
+    const sequence = sequenceFor(project, payload.sequenceId);
+    const index = clipInstanceIndex(sequence, payload.clipInstanceId);
+    const [clipInstance] = sequence.clipInstances.splice(index, 1);
+    return {
+      inverse: { type: "sequence.restore_clip_instance", payload: {
+        sequenceId: sequence.id, clipInstance, index,
+      } },
+      affectedIds: [sequence.id, clipInstance.id, clipInstance.clipId],
+    };
+  },
+
+  "sequence.remove_clip_instance_internal": (project, payload) =>
+    sequenceCommandHandlers["sequence.remove_clip_instance"](project, payload),
+
+  "sequence.restore_clip_instance": (project, payload) => {
+    const sequence = sequenceFor(project, payload.sequenceId);
+    sequence.clipInstances.splice(payload.index, 0, cloneProject(payload.clipInstance));
+    sequence.clipInstances = canonicalizeClipInstances(sequence.clipInstances);
+    return {
+      inverse: { type: "sequence.remove_clip_instance_internal", payload: {
+        sequenceId: sequence.id, clipInstanceId: payload.clipInstance.id,
+      } },
+      affectedIds: [sequence.id, payload.clipInstance.id, payload.clipInstance.clipId],
     };
   },
 };

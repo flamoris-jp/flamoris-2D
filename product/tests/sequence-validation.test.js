@@ -137,7 +137,7 @@ test("schema 12 placeholders and second duration authority are removed without c
   const beforePrograms = structuredClone(project.temporalPrograms);
 
   const migrated = migrateProjectSchema(project);
-  assert.equal(migrated.schemaVersion, 13);
+  assert.equal(migrated.schemaVersion, 14);
   assert.deepEqual(migrated.temporalPrograms, beforePrograms);
   assert.deepEqual(migrated.animation, { clips: [], deformationSamples: [] });
   assert.deepEqual(migrated.sequences, []);
@@ -145,10 +145,18 @@ test("schema 12 placeholders and second duration authority are removed without c
   assert.equal(Object.hasOwn(migrated.renderSettings, "durationTicks"), false);
 });
 
-test("schema 13 rejects non-empty or extended Phase 8 placeholders", () => {
+test("schema 14 accepts typed clips but rejects unsupported placeholder state", () => {
   const clip = fixture();
-  clip.animation.clips.push({ id: "clip_future", temporalProgramId: "program_sequence" });
-  assert.ok(validateProject(clip).some((entry) => entry.code === "ANIMATION_CLIP_UNSUPPORTED"));
+  clip.temporalPrograms.push({ id: "program_clip", durationTicks: 10,
+    tracks: [], events: [], regions: [] });
+  clip.animation.clips.push({ id: "clip_typed", displayName: "Typed",
+    temporalProgramId: "program_clip", defaultLoopMode: "once", metadata: {} });
+  assert.equal(validateProject(clip).some((entry) =>
+    entry.entityId === "clip_typed" && entry.severity === "error"), false);
+
+  const malformed = fixture();
+  malformed.animation.clips.push({ id: "clip_future", temporalProgramId: "program_sequence" });
+  assert.ok(validateProject(malformed).some((entry) => entry.code === "ANIMATION_CLIP_INVALID"));
 
   const deformation = fixture();
   deformation.animation.deformationSamples.push({ id: "sample_future" });

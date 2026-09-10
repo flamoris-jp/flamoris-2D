@@ -6,6 +6,7 @@ import {
   evaluateKeyArtBaseState,
   evaluateTransition,
 } from "../core/transition-evaluator.js";
+import { validateSequenceClipInstances } from "./clip-instance-validation.js";
 
 function problem(code, path, message, entityId = null, details = null) {
   return {
@@ -147,16 +148,7 @@ export function validateSequences(project, register = () => {}) {
     if (!object(sequence.metadata)) {
       issues.push(problem("SEQUENCE_INVALID", path + ".metadata", "Sequence metadata must be an object.", sequence.id));
     }
-    if (!Array.isArray(sequence.clipInstances)) {
-      issues.push(problem("SEQUENCE_INVALID", path + ".clipInstances", "clipInstances must be an array.", sequence.id));
-    } else if (sequence.clipInstances.length) {
-      issues.push(problem(
-        "ANIMATION_CLIP_INSTANCE_UNSUPPORTED",
-        path + ".clipInstances",
-        "ClipInstance persistence is introduced by Phase 8-2.",
-        sequence.id,
-      ));
-    }
+    issues.push(...validateSequenceClipInstances(project, sequence, path, program, register));
     if (!Array.isArray(sequence.viewLaneItems)) {
       issues.push(problem("SEQUENCE_INVALID", path + ".viewLaneItems", "viewLaneItems must be an array.", sequence.id));
       continue;

@@ -19,6 +19,10 @@ src/styles/dialogs.css
 src/model/project.js
 src/model/sequence.js
 src/model/sequence-validation.js
+src/model/animation-clip.js
+src/model/animation-clip-validation.js
+src/model/clip-instance.js
+src/model/clip-instance-validation.js
 src/model/temporal-program-ownership.js
 src/model/bone.js
 src/model/bone-validation.js
@@ -80,6 +84,7 @@ src/commands/bone-command-handlers.js
 src/commands/bone-constraint-command-handlers.js
 src/commands/two-bone-ik-command-handlers.js
 src/commands/sequence-command-handlers.js
+src/commands/animation-clip-command-handlers.js
 src/commands/rigid-bone-binding-command-handlers.js
 src/commands/skin-binding-command-handlers.js
 src/commands/mesh-form-correction-command-handlers.js
@@ -117,6 +122,7 @@ src/ui/bone-viewport-overlay.js
 src/ui/deformer-viewport-overlay.js
 src/ui/correspondence-view.js
 src/core/contour-automesh.js
+src/core/clip-time.js
 src/core/correspondence-solver.js
 src/ui/mesh-authoring-view.js
 src/ui/reimport-render-history.js

@@ -28,7 +28,7 @@ test("Sequence construction canonicalizes ViewLane items without changing stable
   assert.deepEqual(sequence.metadata, {});
 });
 
-test("TemporalProgram ownership ignores unsupported clip placeholders", () => {
+test("TemporalProgram ownership includes typed AnimationClip owners", () => {
   const project = {
     transitions: [{ id: "transition_a", temporalProgramId: "program_shared" }],
     animation: { clips: [{ id: "clip_a", temporalProgramId: "program_shared" }] },
@@ -38,12 +38,13 @@ test("TemporalProgram ownership ignores unsupported clip placeholders", () => {
   assert.deepEqual(
     temporalProgramOwners(project).get("program_shared").map(({ kind, id }) => [kind, id]),
     [
+      ["AnimationClip", "clip_a"],
       ["Sequence", "sequence_a"],
       ["Transition", "transition_a"],
     ],
   );
   const issues = validateTemporalProgramOwnership(project);
-  assert.equal(issues.length, 2);
+  assert.equal(issues.length, 3);
   assert.ok(issues.every((entry) => entry.code === "TEMPORAL_PROGRAM_OWNERSHIP_CONFLICT"));
-  assert.deepEqual(issues.map((entry) => entry.entityId), ["sequence_a", "transition_a"]);
+  assert.deepEqual(issues.map((entry) => entry.entityId), ["clip_a", "sequence_a", "transition_a"]);
 });
