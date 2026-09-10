@@ -449,3 +449,23 @@ test("preview, PNG source, and MP4 source share the ordinary Sequence frame and 
   assert.deepEqual(source.evaluatedFrame, headless);
   assert.deepEqual(sourcePlan, expectedPlan);
 });
+
+test("Sequence export refuses a structurally non-authoritative mixer conflict", () => {
+  const project = fixture();
+  for (const [id, value] of [["a", 2], ["b", 3]]) {
+    addClip(project, id, [track("draw_" + id, "DrawOrderTrack",
+      { semanticSlotId: "slot" }, { drawOrder: channel("draw_key_" + id, value) })],
+    { layer: 4 });
+  }
+  const renderer = new ExportFrameRenderer({
+    createOffscreenRenderer: () => ({ renderEvaluated() { return null; } }),
+  });
+  const result = renderer.render({ project, sequenceId: "sequence",
+    frameRate: { numerator: 2400, denominator: 1 }, frameIndex: 1,
+    outputWidth: 100, outputHeight: 100,
+    renderAssets: [{ nodeId: "node_a", status: "ready", image: {} }] });
+  assert.equal(result.ok, false);
+  assert.ok(result.diagnostics.some((entry) =>
+    entry.code === "export.non_authoritative_evaluation" &&
+    entry.codes.includes("ANIMATION_TRACK_CONFLICT")));
+});

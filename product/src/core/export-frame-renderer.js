@@ -104,6 +104,16 @@ export class ExportFrameRenderer {
     const diagnostics = invalidTransformDiagnostics(
       evaluatedFrame.evaluation,
     );
+    if (sequenceId && evaluatedFrame.evaluation.authoritative === false) {
+      diagnostics.push(diagnostic(
+        "export.non_authoritative_evaluation",
+        "Sequence evaluation contains structural animation diagnostics.",
+        { codes: evaluatedFrame.evaluation.diagnostics
+          .filter((entry) => entry.severity === "error")
+          .map((entry) => entry.code)
+          .sort() },
+      ));
+    }
     const assets = renderAssetMap(renderAssets);
     const resolveArtwork = (nodeId) => {
       const asset = assets.get(nodeId);
