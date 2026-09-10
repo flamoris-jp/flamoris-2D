@@ -17,6 +17,8 @@ src/styles/editor-panels.css
 src/styles/viewport.css
 src/styles/dialogs.css
 src/model/project.js
+src/model/sequence.js
+src/model/temporal-program-ownership.js
 src/model/bone.js
 src/model/bone-validation.js
 src/model/bone-rotation-constraint.js
