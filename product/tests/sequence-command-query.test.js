@@ -94,6 +94,16 @@ test("invalid non-atomic owner/program mutations roll back", () => {
   assert.throws(() => session.execute({ type: "sequence.create",
     payload: { sequence: sequence() } }), TransactionError);
   assert.deepEqual(session.project.sequences, []);
+
+  session.execute({ type: "animation.temporal.create_program",
+    payload: { programId: "program_shot", durationTicks: 100 } });
+  assert.throws(
+    () => session.execute({ type: "sequence.create", payload: { sequence: sequence() } }),
+    (error) => error instanceof TransactionError &&
+      error.issues.some((entry) => entry.code === "SEQUENCE_PROGRAM_CREATION_NOT_ATOMIC"),
+  );
+  assert.deepEqual(session.project.sequences, []);
+  assert.equal(session.project.temporalPrograms[0].id, "program_shot");
 });
 
 test("Sequence queries are MCP-ready, derived from program duration, and DOM-independent", () => {

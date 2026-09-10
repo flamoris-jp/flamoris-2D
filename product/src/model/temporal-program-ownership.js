@@ -124,8 +124,24 @@ export function validateTemporalProgramOwnerTracks(project) {
 
 export function validateTemporalProgramOwnershipChange(beforeProject, afterProject) {
   const issues = [];
+  const beforeSequenceIds = new Set((beforeProject.sequences || []).map((entry) => entry.id));
+  const beforeProgramIds = new Set((beforeProject.temporalPrograms || []).map((entry) => entry.id));
   const afterSequenceIds = new Set((afterProject.sequences || []).map((entry) => entry.id));
   const afterProgramIds = new Set((afterProject.temporalPrograms || []).map((entry) => entry.id));
+
+  for (const sequence of [...(afterProject.sequences || [])]
+    .sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0)) {
+    if (beforeSequenceIds.has(sequence.id) || !beforeProgramIds.has(sequence.temporalProgramId)) {
+      continue;
+    }
+    issues.push(problem(
+      "SEQUENCE_PROGRAM_CREATION_NOT_ATOMIC",
+      "sequences",
+      "Creating a Sequence and its owned TemporalProgram must be one transaction.",
+      sequence.id,
+      { temporalProgramId: sequence.temporalProgramId },
+    ));
+  }
 
   for (const sequence of [...(beforeProject.sequences || [])]
     .sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0)) {
