@@ -486,30 +486,35 @@ Phase 2 minimum behavior is a data/evaluation contract:
 - a transition may explicitly step/handoff between already-valid clipping references;
 - evaluated clipping is deterministic and inspectable.
 
-Phase 2 does not pull the clipping authoring tools or clipping-aware render pass
-forward from Phase 4. Until those capabilities exist, the evaluator preserves
-and validates references it can understand and reports unsupported clipping
-requirements. Mask authoring, clipping rasterization, and mask/clipping morphing
-belong to the later clipping/deformer phase.
+Phase 2 did not pull the clipping authoring tools or clipping-aware render pass
+forward from the later rigging work. Phase 6 subsequently implemented clipping
+domain/evaluation/rendering together with Warp/Lattice Deformers. The
+Transition evaluator now resolves clipping only after final evaluated
+deformation and transforms; mask/clipping morphing beyond the explicit source
+handoff contract remains a later feature.
 
 ## 19. Transition evaluation order
 
-For each active part at transition time `t`:
+For each active part at transition time `t`, the merged Phase 6/7 evaluator now
+uses this canonical order:
 
 ```text
 1. Resolve confirmed semantic correspondence
 2. Resolve transition mode
 3. Sample transition tracks/curves
-4. Evaluate base geometry / endpoint render instances
-5. Resolve appearance/texture/UV contribution
-6. Resolve opacity
-7. Resolve presence
-8. Resolve draw order
-9. Resolve clipping state
+4. Evaluate MeshKeyform base / Transition geometry
+5. Evaluate Warp/Lattice stages
+6. Resolve Bone pose, apply rotation constraints, then FK and rigid/Skinning
+7. Apply MeshFormCorrectionKeyform
+8. Resolve final node/world transform and appearance/opacity/presence/draw order intent
+9. Resolve clipping after all parts have final evaluated geometry/alpha
 10. Emit EvaluatedPartState with zero or more complete render instances
 ```
 
-The complete frame pipeline then layers rig/animation/camera according to `docs/animation-data-model.md`.
+Phase 8 layers reusable animation by supplying transient typed contributions at
+these existing Warp/Bone/form/transform seams, not by modifying a fully
+flattened Transition result. The complete Sequence contract is defined in
+`docs/phase8-animation-sequencing.md`.
 
 ## 20. Example: Back-to-Front turn
 
@@ -720,16 +725,21 @@ In scope for the first transition foundation:
 - dual-texture sampling with per-Key-Art UVs for compatible Morph parts;
 - opacity and `present/occluded/absent` state;
 - explicit draw-order state/events;
-- deterministic clipping-reference handoff data/evaluation minimum (full clipping authoring/rendering remains Phase 4);
+- deterministic clipping-reference handoff data/evaluation minimum (full clipping authoring/rendering was deferred to Phase 6);
 - machine-readable feasibility diagnostics;
 - save/load/undo/redo/validation;
 - deterministic arbitrary-time evaluation.
 
-Deferred to Phase 6:
+Implemented after the Phase 2 foundation:
+
+- Phase 6: clipping authoring/rendering and Warp/Lattice Deformer integration;
+- Phase 7: Bone/FK, rigid/weighted Skinning, rotation constraints, and post-skin form correction.
+
+Deferred to Phase 8:
 
 - reusable AnimationClip authoring and ClipInstance sequencing;
-- general multi-track timeline, mixer, looping, retiming, and graph editor;
-- production bone/deformer/mesh animation authoring;
+- general multi-track timeline, mixer, looping, and retiming;
+- Transform/Bone/Deformer/post-skin mesh animation authoring;
 - combining multiple reusable clips with Transition output.
 
 Deferred beyond the Phase 2 foundation:
@@ -738,7 +748,8 @@ Deferred beyond the Phase 2 foundation:
 - advanced mask morphing;
 - continuous true depth model;
 - neural correspondence as required runtime;
-- full animation timeline/mixer UI;
+- full DAW/NLE-style timeline beyond the focused Phase 8 short-shot UI;
+- graph editor until typed track semantics stabilize;
 - advanced graph-based view-state authoring.
 
 ## 27. Acceptance criteria
