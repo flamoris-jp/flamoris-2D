@@ -78,6 +78,7 @@ export function validateTemporalProgramOwnerTracks(project) {
     const programOwners = ownersByProgram.get(program?.id) || [];
     const soleOwner = programOwners.length === 1 ? programOwners[0] : null;
     const sequenceOwner = soleOwner?.kind === "Sequence" ? soleOwner : null;
+    const clipOwner = soleOwner?.kind === "AnimationClip" ? soleOwner : null;
     const tracks = Array.isArray(program?.tracks) ? program.tracks : [];
 
     tracks.forEach((track, trackIndex) => {
@@ -102,6 +103,18 @@ export function validateTemporalProgramOwnerTracks(project) {
           {
             temporalProgramId: program?.id,
             owner: { kind: sequenceOwner.kind, id: sequenceOwner.id },
+            trackKind: track?.kind,
+          },
+        ));
+      } else if (clipOwner && ["GeometryBlendTrack", "AppearanceTrack"].includes(track?.kind)) {
+        issues.push(problem(
+          "ANIMATION_TRACK_OWNER_INVALID",
+          path + ".kind",
+          track.kind + " remains Transition-owned and cannot be authored in an AnimationClip.",
+          track?.trackId || program?.id,
+          {
+            temporalProgramId: program?.id,
+            owner: { kind: clipOwner.kind, id: clipOwner.id },
             trackKind: track?.kind,
           },
         ));

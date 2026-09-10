@@ -99,6 +99,13 @@ test("schema 13 migration starts typed clip state empty without promoting placeh
   assert.equal(migrated.temporalPrograms[0].id, "unowned_program");
 });
 
+test("schema 13 migration discards a non-array Sequence placeholder", () => {
+  const legacy = projectFixture();
+  legacy.schemaVersion = 13;
+  legacy.sequences = { unsupported: true };
+  assert.deepEqual(migrateProjectSchema(legacy).sequences, []);
+});
+
 test("AnimationClip rejects unknown fields and missing owned programs", () => {
   const project = projectFixture();
   project.animation.clips.push({
@@ -157,4 +164,18 @@ test("AnimationClip ownership preserves existing owner-aware target validation",
   }] });
   assert.ok(validateProject(project).some((issue) =>
     issue.code === "ANIMATION_TRACK_OWNER_INVALID" && issue.entityId === "track_camera"));
+});
+
+test("AnimationClip ownership cannot smuggle Transition-only track families", () => {
+  const project = projectFixture();
+  project.semanticSlots.push({ id: "slot_face", displayName: "Face", mappings: [], metadata: {} });
+  project.animation.clips.push(createAnimationClip({ id: "clip_transition_track",
+    displayName: "Invalid", temporalProgramId: "program_transition_track" }));
+  project.temporalPrograms.push({ ...program("program_transition_track"), tracks: [{
+    trackId: "track_geometry", version: 1, kind: "GeometryBlendTrack",
+    target: { semanticSlotId: "slot_face" },
+    channels: { geometryWeight: { keyframes: [] } },
+  }] });
+  assert.ok(validateProject(project).some((issue) =>
+    issue.code === "ANIMATION_TRACK_OWNER_INVALID" && issue.entityId === "track_geometry"));
 });

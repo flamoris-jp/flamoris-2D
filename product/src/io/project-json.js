@@ -307,7 +307,8 @@ export function migrateProjectSchema(value) {
       clips: [],
       deformationSamples: [],
     };
-    project.sequences = (project.sequences || []).map((sequence) => ({
+    const schema13Sequences = Array.isArray(project.sequences) ? project.sequences : [];
+    project.sequences = schema13Sequences.map((sequence) => ({
       ...sequence,
       clipInstances: [],
     }));
