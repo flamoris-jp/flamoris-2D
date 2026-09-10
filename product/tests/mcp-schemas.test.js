@@ -7,7 +7,7 @@ import {
 } from "../src/mcp/schemas.js";
 
 test("MCP schema module imports with wired query and command schemas", () => {
-  assert.equal(MCP_SCHEMA_VERSION, 16);
+  assert.equal(MCP_SCHEMA_VERSION, 17);
   assert.equal(
     querySchemas["scene.get_node"].properties.nodeId.type,
     "string",
@@ -63,4 +63,8 @@ test("MCP schema module imports with wired query and command schemas", () => {
   assert.equal(querySchemas["animation.clip.get"].properties.clipId.type, "string");
   assert.equal(querySchemas["sequence.project_clip_instances"].properties.timeTicks.type,
     "integer");
+  assert.equal(commandSchemas["animation.deformation_sample.create"]
+    .properties.sample.properties.offsets.items.properties.vertexId.type, "string");
+  assert.equal(querySchemas["animation.deformation_sample.get"].properties.sampleId.type,
+    "string");
 });

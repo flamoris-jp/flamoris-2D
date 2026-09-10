@@ -232,6 +232,10 @@ test("typed tracks reject unknown kinds, duplicate times, and non-step discrete 
 test("Phase 2A typed track families validate without arbitrary property paths", () => {
   const project = fixture();
   project.meshes.push({ id: "mesh_face" });
+  project.meshTopologies.push({ id: "topology_face", vertexIds: ["v1", "v2", "v3"],
+    indices: [0, 1, 2], vertexMetadata: {}, nextVertexSequence: 1 });
+  project.animation.deformationSamples.push({ id: "sample_face", meshId: "mesh_face",
+    topologyId: "topology_face", offsets: [] });
   const scalar = (trackId, kind, target, channel, value) => ({
     trackId,
     version: 1,

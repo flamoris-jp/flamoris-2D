@@ -137,7 +137,7 @@ test("schema 12 placeholders and second duration authority are removed without c
   const beforePrograms = structuredClone(project.temporalPrograms);
 
   const migrated = migrateProjectSchema(project);
-  assert.equal(migrated.schemaVersion, 14);
+  assert.equal(migrated.schemaVersion, 15);
   assert.deepEqual(migrated.temporalPrograms, beforePrograms);
   assert.deepEqual(migrated.animation, { clips: [], deformationSamples: [] });
   assert.deepEqual(migrated.sequences, []);
@@ -145,7 +145,7 @@ test("schema 12 placeholders and second duration authority are removed without c
   assert.equal(Object.hasOwn(migrated.renderSettings, "durationTicks"), false);
 });
 
-test("schema 14 accepts typed clips but rejects unsupported placeholder state", () => {
+test("schema 15 accepts typed clips and rejects malformed deformation samples", () => {
   const clip = fixture();
   clip.temporalPrograms.push({ id: "program_clip", durationTicks: 10,
     tracks: [], events: [], regions: [] });
@@ -161,7 +161,7 @@ test("schema 14 accepts typed clips but rejects unsupported placeholder state", 
   const deformation = fixture();
   deformation.animation.deformationSamples.push({ id: "sample_future" });
   assert.ok(validateProject(deformation).some((entry) =>
-    entry.code === "ANIMATION_DEFORMATION_SAMPLE_UNSUPPORTED"));
+    entry.code === "ANIMATION_DEFORMATION_SAMPLE_INVALID"));
 
   const legacyShape = fixture();
   legacyShape.animation.tracks = [];
