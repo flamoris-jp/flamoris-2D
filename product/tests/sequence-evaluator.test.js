@@ -11,6 +11,7 @@ import { deserializeProject, serializeProject } from "../src/io/project-json.js"
 import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
 import { VIEW_LANE_ITEM_KINDS } from "../src/model/sequence.js";
 import { validateProject } from "../src/model/validation.js";
+import { createEvaluatedRenderPlan } from "../src/core/evaluated-render.js";
 
 function fixture() {
   const project = createProject({ name: "Evaluation", width: 100, height: 100,
@@ -151,4 +152,12 @@ test("Sequence evaluation is deterministic, DOM-independent, and Save/Open equiv
   assert.deepEqual(after, before);
   assert.deepEqual(evaluateSequence(project, "sequence_shot", 150), before);
   assert.equal(Object.hasOwn(globalThis, "document"), false);
+});
+
+test("shared renderer plan consumes Sequence EvaluatedFrame without Sequence semantics", () => {
+  const frame = evaluateSequence(fixture(), "sequence_shot", 0);
+  const plan = createEvaluatedRenderPlan(frame, { resolveArtwork: () => ({}) });
+  assert.equal(plan.renderInstanceCount, 1);
+  assert.deepEqual(plan.unsupportedReasons, []);
+  assert.equal(plan.batches[0].renderInstances[0].sourceNodeId, "node_a");
 });

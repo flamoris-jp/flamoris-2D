@@ -71,7 +71,7 @@ test("ViewLane continuity is resolved canonically instead of by insertion order"
   project.sequences[0].viewLaneItems.reverse();
   assert.equal(validateProject(project).some((entry) => entry.code.startsWith("SEQUENCE_")), false);
   project.sequences[0].viewLaneItems.find((item) => item.id === "hold_b").keyArtId = "keyart_a";
-  assert.ok(validateProject(project).some((entry) => entry.code === "SEQUENCE_VIEW_CONTINUITY_MISMATCH"));
+  assert.ok(validateProject(project).some((entry) => entry.code === "SEQUENCE_TRANSITION_ENDPOINT_MISMATCH"));
 });
 
 test("TemporalProgram ownership rejects a Sequence and Transition sharing one program", () => {

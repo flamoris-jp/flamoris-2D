@@ -245,8 +245,12 @@ export function validateSequences(project, register = () => {}) {
       const outgoing = endpointKeyArtIds(previous, transitionById).end;
       const incoming = endpointKeyArtIds(current, transitionById).start;
       if (outgoing && incoming && outgoing !== incoming) {
+        const transitionBoundary = previous.kind === VIEW_LANE_ITEM_KINDS.TRANSITION_INSTANCE ||
+          current.kind === VIEW_LANE_ITEM_KINDS.TRANSITION_INSTANCE;
         issues.push(problem(
-          "SEQUENCE_VIEW_CONTINUITY_MISMATCH",
+          transitionBoundary
+            ? "SEQUENCE_TRANSITION_ENDPOINT_MISMATCH"
+            : "SEQUENCE_VIEW_CONTINUITY_MISMATCH",
           path + ".viewLaneItems",
           "Adjacent ViewLane endpoints must resolve to the same KeyArt.",
           sequence.id,
@@ -271,8 +275,10 @@ export function validateSequences(project, register = () => {}) {
         }
       }
     }
-    if (items.at(-1)?.endTicks !== program.durationTicks) {
+    if (items.at(-1)?.endTicks < program.durationTicks) {
       issues.push(problem("SEQUENCE_VIEW_GAP", path + ".viewLaneItems", "The last ViewLane item must end at Sequence duration.", sequence.id));
+    } else if (items.at(-1)?.endTicks > program.durationTicks) {
+      issues.push(problem("SEQUENCE_VIEW_OVERLAP", path + ".viewLaneItems", "The last ViewLane item must not extend beyond Sequence duration.", sequence.id));
     }
   }
   return issues;

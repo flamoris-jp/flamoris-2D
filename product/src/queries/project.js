@@ -44,6 +44,7 @@ import {
 import { canonicalizeViewLaneItems } from "../model/sequence.js";
 import { sequenceDurationTicks, validateSequences } from "../model/sequence-validation.js";
 import { evaluateSequence } from "../core/sequence-evaluator.js";
+import { validateTemporalProgramOwnership } from "../model/temporal-program-ownership.js";
 
 function temporalProgram(project, programId) {
   const program = project.temporalPrograms.find((entry) => entry.id === programId);
@@ -592,7 +593,10 @@ export const projectQueries = {
     const index = project.sequences.indexOf(sequence);
     const prefix = "sequences." + index;
     const itemIds = new Set(sequence.viewLaneItems.map((item) => item.id));
-    const issues = validateSequences(project).filter((entry) =>
+    const issues = [
+      ...validateSequences(project),
+      ...validateTemporalProgramOwnership(project),
+    ].filter((entry) =>
       entry.entityId === sequence.id || itemIds.has(entry.entityId) || entry.path.startsWith(prefix));
     return { valid: !issues.some((entry) => entry.severity === "error"), issues };
   },
