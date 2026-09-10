@@ -1,6 +1,6 @@
 import { TIMEBASE_TICKS_PER_SECOND } from "../core/temporal.js";
 
-export const PROJECT_SCHEMA_VERSION = 12;
+export const PROJECT_SCHEMA_VERSION = 13;
 
 export function identityTransform() {
   return {
@@ -71,11 +71,10 @@ export function createProject({ id, name = "Untitled", width, height, idFactory 
     },
     transitions: [],
     temporalPrograms: [],
-    animation: { clips: [], tracks: [], keyframes: [] },
-    sequence: [],
+    animation: { clips: [], deformationSamples: [] },
+    sequences: [],
     renderSettings: {
       frameRate: { numerator: 30, denominator: 1 },
-      durationTicks: 8 * TIMEBASE_TICKS_PER_SECOND,
       alpha: true,
     },
   };

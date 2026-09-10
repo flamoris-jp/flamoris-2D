@@ -334,7 +334,7 @@ test("failed atomic creation rolls back both objects and shared ownership remain
     partTransitions: [],
   });
   assert.ok(validateProject(invalid).some((issue) =>
-    issue.code === "TRANSITION_PROGRAM_SHARED"));
+    issue.code === "TEMPORAL_PROGRAM_OWNERSHIP_CONFLICT"));
 });
 
 test("authoring controller stays DOM-free and routes through headless Session APIs", async () => {

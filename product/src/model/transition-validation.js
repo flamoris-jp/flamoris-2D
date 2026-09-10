@@ -362,7 +362,6 @@ export function validateTransitionDomain(project, register = () => {}) {
     keyformKeys.add(key);
   }
 
-  const programOwners = new Map();
   for (const [index, transition] of transitions.entries()) {
     const path = "transitions." + index;
     if (!object(transition)) {
@@ -381,17 +380,6 @@ export function validateTransitionDomain(project, register = () => {}) {
     if (!programById.has(transition.temporalProgramId)) {
       issues.push(problem("TRANSITION_UNKNOWN_PROGRAM", path + ".temporalProgramId", "Transition TemporalProgram does not exist.", transition.id));
     }
-    const previousOwner = programOwners.get(transition.temporalProgramId);
-    if (previousOwner) {
-      issues.push(problem(
-        "TRANSITION_PROGRAM_SHARED",
-        path + ".temporalProgramId",
-        "A TemporalProgram may be owned by only one Transition.",
-        transition.temporalProgramId,
-        "error",
-        { transitionIds: [previousOwner, transition.id].sort() },
-      ));
-    } else programOwners.set(transition.temporalProgramId, transition.id);
     if (!Array.isArray(transition.partTransitions)) {
       issues.push(problem("TRANSITION_INVALID", path + ".partTransitions", "partTransitions must be an array.", transition.id));
       continue;
