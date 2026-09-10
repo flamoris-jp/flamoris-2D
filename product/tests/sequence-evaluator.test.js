@@ -74,6 +74,16 @@ test("internal boundaries belong to the later item and terminal tick inspects th
   assert.equal(resolveSequenceViewItem(project, "sequence_shot", 300).id, "hold_b");
   assert.equal(evaluateSequence(project, "sequence_shot", 300).activeViewLaneItem.localTimeTicks, 100);
   assert.equal(evaluateSequence(project, "sequence_shot", 150).activeViewLaneItem.localTimeTicks, 4);
+
+  const terminalTransition = fixture();
+  terminalTransition.temporalPrograms.find((entry) =>
+    entry.id === "program_sequence").durationTicks = 200;
+  terminalTransition.sequences[0].viewLaneItems = terminalTransition.sequences[0]
+    .viewLaneItems.filter((item) => item.id !== "hold_b");
+  const terminal = evaluateSequence(terminalTransition, "sequence_shot", 200);
+  assert.equal(terminal.activeViewLaneItem.id, "transition_instance");
+  assert.equal(terminal.activeViewLaneItem.localTimeTicks, 7);
+  assert.equal(terminal.evaluatedParts[0].renderInstances[0].sourceNodeId, "node_b");
 });
 
 test("standalone KeyArtHold shares Warp Bone Form and clipping endpoint evaluation", () => {
