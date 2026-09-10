@@ -150,6 +150,31 @@ const transform = {
 };
 
 export const commandSchemas = {
+  "sequence.create": {
+    type: "object", required: ["sequence"], properties: { sequence: domainObject },
+    additionalProperties: false,
+  },
+  "sequence.update": {
+    type: "object", required: ["sequenceId", "sequence"],
+    properties: { sequenceId: nonEmptyString, sequence: domainObject }, additionalProperties: false,
+  },
+  "sequence.remove": {
+    type: "object", required: ["sequenceId"], properties: { sequenceId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "sequence.add_view_item": {
+    type: "object", required: ["sequenceId", "viewItem"],
+    properties: { sequenceId: nonEmptyString, viewItem: domainObject }, additionalProperties: false,
+  },
+  "sequence.update_view_item": {
+    type: "object", required: ["sequenceId", "viewItemId", "viewItem"],
+    properties: { sequenceId: nonEmptyString, viewItemId: nonEmptyString, viewItem: domainObject },
+    additionalProperties: false,
+  },
+  "sequence.remove_view_item": {
+    type: "object", required: ["sequenceId", "viewItemId"],
+    properties: { sequenceId: nonEmptyString, viewItemId: nonEmptyString }, additionalProperties: false,
+  },
   "bone.create_two_bone_ik": {
     type: "object",
     required: ["constraint"],
@@ -676,6 +701,12 @@ export const commandSchemas = {
     properties: { programId: nonEmptyString, durationTicks: positiveInteger },
     additionalProperties: false,
   },
+  "animation.temporal.remove_program": {
+    type: "object",
+    required: ["programId"],
+    properties: { programId: nonEmptyString },
+    additionalProperties: false,
+  },
   "animation.temporal.set_duration": {
     type: "object",
     required: ["programId", "durationTicks"],
@@ -829,6 +860,23 @@ function entityRestoreSchema() {
 }
 
 const internalCommandSchemas = {
+  "sequence.remove_internal": {
+    type: "object", required: ["sequenceId"], properties: { sequenceId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "sequence.restore": {
+    type: "object", required: ["sequence", "index"],
+    properties: { sequence: domainObject, index: nonNegativeInteger }, additionalProperties: false,
+  },
+  "sequence.remove_view_item_internal": {
+    type: "object", required: ["sequenceId", "viewItemId"],
+    properties: { sequenceId: nonEmptyString, viewItemId: nonEmptyString }, additionalProperties: false,
+  },
+  "sequence.restore_view_item": {
+    type: "object", required: ["sequenceId", "viewItem", "index"],
+    properties: { sequenceId: nonEmptyString, viewItem: domainObject, index: nonNegativeInteger },
+    additionalProperties: false,
+  },
   "bone.remove_two_bone_ik_internal": {
     type: "object",
     required: ["constraintId"],

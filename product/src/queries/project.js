@@ -41,6 +41,8 @@ import {
   projectTwoBoneIkChain,
   solveProjectTwoBoneIk,
 } from "../core/two-bone-ik-authoring-solver.js";
+import { canonicalizeViewLaneItems } from "../model/sequence.js";
+import { sequenceDurationTicks, validateSequences } from "../model/sequence-validation.js";
 
 function temporalProgram(project, programId) {
   const program = project.temporalPrograms.find((entry) => entry.id === programId);
@@ -230,6 +232,7 @@ export const projectQueries = {
       twoBoneIkConstraints: project.rig.twoBoneIkConstraints.length,
       transitions: project.transitions.length,
       clips: project.animation.clips.length,
+      sequences: project.sequences.length,
       temporalPrograms: project.temporalPrograms.length,
     },
   }),
@@ -566,6 +569,32 @@ export const projectQueries = {
     evaluateTransition(project, input.transitionId, input.timeTicks),
   "transition.get_diagnostics": (project, input) =>
     getTransitionDiagnostics(project, input.transitionId),
+  "sequence.get": (project, input) => {
+    const sequence = project.sequences.find((entry) => entry.id === input.sequenceId);
+    if (!sequence) throw new Error("Unknown Sequence " + input.sequenceId + ".");
+    return {
+      ...cloneProject(sequence),
+      viewLaneItems: canonicalizeViewLaneItems(sequence.viewLaneItems),
+      durationTicks: sequenceDurationTicks(project, sequence),
+    };
+  },
+  "sequence.list": (project) => [...project.sequences]
+    .sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0)
+    .map((sequence) => ({
+      ...cloneProject(sequence),
+      viewLaneItems: canonicalizeViewLaneItems(sequence.viewLaneItems),
+      durationTicks: sequenceDurationTicks(project, sequence),
+    })),
+  "sequence.get_diagnostics": (project, input) => {
+    const sequence = project.sequences.find((entry) => entry.id === input.sequenceId);
+    if (!sequence) throw new Error("Unknown Sequence " + input.sequenceId + ".");
+    const index = project.sequences.indexOf(sequence);
+    const prefix = "sequences." + index;
+    const itemIds = new Set(sequence.viewLaneItems.map((item) => item.id));
+    const issues = validateSequences(project).filter((entry) =>
+      entry.entityId === sequence.id || itemIds.has(entry.entityId) || entry.path.startsWith(prefix));
+    return { valid: !issues.some((entry) => entry.severity === "error"), issues };
+  },
   "export.get_frame_plan": (project, input) =>
     planTransitionExportFrames(project, input.transitionId, input.frameRate).describe(),
   "export.evaluate_frame": (project, input) =>
