@@ -224,6 +224,17 @@ Validation requirements:
 - discrete values use step interpolation only;
 - malformed interpolation fails before mutation.
 
+Value interpolation is also typed by `(track.kind, channelName)` in the shared
+temporal sampler. Phase 8 marks `BoneTrack.rotation`,
+`TransformTrack.rotation`, and `CameraTrack.rotation` as shortest-arc angular
+channels. They retain the same step/linear/Bezier time curve; only the value
+interpolation after time progress is angular. The deterministic delta is in
+`[-PI, PI)`, so an exact half-turn chooses `-PI`. All existing Transition
+numeric channels and other numeric channels keep scalar interpolation. This is
+metadata on the common typed-track registry and one `sampleTemporalProgram()`
+path, not a rig- or Sequence-specific sampler. Turns of at least `PI` in a
+chosen direction require intermediate authored keys in the initial model.
+
 ## 8. Typed track model
 
 Do not use an unrestricted string property path such as `"foo.bar.anything"` as the primary persistent track model.
@@ -318,6 +329,7 @@ Each channel is independently keyframed so a simple Y movement does not require 
 
 Phase 8 Transform values are node-local contributions: position and rotation
 are additive deltas and scale is a multiplicative factor around identity `1`.
+Transform rotation keys use the shared shortest-arc angular interpolation rule.
 Clip weight scales position/rotation and exponentiates scale toward identity as
 specified by `docs/phase8-animation-sequencing.md`. Contributions are resolved
 through the Scene hierarchy before final render-instance world transforms are

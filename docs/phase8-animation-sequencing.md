@@ -481,6 +481,39 @@ while an AnimationClip-owned OpacityTrack is validated/evaluated as an opacity
 multiplier around identity. Exclusive TemporalProgram ownership makes that
 scope unambiguous in persistent data.
 
+### 9.1 Typed angular sampling
+
+Phase 8 extends the one shared temporal sampler; it does not add a Bone-only,
+Clip-only, or Sequence-only sampling path. `TEMPORAL_TRACK_DEFINITIONS` gains
+per-channel value-interpolation metadata, and `sampleTemporalProgram()` selects
+the value interpolator by `(track.kind, channelName)` while continuing to use
+the existing key ordering, boundary behavior, step handling, and linear/Bezier
+time progress.
+
+Initial angular channels are:
+
+```text
+BoneTrack.rotation       -> angle-shortest-arc
+TransformTrack.rotation  -> angle-shortest-arc
+CameraTrack.rotation     -> angle-shortest-arc
+```
+
+All existing Transition numeric channels and all other numeric channels retain
+ordinary scalar interpolation. For an angular interval, the sampler first
+computes progress with the existing linear or Bezier time curve, then applies:
+
+```text
+delta = euclideanModulo(to - from + PI, 2 * PI) - PI
+value = from + delta * progress
+```
+
+The exact half-turn tie therefore selects `-PI`, matching the existing
+deterministic shortest-arc convention. Authored and sampled angles remain
+finite radians and are not forcibly normalized afterward. A deliberate turn
+greater than or equal to `PI` must use intermediate keys whose individual arcs
+express the intended direction; a future explicit turns/unwrapped-angle type
+must not change this shipped channel meaning.
+
 ## 10. TransformTrack
 
 Initial general TransformTrack supports either one stable Scene node or one
@@ -592,7 +625,9 @@ rigid/Skinning wrappers. It does not write BonePoseKeyform or clamp each clip
 before mixing. The single existing constraint clamp runs once on the final
 mixed local delta immediately before FK.
 
-Keyframe interpolation of a Bone rotation channel uses shortest-arc interpolation between authored keys. Clip-to-clip mixing adds the resulting local rotation deltas after sampling.
+Keyframe interpolation of a Bone rotation channel uses the shared typed
+shortest-arc rule in section 9.1. Clip-to-clip mixing adds the resulting local
+rotation deltas after sampling.
 
 ## 12. DeformerTrack
 
@@ -1089,7 +1124,11 @@ Cover at least:
 38. same-KeyArt/different-keyform ViewLane endpoint incompatibility rejection;
 39. node-targeted TransformTrack crossing a differently mapped Key Art emits
     `ANIMATION_CLIP_TARGET_INCOMPATIBLE` independent of insertion order;
-40. full existing Phase 1-7 regression suite remains green.
+40. shared typed temporal sampling uses shortest-arc interpolation for
+    BoneTrack, TransformTrack, and CameraTrack rotation while preserving
+    existing Transition scalar samples and Bezier time curves;
+41. exact `PI` angular tie and intermediate-key authored turn direction;
+42. full existing Phase 1-7 regression suite remains green.
 
 ## 26. Acceptance criteria
 
