@@ -138,6 +138,7 @@ export function validateTemporalProgramOwnershipChange(beforeProject, afterProje
       path: "sequences",
       codePrefix: "SEQUENCE_PROGRAM",
       phase: "Phase 8-1",
+      article: "a",
     },
     {
       kind: "AnimationClip",
@@ -146,6 +147,7 @@ export function validateTemporalProgramOwnershipChange(beforeProject, afterProje
       path: "animation.clips",
       codePrefix: "ANIMATION_CLIP_PROGRAM",
       phase: "Phase 8-2",
+      article: "an",
     },
   ];
 
@@ -173,7 +175,8 @@ export function validateTemporalProgramOwnershipChange(beforeProject, afterProje
       issues.push(problem(
         lifecycle.codePrefix + "_CREATION_NOT_ATOMIC",
         lifecycle.path,
-        "Creating an " + lifecycle.kind + " and its owned TemporalProgram must be one transaction.",
+        "Creating " + lifecycle.article + " " + lifecycle.kind +
+          " and its owned TemporalProgram must be one transaction.",
         owner.id,
         { temporalProgramId: owner.temporalProgramId },
       ));
@@ -184,7 +187,8 @@ export function validateTemporalProgramOwnershipChange(beforeProject, afterProje
       issues.push(problem(
         lifecycle.codePrefix + "_REMOVAL_NOT_ATOMIC",
         lifecycle.path,
-        "Removing an " + lifecycle.kind + " and its owned TemporalProgram must be one transaction.",
+        "Removing " + lifecycle.article + " " + lifecycle.kind +
+          " and its owned TemporalProgram must be one transaction.",
         owner.id,
         { temporalProgramId: owner.temporalProgramId },
       ));

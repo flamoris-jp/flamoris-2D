@@ -102,6 +102,13 @@ test("Clip placement is half-open even at terminal Sequence inspection", () => {
   });
 });
 
+test("disabled ClipInstances are inactive without changing their persisted placement", () => {
+  const instance = clipInstance({ enabled: false });
+  assert.equal(projectClipInstanceTick(instance, 0, 20).active, false);
+  assert.equal(instance.startTicks, 0);
+  assert.equal(instance.endTicks, 10);
+});
+
 test("ClipInstance validation rejects references, placement, rate, weight, and layer deterministically", () => {
   const project = projectWithInstance(clipInstance({
     clipId: "missing_clip",
@@ -134,6 +141,18 @@ test("ClipInstance canonical validation is independent of array insertion order"
   right.sequences[0].clipInstances.reverse();
   const signature = (project) => validateProject(project)
     .filter((issue) => issue.code.startsWith("ANIMATION_CLIP"))
-    .map(({ code, entityId, details }) => ({ code, entityId, details }));
+    .map(({ code, path, entityId, details }) => ({ code, path, entityId, details }));
   assert.deepEqual(signature(left), signature(right));
+});
+
+test("local-time overflow is rejected explicitly", () => {
+  const project = projectWithInstance(clipInstance({
+    endTicks: Number.MAX_SAFE_INTEGER,
+    playbackRate: { numerator: Number.MAX_SAFE_INTEGER, denominator: 1 },
+    loopMode: "loop",
+  }), 20, Number.MAX_SAFE_INTEGER);
+  assert.ok(validateProject(project).some((issue) =>
+    issue.code === "ANIMATION_CLIP_LOCAL_TIME_OVERFLOW"));
+  assert.throws(() => rawClipLocalTick(project.sequences[0].clipInstances[0],
+    Number.MAX_SAFE_INTEGER - 1), /safe integer range/);
 });

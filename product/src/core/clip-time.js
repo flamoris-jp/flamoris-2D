@@ -41,7 +41,8 @@ export function euclideanModulo(value, modulus) {
 export function projectClipInstanceTick(instance, sequenceTick, clipDurationTicks) {
   safeNonNegativeInteger(sequenceTick, "Sequence tick");
   safeNonNegativeInteger(clipDurationTicks, "AnimationClip duration");
-  const active = sequenceTick >= instance.startTicks && sequenceTick < instance.endTicks;
+  const active = instance.enabled === true &&
+    sequenceTick >= instance.startTicks && sequenceTick < instance.endTicks;
   const base = {
     active,
     clipInstanceId: instance.id,

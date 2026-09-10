@@ -46,9 +46,8 @@ export function validateSequenceClipInstances(
   const clipById = new Map((project.animation?.clips || []).map((clip) => [clip?.id, clip]));
   const programById = new Map((project.temporalPrograms || []).map((program) => [program?.id, program]));
 
-  canonicalizeClipInstances(sequence.clipInstances).forEach((instance) => {
-    const sourceIndex = sequence.clipInstances.findIndex((entry) => entry?.id === instance?.id);
-    const path = sequencePath + ".clipInstances." + Math.max(0, sourceIndex);
+  canonicalizeClipInstances(sequence.clipInstances).forEach((instance, instanceIndex) => {
+    const path = sequencePath + ".clipInstances." + instanceIndex;
     if (!object(instance)) {
       issues.push(problem("ANIMATION_CLIP_INSTANCE_INVALID", path,
         "ClipInstance must be an object.", sequence.id));

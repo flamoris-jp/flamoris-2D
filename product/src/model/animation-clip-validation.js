@@ -83,9 +83,8 @@ export function validateAnimationClips(project) {
 
   [...project.animation.clips]
     .sort((left, right) => String(left?.id).localeCompare(String(right?.id)))
-    .forEach((clip) => {
-      const sourceIndex = project.animation.clips.indexOf(clip);
-      const path = "animation.clips." + sourceIndex;
+    .forEach((clip, clipIndex) => {
+      const path = "animation.clips." + clipIndex;
       if (!object(clip)) {
         issues.push(problem("ANIMATION_CLIP_INVALID", path, "AnimationClip must be an object."));
         return;
