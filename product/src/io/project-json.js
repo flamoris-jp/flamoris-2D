@@ -11,6 +11,7 @@ import {
   secondsToTicks,
   sortTemporalProgram,
 } from "../core/temporal.js";
+import { canonicalizeClipInstances } from "../model/clip-instance.js";
 
 export const FL2D_FORMAT = "flamoris-2d-project";
 export const FL2D_FORMAT_VERSION = 1;
@@ -145,7 +146,7 @@ export function createFl2dDocument(
     ...sequence,
     viewLaneItems: [...sequence.viewLaneItems].sort((left, right) =>
       left.startTicks - right.startTicks || left.endTicks - right.endTicks || byId(left, right)),
-    clipInstances: [...sequence.clipInstances].sort(byId),
+    clipInstances: canonicalizeClipInstances(sequence.clipInstances),
   }));
   delete body.id;
   delete body.displayName;

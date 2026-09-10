@@ -16,6 +16,7 @@ import { meshFormCorrectionCommandHandlers } from "./mesh-form-correction-comman
 import { boneConstraintCommandHandlers } from "./bone-constraint-command-handlers.js";
 import { twoBoneIkCommandHandlers } from "./two-bone-ik-command-handlers.js";
 import { sequenceCommandHandlers } from "./sequence-command-handlers.js";
+import { animationClipCommandHandlers } from "./animation-clip-command-handlers.js";
 import {
   validateTemporalProgramOwnershipChange,
 } from "../model/temporal-program-ownership.js";
@@ -36,6 +37,7 @@ const handlers = {
   ...boneConstraintCommandHandlers,
   ...twoBoneIkCommandHandlers,
   ...sequenceCommandHandlers,
+  ...animationClipCommandHandlers,
 };
 
 function assertCommand(command, { allowInternal = false } = {}) {
