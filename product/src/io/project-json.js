@@ -12,6 +12,7 @@ import {
   sortTemporalProgram,
 } from "../core/temporal.js";
 import { canonicalizeClipInstances } from "../model/clip-instance.js";
+import { canonicalizeMeshDeformationSamples } from "../model/mesh-deformation-sample.js";
 
 export const FL2D_FORMAT = "flamoris-2d-project";
 export const FL2D_FORMAT_VERSION = 1;
@@ -141,7 +142,9 @@ export function createFl2dDocument(
       a.key < b.key ? -1 : a.key > b.key ? 1 : 0),
   }));
   body.animation.clips = [...body.animation.clips].sort(byId);
-  body.animation.deformationSamples = [...body.animation.deformationSamples].sort(byId);
+  body.animation.deformationSamples = canonicalizeMeshDeformationSamples(
+    body.animation.deformationSamples,
+  );
   body.sequences = [...body.sequences].sort(byId).map((sequence) => ({
     ...sequence,
     viewLaneItems: [...sequence.viewLaneItems].sort((left, right) =>
@@ -319,6 +322,18 @@ export function migrateProjectSchema(value) {
       clipInstances: [],
     }));
     project.schemaVersion = 14;
+  }
+  if (project?.schemaVersion === 14) {
+    if (!Array.isArray(project.animation?.deformationSamples) ||
+      project.animation.deformationSamples.length !== 0) {
+      throw new ProjectFormatError(
+        "Schema 14 deformationSamples must be the guaranteed empty placeholder collection.",
+        "project.schema_invalid",
+        { schemaVersion: 14, path: "animation.deformationSamples" },
+      );
+    }
+    project.animation.deformationSamples = [];
+    project.schemaVersion = 15;
   }
   if (project?.schemaVersion !== PROJECT_SCHEMA_VERSION) {
     throw new ProjectFormatError(
