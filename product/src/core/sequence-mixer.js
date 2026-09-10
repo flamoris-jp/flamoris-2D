@@ -233,6 +233,24 @@ function meshMatchesNode(project, meshId, nodeId) {
   ));
 }
 
+function contributionTargetIsValid(project, entry) {
+  const target = entry.target;
+  if (target.nodeId) return Boolean(project.scene.nodes[target.nodeId]);
+  if (target.semanticSlotId) {
+    return project.semanticSlots.some((slot) => slot.id === target.semanticSlotId);
+  }
+  if (target.boneId) return project.rig.bones.some((bone) => bone.id === target.boneId);
+  if (target.deformerId || target.controlPointId) {
+    const deformer = project.rig.deformers.find((candidate) =>
+      candidate.id === target.deformerId);
+    const point = project.rig.warpControlPoints.find((candidate) =>
+      candidate.id === target.controlPointId && candidate.deformerId === target.deformerId);
+    return Boolean(deformer && point && deformer.controlPointIds.includes(point.id));
+  }
+  if (target.meshId) return project.meshes.some((mesh) => mesh.id === target.meshId);
+  return false;
+}
+
 export function createSequenceAnimationContext(project, sequence, activeSamples, {
   activeSemanticNodes,
 } = {}) {
@@ -253,6 +271,15 @@ export function createSequenceAnimationContext(project, sequence, activeSamples,
   const meshEntries = [];
 
   for (const entry of contributions) {
+    if (!contributionTargetIsValid(project, entry)) {
+      diagnostics.push(diagnostic(sequence.id, "ANIMATION_TRACK_TARGET_INVALID", {
+        clipInstanceId: entry.clipInstanceId,
+        trackId: entry.trackId,
+        kind: entry.kind,
+        target: entry.target,
+      }));
+      continue;
+    }
     if (entry.kind === "TransformTrack") {
       const active = activeSamples.find((sample) => sample.instance.id === entry.clipInstanceId);
       if (entry.target.nodeId) {

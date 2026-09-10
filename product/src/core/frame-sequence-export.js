@@ -1,4 +1,4 @@
-import { planTransitionExportFrames } from "./export-frame-evaluator.js";
+import { planEvaluatedExportFrames } from "./export-frame-evaluator.js";
 import { ExportFrameRenderer } from "./export-frame-renderer.js";
 import { encodeRgba8Png } from "./png-frame-encoder.js";
 
@@ -51,7 +51,8 @@ export class FrameSequenceExportJob {
 
   async run({
     project,
-    transitionId,
+    transitionId = null,
+    sequenceId = null,
     frameRate,
     outputWidth,
     outputHeight,
@@ -62,7 +63,7 @@ export class FrameSequenceExportJob {
   }) {
     let planner;
     try {
-      planner = planTransitionExportFrames(project, transitionId, frameRate);
+      planner = planEvaluatedExportFrames(project, { transitionId, sequenceId }, frameRate);
     } catch (error) {
       return {
         ok: false,
@@ -141,6 +142,7 @@ export class FrameSequenceExportJob {
         const rendered = this.frameRenderer.render({
           project,
           transitionId,
+          sequenceId,
           frameRate: planner.frameRate,
           frameIndex,
           outputWidth,

@@ -9,7 +9,7 @@ import { projectWeightOverlay } from "./weight-viewport-overlay.js";
 import { evaluateMeshFormCorrection } from "../core/mesh-form-correction-evaluator.js";
 import { projectTwoBoneIkOverlay } from "./two-bone-ik-viewport-overlay.js";
 
-export function renderEvaluatedTransitionViewport({
+export function renderEvaluatedViewport({
   evaluation,
   view,
   renderer,
@@ -32,6 +32,8 @@ export function renderEvaluatedTransitionViewport({
     renderInstanceCount: result.renderInstanceCount,
   };
 }
+
+export const renderEvaluatedTransitionViewport = renderEvaluatedViewport;
 
 export function clearLayerCanvas(canvas) {
   const context = canvas.getContext("2d");

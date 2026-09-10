@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { evaluateSequence } from "../src/core/sequence-evaluator.js";
+import { evaluateExportFrame, planSequenceExportFrames } from "../src/core/export-frame-evaluator.js";
+import { ExportFrameRenderer } from "../src/core/export-frame-renderer.js";
+import { createEvaluatedRenderPlan } from "../src/core/evaluated-render.js";
 import {
   collectClipContributions,
   resolveActiveClipSamples,
@@ -9,6 +12,7 @@ import {
 import { deserializeProject, serializeProject } from "../src/io/project-json.js";
 import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
 import { createMeshFormCorrectionKeyform } from "../src/model/mesh-form-correction.js";
+import { renderEvaluatedViewport } from "../src/ui/viewport-renderer.js";
 
 const step = Object.freeze({ kind: "step" });
 
@@ -210,6 +214,35 @@ test("discrete highest layer wins, identical ties agree, and incompatible ties d
   assert.deepEqual(evaluateSequence(project, "sequence", 50).diagnostics, conflict.diagnostics);
 });
 
+test("Presence and Clipping overrides resolve before the existing final clipping pass", () => {
+  const project = fixture();
+  const rootId = project.scene.rootId;
+  project.scene.nodes.mask = createSceneNode({ id: "mask", displayName: "Mask",
+    parentId: rootId, bounds: { left: -5, top: -5, right: 5, bottom: 5 } });
+  project.scene.nodes[rootId].children.push("mask");
+  project.keyArts[0].members.push(member("mask", "appearance_mask", 1));
+  project.semanticSlots.push({ id: "mask_slot", displayName: "Mask", role: null,
+    mappings: [{ keyArtId: "key_a", nodeId: "mask" }], metadata: {} });
+  addClip(project, "clipping", [
+    track("clip_override", "ClippingTrack", { semanticSlotId: "slot" }, {
+      clipping: channel("clip_key", { sourceNodeId: "mask" }),
+    }),
+  ], { layer: 4 });
+  const clipped = evaluateSequence(project, "sequence", 50);
+  const subject = clipped.evaluatedParts.find((part) => part.semanticSlotId === "slot")
+    .renderInstances[0];
+  const mask = clipped.evaluatedParts.find((part) => part.semanticSlotId === "mask_slot")
+    .renderInstances[0];
+  assert.equal(subject.clipping.sourceRenderInstanceId, mask.renderInstanceId);
+
+  addClip(project, "presence", [track("presence_override", "PresenceTrack",
+    { semanticSlotId: "slot" }, { presence: channel("presence_key", "absent") })],
+  { layer: 5 });
+  const hidden = evaluateSequence(project, "sequence", 50);
+  assert.equal(hidden.evaluatedParts.find((part) => part.semanticSlotId === "slot").presence,
+    "absent");
+});
+
 test("disabled, zero-weight, and terminal-ending ClipInstances contribute no visual motion", () => {
   const project = fixture();
   addClip(project, "disabled", [track("disabled", "TransformTrack",
@@ -296,4 +329,63 @@ test("sequence evaluation is pure, repeatable, and Save/Open equivalent", () => 
     deserializeProject(serializeProject(project)), "sequence", 50,
   ), first);
   assert.equal(Object.hasOwn(globalThis, "document"), false);
+});
+
+test("Sequence export uses its owned duration and the exact headless source frame", () => {
+  const project = fixture();
+  addClip(project, "motion", [track("transform", "TransformTrack",
+    { semanticSlotId: "slot", coordinateSpace: "node-local" }, {
+      positionX: channel("position", 8),
+    })]);
+  const planner = planSequenceExportFrames(project, "sequence",
+    { numerator: 2400, denominator: 1 });
+  assert.equal(planner.durationTicks, 100);
+  const exported = evaluateExportFrame(project, { sequenceId: "sequence",
+    frameRate: planner.frameRate, frameIndex: 1 });
+  assert.equal(exported.frame.timeTicks, 50);
+  assert.deepEqual(exported.evaluation, evaluateSequence(project, "sequence", 50));
+  assert.deepEqual(exported.evaluatedSequence, exported.evaluation);
+});
+
+test("preview, PNG source, and MP4 source share the ordinary Sequence frame and camera", () => {
+  const project = fixture();
+  project.temporalPrograms[0].tracks.push(track("camera", "CameraTrack",
+    { cameraId: "main" }, {
+      positionX: channel("camera_x", 4, 50),
+      scale: channel("camera_scale", 2, 50),
+    }));
+  const headless = evaluateSequence(project, "sequence", 50);
+  const expectedPlan = createEvaluatedRenderPlan(headless, { resolveArtwork: () => ({}) });
+  assert.deepEqual(expectedPlan.camera, headless.camera);
+  assert.deepEqual(expectedPlan.batches[0].renderInstances[0].transform,
+    [2, 0, 0, 2, -8, 0]);
+
+  let previewPlan = null;
+  const preview = renderEvaluatedViewport({
+    evaluation: headless,
+    view: { originX: 0, originY: 0, scale: 1 },
+    renderer: { renderEvaluated(plan) { previewPlan = plan; } },
+    resolveArtwork: () => ({}),
+  });
+  assert.equal(preview.renderInstanceCount, 1);
+  assert.deepEqual(previewPlan, expectedPlan);
+
+  let sourcePlan = null;
+  const renderer = new ExportFrameRenderer({
+    createOffscreenRenderer: () => ({
+      renderEvaluated(plan) {
+        sourcePlan = plan;
+        return { kind: "rgba8", width: 100, height: 100,
+          rowOrder: "top-to-bottom", alphaMode: "premultiplied",
+          data: new Uint8Array(100 * 100 * 4) };
+      },
+    }),
+  });
+  const source = renderer.render({ project, sequenceId: "sequence",
+    frameRate: { numerator: 2400, denominator: 1 }, frameIndex: 1,
+    outputWidth: 100, outputHeight: 100,
+    renderAssets: [{ nodeId: "node_a", status: "ready", image: {} }] });
+  assert.equal(source.ok, true);
+  assert.deepEqual(source.evaluatedFrame, headless);
+  assert.deepEqual(sourcePlan, expectedPlan);
 });
