@@ -15,7 +15,10 @@ import { validateMeshFormCorrections } from "./mesh-form-correction-validation.j
 import { validateBoneRotationConstraints } from "./bone-rotation-constraint-validation.js";
 import { validateTwoBoneIkConstraints } from "./two-bone-ik-validation.js";
 import { validateSequences } from "./sequence-validation.js";
-import { validateTemporalProgramOwnership } from "./temporal-program-ownership.js";
+import {
+  validateTemporalProgramOwnership,
+  validateTemporalProgramOwnerTracks,
+} from "./temporal-program-ownership.js";
 
 function issue(code, path, message, entityId = null, severity = "error") {
   return { code, path, message, entityId, severity };
@@ -144,6 +147,7 @@ export function validateProject(project) {
   issues.push(...validateTransitionDomain(project, register));
   issues.push(...validateSequences(project, register));
   issues.push(...validateTemporalProgramOwnership(project));
+  issues.push(...validateTemporalProgramOwnerTracks(project));
   issues.push(...validateClippingBindings(project, register));
   issues.push(...validateTransitionClipping(project));
   issues.push(...validateWarpDeformers(project, register));

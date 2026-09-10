@@ -69,6 +69,62 @@ export function validateTemporalProgramOwnership(project) {
   return issues;
 }
 
+export function validateTemporalProgramOwnerTracks(project) {
+  const issues = [];
+  const ownersByProgram = temporalProgramOwners(project);
+
+  (project.temporalPrograms || []).forEach((program, programIndex) => {
+    const programOwners = ownersByProgram.get(program?.id) || [];
+    const soleOwner = programOwners.length === 1 ? programOwners[0] : null;
+    const sequenceOwner = soleOwner?.kind === "Sequence" ? soleOwner : null;
+    const tracks = Array.isArray(program?.tracks) ? program.tracks : [];
+
+    tracks.forEach((track, trackIndex) => {
+      const path = "temporalPrograms." + programIndex + ".tracks." + trackIndex;
+      if (track?.kind === "CameraTrack" && !sequenceOwner) {
+        issues.push(problem(
+          "ANIMATION_TRACK_OWNER_INVALID",
+          path + ".kind",
+          "CameraTrack is valid only in a Sequence-owned TemporalProgram.",
+          track?.trackId || program?.id,
+          {
+            temporalProgramId: program?.id,
+            owners: programOwners.map(({ kind, id }) => ({ kind, id })),
+          },
+        ));
+      } else if (sequenceOwner && track?.kind !== "CameraTrack") {
+        issues.push(problem(
+          "ANIMATION_TRACK_OWNER_INVALID",
+          path + ".kind",
+          "A Sequence-owned TemporalProgram may initially contain only CameraTrack.",
+          track?.trackId || program?.id,
+          {
+            temporalProgramId: program?.id,
+            owner: { kind: sequenceOwner.kind, id: sequenceOwner.id },
+            trackKind: track?.kind,
+          },
+        ));
+      }
+    });
+
+    const cameraTracks = tracks.filter((track) => track?.kind === "CameraTrack");
+    if (sequenceOwner && cameraTracks.length > 1) {
+      issues.push(problem(
+        "SEQUENCE_CAMERA_TRACK_MULTIPLE",
+        "temporalPrograms." + programIndex + ".tracks",
+        "A Sequence-owned TemporalProgram may contain at most one CameraTrack.",
+        sequenceOwner.id,
+        {
+          temporalProgramId: program.id,
+          trackIds: cameraTracks.map((track) => track.trackId).sort(),
+        },
+      ));
+    }
+  });
+
+  return issues;
+}
+
 export function validateTemporalProgramOwnershipChange(beforeProject, afterProject) {
   const issues = [];
   const afterSequenceIds = new Set((afterProject.sequences || []).map((entry) => entry.id));

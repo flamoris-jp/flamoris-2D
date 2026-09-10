@@ -49,6 +49,19 @@ function fixture() {
   return project;
 }
 
+function scalarTrack(trackId, kind, target, channel, value = 1) {
+  return {
+    trackId,
+    version: 1,
+    kind,
+    target,
+    channels: {
+      [channel]: { keyframes: [{ id: "key_" + trackId, timeTicks: 0, value,
+        interpolationToNext: { kind: "step" } }] },
+    },
+  };
+}
+
 test("Sequence duration comes only from its owned TemporalProgram", () => {
   const project = fixture();
   assert.deepEqual(validateProject(project), []);
@@ -80,6 +93,37 @@ test("TemporalProgram ownership rejects a Sequence and Transition sharing one pr
   const issues = validateProject(project)
     .filter((entry) => entry.code === "TEMPORAL_PROGRAM_OWNERSHIP_CONFLICT");
   assert.deepEqual(issues.map((entry) => entry.entityId), ["sequence_shot", "transition_ab"]);
+});
+
+test("owner-aware validation rejects reusable motion in a Sequence program", () => {
+  const project = fixture();
+  project.temporalPrograms.find((entry) => entry.id === "program_sequence").tracks.push(
+    scalarTrack("track_sequence_opacity", "OpacityTrack",
+      { semanticSlotId: "slot_subject" }, "opacity"),
+  );
+  assert.ok(validateProject(project).some((entry) =>
+    entry.code === "ANIMATION_TRACK_OWNER_INVALID" &&
+    entry.entityId === "track_sequence_opacity"));
+});
+
+test("CameraTrack is Sequence-owned and unique within its program", () => {
+  const wrongOwner = fixture();
+  wrongOwner.temporalPrograms.find((entry) => entry.id === "program_transition").tracks.push(
+    scalarTrack("track_transition_camera", "CameraTrack", { cameraId: "main" }, "positionX", 0),
+  );
+  assert.ok(validateProject(wrongOwner).some((entry) =>
+    entry.code === "ANIMATION_TRACK_OWNER_INVALID" &&
+    entry.entityId === "track_transition_camera"));
+
+  const duplicate = fixture();
+  duplicate.temporalPrograms.find((entry) => entry.id === "program_sequence").tracks.push(
+    scalarTrack("track_camera_x", "CameraTrack", { cameraId: "main" }, "positionX", 0),
+    scalarTrack("track_camera_y", "CameraTrack", { cameraId: "main" }, "positionY", 0),
+  );
+  const cameraIssues = validateProject(duplicate)
+    .filter((entry) => entry.code === "SEQUENCE_CAMERA_TRACK_MULTIPLE");
+  assert.deepEqual(cameraIssues.map((entry) => entry.details.trackIds),
+    [["track_camera_x", "track_camera_y"]]);
 });
 
 test("schema 12 placeholders and second duration authority are removed without changing programs", () => {
