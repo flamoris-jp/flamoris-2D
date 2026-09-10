@@ -13,6 +13,7 @@ import {
 } from "../core/temporal.js";
 import { canonicalizeClipInstances } from "../model/clip-instance.js";
 import { canonicalizeMeshDeformationSamples } from "../model/mesh-deformation-sample.js";
+import { shortestBoneRotationDelta } from "../core/angular.js";
 
 export const FL2D_FORMAT = "flamoris-2d-project";
 export const FL2D_FORMAT_VERSION = 1;
@@ -167,6 +168,79 @@ export function createFl2dDocument(
 
 export function serializeProject(project, spacing = 2, metadata = {}) {
   return JSON.stringify(createFl2dDocument(project, metadata), null, spacing);
+}
+
+function rejectSchema14TrackSemantics(project) {
+  const transitionPrograms = new Set((project.transitions || [])
+    .map((transition) => transition?.temporalProgramId));
+  const conflicts = [];
+  const add = (program, programIndex, track, trackIndex, channelName, reason) => {
+    conflicts.push({
+      programId: String(program?.id || ""),
+      trackId: String(track?.trackId || ""),
+      channel: channelName || "",
+      path: "temporalPrograms." + programIndex + ".tracks." + trackIndex +
+        (channelName ? ".channels." + channelName : ""),
+      trackKind: track?.kind,
+      reason,
+    });
+  };
+  (project.temporalPrograms || []).forEach((program, programIndex) => {
+    (program?.tracks || []).forEach((track, trackIndex) => {
+      if (track?.kind === "MeshDeformationTrack") {
+        add(program, programIndex, track, trackIndex, null,
+          "reserved-mesh-deformation-track");
+      }
+      if (track?.kind === "TransformTrack" && transitionPrograms.has(program?.id)) {
+        add(program, programIndex, track, trackIndex, null,
+          "transition-owned-reusable-track");
+      }
+      if (!["TransformTrack", "CameraTrack"].includes(track?.kind)) return;
+      const scaleChannels = track.kind === "TransformTrack" ? ["scaleX", "scaleY"] : ["scale"];
+      for (const channelName of scaleChannels) {
+        for (const keyframe of track.channels?.[channelName]?.keyframes || []) {
+          if (typeof keyframe?.value === "number" &&
+            Number.isFinite(keyframe.value) && keyframe.value <= 0) {
+            add(program, programIndex, track, trackIndex, channelName,
+              "non-positive-scale-value");
+          }
+          const curve = keyframe?.interpolationToNext;
+          if (curve?.kind === "bezier" &&
+            [curve.y1, curve.y2].some((value) => typeof value === "number" &&
+              Number.isFinite(value) && (value < 0 || value > 1))) {
+            add(program, programIndex, track, trackIndex, channelName,
+              "scale-bezier-outside-positive-domain");
+          }
+        }
+      }
+      const rotation = [...(track.channels?.rotation?.keyframes || [])]
+        .sort((left, right) => left.timeTicks - right.timeTicks ||
+          String(left.id).localeCompare(String(right.id)));
+      for (let index = 0; index < rotation.length - 1; index += 1) {
+        const from = rotation[index];
+        const to = rotation[index + 1];
+        if (from?.interpolationToNext?.kind === "step" ||
+          !Number.isFinite(from?.value) || !Number.isFinite(to?.value)) continue;
+        const scalarDelta = to.value - from.value;
+        if (shortestBoneRotationDelta(from.value, to.value) !== scalarDelta) {
+          add(program, programIndex, track, trackIndex, "rotation",
+            "scalar-to-shortest-arc-change");
+        }
+      }
+    });
+  });
+  if (conflicts.length === 0) return;
+  conflicts.sort((left, right) =>
+    left.programId.localeCompare(right.programId) ||
+    left.trackId.localeCompare(right.trackId) ||
+    left.channel.localeCompare(right.channel) ||
+    left.reason.localeCompare(right.reason));
+  const conflict = conflicts[0];
+  throw new ProjectFormatError(
+    "Schema 14 reserved animation track data cannot be promoted without changing its authored semantics.",
+    "project.schema_track_semantics_incompatible",
+    { schemaVersion: 14, ...conflict },
+  );
 }
 
 export function migrateProjectSchema(value) {
@@ -324,6 +398,7 @@ export function migrateProjectSchema(value) {
     project.schemaVersion = 14;
   }
   if (project?.schemaVersion === 14) {
+    rejectSchema14TrackSemantics(project);
     if (!Array.isArray(project.animation?.deformationSamples) ||
       project.animation.deformationSamples.length !== 0) {
       throw new ProjectFormatError(
