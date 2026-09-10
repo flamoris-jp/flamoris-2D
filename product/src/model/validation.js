@@ -28,6 +28,13 @@ function finite(value) {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+function hasExactKeys(value, expected) {
+  const actual = Object.keys(value).sort();
+  const sorted = [...expected].sort();
+  return actual.length === sorted.length &&
+    actual.every((key, index) => key === sorted[index]);
+}
+
 export function validateProject(project) {
   const issues = [];
   if (!project || typeof project !== "object") {
@@ -57,6 +64,30 @@ export function validateProject(project) {
   }
   if (Object.hasOwn(project.renderSettings || {}, "durationTicks")) {
     issues.push(issue("ANIMATION_SECOND_DURATION_AUTHORITY", "renderSettings.durationTicks", "Duration belongs only to an owned TemporalProgram."));
+  }
+  if (!project.animation || typeof project.animation !== "object" ||
+    Array.isArray(project.animation) ||
+    !hasExactKeys(project.animation, ["clips", "deformationSamples"])) {
+    issues.push(issue(
+      "ANIMATION_SCHEMA_INVALID",
+      "animation",
+      "Schema 13 animation must contain exactly the reserved clips and deformationSamples collections.",
+    ));
+  }
+  if (Array.isArray(project.animation?.clips) && project.animation.clips.length > 0) {
+    issues.push(issue(
+      "ANIMATION_CLIP_UNSUPPORTED",
+      "animation.clips",
+      "AnimationClip entries are reserved for Phase 8-2 and must be empty in schema 13.",
+    ));
+  }
+  if (Array.isArray(project.animation?.deformationSamples) &&
+    project.animation.deformationSamples.length > 0) {
+    issues.push(issue(
+      "ANIMATION_DEFORMATION_SAMPLE_UNSUPPORTED",
+      "animation.deformationSamples",
+      "Animation deformation samples are not authored in Phase 8-1 and must be empty in schema 13.",
+    ));
   }
 
   const nodes = project.scene?.nodes;

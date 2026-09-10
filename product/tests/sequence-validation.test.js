@@ -144,3 +144,18 @@ test("schema 12 placeholders and second duration authority are removed without c
   assert.equal(Object.hasOwn(migrated, "sequence"), false);
   assert.equal(Object.hasOwn(migrated.renderSettings, "durationTicks"), false);
 });
+
+test("schema 13 rejects non-empty or extended Phase 8 placeholders", () => {
+  const clip = fixture();
+  clip.animation.clips.push({ id: "clip_future", temporalProgramId: "program_sequence" });
+  assert.ok(validateProject(clip).some((entry) => entry.code === "ANIMATION_CLIP_UNSUPPORTED"));
+
+  const deformation = fixture();
+  deformation.animation.deformationSamples.push({ id: "sample_future" });
+  assert.ok(validateProject(deformation).some((entry) =>
+    entry.code === "ANIMATION_DEFORMATION_SAMPLE_UNSUPPORTED"));
+
+  const legacyShape = fixture();
+  legacyShape.animation.tracks = [];
+  assert.ok(validateProject(legacyShape).some((entry) => entry.code === "ANIMATION_SCHEMA_INVALID"));
+});

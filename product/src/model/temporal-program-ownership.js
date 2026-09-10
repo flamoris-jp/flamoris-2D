@@ -17,12 +17,9 @@ function owners(project) {
       temporalProgramId: entity?.temporalProgramId,
       path: "transitions." + index + ".temporalProgramId",
     })),
-    ...(project.animation?.clips || []).map((entity, index) => ({
-      kind: "AnimationClip",
-      id: entity?.id,
-      temporalProgramId: entity?.temporalProgramId,
-      path: "animation.clips." + index + ".temporalProgramId",
-    })),
+    // Schema 13 reserves animation.clips as an empty unsupported placeholder.
+    // Phase 8-2 must add exact AnimationClip validation before clips can become
+    // a trusted ownership source here.
     ...(project.sequences || []).map((entity, index) => ({
       kind: "Sequence",
       id: entity?.id,
@@ -60,7 +57,7 @@ export function validateTemporalProgramOwnership(project) {
       issues.push(problem(
         "TEMPORAL_PROGRAM_OWNERSHIP_CONFLICT",
         owner.path,
-        "A TemporalProgram may be owned by only one Transition, AnimationClip, or Sequence.",
+        "A TemporalProgram may be owned by only one persistent domain owner.",
         owner.id,
         details,
       ));
