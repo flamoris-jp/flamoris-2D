@@ -16,6 +16,9 @@ import { meshFormCorrectionCommandHandlers } from "./mesh-form-correction-comman
 import { boneConstraintCommandHandlers } from "./bone-constraint-command-handlers.js";
 import { twoBoneIkCommandHandlers } from "./two-bone-ik-command-handlers.js";
 import { sequenceCommandHandlers } from "./sequence-command-handlers.js";
+import {
+  validateTemporalProgramOwnershipChange,
+} from "../model/temporal-program-ownership.js";
 
 export { CommandError, TransactionError } from "./errors.js";
 
@@ -53,6 +56,13 @@ function applyToDraft(project, command) {
 function validationErrors(project) {
   return validateProject(project)
     .filter((entry) => entry.severity === "error");
+}
+
+function transactionValidationIssues(beforeProject, afterProject) {
+  return [
+    ...validateProject(afterProject),
+    ...validateTemporalProgramOwnershipChange(beforeProject, afterProject),
+  ];
 }
 
 export class EditorSession {
@@ -93,7 +103,7 @@ export class EditorSession {
       inverses.unshift(result.inverse);
       result.affectedIds.forEach((id) => affected.add(id));
     }
-    const issues = validateProject(draft);
+    const issues = transactionValidationIssues(this.project, draft);
     if (issues.some((entry) => entry.severity === "error")) {
       throw new TransactionError(issues);
     }
@@ -131,7 +141,8 @@ export class EditorSession {
       assertCommand(command, { allowInternal: true });
       applyToDraft(draft, command);
     });
-    const issues = validationErrors(draft);
+    const issues = transactionValidationIssues(this.project, draft)
+      .filter((entry) => entry.severity === "error");
     if (issues.length) throw new TransactionError(issues);
     this.project = draft;
     this.currentRevision = entry.beforeRevision;
@@ -153,7 +164,8 @@ export class EditorSession {
       assertCommand(command);
       applyToDraft(draft, command);
     });
-    const issues = validationErrors(draft);
+    const issues = transactionValidationIssues(this.project, draft)
+      .filter((entry) => entry.severity === "error");
     if (issues.length) throw new TransactionError(issues);
     this.project = draft;
     this.currentRevision = entry.afterRevision;

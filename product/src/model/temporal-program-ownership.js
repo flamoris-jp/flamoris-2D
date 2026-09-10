@@ -68,3 +68,25 @@ export function validateTemporalProgramOwnership(project) {
   }
   return issues;
 }
+
+export function validateTemporalProgramOwnershipChange(beforeProject, afterProject) {
+  const issues = [];
+  const afterSequenceIds = new Set((afterProject.sequences || []).map((entry) => entry.id));
+  const afterProgramIds = new Set((afterProject.temporalPrograms || []).map((entry) => entry.id));
+
+  for (const sequence of [...(beforeProject.sequences || [])]
+    .sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0)) {
+    if (afterSequenceIds.has(sequence.id) || !afterProgramIds.has(sequence.temporalProgramId)) {
+      continue;
+    }
+    issues.push(problem(
+      "SEQUENCE_PROGRAM_REMOVAL_NOT_ATOMIC",
+      "sequences",
+      "Removing a Sequence and its owned TemporalProgram must be one transaction.",
+      sequence.id,
+      { temporalProgramId: sequence.temporalProgramId },
+    ));
+  }
+
+  return issues;
+}

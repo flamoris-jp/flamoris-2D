@@ -44,6 +44,14 @@ test("Sequence and owned TemporalProgram create and remove as atomic Undo/Redo u
   assert.equal(session.project.sequences[0].id, "sequence_shot");
   assert.equal(session.project.temporalPrograms[0].id, "program_shot");
 
+  assert.throws(
+    () => session.execute({ type: "sequence.remove", payload: { sequenceId: "sequence_shot" } }),
+    (error) => error instanceof TransactionError &&
+      error.issues.some((entry) => entry.code === "SEQUENCE_PROGRAM_REMOVAL_NOT_ATOMIC"),
+  );
+  assert.equal(session.project.sequences[0].id, "sequence_shot");
+  assert.equal(session.project.temporalPrograms[0].id, "program_shot");
+
   session.executeTransaction([
     { type: "sequence.remove", payload: { sequenceId: "sequence_shot" } },
     { type: "animation.temporal.remove_program", payload: { programId: "program_shot" } },
