@@ -11,6 +11,7 @@ import {
   secondsToTicks,
   sortTemporalProgram,
 } from "../core/temporal.js";
+import { canonicalizeClipInstances } from "../model/clip-instance.js";
 
 export const FL2D_FORMAT = "flamoris-2d-project";
 export const FL2D_FORMAT_VERSION = 1;
@@ -145,7 +146,7 @@ export function createFl2dDocument(
     ...sequence,
     viewLaneItems: [...sequence.viewLaneItems].sort((left, right) =>
       left.startTicks - right.startTicks || left.endTicks - right.endTicks || byId(left, right)),
-    clipInstances: [...sequence.clipInstances].sort(byId),
+    clipInstances: canonicalizeClipInstances(sequence.clipInstances),
   }));
   delete body.id;
   delete body.displayName;
@@ -297,6 +298,27 @@ export function migrateProjectSchema(value) {
       delete project.renderSettings.durationTicks;
     }
     project.schemaVersion = 13;
+  }
+  if (project?.schemaVersion === 13) {
+    // Schema 13 exposed animation collections and nested clipInstances only
+    // as unsupported placeholders. The Sequence collection itself was already
+    // authoritative Phase 8-1 data and must never be silently repaired away.
+    if (!Array.isArray(project.sequences)) {
+      throw new ProjectFormatError(
+        "Schema 13 sequences must be an array.",
+        "project.schema_invalid",
+        { schemaVersion: 13, path: "sequences" },
+      );
+    }
+    project.animation = {
+      clips: [],
+      deformationSamples: [],
+    };
+    project.sequences = project.sequences.map((sequence) => ({
+      ...sequence,
+      clipInstances: [],
+    }));
+    project.schemaVersion = 14;
   }
   if (project?.schemaVersion !== PROJECT_SCHEMA_VERSION) {
     throw new ProjectFormatError(

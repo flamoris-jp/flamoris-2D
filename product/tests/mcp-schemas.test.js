@@ -7,7 +7,7 @@ import {
 } from "../src/mcp/schemas.js";
 
 test("MCP schema module imports with wired query and command schemas", () => {
-  assert.equal(MCP_SCHEMA_VERSION, 15);
+  assert.equal(MCP_SCHEMA_VERSION, 16);
   assert.equal(
     querySchemas["scene.get_node"].properties.nodeId.type,
     "string",
@@ -60,4 +60,7 @@ test("MCP schema module imports with wired query and command schemas", () => {
     "number");
   assert.equal(commandSchemas["sequence.add_view_item"].properties.sequenceId.type, "string");
   assert.equal(querySchemas["sequence.evaluate"].properties.timeTicks.type, "integer");
+  assert.equal(querySchemas["animation.clip.get"].properties.clipId.type, "string");
+  assert.equal(querySchemas["sequence.project_clip_instances"].properties.timeTicks.type,
+    "integer");
 });

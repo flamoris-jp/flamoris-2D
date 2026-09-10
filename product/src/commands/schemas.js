@@ -150,6 +150,18 @@ const transform = {
 };
 
 export const commandSchemas = {
+  "animation.clip.create": {
+    type: "object", required: ["clip"], properties: { clip: domainObject },
+    additionalProperties: false,
+  },
+  "animation.clip.update": {
+    type: "object", required: ["clipId", "clip"],
+    properties: { clipId: nonEmptyString, clip: domainObject }, additionalProperties: false,
+  },
+  "animation.clip.remove": {
+    type: "object", required: ["clipId"], properties: { clipId: nonEmptyString },
+    additionalProperties: false,
+  },
   "sequence.create": {
     type: "object", required: ["sequence"], properties: { sequence: domainObject },
     additionalProperties: false,
@@ -174,6 +186,21 @@ export const commandSchemas = {
   "sequence.remove_view_item": {
     type: "object", required: ["sequenceId", "viewItemId"],
     properties: { sequenceId: nonEmptyString, viewItemId: nonEmptyString }, additionalProperties: false,
+  },
+  "sequence.add_clip_instance": {
+    type: "object", required: ["sequenceId", "clipInstance"],
+    properties: { sequenceId: nonEmptyString, clipInstance: domainObject },
+    additionalProperties: false,
+  },
+  "sequence.update_clip_instance": {
+    type: "object", required: ["sequenceId", "clipInstanceId", "clipInstance"],
+    properties: { sequenceId: nonEmptyString, clipInstanceId: nonEmptyString,
+      clipInstance: domainObject }, additionalProperties: false,
+  },
+  "sequence.remove_clip_instance": {
+    type: "object", required: ["sequenceId", "clipInstanceId"],
+    properties: { sequenceId: nonEmptyString, clipInstanceId: nonEmptyString },
+    additionalProperties: false,
   },
   "bone.create_two_bone_ik": {
     type: "object",
@@ -860,6 +887,14 @@ function entityRestoreSchema() {
 }
 
 const internalCommandSchemas = {
+  "animation.clip.remove_internal": {
+    type: "object", required: ["clipId"], properties: { clipId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "animation.clip.restore": {
+    type: "object", required: ["clip", "index"],
+    properties: { clip: domainObject, index: nonNegativeInteger }, additionalProperties: false,
+  },
   "sequence.remove_internal": {
     type: "object", required: ["sequenceId"], properties: { sequenceId: nonEmptyString },
     additionalProperties: false,
@@ -876,6 +911,16 @@ const internalCommandSchemas = {
     type: "object", required: ["sequenceId", "viewItem", "index"],
     properties: { sequenceId: nonEmptyString, viewItem: domainObject, index: nonNegativeInteger },
     additionalProperties: false,
+  },
+  "sequence.remove_clip_instance_internal": {
+    type: "object", required: ["sequenceId", "clipInstanceId"],
+    properties: { sequenceId: nonEmptyString, clipInstanceId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "sequence.restore_clip_instance": {
+    type: "object", required: ["sequenceId", "clipInstance", "index"],
+    properties: { sequenceId: nonEmptyString, clipInstance: domainObject,
+      index: nonNegativeInteger }, additionalProperties: false,
   },
   "bone.remove_two_bone_ik_internal": {
     type: "object",

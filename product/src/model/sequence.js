@@ -1,4 +1,5 @@
 import { cloneProject } from "./project.js";
+import { canonicalizeClipInstances } from "./clip-instance.js";
 
 export const VIEW_LANE_ITEM_KINDS = Object.freeze({
   KEY_ART_HOLD: "KeyArtHold",
@@ -19,7 +20,7 @@ export function normalizeSequence(sequence) {
   return {
     ...cloneProject(sequence),
     viewLaneItems: canonicalizeViewLaneItems(sequence.viewLaneItems || []),
-    clipInstances: cloneProject(sequence.clipInstances || []),
+    clipInstances: canonicalizeClipInstances(sequence.clipInstances || []),
     metadata: cloneProject(sequence.metadata || {}),
   };
 }

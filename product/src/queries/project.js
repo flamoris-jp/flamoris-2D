@@ -42,8 +42,11 @@ import {
   solveProjectTwoBoneIk,
 } from "../core/two-bone-ik-authoring-solver.js";
 import { canonicalizeViewLaneItems } from "../model/sequence.js";
+import { canonicalizeClipInstances } from "../model/clip-instance.js";
+import { canonicalizeAnimationClips } from "../model/animation-clip.js";
 import { sequenceDurationTicks, validateSequences } from "../model/sequence-validation.js";
 import { evaluateSequence } from "../core/sequence-evaluator.js";
+import { projectClipInstanceTick } from "../core/clip-time.js";
 import { validateTemporalProgramOwnership } from "../model/temporal-program-ownership.js";
 
 function temporalProgram(project, programId) {
@@ -462,6 +465,19 @@ export const projectQueries = {
     sortTemporalProgram(temporalProgram(project, input.programId)).tracks,
   "animation.sample_program": (project, input) =>
     sampleTemporalProgram(temporalProgram(project, input.programId), input.timeTicks),
+  "animation.clip.get": (project, input) => {
+    const clip = project.animation.clips.find((entry) => entry.id === input.clipId);
+    if (!clip) throw new Error("Unknown AnimationClip " + input.clipId + ".");
+    return {
+      ...cloneProject(clip),
+      durationTicks: temporalProgram(project, clip.temporalProgramId).durationTicks,
+    };
+  },
+  "animation.clip.list": (project) => canonicalizeAnimationClips(project.animation.clips)
+    .map((clip) => ({
+      ...clip,
+      durationTicks: temporalProgram(project, clip.temporalProgramId).durationTicks,
+    })),
   "keyart.get": (project, input) => {
     const keyArt = project.keyArts.find((entry) => entry.id === input.keyArtId);
     if (!keyArt) throw new Error("Unknown KeyArt " + input.keyArtId + ".");
@@ -577,6 +593,7 @@ export const projectQueries = {
     return {
       ...cloneProject(sequence),
       viewLaneItems: canonicalizeViewLaneItems(sequence.viewLaneItems),
+      clipInstances: canonicalizeClipInstances(sequence.clipInstances),
       durationTicks: sequenceDurationTicks(project, sequence),
     };
   },
@@ -585,6 +602,7 @@ export const projectQueries = {
     .map((sequence) => ({
       ...cloneProject(sequence),
       viewLaneItems: canonicalizeViewLaneItems(sequence.viewLaneItems),
+      clipInstances: canonicalizeClipInstances(sequence.clipInstances),
       durationTicks: sequenceDurationTicks(project, sequence),
     })),
   "sequence.get_diagnostics": (project, input) => {
@@ -602,6 +620,21 @@ export const projectQueries = {
   },
   "sequence.evaluate": (project, input) =>
     evaluateSequence(project, input.sequenceId, input.timeTicks),
+  "sequence.project_clip_instances": (project, input) => {
+    const sequence = project.sequences.find((entry) => entry.id === input.sequenceId);
+    if (!sequence) throw new Error("Unknown Sequence " + input.sequenceId + ".");
+    const durationTicks = sequenceDurationTicks(project, sequence);
+    if (!Number.isSafeInteger(input.timeTicks) || input.timeTicks < 0 ||
+      input.timeTicks > durationTicks) {
+      throw new RangeError("Sequence time must be within its inclusive inspection domain.");
+    }
+    const clipById = new Map(project.animation.clips.map((clip) => [clip.id, clip]));
+    return canonicalizeClipInstances(sequence.clipInstances).map((instance) => {
+      const clip = clipById.get(instance.clipId);
+      const clipDurationTicks = temporalProgram(project, clip.temporalProgramId).durationTicks;
+      return projectClipInstanceTick(instance, input.timeTicks, clipDurationTicks);
+    });
+  },
   "export.get_frame_plan": (project, input) =>
     planTransitionExportFrames(project, input.transitionId, input.frameRate).describe(),
   "export.evaluate_frame": (project, input) =>
