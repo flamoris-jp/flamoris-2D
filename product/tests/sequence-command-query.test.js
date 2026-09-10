@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { EditorSession, TransactionError } from "../src/commands/editor.js";
+import { CommandError, EditorSession, TransactionError } from "../src/commands/editor.js";
 import { createIdFactory, createProject } from "../src/model/project.js";
 import { VIEW_LANE_ITEM_KINDS } from "../src/model/sequence.js";
 import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
@@ -104,6 +104,29 @@ test("invalid non-atomic owner/program mutations roll back", () => {
   );
   assert.deepEqual(session.project.sequences, []);
   assert.equal(session.project.temporalPrograms[0].id, "program_shot");
+});
+
+test("sequence.update cannot rebind ownership to a pre-existing TemporalProgram", () => {
+  const session = new EditorSession(baseProject());
+  session.executeTransaction(createCommands());
+  session.execute({ type: "animation.temporal.create_program",
+    payload: { programId: "program_replacement", durationTicks: 100 } });
+  const before = structuredClone(session.project);
+  const historyLength = session.undoStack.length;
+
+  assert.throws(
+    () => session.execute({
+      type: "sequence.update",
+      payload: {
+        sequenceId: "sequence_shot",
+        sequence: { ...sequence(), temporalProgramId: "program_replacement" },
+      },
+    }),
+    (error) => error instanceof CommandError &&
+      error.code === "sequence.temporal_program_immutable",
+  );
+  assert.deepEqual(session.project, before);
+  assert.equal(session.undoStack.length, historyLength);
 });
 
 test("Sequence queries are MCP-ready, derived from program duration, and DOM-independent", () => {

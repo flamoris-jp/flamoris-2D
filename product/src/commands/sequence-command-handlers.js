@@ -46,6 +46,17 @@ export const sequenceCommandHandlers = {
     if (next.id !== payload.sequenceId) {
       throw new CommandError("Sequence updates must preserve stable identity.", "identity.changed");
     }
+    if (next.temporalProgramId !== previous.temporalProgramId) {
+      throw new CommandError(
+        "Sequence TemporalProgram ownership cannot be reassigned by sequence.update.",
+        "sequence.temporal_program_immutable",
+        {
+          sequenceId: previous.id,
+          temporalProgramId: previous.temporalProgramId,
+          requestedTemporalProgramId: next.temporalProgramId,
+        },
+      );
+    }
     project.sequences[index] = next;
     sortSequences(project);
     return {
