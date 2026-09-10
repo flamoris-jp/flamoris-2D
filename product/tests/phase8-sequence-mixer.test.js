@@ -13,6 +13,7 @@ import { deserializeProject, serializeProject } from "../src/io/project-json.js"
 import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
 import { createMeshFormCorrectionKeyform } from "../src/model/mesh-form-correction.js";
 import { renderEvaluatedViewport } from "../src/ui/viewport-renderer.js";
+import { EditorSession } from "../src/commands/editor.js";
 
 const step = Object.freeze({ kind: "step" });
 
@@ -319,7 +320,12 @@ test("MeshDeformationTrack applies after existing MeshFormCorrection by stable v
     { meshId: "mesh_subject" }, { deformation: channel("mesh_key", {
       deformationSampleId: "sample", weight: 0.5,
     }) })], { weight: 0.4 });
-  assert.deepEqual(firstInstance(project).mesh.positions.slice(0, 2), [3, 4.4]);
+  const evaluated = evaluateSequence(project, "sequence", 50);
+  assert.deepEqual(evaluated.evaluatedParts[0].renderInstances[0]
+    .mesh.positions.slice(0, 2), [3, 4.4]);
+  assert.deepEqual(evaluateSequence(
+    deserializeProject(serializeProject(project)), "sequence", 50,
+  ), evaluated);
 });
 
 test("topology mismatch is structural and does not silently remap offsets", () => {
@@ -389,6 +395,23 @@ test("sequence evaluation is pure, repeatable, and Save/Open equivalent", () => 
     deserializeProject(serializeProject(project)), "sequence", 50,
   ), first);
   assert.equal(Object.hasOwn(globalThis, "document"), false);
+});
+
+test("headless sequence.evaluate with Clips does not mutate Project or history", () => {
+  const project = fixture();
+  addClip(project, "motion", [track("transform", "TransformTrack",
+    { semanticSlotId: "slot", coordinateSpace: "node-local" }, {
+      positionX: channel("position", 8),
+    })]);
+  const session = new EditorSession(project);
+  const before = structuredClone(session.project);
+  const history = { undo: session.undoStack.length, redo: session.redoStack.length,
+    length: session.history.length, revision: session.currentRevision };
+  const result = session.query("sequence.evaluate", { sequenceId: "sequence", timeTicks: 50 });
+  assert.equal(result.evaluatedParts[0].renderInstances[0].transform[4], 8);
+  assert.deepEqual(session.project, before);
+  assert.deepEqual({ undo: session.undoStack.length, redo: session.redoStack.length,
+    length: session.history.length, revision: session.currentRevision }, history);
 });
 
 test("Sequence export uses its owned duration and the exact headless source frame", () => {
