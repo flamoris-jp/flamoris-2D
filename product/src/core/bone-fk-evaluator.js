@@ -5,9 +5,11 @@ import {
   transformPoint,
 } from "./transforms.js";
 import { constrainedBonePoseDelta } from "./bone-rotation-constraint-evaluator.js";
+import { shortestBoneRotationDelta } from "./angular.js";
+
+export { shortestBoneRotationDelta } from "./angular.js";
 
 const IDENTITY_AFFINE = Object.freeze([1, 0, 0, 1, 0, 0]);
-const TWO_PI = Math.PI * 2;
 
 export class BoneEvaluationError extends Error {
   constructor(message, code, details = null) {
@@ -180,13 +182,6 @@ export function bonePoseDeltaForKeyArt(project, boneId, keyArtId) {
   return keyform
     ? { ...keyform.localDelta }
     : identityBonePoseDelta();
-}
-
-export function shortestBoneRotationDelta(from, to) {
-  let delta = (to - from) % TWO_PI;
-  if (delta > Math.PI) delta -= TWO_PI;
-  if (delta < -Math.PI) delta += TWO_PI;
-  return delta;
 }
 
 export function interpolateBonePoseDeltas(from, to, amount) {

@@ -112,6 +112,23 @@ const meshFormCorrectionKeyform = {
   },
   additionalProperties: false,
 };
+const meshDeformationOffset = {
+  type: "object",
+  required: ["vertexId", "dx", "dy"],
+  properties: { vertexId: nonEmptyString, dx: finiteNumber, dy: finiteNumber },
+  additionalProperties: false,
+};
+const meshDeformationSample = {
+  type: "object",
+  required: ["id", "meshId", "topologyId", "offsets"],
+  properties: {
+    id: nonEmptyString,
+    meshId: nonEmptyString,
+    topologyId: nonEmptyString,
+    offsets: { type: "array", items: meshDeformationOffset },
+  },
+  additionalProperties: false,
+};
 
 const clippingBinding = {
   type: "object",
@@ -150,6 +167,19 @@ const transform = {
 };
 
 export const commandSchemas = {
+  "animation.deformation_sample.create": {
+    type: "object", required: ["sample"], properties: { sample: meshDeformationSample },
+    additionalProperties: false,
+  },
+  "animation.deformation_sample.update": {
+    type: "object", required: ["sampleId", "sample"],
+    properties: { sampleId: nonEmptyString, sample: meshDeformationSample },
+    additionalProperties: false,
+  },
+  "animation.deformation_sample.remove": {
+    type: "object", required: ["sampleId"], properties: { sampleId: nonEmptyString },
+    additionalProperties: false,
+  },
   "animation.clip.create": {
     type: "object", required: ["clip"], properties: { clip: domainObject },
     additionalProperties: false,
@@ -887,6 +917,15 @@ function entityRestoreSchema() {
 }
 
 const internalCommandSchemas = {
+  "animation.deformation_sample.remove_internal": {
+    type: "object", required: ["sampleId"], properties: { sampleId: nonEmptyString },
+    additionalProperties: false,
+  },
+  "animation.deformation_sample.restore": {
+    type: "object", required: ["sample", "index"],
+    properties: { sample: meshDeformationSample, index: nonNegativeInteger },
+    additionalProperties: false,
+  },
   "animation.clip.remove_internal": {
     type: "object", required: ["clipId"], properties: { clipId: nonEmptyString },
     additionalProperties: false,

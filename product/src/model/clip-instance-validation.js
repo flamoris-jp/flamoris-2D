@@ -1,6 +1,7 @@
 import { CLIP_LOOP_MODES } from "./animation-clip.js";
 import { canonicalizeClipInstances } from "./clip-instance.js";
 import { rawClipLocalTick } from "../core/clip-time.js";
+import { temporalChannelDefinition } from "../core/temporal.js";
 
 function problem(code, path, message, entityId = null, details = null) {
   return {
@@ -108,6 +109,17 @@ export function validateSequenceClipInstances(
     if (typeof instance.enabled !== "boolean") {
       issues.push(problem("ANIMATION_CLIP_INSTANCE_INVALID", path + ".enabled",
         "ClipInstance enabled must be boolean.", instance.id));
+    }
+    const hasDiscreteOverrideData = Array.isArray(clipProgram?.tracks) &&
+      clipProgram.tracks.some((track) => Object.entries(track?.channels || {}).some(
+        ([channelName, channel]) => temporalChannelDefinition(track.kind, channelName)?.discrete &&
+          Array.isArray(channel?.keyframes) && channel.keyframes.length > 0,
+      ));
+    if (instance.enabled === true && instance.weight > 0 && instance.weight !== 1 &&
+      hasDiscreteOverrideData) {
+      issues.push(problem("ANIMATION_DISCRETE_WEIGHT_INVALID", path + ".weight",
+        "An enabled positive-weight ClipInstance with discrete override data requires weight 1.",
+        instance.id, { clipId: instance.clipId, weight: instance.weight }));
     }
 
     if (!clipProgram || !placementValid || !rateValuesValid ||

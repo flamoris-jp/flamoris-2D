@@ -104,7 +104,7 @@ test("schema 9 migration adds correction state without changing Phase 7-3 rig st
   project.rig.skinBindings = [{ id: "disabled", targetNodeId: "part", topologyId: "topology",
     enabled: false, vertexWeights: [] }];
   const migrated = migrateProjectSchema(project);
-  assert.equal(migrated.schemaVersion, 14);
+  assert.equal(migrated.schemaVersion, 15);
   assert.deepEqual(migrated.meshFormCorrectionKeyforms, []);
   assert.equal(migrated.rig.skinBindings[0].id, "disabled");
   assert.deepEqual(migrated.rig.boneRotationConstraints, []);

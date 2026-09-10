@@ -16,6 +16,7 @@ import { validateBoneRotationConstraints } from "./bone-rotation-constraint-vali
 import { validateTwoBoneIkConstraints } from "./two-bone-ik-validation.js";
 import { validateSequences } from "./sequence-validation.js";
 import { validateAnimationClips } from "./animation-clip-validation.js";
+import { validateMeshDeformationSamples } from "./mesh-deformation-sample-validation.js";
 import {
   validateTemporalProgramOwnership,
   validateTemporalProgramOwnerTracks,
@@ -72,15 +73,7 @@ export function validateProject(project) {
     issues.push(issue(
       "ANIMATION_SCHEMA_INVALID",
       "animation",
-      "Schema 14 animation must contain exactly the typed clips and reserved deformationSamples collections.",
-    ));
-  }
-  if (Array.isArray(project.animation?.deformationSamples) &&
-    project.animation.deformationSamples.length > 0) {
-    issues.push(issue(
-      "ANIMATION_DEFORMATION_SAMPLE_UNSUPPORTED",
-      "animation.deformationSamples",
-      "Animation deformation samples are not authored in Phase 8-2 and must remain empty in schema 14.",
+      "Schema 15 animation must contain exactly the typed clips and deformationSamples collections.",
     ));
   }
 
@@ -171,6 +164,7 @@ export function validateProject(project) {
   issues.push(...validateTemporalPrograms(project, register));
   issues.push(...validateTransitionDomain(project, register));
   issues.push(...validateAnimationClips(project));
+  issues.push(...validateMeshDeformationSamples(project));
   issues.push(...validateSequences(project, register));
   issues.push(...validateTemporalProgramOwnership(project));
   issues.push(...validateTemporalProgramOwnerTracks(project));

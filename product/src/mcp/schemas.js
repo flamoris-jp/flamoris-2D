@@ -1,6 +1,6 @@
 export { commandSchemas } from "../commands/schemas.js";
 
-export const MCP_SCHEMA_VERSION = 16;
+export const MCP_SCHEMA_VERSION = 17;
 
 const nodeId = {
   type: "string",
@@ -11,6 +11,7 @@ const programId = { ...nodeId };
 const transitionId = { ...nodeId };
 const sequenceId = { ...nodeId };
 const clipId = { ...nodeId };
+const sampleId = { ...nodeId };
 const keyArtId = { ...nodeId };
 const semanticSlotId = { ...nodeId };
 
@@ -172,6 +173,12 @@ export const querySchemas = {
   },
   "animation.clip.get": idQuery("clipId", clipId),
   "animation.clip.list": emptyQuery(),
+  "animation.deformation_sample.get": idQuery("sampleId", sampleId),
+  "animation.deformation_sample.list": {
+    type: "object",
+    properties: { meshId: nodeId, topologyId: nodeId },
+    additionalProperties: false,
+  },
   "animation.get_program": {
     type: "object",
     required: ["programId"],

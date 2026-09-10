@@ -92,8 +92,8 @@ test("schema 13 migration starts typed clip state empty without promoting placeh
   legacy.temporalPrograms.push(program("unowned_program"));
 
   const migrated = migrateProjectSchema(legacy);
-  assert.equal(PROJECT_SCHEMA_VERSION, 14);
-  assert.equal(migrated.schemaVersion, 14);
+  assert.equal(PROJECT_SCHEMA_VERSION, 15);
+  assert.equal(migrated.schemaVersion, 15);
   assert.deepEqual(migrated.animation, { clips: [], deformationSamples: [] });
   assert.deepEqual(migrated.sequences[0].clipInstances, []);
   assert.equal(migrated.temporalPrograms[0].id, "unowned_program");
@@ -185,9 +185,13 @@ test("AnimationClip ownership cannot smuggle Transition-only track families", ()
     issue.code === "ANIMATION_TRACK_OWNER_INVALID" && issue.entityId === "track_geometry"));
 });
 
-test("AnimationClip ownership rejects deferred MeshDeformationTrack state", () => {
+test("AnimationClip ownership accepts typed MeshDeformationTrack state", () => {
   const project = projectFixture();
   project.meshes.push({ id: "mesh_face" });
+  project.meshTopologies.push({ id: "topology_face", vertexIds: ["v1", "v2", "v3"],
+    indices: [0, 1, 2], vertexMetadata: {}, nextVertexSequence: 1 });
+  project.animation.deformationSamples.push({ id: "sample_future", meshId: "mesh_face",
+    topologyId: "topology_face", offsets: [] });
   project.animation.clips.push(createAnimationClip({ id: "clip_mesh_deform",
     displayName: "Invalid", temporalProgramId: "program_mesh_deform" }));
   project.temporalPrograms.push({ ...program("program_mesh_deform"), tracks: [{
@@ -199,6 +203,6 @@ test("AnimationClip ownership rejects deferred MeshDeformationTrack state", () =
       interpolationToNext: { kind: "step" },
     }] } },
   }] });
-  assert.ok(validateProject(project).some((issue) =>
-    issue.code === "ANIMATION_TRACK_OWNER_INVALID" && issue.entityId === "track_mesh_deform"));
+  assert.equal(validateProject(project).some((issue) =>
+    issue.code === "ANIMATION_TRACK_OWNER_INVALID" && issue.entityId === "track_mesh_deform"), false);
 });
