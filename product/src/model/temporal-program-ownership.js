@@ -17,9 +17,12 @@ function owners(project) {
       temporalProgramId: entity?.temporalProgramId,
       path: "transitions." + index + ".temporalProgramId",
     })),
-    // Schema 13 reserves animation.clips as an empty unsupported placeholder.
-    // Phase 8-2 must add exact AnimationClip validation before clips can become
-    // a trusted ownership source here.
+    ...(project.animation?.clips || []).map((entity, index) => ({
+      kind: "AnimationClip",
+      id: entity?.id,
+      temporalProgramId: entity?.temporalProgramId,
+      path: "animation.clips." + index + ".temporalProgramId",
+    })),
     ...(project.sequences || []).map((entity, index) => ({
       kind: "Sequence",
       id: entity?.id,
@@ -124,58 +127,68 @@ export function validateTemporalProgramOwnerTracks(project) {
 
 export function validateTemporalProgramOwnershipChange(beforeProject, afterProject) {
   const issues = [];
-  const beforeSequenceById = new Map((beforeProject.sequences || [])
-    .map((entry) => [entry.id, entry]));
-  const afterSequenceById = new Map((afterProject.sequences || [])
-    .map((entry) => [entry.id, entry]));
-  const beforeSequenceIds = new Set(beforeSequenceById.keys());
   const beforeProgramIds = new Set((beforeProject.temporalPrograms || []).map((entry) => entry.id));
-  const afterSequenceIds = new Set(afterSequenceById.keys());
   const afterProgramIds = new Set((afterProject.temporalPrograms || []).map((entry) => entry.id));
 
-  for (const sequenceId of [...beforeSequenceIds]
-    .filter((id) => afterSequenceIds.has(id)).sort()) {
-    const beforeSequence = beforeSequenceById.get(sequenceId);
-    const afterSequence = afterSequenceById.get(sequenceId);
-    if (beforeSequence.temporalProgramId === afterSequence.temporalProgramId) continue;
-    issues.push(problem(
-      "SEQUENCE_PROGRAM_OWNERSHIP_REASSIGNED",
-      "sequences",
-      "Sequence TemporalProgram ownership is immutable in Phase 8-1.",
-      sequenceId,
-      {
-        temporalProgramId: beforeSequence.temporalProgramId,
-        requestedTemporalProgramId: afterSequence.temporalProgramId,
-      },
-    ));
-  }
+  const ownerLifecycles = [
+    {
+      kind: "Sequence",
+      before: beforeProject.sequences || [],
+      after: afterProject.sequences || [],
+      path: "sequences",
+      codePrefix: "SEQUENCE_PROGRAM",
+      phase: "Phase 8-1",
+    },
+    {
+      kind: "AnimationClip",
+      before: beforeProject.animation?.clips || [],
+      after: afterProject.animation?.clips || [],
+      path: "animation.clips",
+      codePrefix: "ANIMATION_CLIP_PROGRAM",
+      phase: "Phase 8-2",
+    },
+  ];
 
-  for (const sequence of [...(afterProject.sequences || [])]
-    .sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0)) {
-    if (beforeSequenceIds.has(sequence.id) || !beforeProgramIds.has(sequence.temporalProgramId)) {
-      continue;
+  for (const lifecycle of ownerLifecycles) {
+    const beforeById = new Map(lifecycle.before.map((entry) => [entry.id, entry]));
+    const afterById = new Map(lifecycle.after.map((entry) => [entry.id, entry]));
+    for (const id of [...beforeById.keys()].filter((entry) => afterById.has(entry)).sort()) {
+      const beforeOwner = beforeById.get(id);
+      const afterOwner = afterById.get(id);
+      if (beforeOwner.temporalProgramId === afterOwner.temporalProgramId) continue;
+      issues.push(problem(
+        lifecycle.codePrefix + "_OWNERSHIP_REASSIGNED",
+        lifecycle.path,
+        lifecycle.kind + " TemporalProgram ownership is immutable in " + lifecycle.phase + ".",
+        id,
+        {
+          temporalProgramId: beforeOwner.temporalProgramId,
+          requestedTemporalProgramId: afterOwner.temporalProgramId,
+        },
+      ));
     }
-    issues.push(problem(
-      "SEQUENCE_PROGRAM_CREATION_NOT_ATOMIC",
-      "sequences",
-      "Creating a Sequence and its owned TemporalProgram must be one transaction.",
-      sequence.id,
-      { temporalProgramId: sequence.temporalProgramId },
-    ));
-  }
-
-  for (const sequence of [...(beforeProject.sequences || [])]
-    .sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0)) {
-    if (afterSequenceIds.has(sequence.id) || !afterProgramIds.has(sequence.temporalProgramId)) {
-      continue;
+    for (const owner of [...lifecycle.after]
+      .sort((left, right) => String(left.id).localeCompare(String(right.id)))) {
+      if (beforeById.has(owner.id) || !beforeProgramIds.has(owner.temporalProgramId)) continue;
+      issues.push(problem(
+        lifecycle.codePrefix + "_CREATION_NOT_ATOMIC",
+        lifecycle.path,
+        "Creating an " + lifecycle.kind + " and its owned TemporalProgram must be one transaction.",
+        owner.id,
+        { temporalProgramId: owner.temporalProgramId },
+      ));
     }
-    issues.push(problem(
-      "SEQUENCE_PROGRAM_REMOVAL_NOT_ATOMIC",
-      "sequences",
-      "Removing a Sequence and its owned TemporalProgram must be one transaction.",
-      sequence.id,
-      { temporalProgramId: sequence.temporalProgramId },
-    ));
+    for (const owner of [...lifecycle.before]
+      .sort((left, right) => String(left.id).localeCompare(String(right.id)))) {
+      if (afterById.has(owner.id) || !afterProgramIds.has(owner.temporalProgramId)) continue;
+      issues.push(problem(
+        lifecycle.codePrefix + "_REMOVAL_NOT_ATOMIC",
+        lifecycle.path,
+        "Removing an " + lifecycle.kind + " and its owned TemporalProgram must be one transaction.",
+        owner.id,
+        { temporalProgramId: owner.temporalProgramId },
+      ));
+    }
   }
 
   return issues;

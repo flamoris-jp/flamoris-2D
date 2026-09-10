@@ -298,6 +298,20 @@ export function migrateProjectSchema(value) {
     }
     project.schemaVersion = 13;
   }
+  if (project?.schemaVersion === 13) {
+    // Schema 13 exposed both collections only as unsupported placeholders.
+    // Phase 8-2 starts their typed lifetime from empty state rather than
+    // reinterpreting arbitrary legacy placeholder objects.
+    project.animation = {
+      clips: [],
+      deformationSamples: [],
+    };
+    project.sequences = (project.sequences || []).map((sequence) => ({
+      ...sequence,
+      clipInstances: [],
+    }));
+    project.schemaVersion = 14;
+  }
   if (project?.schemaVersion !== PROJECT_SCHEMA_VERSION) {
     throw new ProjectFormatError(
       "This project uses an unsupported Project schema.",
