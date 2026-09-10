@@ -26,8 +26,8 @@ export class RigidBoneEvaluationError extends Error {
   }
 }
 
-function documentWarpSpace(project, deformerId) {
-  const fromDeformerLocal = worldTransformMatrix(project, deformerId);
+function documentWarpSpace(project, deformerId, transformOverrides = null) {
+  const fromDeformerLocal = worldTransformMatrix(project, deformerId, transformOverrides);
   return {
     toDeformerLocal: invertAffine(fromDeformerLocal),
     fromDeformerLocal,
@@ -62,9 +62,12 @@ function rootParentId(project, boneId) {
 
 export function createEndpointBoneWarpEvaluationStages(project, boneId, keyArtId, {
   warpKeyformForDeformer = undefined,
+  transformOverrides = null,
 } = {}) {
   const resolved = createWarpEvaluationStages(project, boneId, keyArtId, {
-    spaceForDeformer: (deformerId) => documentWarpSpace(project, deformerId),
+    spaceForDeformer: (deformerId) => documentWarpSpace(
+      project, deformerId, transformOverrides,
+    ),
     ...(warpKeyformForDeformer ? { keyformForDeformer: warpKeyformForDeformer } : {}),
   });
   if (resolved.diagnostics.length) {
@@ -79,6 +82,7 @@ export function createEndpointBoneWarpEvaluationStages(project, boneId, keyArtId
 
 function morphStages(project, boneId, fromKeyArtId, toKeyArtId, geometryWeight, {
   warpKeyformForDeformer = undefined,
+  transformOverrides = null,
 } = {}) {
   return createInterpolatedWarpEvaluationStages(
     project,
@@ -88,19 +92,23 @@ function morphStages(project, boneId, fromKeyArtId, toKeyArtId, geometryWeight, 
     toKeyArtId,
     geometryWeight,
     {
-      spaceForDeformer: (deformerId) => documentWarpSpace(project, deformerId),
+      spaceForDeformer: (deformerId) => documentWarpSpace(
+        project, deformerId, transformOverrides,
+      ),
       ...(warpKeyformForDeformer ? { keyformForDeformer: warpKeyformForDeformer } : {}),
     },
   );
 }
 
-function projectedWarpPoint(project, stageForBone) {
+function projectedWarpPoint(project, stageForBone, transformOverrides = null) {
   const cache = new Map();
   return (point, { boneId }) => {
     let entry = cache.get(boneId);
     if (!entry) {
       entry = {
-        rigToDocument: worldTransformMatrix(project, rootParentId(project, boneId)),
+        rigToDocument: worldTransformMatrix(
+          project, rootParentId(project, boneId), transformOverrides,
+        ),
         stages: stageForBone(boneId),
       };
       cache.set(boneId, entry);
@@ -130,6 +138,7 @@ function evaluationDiagnostic(error, binding = null) {
 export function evaluateEndpointProjectedBoneFk(project, keyArtId, {
   poseForBone = null,
   warpKeyformForDeformer = undefined,
+  transformOverrides = null,
 } = {}) {
   try {
     return evaluateBoneFk(project, keyArtId, {
@@ -137,7 +146,9 @@ export function evaluateEndpointProjectedBoneFk(project, keyArtId, {
         project,
         (boneId) => createEndpointBoneWarpEvaluationStages(project, boneId, keyArtId, {
           warpKeyformForDeformer,
+          transformOverrides,
         }),
+        transformOverrides,
       ),
       poseForBone,
     });
@@ -151,6 +162,7 @@ export function evaluateMorphProjectedBoneFk(
   {
     poseForBone = null,
     warpKeyformForDeformer = undefined,
+    transformOverrides = null,
   } = {},
 ) {
   try {
@@ -160,8 +172,10 @@ export function evaluateMorphProjectedBoneFk(
         (boneId) => morphStages(
           project, boneId, fromKeyArtId, toKeyArtId, geometryWeight, {
             warpKeyformForDeformer,
+            transformOverrides,
           },
         ),
+        transformOverrides,
       ),
       poseForBone: poseForBone || ((bone) => interpolateBonePoseDeltas(
           bonePoseDeltaForKeyArt(project, bone.id, fromKeyArtId),
@@ -216,6 +230,7 @@ export function evaluateEndpointRigidBoneMesh(project, {
   targetWorldTransform,
   poseForBone = null,
   warpKeyformForDeformer = undefined,
+  transformOverrides = null,
 }) {
   const binding = rigidBoneBindingForTarget(project, targetNodeId);
   if (!binding) return { mesh, diagnostics: [] };
@@ -226,6 +241,7 @@ export function evaluateEndpointRigidBoneMesh(project, {
     evaluateEndpointProjectedBoneFk(project, keyArtId, {
       poseForBone,
       warpKeyformForDeformer,
+      transformOverrides,
     }),
   );
 }
@@ -240,6 +256,7 @@ export function evaluateMorphRigidBoneMesh(project, {
   targetWorldTransform,
   poseForBone = null,
   warpKeyformForDeformer = undefined,
+  transformOverrides = null,
 }) {
   const fromBinding = rigidBoneBindingForTarget(project, fromTargetNodeId);
   const toBinding = rigidBoneBindingForTarget(project, toTargetNodeId);
@@ -266,6 +283,7 @@ export function evaluateMorphRigidBoneMesh(project, {
     evaluateMorphProjectedBoneFk(project, fromKeyArtId, toKeyArtId, geometryWeight, {
       poseForBone,
       warpKeyformForDeformer,
+      transformOverrides,
     }),
   );
 }
