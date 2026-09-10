@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { EditorSession, TransactionError } from "../src/commands/editor.js";
 import { sampleBezier } from "../src/core/temporal.js";
+import { migrateProjectSchema, ProjectFormatError } from "../src/io/project-json.js";
 import { createWarpDeformer } from "../src/model/warp-deformer.js";
 import { boneSceneTransform, createBone } from "../src/model/bone.js";
 import { createAnimationClip } from "../src/model/animation-clip.js";
@@ -173,6 +174,99 @@ test("CameraTrack is Sequence-owned and shares scalar Bezier and angular samplin
 
   project.temporalPrograms[0].tracks[0].channels.scale.keyframes[0].value = 0;
   assert.ok(validateProject(project).some((issue) => issue.code === "ANIMATION_INVALID_VALUE"));
+});
+
+test("positive Transform and Camera scales reject overshooting Bezier progress", () => {
+  const overshoot = { kind: "bezier", x1: 0, y1: -10, x2: 1, y2: -10 };
+  const transform = fixture();
+  ownClipProgram(transform, [
+    track("transform", "TransformTrack", { nodeId: "part", coordinateSpace: "node-local" }, {
+      scaleX: channel(key("scale0", 0, 1, overshoot), key("scale1", 100, 2, step)),
+    }),
+  ]);
+  assert.ok(validateProject(transform).some((issue) =>
+    issue.code === "ANIMATION_INVALID_CURVE" &&
+    issue.path.endsWith("channels.scaleX.keyframes.0.interpolationToNext")));
+
+  const camera = fixture();
+  camera.keyArts.push({ id: "key", displayName: "Key", rootNodeId: camera.scene.rootId,
+    members: [], metadata: {} });
+  camera.temporalPrograms.push({ id: "camera_program", durationTicks: 100, events: [], regions: [],
+    tracks: [track("camera", "CameraTrack", { cameraId: "main" }, {
+      scale: channel(key("scale0", 0, 1, overshoot), key("scale1", 100, 2, step)),
+    })] });
+  camera.sequences.push({ id: "sequence", displayName: "Sequence",
+    temporalProgramId: "camera_program", viewLaneItems: [{ id: "hold", kind: "KeyArtHold",
+      keyArtId: "key", startTicks: 0, endTicks: 100 }], clipInstances: [], metadata: {} });
+  assert.ok(validateProject(camera).some((issue) =>
+    issue.code === "ANIMATION_INVALID_CURVE" &&
+    issue.path.endsWith("channels.scale.keyframes.0.interpolationToNext")));
+});
+
+test("accepted Bezier boundaries keep Transform and Camera scale samples positive", () => {
+  const boundary = { kind: "bezier", x1: 0, y1: 0, x2: 1, y2: 1 };
+  const project = fixture();
+  ownClipProgram(project, [
+    track("transform", "TransformTrack", { nodeId: "part", coordinateSpace: "node-local" }, {
+      scaleY: channel(key("transform0", 0, Number.MIN_VALUE, boundary),
+        key("transform1", 100, 2, step)),
+    }),
+  ]);
+  project.keyArts.push({ id: "key", displayName: "Key", rootNodeId: project.scene.rootId,
+    members: [], metadata: {} });
+  project.temporalPrograms.push({ id: "camera_program", durationTicks: 100, events: [], regions: [],
+    tracks: [track("camera", "CameraTrack", { cameraId: "main" }, {
+      scale: channel(key("camera0", 0, 2, boundary),
+        key("camera1", 100, Number.MIN_VALUE, step)),
+    })] });
+  project.sequences.push({ id: "sequence", displayName: "Sequence",
+    temporalProgramId: "camera_program", viewLaneItems: [{ id: "hold", kind: "KeyArtHold",
+      keyArtId: "key", startTicks: 0, endTicks: 100 }], clipInstances: [], metadata: {} });
+  assert.equal(validateProject(project).some((issue) => issue.severity === "error"), false);
+  const session = new EditorSession(project);
+  for (let timeTicks = 0; timeTicks <= 100; timeTicks += 1) {
+    const transformValue = session.query("animation.sample_program",
+      { programId: "program", timeTicks }).tracks[0].values.scaleY;
+    const cameraValue = session.query("animation.sample_program",
+      { programId: "camera_program", timeTicks }).tracks[0].values.scale;
+    assert.ok(transformValue > 0, "Transform scale at tick " + timeTicks);
+    assert.ok(cameraValue > 0, "Camera scale at tick " + timeTicks);
+  }
+});
+
+test("schema 14 migration rejects non-positive reserved Camera scale explicitly", () => {
+  const legacy = fixture();
+  legacy.schemaVersion = 14;
+  legacy.keyArts.push({ id: "key", displayName: "Key", rootNodeId: legacy.scene.rootId,
+    members: [], metadata: {} });
+  legacy.temporalPrograms.push({ id: "camera_program", durationTicks: 100, events: [], regions: [],
+    tracks: [track("camera", "CameraTrack", { cameraId: "main" }, {
+      scale: channel(key("scale", 0, 0, step)),
+    })] });
+  legacy.sequences.push({ id: "sequence", displayName: "Sequence",
+    temporalProgramId: "camera_program", viewLaneItems: [{ id: "hold", kind: "KeyArtHold",
+      keyArtId: "key", startTicks: 0, endTicks: 100 }], clipInstances: [], metadata: {} });
+  assert.throws(() => migrateProjectSchema(legacy), (error) =>
+    error instanceof ProjectFormatError &&
+    error.code === "project.schema_track_semantics_incompatible" &&
+    error.details?.reason === "non-positive-scale-value" &&
+    error.details?.trackId === "camera");
+});
+
+test("schema 14 migration rejects scalar rotation that shortest-arc sampling would reinterpret", () => {
+  const legacy = fixture();
+  legacy.schemaVersion = 14;
+  ownClipProgram(legacy, [
+    track("transform", "TransformTrack", { nodeId: "part", coordinateSpace: "node-local" }, {
+      rotation: channel(key("rotation0", 0, 0),
+        key("rotation1", 100, 3 * Math.PI / 2, step)),
+    }),
+  ]);
+  assert.throws(() => migrateProjectSchema(legacy), (error) =>
+    error instanceof ProjectFormatError &&
+    error.code === "project.schema_track_semantics_incompatible" &&
+    error.details?.reason === "scalar-to-shortest-arc-change" &&
+    error.details?.trackId === "transform");
 });
 
 test("clip discrete and opacity tracks accept exact node and SemanticSlot targets", () => {
