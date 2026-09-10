@@ -228,12 +228,17 @@ Value interpolation is also typed by `(track.kind, channelName)` in the shared
 temporal sampler. Phase 8 marks `BoneTrack.rotation`,
 `TransformTrack.rotation`, and `CameraTrack.rotation` as shortest-arc angular
 channels. They retain the same step/linear/Bezier time curve; only the value
-interpolation after time progress is angular. The deterministic delta is in
-`[-PI, PI)`, so an exact half-turn chooses `-PI`. All existing Transition
-numeric channels and other numeric channels keep scalar interpolation. This is
-metadata on the common typed-track registry and one `sampleTemporalProgram()`
-path, not a rig- or Sequence-specific sampler. Turns of at least `PI` in a
-chosen direction require intermediate authored keys in the initial model.
+interpolation after time progress is angular. The deterministic boundary is
+the existing Phase 7 Bone rule: reduce the difference by remainder `2 * PI`,
+subtract/add one turn only when it is strictly greater than `PI` or strictly
+less than `-PI`. Exact `+PI` therefore remains `+PI`, and exact `-PI` remains
+`-PI`. All existing Transition numeric channels and other numeric channels keep
+their current interpolation. In particular, the existing Transition endpoint
+transform helper retains its separate `[-PI, PI)` half-turn tie; Phase 8 does
+not silently change that shipped result. This is metadata on the common
+typed-track registry and one `sampleTemporalProgram()` path, not a rig- or
+Sequence-specific sampler. Turns greater than `PI` require intermediate keys;
+at exactly `PI`, the authored difference sign selects direction.
 
 ## 8. Typed track model
 

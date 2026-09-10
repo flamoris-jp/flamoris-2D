@@ -493,9 +493,9 @@ time progress.
 Initial angular channels are:
 
 ```text
-BoneTrack.rotation       -> angle-shortest-arc
-TransformTrack.rotation  -> angle-shortest-arc
-CameraTrack.rotation     -> angle-shortest-arc
+BoneTrack.rotation       -> angle-shortest-arc-bone-compatible
+TransformTrack.rotation  -> angle-shortest-arc-bone-compatible
+CameraTrack.rotation     -> angle-shortest-arc-bone-compatible
 ```
 
 All existing Transition numeric channels and all other numeric channels retain
@@ -503,16 +503,33 @@ ordinary scalar interpolation. For an angular interval, the sampler first
 computes progress with the existing linear or Bezier time curve, then applies:
 
 ```text
-delta = euclideanModulo(to - from + PI, 2 * PI) - PI
+delta = (to - from) remainder (2 * PI)
+if delta > PI:  delta -= 2 * PI
+if delta < -PI: delta += 2 * PI
 value = from + delta * progress
 ```
 
-The exact half-turn tie therefore selects `-PI`, matching the existing
-deterministic shortest-arc convention. Authored and sampled angles remain
-finite radians and are not forcibly normalized afterward. A deliberate turn
-greater than or equal to `PI` must use intermediate keys whose individual arcs
-express the intended direction; a future explicit turns/unwrapped-angle type
-must not change this shipped channel meaning.
+This is the exact existing Phase 7 `shortestBoneRotationDelta()` boundary:
+`to - from == +PI` remains `+PI`, and `to - from == -PI` remains `-PI`.
+Implementation may extract that function into a shared angular utility, but it
+must preserve the Phase 7 result and use it from both Bone pose interpolation
+and the typed temporal sampler.
+
+The existing Transition endpoint-transform helper currently uses a different
+`[-PI, PI)` tie and maps an exact positive half-turn to `-PI`. That legacy
+endpoint interpolation remains unchanged and authoritative for Transition
+base transforms. TransformTrack/CameraTrack key sampling uses the
+Bone-compatible signed half-turn rule above; applying a TransformTrack delta
+does not redefine Transition endpoint interpolation. The two deterministic tie
+contracts are intentionally explicit rather than being called one universal
+repository convention.
+
+Authored and sampled angles remain finite radians and are not forcibly
+normalized afterward. A deliberate turn greater than `PI` must use
+intermediate keys whose individual arcs express the intended direction; at
+exactly `PI`, the sign of the authored difference selects the direction. A
+future explicit turns/unwrapped-angle type must not change this shipped channel
+meaning.
 
 ## 10. TransformTrack
 
@@ -1127,7 +1144,8 @@ Cover at least:
 40. shared typed temporal sampling uses shortest-arc interpolation for
     BoneTrack, TransformTrack, and CameraTrack rotation while preserving
     existing Transition scalar samples and Bezier time curves;
-41. exact `PI` angular tie and intermediate-key authored turn direction;
+41. exact `+PI`/`-PI` typed-channel ties preserve the Phase 7 Bone result,
+    while existing Transition endpoint-transform `-PI` tie remains unchanged;
 42. full existing Phase 1-7 regression suite remains green.
 
 ## 26. Acceptance criteria
