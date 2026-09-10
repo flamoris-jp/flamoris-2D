@@ -54,6 +54,7 @@ src/core/rigid-bone-evaluator.js
 src/core/linear-blend-skinning-evaluator.js
 src/core/warp-deformer-evaluator.js
 src/core/temporal.js
+src/core/angular.js
 src/core/transition-evaluator.js
 src/core/sequence-evaluator.js
 src/core/mesh-form-correction-evaluator.js

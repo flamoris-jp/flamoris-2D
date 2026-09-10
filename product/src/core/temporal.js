@@ -1,3 +1,5 @@
+import { interpolateBoneCompatibleAngle } from "./angular.js";
+
 export const TIMEBASE_TICKS_PER_SECOND = 120000;
 
 export const TEMPORAL_TRACK_DEFINITIONS = Object.freeze({
@@ -10,12 +12,40 @@ export const TEMPORAL_TRACK_DEFINITIONS = Object.freeze({
   TransformTrack: {
     channels: ["positionX", "positionY", "rotation", "scaleX", "scaleY"],
     value: "number",
-    target: "node",
+    target: "node-or-semantic-local",
+    channelDefinitions: {
+      positionX: { value: "number" },
+      positionY: { value: "number" },
+      rotation: { value: "number", interpolation: "bone-compatible-angle" },
+      scaleX: { value: "positive-number" },
+      scaleY: { value: "positive-number" },
+    },
+  },
+  BoneTrack: {
+    channels: ["x", "y", "rotation"],
+    value: "number",
+    target: "bone",
+    channelDefinitions: {
+      x: { value: "number" },
+      y: { value: "number" },
+      rotation: { value: "number", interpolation: "bone-compatible-angle" },
+    },
+  },
+  DeformerTrack: {
+    channels: ["deltaX", "deltaY"],
+    value: "number",
+    target: "deformer-control-point",
   },
   CameraTrack: {
     channels: ["positionX", "positionY", "rotation", "scale"],
     value: "number",
     target: "camera",
+    channelDefinitions: {
+      positionX: { value: "number" },
+      positionY: { value: "number" },
+      rotation: { value: "number", interpolation: "bone-compatible-angle" },
+      scale: { value: "positive-number" },
+    },
   },
   MeshDeformationTrack: {
     channels: ["deformation"],
@@ -23,6 +53,17 @@ export const TEMPORAL_TRACK_DEFINITIONS = Object.freeze({
     target: "mesh",
   },
 });
+
+export function temporalChannelDefinition(kind, channelName) {
+  const track = TEMPORAL_TRACK_DEFINITIONS[kind];
+  if (!track || !track.channels.includes(channelName)) return null;
+  const channel = track.channelDefinitions?.[channelName] || {};
+  return Object.freeze({
+    value: channel.value || track.value,
+    interpolation: channel.interpolation || "default",
+    discrete: channel.discrete ?? track.discrete === true,
+  });
+}
 
 function gcd(a, b) {
   let left = Math.abs(a);
@@ -188,7 +229,7 @@ function interpolateValue(from, to, progress) {
   return structuredClone(from);
 }
 
-export function sampleKeyframes(keyframes, timeTicks) {
+export function sampleKeyframes(keyframes, timeTicks, { interpolationMode = "default" } = {}) {
   if (!Number.isSafeInteger(timeTicks) || timeTicks < 0) {
     throw new RangeError("Sample time must be a non-negative integer tick.");
   }
@@ -208,6 +249,9 @@ export function sampleKeyframes(keyframes, timeTicks) {
   const progress = interpolation.kind === "bezier"
     ? sampleBezier(raw, interpolation)
     : raw;
+  if (interpolationMode === "bone-compatible-angle") {
+    return interpolateBoneCompatibleAngle(previous.value, next.value, progress);
+  }
   return interpolateValue(previous.value, next.value, progress);
 }
 
@@ -223,8 +267,12 @@ export function sampleTemporalProgram(program, timeTicks) {
       trackId: track.trackId,
       kind: track.kind,
       target: structuredClone(track.target),
-      values: Object.fromEntries(Object.entries(track.channels).map(([name, channel]) =>
-        [name, sampleKeyframes(channel.keyframes, timeTicks)])),
+      values: Object.fromEntries(Object.entries(track.channels).map(([name, channel]) => {
+        const definition = temporalChannelDefinition(track.kind, name);
+        return [name, sampleKeyframes(channel.keyframes, timeTicks, {
+          interpolationMode: definition?.interpolation,
+        })];
+      })),
     })),
     events: ordered.events.filter((event) => event.timeTicks === timeTicks),
     regions: ordered.regions.filter((region) =>
