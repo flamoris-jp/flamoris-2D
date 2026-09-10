@@ -1,5 +1,9 @@
 import { CLIP_LOOP_MODES } from "./animation-clip.js";
-import { TEMPORAL_TRACK_DEFINITIONS, sampleKeyframes } from "../core/temporal.js";
+import {
+  TEMPORAL_TRACK_DEFINITIONS,
+  sampleKeyframes,
+  temporalChannelDefinition,
+} from "../core/temporal.js";
 
 const LOOP_NUMERIC_TOLERANCE = 1e-9;
 
@@ -52,7 +56,7 @@ function numericEqual(left, right) {
 }
 
 function endpointValuesEqual(left, right, definition) {
-  if (["number", "unit-number", "weights"].includes(definition?.value)) {
+  if (["number", "positive-number", "unit-number", "weights"].includes(definition?.value)) {
     return numericEqual(left, right);
   }
   return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
@@ -134,7 +138,8 @@ export function validateAnimationClips(project) {
             try {
               const startValue = sampleKeyframes(channel.keyframes, 0);
               const endValue = sampleKeyframes(channel.keyframes, program.durationTicks);
-              if (endpointValuesEqual(startValue, endValue, definition)) return;
+              if (endpointValuesEqual(startValue, endValue,
+                temporalChannelDefinition(track.kind, channelName))) return;
               issues.push(problem(
                 "ANIMATION_LOOP_ENDPOINT_MISMATCH",
                 path + ".temporalProgramId",

@@ -35,6 +35,8 @@ src/model/skin-binding.js
 src/model/skin-binding-validation.js
 src/model/mesh-form-correction.js
 src/model/mesh-form-correction-validation.js
+src/model/mesh-deformation-sample.js
+src/model/mesh-deformation-sample-validation.js
 src/model/rigid-bone-binding-validation.js
 src/model/warp-deformer.js
 src/model/warp-deformer-validation.js
@@ -54,6 +56,7 @@ src/core/rigid-bone-evaluator.js
 src/core/linear-blend-skinning-evaluator.js
 src/core/warp-deformer-evaluator.js
 src/core/temporal.js
+src/core/angular.js
 src/core/transition-evaluator.js
 src/core/sequence-evaluator.js
 src/core/mesh-form-correction-evaluator.js
@@ -88,6 +91,7 @@ src/commands/animation-clip-command-handlers.js
 src/commands/rigid-bone-binding-command-handlers.js
 src/commands/skin-binding-command-handlers.js
 src/commands/mesh-form-correction-command-handlers.js
+src/commands/mesh-deformation-sample-command-handlers.js
 src/commands/warp-deformer-command-handlers.js
 src/commands/schemas.js
 src/io/project-json.js

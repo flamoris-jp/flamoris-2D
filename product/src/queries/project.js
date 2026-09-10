@@ -44,6 +44,7 @@ import {
 import { canonicalizeViewLaneItems } from "../model/sequence.js";
 import { canonicalizeClipInstances } from "../model/clip-instance.js";
 import { canonicalizeAnimationClips } from "../model/animation-clip.js";
+import { canonicalizeMeshDeformationSamples } from "../model/mesh-deformation-sample.js";
 import { sequenceDurationTicks, validateSequences } from "../model/sequence-validation.js";
 import { evaluateSequence } from "../core/sequence-evaluator.js";
 import { projectClipInstanceTick } from "../core/clip-time.js";
@@ -237,6 +238,7 @@ export const projectQueries = {
       twoBoneIkConstraints: project.rig.twoBoneIkConstraints.length,
       transitions: project.transitions.length,
       clips: project.animation.clips.length,
+      deformationSamples: project.animation.deformationSamples.length,
       sequences: project.sequences.length,
       temporalPrograms: project.temporalPrograms.length,
     },
@@ -478,6 +480,15 @@ export const projectQueries = {
       ...clip,
       durationTicks: temporalProgram(project, clip.temporalProgramId).durationTicks,
     })),
+  "animation.deformation_sample.get": (project, input) => {
+    const sample = project.animation.deformationSamples.find((entry) => entry.id === input.sampleId);
+    if (!sample) throw new Error("Unknown MeshDeformationSample " + input.sampleId + ".");
+    return cloneProject(sample);
+  },
+  "animation.deformation_sample.list": (project, input = {}) =>
+    canonicalizeMeshDeformationSamples(project.animation.deformationSamples)
+      .filter((sample) => !input.meshId || sample.meshId === input.meshId)
+      .filter((sample) => !input.topologyId || sample.topologyId === input.topologyId),
   "keyart.get": (project, input) => {
     const keyArt = project.keyArts.find((entry) => entry.id === input.keyArtId);
     if (!keyArt) throw new Error("Unknown KeyArt " + input.keyArtId + ".");

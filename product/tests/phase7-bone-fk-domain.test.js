@@ -102,7 +102,7 @@ function createBoneCommand({
 
 test("new schema contains empty typed Bone collections", () => {
   const project = boneProject();
-  assert.equal(PROJECT_SCHEMA_VERSION, 14);
+  assert.equal(PROJECT_SCHEMA_VERSION, 15);
   assert.deepEqual(project.rig.bones, []);
   assert.deepEqual(project.rig.bonePoseKeyforms, []);
   assert.deepEqual(project.rig.rigidBoneBindings, []);
@@ -377,6 +377,16 @@ test("Bone pose interpolation uses linear translation and shortest-arc rotation"
   const midpoint = interpolateBonePoseDeltas(from, to, 0.5);
   assert.deepEqual({ x: midpoint.x, y: midpoint.y }, { x: 10, y: 0 });
   assert.ok(Math.abs(midpoint.rotation - Math.PI) < 1e-12);
+  assert.equal(interpolateBonePoseDeltas(
+    { x: 0, y: 0, rotation: 0 },
+    { x: 0, y: 0, rotation: Math.PI },
+    0.5,
+  ).rotation, Math.PI / 2);
+  assert.equal(interpolateBonePoseDeltas(
+    { x: 0, y: 0, rotation: 0 },
+    { x: 0, y: 0, rotation: -Math.PI },
+    0.5,
+  ).rotation, -Math.PI / 2);
 });
 
 test("Bone commands create rename enable and pose through normal Undo Redo", () => {

@@ -302,7 +302,8 @@ test("Morph interpolates rotation semantically without a singular midpoint", () 
   const determinant = transform[0] * transform[3] - transform[1] * transform[2];
   assert.ok(Math.abs(determinant - 1) < 1e-12);
   assert.ok(Math.abs(transform[0]) < 1e-12);
-  assert.ok(Math.abs(Math.abs(transform[1]) - 1) < 1e-12);
+  assert.ok(Math.abs(transform[1] + 1) < 1e-12,
+    "Transition endpoint interpolation keeps its existing +PI -> -PI tie direction");
 });
 
 test("Appear changes absent to present with rising opacity", () => {
