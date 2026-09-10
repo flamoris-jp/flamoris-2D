@@ -17,6 +17,7 @@ import { boneConstraintCommandHandlers } from "./bone-constraint-command-handler
 import { twoBoneIkCommandHandlers } from "./two-bone-ik-command-handlers.js";
 import { sequenceCommandHandlers } from "./sequence-command-handlers.js";
 import { animationClipCommandHandlers } from "./animation-clip-command-handlers.js";
+import { meshDeformationSampleCommandHandlers } from "./mesh-deformation-sample-command-handlers.js";
 import {
   validateTemporalProgramOwnershipChange,
 } from "../model/temporal-program-ownership.js";
@@ -38,6 +39,7 @@ const handlers = {
   ...twoBoneIkCommandHandlers,
   ...sequenceCommandHandlers,
   ...animationClipCommandHandlers,
+  ...meshDeformationSampleCommandHandlers,
 };
 
 function assertCommand(command, { allowInternal = false } = {}) {

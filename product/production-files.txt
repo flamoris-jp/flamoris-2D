@@ -91,6 +91,7 @@ src/commands/animation-clip-command-handlers.js
 src/commands/rigid-bone-binding-command-handlers.js
 src/commands/skin-binding-command-handlers.js
 src/commands/mesh-form-correction-command-handlers.js
+src/commands/mesh-deformation-sample-command-handlers.js
 src/commands/warp-deformer-command-handlers.js
 src/commands/schemas.js
 src/io/project-json.js
