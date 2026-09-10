@@ -1,6 +1,7 @@
 import {
   TEMPORAL_TRACK_DEFINITIONS,
   sampleKeyframes,
+  temporalChannelDefinition,
 } from "../core/temporal.js";
 
 const EVENT_TYPES = new Set([
@@ -78,7 +79,7 @@ function validateInterpolation(value, path, issues, discrete) {
 function validateTarget(track, definition, program, project, path, issues) {
   const target = track.target;
   if (!object(target)) {
-    issues.push(problem("ANIMATION_UNKNOWN_TARGET", path, "Track target must be a typed object.", track.trackId));
+    issues.push(problem("ANIMATION_TRACK_TARGET_INVALID", path, "Track target must be a typed object.", track.trackId));
     return;
   }
   const hasNode = typeof target.nodeId === "string" && target.nodeId.length > 0;
@@ -95,40 +96,68 @@ function validateTarget(track, definition, program, project, path, issues) {
     valid = Number(hasNode) + Number(hasSemantic) + Number(hasTransitionDefault) === 1 &&
       fields.length === 1;
   }
-  if (definition.target === "node") {
-    valid = hasNode && target.coordinateSpace === "node-local" && fields.length === 2;
+  if (definition.target === "node-or-semantic-local") {
+    valid = (hasNode !== hasSemantic) && target.coordinateSpace === "node-local" && fields.length === 2;
+  }
+  if (definition.target === "bone") {
+    valid = typeof target.boneId === "string" && Boolean(target.boneId) && fields.length === 1;
+  }
+  if (definition.target === "deformer-control-point") {
+    valid = typeof target.deformerId === "string" && Boolean(target.deformerId) &&
+      typeof target.controlPointId === "string" && Boolean(target.controlPointId) && fields.length === 2;
   }
   if (definition.target === "mesh") {
     valid = typeof target.meshId === "string" && target.meshId.length > 0 && fields.length === 1;
   }
   if (definition.target === "camera") valid = target.cameraId === "main" && fields.length === 1;
   if (!valid) {
-    issues.push(problem("ANIMATION_UNKNOWN_TARGET", path, "Target shape is invalid for " + track.kind + ".", track.trackId));
+    issues.push(problem("ANIMATION_TRACK_TARGET_INVALID", path, "Target shape is invalid for " + track.kind + ".", track.trackId));
     return;
   }
   if (hasNode && !project.scene?.nodes?.[target.nodeId]) {
-    issues.push(problem("ANIMATION_UNKNOWN_TARGET", path + ".nodeId", "Target scene node does not exist.", target.nodeId));
+    issues.push(problem("ANIMATION_TRACK_TARGET_INVALID", path + ".nodeId", "Target scene node does not exist.", target.nodeId));
   }
   if (hasSemantic && !(project.semanticSlots || []).some((slot) => slot.id === target.semanticSlotId)) {
-    issues.push(problem("ANIMATION_UNKNOWN_TARGET", path + ".semanticSlotId", "Target semantic slot does not exist.", target.semanticSlotId));
+    issues.push(problem("ANIMATION_TRACK_TARGET_INVALID", path + ".semanticSlotId", "Target semantic slot does not exist.", target.semanticSlotId));
   }
   if (hasTransitionDefault && !(project.transitions || []).some((transition) =>
     transition.temporalProgramId === program.id)) {
     issues.push(problem(
-      "ANIMATION_UNKNOWN_TARGET",
+      "ANIMATION_TRACK_TARGET_INVALID",
       path + ".transitionDefault",
       "transitionDefault may target only a Transition-owned TemporalProgram.",
       track.trackId,
     ));
   }
   if (target.meshId && !(project.meshes || []).some((mesh) => mesh.id === target.meshId)) {
-    issues.push(problem("ANIMATION_UNKNOWN_TARGET", path + ".meshId", "Target mesh does not exist.", target.meshId));
+    issues.push(problem("ANIMATION_TRACK_TARGET_INVALID", path + ".meshId", "Target mesh does not exist.", target.meshId));
+  }
+  if (target.boneId && !(project.rig?.bones || []).some((bone) => bone.id === target.boneId)) {
+    issues.push(problem("ANIMATION_TRACK_TARGET_INVALID", path + ".boneId",
+      "Target Bone does not exist.", target.boneId));
+  }
+  if (target.deformerId) {
+    const deformer = (project.rig?.deformers || []).find((entry) => entry.id === target.deformerId);
+    const controlPoint = (project.rig?.warpControlPoints || []).find((entry) =>
+      entry.id === target.controlPointId);
+    if (!deformer) {
+      issues.push(problem("ANIMATION_TRACK_TARGET_INVALID", path + ".deformerId",
+        "Target WarpDeformer does not exist.", target.deformerId));
+    }
+    if (!controlPoint || controlPoint.deformerId !== target.deformerId ||
+      !deformer?.controlPointIds?.includes(target.controlPointId)) {
+      issues.push(problem("ANIMATION_TRACK_TARGET_INVALID", path + ".controlPointId",
+        "Target control point must belong to the target WarpDeformer.", target.controlPointId,
+        "error", { deformerId: target.deformerId, controlPointId: target.controlPointId }));
+    }
   }
 }
 
-function validateValue(value, valueType, path, issues, project) {
+function validateValue(value, valueType, path, issues, project, track) {
   if (valueType === "number" && !finite(value)) {
     issues.push(problem("ANIMATION_INVALID_VALUE", path, "Channel value must be finite."));
+  } else if (valueType === "positive-number" && (!finite(value) || value <= 0)) {
+    issues.push(problem("ANIMATION_INVALID_VALUE", path, "Scale factor must be finite and greater than zero."));
   } else if (valueType === "unit-number" && (!finite(value) || value < 0 || value > 1)) {
     issues.push(problem("ANIMATION_INVALID_VALUE", path, "Channel value must be within 0..1."));
   } else if (valueType === "integer" && !Number.isSafeInteger(value)) {
@@ -153,9 +182,27 @@ function validateValue(value, valueType, path, issues, project) {
       issues.push(problem("ANIMATION_UNKNOWN_TARGET", path + ".sourceNodeId", "Clipping source node does not exist.", value.sourceNodeId));
     }
   } else if (valueType === "deformation") {
-    if (!object(value) || typeof value.deformationSampleId !== "string" || !value.deformationSampleId ||
-      !finite(value.weight)) {
+    if (!object(value) || !hasExactKeys(value, ["deformationSampleId", "weight"]) ||
+      typeof value.deformationSampleId !== "string" || !value.deformationSampleId || !finite(value.weight)) {
       issues.push(problem("ANIMATION_INVALID_VALUE", path, "Deformation value requires deformationSampleId and a finite weight."));
+      return;
+    }
+    const sample = (project.animation?.deformationSamples || []).find((entry) =>
+      entry.id === value.deformationSampleId);
+    if (!sample) {
+      issues.push(problem("ANIMATION_TOPOLOGY_INCOMPATIBLE", path + ".deformationSampleId",
+        "MeshDeformationTrack references a missing MeshDeformationSample.", track.trackId,
+        "error", { deformationSampleId: value.deformationSampleId }));
+    } else if (sample.meshId !== track.target?.meshId ||
+      !(project.meshTopologies || []).some((entry) => entry.id === sample.topologyId)) {
+      issues.push(problem("ANIMATION_TOPOLOGY_INCOMPATIBLE", path,
+        "MeshDeformationSample mesh and topology must be compatible with the track target.",
+        track.trackId, "error", {
+          deformationSampleId: sample.id,
+          sampleMeshId: sample.meshId,
+          targetMeshId: track.target?.meshId ?? null,
+          topologyId: sample.topologyId,
+        }));
     }
   }
 }
@@ -217,10 +264,12 @@ function validateTrack(track, program, project, path, issues, register) {
         }
         times.add(keyframe.timeTicks);
       }
-      validateValue(keyframe.value, definition.value, keyPath + ".value", issues, project);
-      validateInterpolation(keyframe.interpolationToNext, keyPath + ".interpolationToNext", issues, definition.discrete);
+      const channelDefinition = temporalChannelDefinition(track.kind, channelName);
+      validateValue(keyframe.value, channelDefinition.value, keyPath + ".value", issues, project, track);
+      validateInterpolation(keyframe.interpolationToNext, keyPath + ".interpolationToNext", issues,
+        channelDefinition.discrete);
     });
-    if (definition.value === "deformation") {
+    if (temporalChannelDefinition(track.kind, channelName).value === "deformation") {
       const ordered = [...channel.keyframes].sort((a, b) => a.timeTicks - b.timeTicks);
       for (let keyIndex = 0; keyIndex < ordered.length - 1; keyIndex += 1) {
         const current = ordered[keyIndex];

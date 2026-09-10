@@ -80,6 +80,14 @@ export function validateTemporalProgramOwnerTracks(project) {
     const sequenceOwner = soleOwner?.kind === "Sequence" ? soleOwner : null;
     const clipOwner = soleOwner?.kind === "AnimationClip" ? soleOwner : null;
     const tracks = Array.isArray(program?.tracks) ? program.tracks : [];
+    const transitionKinds = new Set([
+      "GeometryBlendTrack", "AppearanceTrack", "OpacityTrack", "PresenceTrack",
+      "DrawOrderTrack", "ClippingTrack",
+    ]);
+    const clipKinds = new Set([
+      "TransformTrack", "BoneTrack", "DeformerTrack", "MeshDeformationTrack",
+      "OpacityTrack", "PresenceTrack", "DrawOrderTrack", "ClippingTrack",
+    ]);
 
     tracks.forEach((track, trackIndex) => {
       const path = "temporalPrograms." + programIndex + ".tracks." + trackIndex;
@@ -106,17 +114,23 @@ export function validateTemporalProgramOwnerTracks(project) {
             trackKind: track?.kind,
           },
         ));
-      } else if (clipOwner && [
-        "GeometryBlendTrack",
-        "AppearanceTrack",
-        "MeshDeformationTrack",
-      ].includes(track?.kind)) {
+      } else if (soleOwner?.kind === "Transition" && !transitionKinds.has(track?.kind)) {
         issues.push(problem(
           "ANIMATION_TRACK_OWNER_INVALID",
           path + ".kind",
-          track.kind === "MeshDeformationTrack"
-            ? "MeshDeformationTrack is deferred until its deformation-sample domain is introduced."
-            : track.kind + " remains Transition-owned and cannot be authored in an AnimationClip.",
+          "A Transition-owned TemporalProgram may contain only Transition track families.",
+          track?.trackId || program?.id,
+          {
+            temporalProgramId: program?.id,
+            owner: { kind: soleOwner.kind, id: soleOwner.id },
+            trackKind: track?.kind,
+          },
+        ));
+      } else if (clipOwner && !clipKinds.has(track?.kind)) {
+        issues.push(problem(
+          "ANIMATION_TRACK_OWNER_INVALID",
+          path + ".kind",
+          track?.kind + " cannot be authored in an AnimationClip.",
           track?.trackId || program?.id,
           {
             temporalProgramId: program?.id,
