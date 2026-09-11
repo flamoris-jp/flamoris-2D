@@ -88,8 +88,13 @@ frame.
 ## Validation boundary
 
 Automated tests cover the production data, Commands/Queries, timeline controller, evaluator,
-shared renderer, PNG encoding boundary, and desktop MP4 source-frame job fully offline. The Windows
-Desktop Package is built and its production manifest/import closure is tested in CI. Interactive
-launch, scrub, Save/reopen, and actual FFmpeg-backed MP4 encoding in a packaged Windows GUI require
-a Windows desktop runner and are reported separately in the pull request; they are not represented
-as completed by Linux automation.
+shared renderer, PNG encoding boundary, and desktop MP4 source-frame job fully offline. Local
+validation completed `npm --offline test` with 699/699 passing tests. A Windows x64 unpacked package
+was produced with `npm --offline run desktop:pack`; inspection of its `app.asar` confirmed the
+desktop entry, shell, timeline controller/view, and ease-preset module are packaged. Product CI and
+Windows Desktop Package workflows provide the independent hosted checks after the pull request is
+opened.
+
+Interactive launch, scrub, Save/reopen, PNG output review, and actual FFmpeg-backed MP4 encoding in
+a packaged Windows GUI require a Windows desktop runner and are reported separately in the pull
+request; they are not represented as completed by Linux automation.
