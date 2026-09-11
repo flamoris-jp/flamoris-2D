@@ -124,6 +124,21 @@ test("BoneTrack translation is additive and ClipInstance-weighted", () => {
   closeArray(firstPositions(project).slice(0, 2), [6, 0]);
 });
 
+test("TransformTrack stays after Bone geometry in the frozen stage order", () => {
+  const project = fixture();
+  project.rig.bonePoseKeyforms[0].localDelta.x = 2;
+  const beforeTransform = firstPositions(project);
+  attachClip(project, "final_transform", [scalar(
+    "part_rotation", "TransformTrack",
+    { nodeId: "part", coordinateSpace: "node-local" },
+    "rotation", Math.PI / 2,
+  )]);
+  const result = evaluateSequence(project, "sequence", 50);
+  const instance = result.evaluatedParts[0].renderInstances[0];
+  closeArray(instance.mesh.positions, beforeTransform);
+  closeArray(instance.transform, [0, 1, -1, 0, 0, 0]);
+});
+
 test("DeformerTrack overlays the cage before Warp without mutating keyforms", () => {
   const project = fixture();
   const rootId = project.scene.rootId;
