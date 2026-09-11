@@ -50,6 +50,7 @@ import { createKeyStateStripView } from "./ui/key-state-strip-view.js";
 import { AutoMeshPreviewController } from "./ui/automesh-preview-controller.js";
 import { createCorrespondenceView } from "./ui/correspondence-view.js";
 import { createViewportCameraController } from "./ui/viewport-camera-controller.js";
+import { createSequenceTimelineView } from "./ui/sequence-timeline-view.js";
 
 const desktopApi = window.flamorisDesktop || null;
 const appStorage = desktopApi?.storage || localStorage;
@@ -155,6 +156,7 @@ const viewportRenderer = createViewportRenderer({
   selectedNodeDocumentBounds,
   endpointContext: activeEndpointContext,
   transitionPreviewContext: () => state.editor?.transitionPreview.getState() || null,
+  sequenceTimelineContext: () => state.editor?.sequenceTimeline.getState() || null,
   autoMeshPreviewContext: () => autoMeshPreview.getState(),
   correspondencePreviewContext: () => state.editor?.correspondencePreview.getState() || null,
   clippingAuthoringContext: () => {
@@ -227,6 +229,13 @@ const keyStateStripView = createKeyStateStripView({
     renderEditorUi();
     render();
   },
+});
+
+const sequenceTimelineView = createSequenceTimelineView({
+  state,
+  elements,
+  setStatus,
+  onSequencePreview: () => render(),
 });
 
 const transitionDiagnosticsView = createTransitionDiagnosticsView({
@@ -476,6 +485,7 @@ async function loadImage(source, label) {
   await loaded;
 
   state.editor?.keyStateStrip.pause();
+  state.editor?.sequenceTimeline.pause();
   state.mode = "png";
   state.editorMode = EDITOR_MODES.DEFORM;
   state.editTargetNodeId = null;
@@ -524,6 +534,7 @@ function renderEditorUi() {
   transitionAuthoringView.render();
   transitionPreviewView.render();
   keyStateStripView.render();
+  sequenceTimelineView.render();
   transitionDiagnosticsView.render();
   meshAuthoringView.render();
   correspondenceView.render();
@@ -606,6 +617,7 @@ function attachProject(project, {
   recovered = false,
 } = {}) {
   state.editor?.keyStateStrip.pause();
+  state.editor?.sequenceTimeline.pause();
   state.autosaveScheduler?.stop();
   const session = new EditorSession(project);
   if (!saved) session.savedRevision = -1;
