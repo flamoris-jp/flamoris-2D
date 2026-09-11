@@ -84,6 +84,16 @@ export function normalizePlaybackRate(numerator, denominator) {
   return { numerator: numerator / divisor, denominator: denominator / divisor };
 }
 
+function clipPlacementDuration(durationTicks, playbackRate) {
+  const projected = BigInt(durationTicks) * BigInt(playbackRate.denominator) /
+    BigInt(playbackRate.numerator);
+  const value = Number(projected);
+  if (!Number.isSafeInteger(value)) {
+    throw new RangeError("Default ClipInstance placement exceeds the safe integer range.");
+  }
+  return Math.max(1, value);
+}
+
 function interpolation(kind, controls = {}) {
   if (kind === "step" || kind === "linear") return { kind };
   if (kind !== "bezier") throw new Error(`Unknown interpolation ${kind}.`);
@@ -408,13 +418,15 @@ export class SequenceTimelineController {
   }
 
   commitViewItems(nextItems, label) {
-    return this.mutate(() => {
-      const commands = this.viewCommands(nextItems);
-      if (!commands.length) return null;
-      const result = this.session.executeTransaction(commands, { label });
+    try {
+      return this.mutate(() => {
+        const commands = this.viewCommands(nextItems);
+        if (!commands.length) return null;
+        return this.session.executeTransaction(commands, { label });
+      });
+    } finally {
       this.viewPreview.clear();
-      return result;
-    });
+    }
   }
 
   insertTransition({
@@ -528,10 +540,12 @@ export class SequenceTimelineController {
     const left = sequence?.viewLaneItems.find((entry) => entry.id === leftItemId);
     const right = sequence?.viewLaneItems.find((entry) => entry.id === rightItemId);
     if (!left || !right || left.endTicks !== right.startTicks) {
+      this.viewPreview.clear();
       throw new Error("Choose adjacent ViewLane items.");
     }
     if (!Number.isSafeInteger(boundaryTick) || boundaryTick <= left.startTicks ||
       boundaryTick >= right.endTicks) {
+      this.viewPreview.clear();
       throw new Error("Boundary must preserve positive neighboring durations.");
     }
     this.viewPreview = new Map([
@@ -726,7 +740,7 @@ export class SequenceTimelineController {
       const clip = this.session.query("animation.clip.get", { clipId });
       const rate = normalizePlaybackRate(playbackRate.numerator, playbackRate.denominator);
       const resolvedEnd = endTicks ?? Math.min(sequence.durationTicks,
-        startTicks + Math.max(1, Math.floor(clip.durationTicks * rate.denominator / rate.numerator)));
+        startTicks + clipPlacementDuration(clip.durationTicks, rate));
       const clipInstance = {
         id: clipInstanceId,
         clipId,
@@ -770,6 +784,7 @@ export class SequenceTimelineController {
     if (!Number.isSafeInteger(preview.startTicks) || !Number.isSafeInteger(preview.endTicks) ||
       preview.startTicks < 0 || preview.startTicks >= preview.endTicks ||
       preview.endTicks > sequence.durationTicks) {
+      this.clipPreview.delete(instance.id);
       throw new Error("ClipInstance preview must remain inside the Sequence.");
     }
     this.clipPreview.set(instance.id, preview);
@@ -777,28 +792,30 @@ export class SequenceTimelineController {
   }
 
   commitClipInstance(clipInstanceId, patch = null, label = "Move ClipInstance") {
-    return this.mutate(() => {
-      const sequence = this.activeSequence();
-      const instance = sequence?.clipInstances.find((entry) => entry.id === clipInstanceId);
-      if (!instance) throw new Error(`Unknown ClipInstance ${clipInstanceId}.`);
-      const preview = this.clipPreview.get(clipInstanceId);
-      const next = {
-        ...instance,
-        ...(preview ? cloneProject(preview) : {}),
-        ...(patch ? cloneProject(patch) : {}),
-        id: instance.id,
-      };
-      if (next.playbackRate) {
-        next.playbackRate = normalizePlaybackRate(
-          next.playbackRate.numerator, next.playbackRate.denominator);
-      }
-      const result = this.session.execute({
-        type: "sequence.update_clip_instance",
-        payload: { sequenceId: sequence.id, clipInstanceId: instance.id, clipInstance: next },
-      }, { label });
+    try {
+      return this.mutate(() => {
+        const sequence = this.activeSequence();
+        const instance = sequence?.clipInstances.find((entry) => entry.id === clipInstanceId);
+        if (!instance) throw new Error(`Unknown ClipInstance ${clipInstanceId}.`);
+        const preview = this.clipPreview.get(clipInstanceId);
+        const next = {
+          ...instance,
+          ...(preview ? cloneProject(preview) : {}),
+          ...(patch ? cloneProject(patch) : {}),
+          id: instance.id,
+        };
+        if (next.playbackRate) {
+          next.playbackRate = normalizePlaybackRate(
+            next.playbackRate.numerator, next.playbackRate.denominator);
+        }
+        return this.session.execute({
+          type: "sequence.update_clip_instance",
+          payload: { sequenceId: sequence.id, clipInstanceId: instance.id, clipInstance: next },
+        }, { label });
+      });
+    } finally {
       this.clipPreview.delete(clipInstanceId);
-      return result;
-    });
+    }
   }
 
   cancelClipPreview(clipInstanceId = null) {
@@ -980,18 +997,17 @@ export class SequenceTimelineController {
   }
 
   updateKeyframe(trackId, channel, keyframeId, patch, label = "Update Animation keyframe") {
+    this.keyframePreview = null;
     return this.mutate(() => {
       const program = this.activeProgram();
       const keyframe = program?.tracks.find((entry) => entry.trackId === trackId)
         ?.channels?.[channel]?.keyframes.find((entry) => entry.id === keyframeId);
       if (!keyframe) throw new Error(`Unknown keyframe ${keyframeId}.`);
       const next = { ...keyframe, ...cloneProject(patch), id: keyframe.id };
-      const result = this.session.execute({
+      return this.session.execute({
         type: "animation.temporal.update_keyframe",
         payload: { programId: program.id, trackId, channel, keyframeId, keyframe: next },
       }, { label });
-      this.keyframePreview = null;
-      return result;
     });
   }
 

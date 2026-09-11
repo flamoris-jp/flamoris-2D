@@ -70,8 +70,6 @@ export class KeyStateStripController {
     this.onChange = onChange;
     this.onEndpointEdit = onEndpointEdit;
     this.onPreview = onPreview;
-    this.scheduleFrame = scheduleFrame;
-    this.cancelFrame = cancelFrame;
     this.meshTools = meshTools;
     this.clock = new TransientPlaybackClock({
       onTick: (tick) => {

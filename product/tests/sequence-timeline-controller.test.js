@@ -126,6 +126,11 @@ test("coordinated ViewLane boundary drag previews transiently and commits once",
   assert.equal(timeline.getState().viewItems[0].endTicks, 120);
   assert.deepEqual(session.project, before);
   assert.equal(session.history.length, history);
+  assert.throws(() => timeline.previewViewBoundary("hold_a", "instance_ab", 0),
+    /positive neighboring durations/);
+  assert.equal(timeline.commitViewBoundary(), null);
+  assert.equal(session.history.length, history);
+  timeline.previewViewBoundary("hold_a", "instance_ab", 120);
   timeline.commitViewBoundary();
   assert.equal(session.history.length, history + 1);
   assert.deepEqual(session.history.at(-1).commandTypes,
@@ -248,6 +253,10 @@ test("ClipInstance add, drag, resize, trim, retime, loop and flags commit one un
   assert.equal(timeline.getState().clipInstances[0].startTicks, 50);
   assert.deepEqual(session.project, before);
   assert.equal(session.history.length, history);
+  assert.throws(() => timeline.previewClipInstance("instance",
+    { startTicks: 250, endTicks: 350 }), /inside the Sequence/);
+  assert.deepEqual(session.project, before);
+  timeline.previewClipInstance("instance", { startTicks: 50, endTicks: 150 });
   timeline.commitClipInstance("instance");
   assert.equal(session.history.length, ++history);
   timeline.commitClipInstance("instance", { endTicks: 140 }, "Resize ClipInstance");
