@@ -3,8 +3,10 @@ import test from "node:test";
 
 import { EditorSession, TransactionError } from "../src/commands/editor.js";
 import { deserializeProject, serializeProject } from "../src/io/project-json.js";
-import { createIdFactory, createProject } from "../src/model/project.js";
+import { boneSceneTransform, createBone } from "../src/model/bone.js";
+import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
 import { validateProject } from "../src/model/validation.js";
+import { createWarpDeformer } from "../src/model/warp-deformer.js";
 import { SequenceTimelineController } from "../src/ui/sequence-timeline-controller.js";
 
 function fixture({ withSequence = true } = {}) {
@@ -15,6 +17,25 @@ function fixture({ withSequence = true } = {}) {
     { id: "key_b", displayName: "B", rootNodeId: project.scene.rootId, members: [], metadata: {} },
     { id: "key_c", displayName: "C", rootNodeId: project.scene.rootId, members: [], metadata: {} },
   );
+  project.semanticSlots.push({ id: "slot", displayName: "Subject", role: "subject",
+    mappings: [], metadata: {} });
+  project.scene.nodes.part = createSceneNode({ id: "part", displayName: "Part",
+    parentId: project.scene.rootId });
+  project.scene.nodes.bone = createSceneNode({ id: "bone", kind: "bone", displayName: "Arm",
+    parentId: project.scene.rootId, transform: boneSceneTransform({ x: 0, y: 0, rotation: 0 }) });
+  project.scene.nodes[project.scene.rootId].children.push("part", "bone");
+  project.rig.bones.push(createBone({ id: "bone", parentNodeId: project.scene.rootId,
+    restLocalTransform: { x: 0, y: 0, rotation: 0 }, length: 10 }));
+  const warp = createWarpDeformer({ id: "warp", displayName: "Warp",
+    parentNodeId: project.scene.rootId, columns: 2, rows: 2,
+    bounds: { left: 0, top: 0, right: 10, bottom: 10 },
+    controlPointIds: ["cp1", "cp2", "cp3", "cp4"] });
+  project.rig.deformers.push(warp.deformer);
+  project.rig.warpControlPoints.push(...warp.controlPoints);
+  project.scene.nodes.warp = createSceneNode({ id: "warp", kind: "deformer",
+    displayName: "Warp", parentId: project.scene.rootId });
+  project.scene.nodes[project.scene.rootId].children.push("warp");
+  project.meshes.push({ id: "mesh" });
   project.temporalPrograms.push(
     { id: "program_ab", durationTicks: 100, tracks: [], events: [], regions: [] },
     { id: "program_bc", durationTicks: 100, tracks: [], events: [], regions: [] },
@@ -258,12 +279,15 @@ test("Once overrun and Loop offset validation surface without clamping or histor
 });
 
 test("typed owner filtering and stable target pickers mirror Core contracts", () => {
-  const { timeline } = controller();
+  const { session, timeline } = controller();
   assert.deepEqual(timeline.allowedTrackKinds(), ["CameraTrack"]);
   assert.deepEqual(timeline.targetOptions("CameraTrack"),
     [{ label: "Main camera", target: { cameraId: "main" } }]);
   assert.throws(() => timeline.addTrack("TransformTrack",
     { nodeId: "missing", coordinateSpace: "node-local" }), /not valid/);
+  timeline.addTrack("CameraTrack", { cameraId: "main" }, { trackId: "camera" });
+  assert.deepEqual(session.history.at(-1).commandTypes, ["animation.temporal.add_track"]);
+  timeline.removeTrack("camera");
   timeline.createClip({ displayName: "Motion", durationTicks: 100,
     clipId: "clip", programId: "program_clip" });
   assert.deepEqual(timeline.allowedTrackKinds(), [
@@ -274,6 +298,14 @@ test("typed owner filtering and stable target pickers mirror Core contracts", ()
     .find((entry) => entry.target.nodeId)?.target;
   assert.equal(root.coordinateSpace, "node-local");
   assert.equal(Object.hasOwn(root, "displayName"), false);
+  assert.deepEqual(timeline.targetOptions("BoneTrack").map((entry) => entry.target),
+    [{ boneId: "bone" }]);
+  assert.ok(timeline.targetOptions("DeformerTrack").some((entry) =>
+    entry.target.deformerId === "warp" && entry.target.controlPointId === "cp1"));
+  assert.deepEqual(timeline.targetOptions("MeshDeformationTrack").map((entry) => entry.target),
+    [{ meshId: "mesh" }]);
+  assert.ok(timeline.targetOptions("OpacityTrack").some((entry) =>
+    entry.target.semanticSlotId === "slot"));
 });
 
 test("typed track and keyframe editing uses animation.temporal only with transient drag", () => {
@@ -294,6 +326,12 @@ test("typed track and keyframe editing uses animation.temporal only with transie
   timeline.commitKeyframePreview();
   assert.equal(session.history.length, history + 1);
   assert.deepEqual(session.history.at(-1).commandTypes, ["animation.temporal.update_keyframe"]);
+  timeline.setKeyframeInterpolation("track", "positionX", "key", "step");
+  assert.deepEqual(timeline.getState().selectedKeyframeValue.interpolationToNext,
+    { kind: "step" });
+  timeline.setKeyframeInterpolation("track", "positionX", "key", "linear");
+  assert.deepEqual(timeline.getState().selectedKeyframeValue.interpolationToNext,
+    { kind: "linear" });
   timeline.setKeyframeInterpolation("track", "positionX", "key", "bezier",
     { x1: 0.25, y1: 0.1, x2: 0.75, y2: 0.9 });
   assert.deepEqual(timeline.getState().selectedKeyframeValue.interpolationToNext,
