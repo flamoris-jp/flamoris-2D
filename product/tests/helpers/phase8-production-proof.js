@@ -10,14 +10,20 @@ import {
 } from "../../src/model/warp-deformer.js";
 import { SequenceTimelineController } from "../../src/ui/sequence-timeline-controller.js";
 
+export const PROOF_TICK_SCALE = 1000;
+
+export function proofTicks(value) {
+  return value * PROOF_TICK_SCALE;
+}
+
 export const PROOF_TICKS = Object.freeze({
   start: 0,
-  holdA: 50,
-  transitionAB: 150,
-  holdB: 250,
-  transitionBC: 350,
-  blinkC: 450,
-  terminal: 600,
+  holdA: proofTicks(50),
+  transitionAB: proofTicks(150),
+  holdB: proofTicks(250),
+  transitionBC: proofTicks(350),
+  blinkC: proofTicks(450),
+  terminal: proofTicks(600),
 });
 
 const KEY_ARTS = Object.freeze([
@@ -111,7 +117,7 @@ function createBaseProject() {
     height: 64,
     idFactory: createIdFactory("phase8_proof"),
   });
-  project.renderSettings.frameRate = { numerator: 1200, denominator: 1 };
+  project.renderSettings.frameRate = { numerator: 24, denominator: 1 };
   const rootId = project.scene.rootId;
   project.scene.nodes.background = createSceneNode({
     id: "background",
@@ -283,38 +289,40 @@ function addScalarKeys(timeline, trackId, channel, entries) {
 }
 
 function authorBlink(timeline) {
-  timeline.createClip({ displayName: "Blink", durationTicks: 40,
+  timeline.createClip({ displayName: "Blink", durationTicks: proofTicks(40),
     defaultLoopMode: "once", clipId: "clip_blink", programId: "program_blink" });
   timeline.addTrack("TransformTrack",
     { semanticSlotId: "slot_eye", coordinateSpace: "node-local" },
     { trackId: "blink_eye_transform" });
   addScalarKeys(timeline, "blink_eye_transform", "scaleY", [
     ["blink_open_start", 0, 1],
-    ["blink_closed", 20, 0.08],
-    ["blink_open_end", 40, 1],
+    ["blink_closed", proofTicks(20), 0.08],
+    ["blink_open_end", proofTicks(40), 1],
   ]);
   timeline.applyEasePreset("blink_eye_transform", "scaleY", "blink_open_start", "ease-in");
   timeline.applyEasePreset("blink_eye_transform", "scaleY", "blink_closed", "ease-out");
 }
 
 function authorBreath(timeline) {
-  timeline.createClip({ displayName: "Breath", durationTicks: 120,
+  timeline.createClip({ displayName: "Breath", durationTicks: proofTicks(120),
     defaultLoopMode: "loop", clipId: "clip_breath", programId: "program_breath" });
   timeline.addTrack("TransformTrack",
     { semanticSlotId: "slot_body", coordinateSpace: "node-local" },
     { trackId: "breath_body_transform" });
   addScalarKeys(timeline, "breath_body_transform", "positionY", [
-    ["breath_y_start", 0, 0], ["breath_y_peak", 60, -1.5], ["breath_y_end", 120, 0],
+    ["breath_y_start", 0, 0], ["breath_y_peak", proofTicks(60), -1.5],
+    ["breath_y_end", proofTicks(120), 0],
   ]);
   timeline.addTrack("BoneTrack", { boneId: "chest_bone" }, { trackId: "breath_bone" });
   addScalarKeys(timeline, "breath_bone", "rotation", [
-    ["breath_bone_start", 0, 0], ["breath_bone_peak", 60, 0.4],
-    ["breath_bone_end", 120, 0],
+    ["breath_bone_start", 0, 0], ["breath_bone_peak", proofTicks(60), 0.4],
+    ["breath_bone_end", proofTicks(120), 0],
   ]);
   timeline.addTrack("MeshDeformationTrack", { meshId: "mesh_body" },
     { trackId: "breath_form_detail" });
   for (const [id, timeTicks, weight] of [
-    ["detail_start", 0, 0], ["detail_peak", 60, 1], ["detail_end", 120, 0],
+    ["detail_start", 0, 0], ["detail_peak", proofTicks(60), 1],
+    ["detail_end", proofTicks(120), 0],
   ]) {
     timeline.addKeyframe("breath_form_detail", "deformation", {
       keyframeId: id,
@@ -326,7 +334,7 @@ function authorBreath(timeline) {
 }
 
 function authorHairSway(timeline, outerPoints, innerPoints) {
-  timeline.createClip({ displayName: "HairSway", durationTicks: 100,
+  timeline.createClip({ displayName: "HairSway", durationTicks: proofTicks(100),
     defaultLoopMode: "loop", clipId: "clip_hair_sway", programId: "program_hair_sway" });
   for (const [trackId, deformerId, controlPointId, amplitude] of [
     ["hair_outer", "warp_outer", outerPoints[1], 1.25],
@@ -334,20 +342,21 @@ function authorHairSway(timeline, outerPoints, innerPoints) {
   ]) {
     timeline.addTrack("DeformerTrack", { deformerId, controlPointId }, { trackId });
     addScalarKeys(timeline, trackId, "deltaX", [
-      [`${trackId}_start`, 0, 0], [`${trackId}_peak`, 50, amplitude],
-      [`${trackId}_end`, 100, 0],
+      [`${trackId}_start`, 0, 0], [`${trackId}_peak`, proofTicks(50), amplitude],
+      [`${trackId}_end`, proofTicks(100), 0],
     ]);
   }
 }
 
 function authorNodeMotion(timeline) {
-  timeline.createClip({ displayName: "Shot Accent", durationTicks: 200,
+  timeline.createClip({ displayName: "Shot Accent", durationTicks: proofTicks(200),
     defaultLoopMode: "once", clipId: "clip_node_motion", programId: "program_node_motion" });
   timeline.addTrack("TransformTrack",
     { nodeId: "background", coordinateSpace: "node-local" },
     { trackId: "background_pan" });
   addScalarKeys(timeline, "background_pan", "positionX", [
-    ["pan_start", 0, 0], ["pan_peak", 100, 2], ["pan_end", 200, 0],
+    ["pan_start", 0, 0], ["pan_peak", proofTicks(100), 2],
+    ["pan_end", proofTicks(200), 0],
   ]);
 }
 
@@ -355,22 +364,25 @@ export function buildPhase8ProductionProof() {
   const { project, outerPoints, innerPoints } = createBaseProject();
   const session = new EditorSession(project);
   createTransition(session, { id: "transition_ab", programId: "program_transition_ab",
-    durationTicks: 80,
+    durationTicks: proofTicks(80),
     fromKeyArtId: "key_a", toKeyArtId: "key_b", fromSuffix: "a", toSuffix: "b" });
   createTransition(session, { id: "transition_bc", programId: "program_transition_bc",
-    durationTicks: 120,
+    durationTicks: proofTicks(120),
     fromKeyArtId: "key_b", toKeyArtId: "key_c", fromSuffix: "b", toSuffix: "c" });
 
   let sequenceId = 0;
   const timeline = new SequenceTimelineController(session, {
     idFactory: (kind) => `${kind}_proof_${++sequenceId}`,
   });
-  timeline.createSequence({ displayName: "A → B → C Production Shot", durationTicks: 600,
+  timeline.createSequence({ displayName: "A → B → C Production Shot",
+    durationTicks: PROOF_TICKS.terminal,
     keyArtId: "key_a", sequenceId: "sequence_proof", programId: "program_sequence_proof",
     viewItemId: "hold_a" });
-  timeline.insertTransition({ transitionId: "transition_ab", startTicks: 100, endTicks: 200,
+  timeline.insertTransition({ transitionId: "transition_ab",
+    startTicks: proofTicks(100), endTicks: proofTicks(200),
     itemId: "view_transition_ab" });
-  timeline.insertTransition({ transitionId: "transition_bc", startTicks: 300, endTicks: 400,
+  timeline.insertTransition({ transitionId: "transition_bc",
+    startTicks: proofTicks(300), endTicks: proofTicks(400),
     itemId: "view_transition_bc" });
 
   authorBlink(timeline);
@@ -380,15 +392,15 @@ export function buildPhase8ProductionProof() {
 
   timeline.selectSequence("sequence_proof");
   timeline.addClipInstance({ clipId: "clip_blink", clipInstanceId: "blink_cross_boundary",
-    startTicks: 80, endTicks: 220, loopMode: "loop", layer: 3 });
+    startTicks: proofTicks(80), endTicks: proofTicks(220), loopMode: "loop", layer: 3 });
   timeline.addClipInstance({ clipId: "clip_blink", clipInstanceId: "blink_hold_c",
-    startTicks: 420, endTicks: 460, loopMode: "once", layer: 3 });
+    startTicks: proofTicks(420), endTicks: proofTicks(460), loopMode: "once", layer: 3 });
   timeline.addClipInstance({ clipId: "clip_breath", clipInstanceId: "breath_loop",
-    startTicks: 0, endTicks: 600, loopMode: "loop", layer: 1 });
+    startTicks: 0, endTicks: PROOF_TICKS.terminal, loopMode: "loop", layer: 1 });
   timeline.addClipInstance({ clipId: "clip_hair_sway", clipInstanceId: "hair_sway_loop",
-    startTicks: 0, endTicks: 600, loopMode: "loop", layer: 2 });
+    startTicks: 0, endTicks: PROOF_TICKS.terminal, loopMode: "loop", layer: 2 });
   timeline.addClipInstance({ clipId: "clip_node_motion", clipInstanceId: "background_accent",
-    startTicks: 200, endTicks: 400, loopMode: "once", layer: 0 });
+    startTicks: proofTicks(200), endTicks: proofTicks(400), loopMode: "once", layer: 0 });
   return { project: session.project, session, timeline };
 }
 
