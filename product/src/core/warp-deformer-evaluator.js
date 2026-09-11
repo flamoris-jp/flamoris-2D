@@ -379,6 +379,7 @@ export function warpDeformerAncestors(project, nodeId) {
 
 export function createWarpEvaluationStages(project, nodeId, keyArtId, {
   spaceForDeformer = () => ({}),
+  keyformForDeformer = ({ keyform }) => keyform,
 } = {}) {
   const stages = [];
   const diagnostics = [];
@@ -403,7 +404,7 @@ export function createWarpEvaluationStages(project, nodeId, keyArtId, {
     stages.push({
       deformer,
       controlPoints: project.rig.warpControlPoints.filter((point) => point.deformerId === deformerId),
-      keyform,
+      keyform: keyformForDeformer({ deformer, keyform, keyArtId }),
       ...spaceForDeformer(deformerId),
     });
   }
@@ -421,7 +422,10 @@ export function createInterpolatedWarpEvaluationStages(
   fromKeyArtId,
   toKeyArtId,
   amount,
-  { spaceForDeformer = () => ({}) } = {},
+  {
+    spaceForDeformer = () => ({}),
+    keyformForDeformer = ({ keyform }) => keyform,
+  } = {},
 ) {
   const fromAncestors = warpDeformerAncestors(project, fromNodeId);
   const toAncestors = warpDeformerAncestors(project, toNodeId);
@@ -443,11 +447,18 @@ export function createInterpolatedWarpEvaluationStages(
       entry.deformerId === deformerId && entry.keyArtId === fromKeyArtId);
     const toKeyform = project.rig.warpDeformerKeyforms.find((entry) =>
       entry.deformerId === deformerId && entry.keyArtId === toKeyArtId);
+    const keyform = interpolateWarpKeyforms(deformer, fromKeyform, toKeyform, amount);
     return {
       deformer,
       controlPoints: project.rig.warpControlPoints.filter((point) =>
         point.deformerId === deformerId),
-      keyform: interpolateWarpKeyforms(deformer, fromKeyform, toKeyform, amount),
+      keyform: keyformForDeformer({
+        deformer,
+        keyform,
+        fromKeyArtId,
+        toKeyArtId,
+        amount,
+      }),
       ...spaceForDeformer(deformerId),
     };
   });
