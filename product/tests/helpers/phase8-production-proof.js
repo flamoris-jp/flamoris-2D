@@ -243,11 +243,19 @@ function createBaseProject() {
   return { project, outerPoints, innerPoints };
 }
 
-function createTransition(session, { id, programId, fromKeyArtId, toKeyArtId, fromSuffix, toSuffix }) {
+function createTransition(session, {
+  id,
+  programId,
+  durationTicks,
+  fromKeyArtId,
+  toKeyArtId,
+  fromSuffix,
+  toSuffix,
+}) {
   session.executeTransaction([
     {
       type: "animation.temporal.create_program",
-      payload: { programId, durationTicks: 100 },
+      payload: { programId, durationTicks },
     },
     {
       type: "transition.create",
@@ -347,8 +355,10 @@ export function buildPhase8ProductionProof() {
   const { project, outerPoints, innerPoints } = createBaseProject();
   const session = new EditorSession(project);
   createTransition(session, { id: "transition_ab", programId: "program_transition_ab",
+    durationTicks: 80,
     fromKeyArtId: "key_a", toKeyArtId: "key_b", fromSuffix: "a", toSuffix: "b" });
   createTransition(session, { id: "transition_bc", programId: "program_transition_bc",
+    durationTicks: 120,
     fromKeyArtId: "key_b", toKeyArtId: "key_c", fromSuffix: "b", toSuffix: "c" });
 
   let sequenceId = 0;
