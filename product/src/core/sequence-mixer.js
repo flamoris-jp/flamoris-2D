@@ -201,15 +201,6 @@ function discreteOverrides(sequenceId, contributions, activeSemanticNodes, diagn
   return overrides;
 }
 
-function meshMatchesNode(project, meshId, nodeId) {
-  const mesh = project.meshes.find((entry) => entry.id === meshId);
-  const node = project.scene.nodes[nodeId];
-  return Boolean(mesh && node && (
-    node.id === meshId || node.sourceRef === meshId ||
-    mesh.nodeId === nodeId || mesh.targetNodeId === nodeId
-  ));
-}
-
 function contributionTargetIsValid(project, entry) {
   const target = entry.target;
   if (target.nodeId) return Boolean(project.scene.nodes[target.nodeId]);
@@ -334,6 +325,7 @@ export function createSequenceAnimationContext(project, sequence, activeSamples,
 
   const warpKeyformCache = new Map();
   const activeDeformerIds = new Set();
+  const activeMeshTopologyIds = new Set();
   const appliedMeshEntries = new Set();
   let finalized = false;
   return {
@@ -371,25 +363,20 @@ export function createSequenceAnimationContext(project, sequence, activeSamples,
       y: basePose.y + (boneY.get(bone.id) || 0),
       rotation: basePose.rotation + (boneRotation.get(bone.id) || 0),
     }),
-    applyMesh: (mesh, { nodeId }) => {
+    applyMesh: (mesh) => {
+      if (mesh?.topologyId) activeMeshTopologyIds.add(mesh.topologyId);
       let result = mesh;
       for (const entry of meshEntries) {
-        if (!meshMatchesNode(project, entry.target.meshId, nodeId)) continue;
-        appliedMeshEntries.add(entry);
         const deformation = project.animation.deformationSamples.find((sample) =>
           sample.id === entry.value.deformationSampleId);
-        const topology = project.meshTopologies.find((candidate) =>
-          candidate.id === mesh.topologyId);
-        if (!deformation || !topology || deformation.topologyId !== topology.id) {
-          diagnostics.push(diagnostic(sequence.id, "ANIMATION_TOPOLOGY_INCOMPATIBLE", {
-            clipInstanceId: entry.clipInstanceId,
-            trackId: entry.trackId,
-            meshId: entry.target.meshId,
-            activeTopologyId: mesh.topologyId || null,
-            sampleTopologyId: deformation?.topologyId || null,
-          }));
+        if (!deformation || deformation.meshId !== entry.target.meshId ||
+          !mesh?.topologyId || deformation.topologyId !== mesh.topologyId) {
           continue;
         }
+        const topology = project.meshTopologies.find((candidate) =>
+          candidate.id === mesh.topologyId);
+        if (!topology) continue;
+        appliedMeshEntries.add(entry);
         const positions = [...result.positions];
         const effectiveWeight = entry.value.weight * entry.weight;
         let compatible = true;
@@ -437,12 +424,26 @@ export function createSequenceAnimationContext(project, sequence, activeSamples,
       }
       for (const entry of meshEntries) {
         if (appliedMeshEntries.has(entry)) continue;
-        diagnostics.push(diagnostic(sequence.id, "ANIMATION_TRACK_TARGET_INVALID", {
+        const deformation = project.animation.deformationSamples.find((sample) =>
+          sample.id === entry.value.deformationSampleId);
+        if (!deformation || deformation.meshId !== entry.target.meshId) {
+          diagnostics.push(diagnostic(sequence.id, "ANIMATION_TRACK_TARGET_INVALID", {
+            clipInstanceId: entry.clipInstanceId,
+            trackId: entry.trackId,
+            kind: entry.kind,
+            target: entry.target,
+            deformationSampleId: entry.value.deformationSampleId,
+            reason: !deformation ? "deformation-sample-missing" : "sample-mesh-mismatch",
+          }));
+          continue;
+        }
+        diagnostics.push(diagnostic(sequence.id, "ANIMATION_TOPOLOGY_INCOMPATIBLE", {
           clipInstanceId: entry.clipInstanceId,
           trackId: entry.trackId,
-          kind: entry.kind,
-          target: entry.target,
-          reason: "mesh-not-active",
+          meshId: entry.target.meshId,
+          sampleTopologyId: deformation.topologyId,
+          activeTopologyIds: [...activeMeshTopologyIds].sort(compareText),
+          reason: "topology-not-active",
         }));
       }
     },
