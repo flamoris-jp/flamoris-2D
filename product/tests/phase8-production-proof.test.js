@@ -7,44 +7,49 @@ import { validateProject } from "../src/model/validation.js";
 import {
   PROOF_TICKS,
   buildPhase8ProductionProof,
+  proofTicks,
 } from "./helpers/phase8-production-proof.js";
 
 test("production proof authors an exact A to B to C Sequence through timeline Commands", () => {
   const { project, session } = buildPhase8ProductionProof();
   assert.deepEqual(validateProject(project), []);
   const sequence = session.query("sequence.get", { sequenceId: "sequence_proof" });
+  assert.equal(sequence.durationTicks, 600000);
+  assert.equal(sequence.durationTicks / project.timebaseTicksPerSecond, 5);
+  assert.deepEqual(project.renderSettings.frameRate, { numerator: 24, denominator: 1 });
   assert.deepEqual(sequence.viewLaneItems.map((item) => [
     item.kind,
     item.keyArtId || item.transitionId,
     item.startTicks,
     item.endTicks,
   ]), [
-    ["KeyArtHold", "key_a", 0, 100],
-    ["TransitionInstance", "transition_ab", 100, 200],
-    ["KeyArtHold", "key_b", 200, 300],
-    ["TransitionInstance", "transition_bc", 300, 400],
-    ["KeyArtHold", "key_c", 400, 600],
+    ["KeyArtHold", "key_a", 0, proofTicks(100)],
+    ["TransitionInstance", "transition_ab", proofTicks(100), proofTicks(200)],
+    ["KeyArtHold", "key_b", proofTicks(200), proofTicks(300)],
+    ["TransitionInstance", "transition_bc", proofTicks(300), proofTicks(400)],
+    ["KeyArtHold", "key_c", proofTicks(400), PROOF_TICKS.terminal],
   ]);
   assert.equal(session.query("sequence.evaluate",
     { sequenceId: "sequence_proof", timeTicks: PROOF_TICKS.transitionAB })
-    .activeViewLaneItem.localTimeTicks, 40);
+    .activeViewLaneItem.localTimeTicks, proofTicks(40));
   assert.equal(session.query("sequence.evaluate",
     { sequenceId: "sequence_proof", timeTicks: PROOF_TICKS.transitionBC })
-    .activeViewLaneItem.localTimeTicks, 60);
+    .activeViewLaneItem.localTimeTicks, proofTicks(60));
   assert.deepEqual(project.temporalPrograms
     .filter(({ id }) => id.startsWith("program_transition_"))
-    .map(({ durationTicks }) => durationTicks).sort((a, b) => a - b), [80, 120]);
+    .map(({ durationTicks }) => durationTicks).sort((a, b) => a - b),
+  [proofTicks(80), proofTicks(120)]);
   const bodyKeyforms = project.meshKeyforms
     .filter(({ id }) => id.startsWith("keyform_slot_body_"))
     .map(({ id, positions }) => [id, positions]);
   assert.equal(new Set(bodyKeyforms.map(([, positions]) => JSON.stringify(positions))).size, 3);
   for (const [tick, expectedKind, expectedId] of [
-    [99, "KeyArtHold", "hold_a"],
-    [100, "TransitionInstance", "view_transition_ab"],
-    [200, "KeyArtHold", null],
-    [300, "TransitionInstance", "view_transition_bc"],
-    [400, "KeyArtHold", null],
-    [600, "KeyArtHold", null],
+    [proofTicks(100) - 1, "KeyArtHold", "hold_a"],
+    [proofTicks(100), "TransitionInstance", "view_transition_ab"],
+    [proofTicks(200), "KeyArtHold", null],
+    [proofTicks(300), "TransitionInstance", "view_transition_bc"],
+    [proofTicks(400), "KeyArtHold", null],
+    [PROOF_TICKS.terminal, "KeyArtHold", null],
   ]) {
     const item = session.query("sequence.evaluate", { sequenceId: "sequence_proof", timeTicks: tick })
       .activeViewLaneItem;
@@ -67,7 +72,7 @@ test("Blink, Breath, and HairSway are ordinary reusable typed AnimationClips", (
   assert.deepEqual(program("clip_blink").tracks[0].channels.scaleY.keyframes.map((keyframe) => [
     keyframe.timeTicks,
     keyframe.value,
-  ]), [[0, 1], [20, 0.08], [40, 1]]);
+  ]), [[0, 1], [proofTicks(20), 0.08], [proofTicks(40), 1]]);
   assert.deepEqual(program("clip_breath").tracks.map((track) => track.kind),
     ["TransformTrack", "BoneTrack", "MeshDeformationTrack"]);
   assert.deepEqual(program("clip_hair_sway").tracks.map((track) => track.kind),
@@ -99,16 +104,22 @@ test("looping clips wrap exact periods and stay inactive at the terminal Sequenc
   const breath = project.sequences[0].clipInstances.find(({ id }) => id === "breath_loop");
   const breathClip = project.animation.clips.find(({ id }) => id === breath.clipId);
   const breathProgram = project.temporalPrograms.find(({ id }) => id === breathClip.temporalProgramId);
-  assert.deepEqual(projectClipInstanceTick(breath, 120, breathProgram.durationTicks), {
+  assert.deepEqual(projectClipInstanceTick(
+    breath, proofTicks(120), breathProgram.durationTicks), {
     active: true,
     clipInstanceId: "breath_loop",
     clipId: "clip_breath",
     loopMode: "loop",
-    rawLocalTick: 120,
+    rawLocalTick: proofTicks(120),
     localTick: 0,
   });
+  const hair = project.sequences[0].clipInstances.find(({ id }) => id === "hair_sway_loop");
+  const hairClip = project.animation.clips.find(({ id }) => id === hair.clipId);
+  const hairProgram = project.temporalPrograms.find(({ id }) => id === hairClip.temporalProgramId);
+  assert.equal(projectClipInstanceTick(
+    hair, proofTicks(100), hairProgram.durationTicks).localTick, 0);
   const exactPeriod = session.query("sequence.evaluate",
-    { sequenceId: "sequence_proof", timeTicks: 120 });
+    { sequenceId: "sequence_proof", timeTicks: proofTicks(120) });
   assert.equal(exactPeriod.activeClipInstances.find(({ clipInstanceId }) =>
     clipInstanceId === "breath_loop").localTick, 0);
   const terminal = session.query("sequence.evaluate",
@@ -120,7 +131,7 @@ test("looping clips wrap exact periods and stay inactive at the terminal Sequenc
 
 test("SemanticSlot Blink crosses Hold to Transition to Hold without target remapping", () => {
   const { session } = buildPhase8ProductionProof();
-  for (const tick of [90, PROOF_TICKS.transitionAB, 210]) {
+  for (const tick of [proofTicks(90), PROOF_TICKS.transitionAB, proofTicks(210)]) {
     const evaluation = session.query("sequence.evaluate", { sequenceId: "sequence_proof", timeTicks: tick });
     const blink = evaluation.activeClipInstances.find(({ clipInstanceId }) =>
       clipInstanceId === "blink_cross_boundary");
