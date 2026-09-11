@@ -34,7 +34,6 @@ import {
 function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
-
 function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
 }
@@ -59,10 +58,14 @@ function memberState(project, keyArt, mapping, animation = null) {
   const node = project.scene.nodes[mapping.nodeId];
   const member = keyArtMemberFor(keyArt, mapping.nodeId);
   if (!node || !member) return null;
+  const baseWorldTransform = worldTransformMatrix(project, node.id);
   return {
     node,
     member,
-    worldTransform: worldTransformMatrix(project, node.id, animation?.transformOverrides),
+    baseWorldTransform,
+    worldTransform: animation?.transformOverrides
+      ? worldTransformMatrix(project, node.id, animation.transformOverrides)
+      : baseWorldTransform,
   };
 }
 
@@ -92,9 +95,9 @@ function keyformMesh(project, keyformId, fallbackNode) {
   };
 }
 
-function warpSpace(project, deformerId, partWorldTransform, animation = null) {
+function warpSpace(project, deformerId, partWorldTransform) {
   const toDeformerLocal = multiplyAffine(
-    invertAffine(worldTransformMatrix(project, deformerId, animation?.transformOverrides)),
+    invertAffine(worldTransformMatrix(project, deformerId)),
     partWorldTransform,
   );
   return { toDeformerLocal, fromDeformerLocal: invertAffine(toDeformerLocal) };
@@ -155,10 +158,9 @@ function endpointRigidMesh(project, state, keyArtId, mesh, semanticSlotId, issue
     targetNodeId: state.node.id,
     keyArtId,
     mesh,
-    targetWorldTransform: state.worldTransform,
+    targetWorldTransform: state.baseWorldTransform,
     poseForBone: endpointPoseForBone(project, keyArtId, animation),
     warpKeyformForDeformer: animation?.warpKeyformForDeformer,
-    transformOverrides: animation?.transformOverrides,
   }), semanticSlotId);
 }
 
@@ -176,10 +178,9 @@ function endpointBoneMesh(project, state, keyArtId, mesh, semanticSlotId, issues
     keyArtId,
     topology,
     mesh,
-    targetWorldTransform: state.worldTransform,
+    targetWorldTransform: state.baseWorldTransform,
     poseForBone: endpointPoseForBone(project, keyArtId, animation),
     warpKeyformForDeformer: animation?.warpKeyformForDeformer,
-    transformOverrides: animation?.transformOverrides,
   }), semanticSlotId);
 }
 
@@ -230,7 +231,7 @@ function endpointWarpMesh(project, state, keyArtId, mesh, semanticSlotId, issues
   try {
     const resolved = createWarpEvaluationStages(project, state.node.id, keyArtId, {
       spaceForDeformer: (deformerId) => warpSpace(
-        project, deformerId, state.worldTransform, animation,
+        project, deformerId, state.baseWorldTransform,
       ),
       ...(animation?.warpKeyformForDeformer
         ? { keyformForDeformer: animation.warpKeyformForDeformer }
@@ -263,7 +264,7 @@ function morphWarpMesh(project, from, to, fromKeyArtId, toKeyArtId, mesh,
       geometryWeight,
       {
         spaceForDeformer: (deformerId) => warpSpace(
-          project, deformerId, transform, animation,
+          project, deformerId, transform,
         ),
         ...(animation?.warpKeyformForDeformer
           ? { keyformForDeformer: animation.warpKeyformForDeformer }
@@ -435,11 +436,11 @@ function interpolateAngle(from, to, amount) {
   return from + delta * amount;
 }
 
-function endpointTransform(from, to, amount) {
-  if (!from) return [...to.worldTransform];
-  if (!to) return [...from.worldTransform];
-  const left = decomposeAffine(from.worldTransform);
-  const right = decomposeAffine(to.worldTransform);
+function endpointTransform(from, to, amount, property = "worldTransform") {
+  if (!from) return [...to[property]];
+  if (!to) return [...from[property]];
+  const left = decomposeAffine(from[property]);
+  const right = decomposeAffine(to[property]);
   const rotation = interpolateAngle(left.rotation, right.rotation, amount);
   const cosine = Math.cos(rotation);
   const sine = Math.sin(rotation);
@@ -550,9 +551,10 @@ function evaluateMorph(project, transition, part, slot, from, to, fromMesh, toMe
     positions: lerpArray(fromMesh.positions, toMesh.positions, geometryWeight),
     indices: [...topology.indices],
   };
+  const baseTransform = endpointTransform(from, to, geometryWeight, "baseWorldTransform");
   const transform = endpointTransform(from, to, geometryWeight);
   mesh = morphWarpMesh(
-    project, from, to, fromKeyArtId, toKeyArtId, mesh, geometryWeight, transform,
+    project, from, to, fromKeyArtId, toKeyArtId, mesh, geometryWeight, baseTransform,
     slot.id, warpIssues, animation,
   );
   const hasSkin = skinBindingForTarget(project, from.node.id) ||
@@ -566,12 +568,11 @@ function evaluateMorph(project, transition, part, slot, from, to, fromMesh, toMe
       geometryWeight,
       topology,
       mesh,
-      targetWorldTransform: transform,
+      targetWorldTransform: baseTransform,
       poseForBone: morphPoseForBone(
         project, fromKeyArtId, toKeyArtId, geometryWeight, animation,
       ),
       warpKeyformForDeformer: animation?.warpKeyformForDeformer,
-      transformOverrides: animation?.transformOverrides,
     })
     : evaluateMorphRigidBoneMesh(project, {
       fromTargetNodeId: from.node.id,
@@ -580,12 +581,11 @@ function evaluateMorph(project, transition, part, slot, from, to, fromMesh, toMe
       toKeyArtId,
       geometryWeight,
       mesh,
-      targetWorldTransform: transform,
+      targetWorldTransform: baseTransform,
       poseForBone: morphPoseForBone(
         project, fromKeyArtId, toKeyArtId, geometryWeight, animation,
       ),
       warpKeyformForDeformer: animation?.warpKeyformForDeformer,
-      transformOverrides: animation?.transformOverrides,
     }), slot.id);
   mesh = morphCorrectedMesh(project, topology, slot, fromKeyArtId, toKeyArtId,
     geometryWeight, mesh, correctionIssues);
