@@ -25,6 +25,19 @@ test("production proof authors an exact A to B to C Sequence through timeline Co
     ["TransitionInstance", "transition_bc", 300, 400],
     ["KeyArtHold", "key_c", 400, 600],
   ]);
+  assert.equal(session.query("sequence.evaluate",
+    { sequenceId: "sequence_proof", timeTicks: PROOF_TICKS.transitionAB })
+    .activeViewLaneItem.localTimeTicks, 40);
+  assert.equal(session.query("sequence.evaluate",
+    { sequenceId: "sequence_proof", timeTicks: PROOF_TICKS.transitionBC })
+    .activeViewLaneItem.localTimeTicks, 60);
+  assert.deepEqual(project.temporalPrograms
+    .filter(({ id }) => id.startsWith("program_transition_"))
+    .map(({ durationTicks }) => durationTicks).sort((a, b) => a - b), [80, 120]);
+  const bodyKeyforms = project.meshKeyforms
+    .filter(({ id }) => id.startsWith("keyform_slot_body_"))
+    .map(({ id, positions }) => [id, positions]);
+  assert.equal(new Set(bodyKeyforms.map(([, positions]) => JSON.stringify(positions))).size, 3);
   for (const [tick, expectedKind, expectedId] of [
     [99, "KeyArtHold", "hold_a"],
     [100, "TransitionInstance", "view_transition_ab"],
