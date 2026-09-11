@@ -7,16 +7,17 @@ network, cloud, or AI runtime.
 
 ## Shot
 
-The one 600-tick Sequence is authored through `SequenceTimelineController`, existing Commands,
-and the ordinary owned `TemporalProgram` lifecycle.
+The one 600000-tick (5-second) Sequence is authored through `SequenceTimelineController`, existing
+Commands, and the ordinary owned `TemporalProgram` lifecycle. The Project timebase remains the
+canonical 120000 ticks per second.
 
 | Sequence ticks | ViewLane item | Source duration | Production state |
 | --- | --- | ---: | --- |
-| `[0, 100)` | Hold A | — | Open pose |
-| `[100, 200)` | Transition A/B | 80 ticks | Retimed A to forward pose |
-| `[200, 300)` | Hold B | — | Forward pose |
-| `[300, 400)` | Transition B/C | 120 ticks | Retimed B to settled pose |
-| `[400, 600]` | Hold C | — | Settled pose; terminal tick is inspectable |
+| `[0, 100000)` | Hold A | — | Open pose |
+| `[100000, 200000)` | Transition A/B | 80000 ticks | Retimed A to forward pose |
+| `[200000, 300000)` | Hold B | — | Forward pose |
+| `[300000, 400000)` | Transition B/C | 120000 ticks | Retimed B to settled pose |
+| `[400000, 600000]` | Hold C | — | Settled pose; terminal tick is inspectable |
 
 A, B, and C use distinct mesh positions, Bone poses, Warp keyforms, and form corrections. The
 internal boundaries belong to the later item. The Sequence terminal is inclusive for inspection;
@@ -28,12 +29,12 @@ There is no preset-specific evaluator, renderer behavior, track type, or persist
 
 | Clip | Existing typed tracks | Target and authored motion | Placement |
 | --- | --- | --- | --- |
-| Blink | `TransformTrack.scaleY` | Semantic slot `slot_eye`; `1 -> 0.08 -> 1` at local ticks `0, 20, 40` | The same Clip ID is placed at `[80, 220)` and `[420, 460)`; the first crosses Hold A, Transition A/B, and Hold B |
-| Breath | `TransformTrack.positionY`, `BoneTrack.rotation`, `MeshDeformationTrack.deformation` | Semantic body motion, constrained chest rotation, and ordinary deformation sample; endpoints match | One looping placement `[0, 600)` |
-| HairSway | Two `DeformerTrack.deltaX` tracks | Stable control-point IDs in nested `warp_outer -> warp_inner`; endpoints match | One looping placement `[0, 600)` |
-| Shot Accent | `TransformTrack.positionX` | Stable node target `background` | One once placement `[200, 400)` |
+| Blink | `TransformTrack.scaleY` | Semantic slot `slot_eye`; `1 -> 0.08 -> 1` at local ticks `0, 20000, 40000` | The same Clip ID is placed at `[80000, 220000)` and `[420000, 460000)`; the first crosses Hold A, Transition A/B, and Hold B |
+| Breath | `TransformTrack.positionY`, `BoneTrack.rotation`, `MeshDeformationTrack.deformation` | Semantic body motion, constrained chest rotation, and ordinary deformation sample over 120000 ticks; endpoints match | One looping placement `[0, 600000)` |
+| HairSway | Two `DeformerTrack.deltaX` tracks | Stable control-point IDs in nested `warp_outer -> warp_inner`; 100000-tick endpoints match | One looping placement `[0, 600000)` |
+| Shot Accent | `TransformTrack.positionX` | Stable node target `background` | One once placement `[200000, 400000)` |
 
-At exact periods, looping instances resolve to local phase zero. At Sequence tick 600 all ending
+At exact periods, looping instances resolve to local phase zero. At Sequence tick 600000 all ending
 instances are inactive. The authored KeyArt, BonePose, WarpDeformer, and form-correction keyforms
 are deep-compared before and after evaluation to prove playback does not mutate them.
 
@@ -66,12 +67,12 @@ unchanged.
 | Representative tick | Expected activity |
 | ---: | --- |
 | 0 | Hold A; loop phase zero |
-| 50 | Hold A; Breath Bone/form peak approaching; HairSway peak |
-| 150 | A/B midpoint maps exactly to source tick 40; cross-boundary Blink is closing/opening |
-| 250 | Hold B; node Shot Accent plus Breath and HairSway |
-| 350 | B/C midpoint maps exactly to source tick 60 |
-| 450 | Hold C; second Blink active; Breath and HairSway active; clipping uses final geometry |
-| 600 | Final C state inspectable; no ending ClipInstance is active |
+| 50000 | Hold A; Breath Bone/form peak approaching; HairSway peak |
+| 150000 | A/B midpoint maps exactly to source tick 40000; cross-boundary Blink is closing/opening |
+| 250000 | Hold B; node Shot Accent plus Breath and HairSway |
+| 350000 | B/C midpoint maps exactly to source tick 60000 |
+| 450000 | Hold C; second Blink active; Breath and HairSway active; clipping uses final geometry |
+| 600000 | Final C state inspectable; no ending ClipInstance is active |
 
 Save/Open compares stable semantic evaluation at all representative categories: Sequence start,
 both transition midpoints, Hold B, active Blink, active loop, and terminal. Undo/Redo exercises a
@@ -81,9 +82,9 @@ from serialized Project state.
 
 Preview, PNG-frame export, and MP4 source-frame export are driven by the same
 `sequence.evaluate -> EvaluatedFrame -> shared render plan` path and compared at every exported
-source tick. Export uses the existing rational frame planner at 24 fps and therefore emits ticks
-`0, 50, ... 550`; terminal tick 600 remains an inspection tick rather than an exported half-open
-frame.
+source tick. Export uses the existing rational frame planner at 24/1 fps and therefore emits 120
+frames at ticks `0, 5000, ... 595000`; terminal tick 600000 remains an inspection tick rather than
+an exported half-open frame.
 
 ## Validation boundary
 
