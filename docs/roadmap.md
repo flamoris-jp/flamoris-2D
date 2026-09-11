@@ -4,39 +4,53 @@ Status: active
 
 This roadmap is dependency-driven rather than date-driven. A phase is complete when its acceptance criteria pass.
 
-FLAMORIS 2D is optimized for producing moving-picture shots from layered or flat artwork with deterministic editing, preview, and export. It is not intended to reproduce every Live2D feature before real production use begins.
+FLAMORIS 2D is optimized for producing short deterministic moving-picture shots from layered or flat artwork. It is not intended to reproduce every Live2D feature before real production use begins.
 
 The defining workflow is now:
 
 ```text
-PSD or PNG artwork
-  -> optional part decomposition
+PSD / PNG artwork
   -> Scene / Mesh / Semantic Mapping
-  -> Key Art A -> B transition
-  -> optional Key Art C / D sequence
-  -> preview
+  -> Clipping / Warp / Bones / Skinning where needed
+  -> Key Art A -> B -> C ...
+  -> reusable AnimationClips such as Blink / Breath / HairSway
+  -> deterministic Sequence preview
   -> deterministic PNG / MP4 export
   -> MV shot
 ```
 
-MCP/AI readiness is an architectural constraint from the beginning, not a late integration task.
+MCP/AI readiness remains an architectural constraint from the beginning, not a late integration task.
 
 ## Current checkpoint
 
-Implemented and merged:
+Implemented through the current production core:
 
 - Phase 0 repository/design baseline
 - Phase 1 Editor Core + Windows Desktop shell
-- Phase 2 deterministic two-Key-Art Transition foundation and authoring
+- Phase 2 deterministic Key-Art Transition foundation and authoring
 - Phase 3 production mesh topology, Contour AutoMesh, and correspondence assistance
-- Phase 4 deterministic video export through PNG sequence and Windows MP4
+- Phase 4 deterministic PNG / Windows MP4 export
 - repository-wide architecture audit and targeted refactor after Phase 4
+- Phase 6 clipping + Warp/Lattice Deformer
+- Phase 7 Bones, FK, rigid/weighted skinning, form correction, constraints, IK, and mirror helpers
+- Phase 8 Multi-Key-Art Sequence / Clip animation architecture, authoring UI, deterministic mixer, and automated production proof
 
-Current production gate:
+Phase 5 input-simplification work remains experimental/deferred and does not block the current production pipeline.
 
-- real Windows manual QA using actual artwork/projects and real FFmpeg
+### Current production gate
 
-The sections below preserve completed work and define the next implementation order.
+The remaining gate is real packaged-Windows production QA with actual artwork/projects and a real supported FFmpeg path:
+
+- launch the packaged app
+- author or open a real multi-Key-Art shot
+- scrub/play Sequence animation
+- verify clipping / Warp / Bone / reusable Clip motion visually
+- Save, close, reopen, and continue editing
+- export PNG sequence
+- export actual H.264 MP4 through Windows Media Foundation
+- inspect output and repeatability
+
+Automated Phase 8 production proof already covers deterministic Sequence evaluation, reusable Blink/Breath/HairSway clips, Undo/Redo, Save/Open equivalence, clipping coexistence, rig/Warp coexistence, and Preview/PNG/MP4 source-frame parity.
 
 ---
 
@@ -64,20 +78,18 @@ Delivered includes:
 - Query / Command / Transaction / EditorSession
 - Undo/Redo
 - validation and migration
-- deterministic save/open and recovery
+- deterministic Save/Open and recovery
 - PSD import/re-import
-- Scene Tree, Inspector, selection and transforms
+- Scene Tree, Inspector, selection, and transforms
 - Browser/Desktop adapters
 - Windows Desktop shell and native file workflows
 - typed MCP-ready command/query schemas
 
-Remaining acceptance work is manual Windows production QA, not core implementation.
-
 ---
 
-## Phase 2 — Deterministic Multi-Key-Art Transition foundation — COMPLETE
+## Phase 2 — Deterministic Key-Art Transition foundation — COMPLETE
 
-Goal: establish the two-image workflow that differentiates FLAMORIS 2D.
+Goal: establish the multi-image transition workflow that differentiates FLAMORIS 2D.
 
 Delivered includes:
 
@@ -115,7 +127,7 @@ Delivered includes:
 - deterministic target-keyform initialization
 - ordinary editable MeshKeyform output after correspondence Apply
 
-Deferred advanced helpers remain optional future work rather than blockers:
+Deferred helpers remain optional future work rather than blockers:
 
 - brush/proportional editing
 - lasso selection
@@ -127,15 +139,15 @@ Deferred advanced helpers remain optional future work rather than blockers:
 
 ## Phase 4 — Deterministic production export — COMPLETE IMPLEMENTATION
 
-Goal: turn an authored Transition into an actual video output using the same deterministic semantics as preview.
+Goal: turn authored animation into actual output using the same deterministic semantics as preview.
 
 Delivered includes:
 
 ### 4-1 Deterministic frame render pipeline
 
 - rational FPS -> deterministic frame/tick plan
-- half-open tick-domain boundary
-- canonical Transition evaluator reuse
+- half-open export tick-domain boundary
+- canonical evaluator reuse
 - shared preview/export composition semantics
 - viewport-independent offscreen rendering
 - RGBA frame readback
@@ -168,186 +180,216 @@ Delivered includes:
 - progress/cancel/diagnostics
 - one-step temporary-frame MP4 workflow
 
-### Remaining Phase 4 gate
-
-Run real Windows production QA with:
-
-- actual FLAMORIS project/artwork
-- PNG sequence comparison against preview
-- real supported FFmpeg
-- MP4 playback
-- viewport-independence checks
-- cancellation/conflict/temp-cleanup checks
-- edit-after-export checks
+The remaining export gate is packaged-Windows manual production QA with real artwork and real FFmpeg, now tracked as part of the current production gate rather than unfinished export architecture.
 
 ---
 
-## Phase 5 — Input Simplification and PNG Part Decomposition
+## Phase 5 — Input Simplification / Part Decomposition — EXPERIMENTAL / DEFERRED
 
-Goal: reduce the effort required before authoring can begin, especially when no layered PSD exists.
+Goal: reduce setup effort when no layered PSD exists.
 
-A single flat PNG should be able to enter FLAMORIS through a lightweight deterministic path first, with AI assistance layered on later rather than becoming a mandatory dependency.
+A classical cutout experiment explored human-in-the-loop flat-image decomposition with deterministic local tools. Useful findings include:
 
-### Phase 5A — PNG Part Decomposition Light
+- Polygon Lasso as an exact final binary selection
+- FG/BG refinement where needed
+- multi-layer cutouts and masks
+- manual Patch-based hidden-region repair
+- blur/smudge cleanup
+- original-image visibility for recovering damaged or occluded details
+- lightweight `.flimg` style packaging concepts for cutout layers and order metadata
 
-Goal: turn one flat or partially transparent PNG into rough editable part candidates without AI.
+The experiment confirmed that rough perceptual sufficiency and editing speed matter more than pixel-perfect segmentation for short moving-picture clips.
 
-Initial candidates:
+This work is intentionally not a blocker for the current PSD/part-based production pipeline. Future input simplification should reuse the same principle used elsewhere in FLAMORIS:
 
-- alpha-connected-region analysis
-- contour / edge / color-region heuristics where useful
-- deterministic candidate masks/cutouts
-- merge/delete/review of proposed parts
-- rough stacking-order assistance where deterministic evidence exists
-- generated temporary names such as `part_001`
-- Apply into ordinary Scene/render-asset structures
+> helpers propose or prepare ordinary editable data; the deterministic Project model remains authoritative.
 
-Principles:
+Future candidates:
 
-- no opaque persistent decomposition model
-- no mandatory cloud service
-- deterministic inputs produce deterministic candidate output
-- decomposition preview is transient
-- accepted results become ordinary editable FLAMORIS parts
-- hidden/occluded pixels are not fabricated by the Light path
-
-Acceptance criteria:
-
-- import one PNG and produce multiple editable part candidates
-- review, reject, merge, or accept candidates
-- Apply creates normal project content usable by existing mesh/Transition tools
-- accepted results survive Save/Open
-- ordinary Project mutation/history rules remain intact
-- no AI runtime is required
-
-### Phase 5B — Input workflow polish
-
-Goal: make PSD and PNG entry equally understandable in production.
-
-Work may include:
-
-- Import PSD / Import PNG / Decompose PNG entry points
-- clear decomposition Review/Apply workflow
-- source-artwork provenance and replacement behavior
-- diagnostics for unusable segmentation candidates
-- production testing with character illustrations rather than synthetic fixtures only
+- deterministic candidate-mask generation
+- review/merge/delete candidate workflow
+- rough stacking-order assistance
+- optional AI-assisted segmentation layered on top of the deterministic review/apply path
 
 ---
 
-## Phase 6 — Clipping and group deformers
+## Phase 6 — Clipping and Group Deformer — COMPLETE
 
-Goal: support common facial occlusion and grouped organic deformation without turning FLAMORIS into a full Live2D clone.
+Goal: support facial occlusion and grouped organic deformation without turning FLAMORIS into a full Live2D clone.
 
-Work:
+Delivered includes:
 
-- source mask preservation/model
-- part-to-part clipping
-- eye clipping workflow
-- clipping-aware render pass
-- clipping visualization
-- Warp/Lattice Deformer
-- deformer child hierarchy
-- control-point editing
-- Key-Art-specific clipping/visibility state where required
+- persistent clipping bindings with stable identity
+- clipping validation and cycle protection
+- clipping authoring UI and diagnostics
+- clipping-aware shared preview/export renderer
+- final-geometry clipping resolution
+- Warp/Lattice Deformer domain model
+- 2x2 / 3x3 / 4x4 deterministic lattices
+- stable Warp control-point IDs
+- Key-Art-specific Warp keyforms
+- nested parent-first Warp semantics
+- child-lattice projection through parent Warp
+- Deformer authoring and Transition integration
+- persistence, Undo/Redo, Commands/Queries, and MCP-ready schemas
 
-Acceptance criteria:
+Acceptance achieved:
 
-- iris/pupil remain constrained inside an eye region during deformation
-- one sparse deformer can move multiple child parts
-- clipping/deformer results remain valid through a Transition and export
-
-Implementation priority may be adjusted by real-production QA findings.
+- clipped facial parts remain constrained through deformation
+- one sparse deformer can affect grouped child content
+- clipping and Warp coexist with Transition preview/export semantics
 
 ---
 
-## Phase 7 — Bones and skinning
+## Phase 7 — Bones and Skinning — COMPLETE
 
-Goal: make limbs and large pose changes practical when mesh/deformer editing alone becomes inefficient.
+Goal: make limbs and large pose changes practical when mesh/deformer editing alone is inefficient.
 
-### 7A — FK proof
+Delivered includes:
 
-- Bone hierarchy
-- Edit vs Pose mode
-- origin/pivot and parent-child transforms
-- rigid part attachment
+### Bone / FK foundation
 
-### 7B — Weighted skinning
+- persistent Bone and BonePoseKeyform
+- Scene-owned Bone hierarchy
+- deterministic parent-first FK
+- post-Warp projected Bone frames
+- Bone Edit / Pose authoring
+- rigid Bone attachment
 
-- per-vertex bone weights
-- multiple influences
-- normalization
-- weight visualization/editing
+### Weighted skinning and correction
 
-### 7C — Convenience
+- persistent SkinBinding
+- stable-vertex-ID weights
+- one-to-four normalized influences
+- weight authoring and visualization
+- deterministic linear blend skinning
+- MeshFormCorrectionKeyform
+- direct correction after skeletal deformation
+
+### Constraints and helpers
 
 - rotation constraints
-- simple 2-bone IK
-- mirror rig helpers
+- authoring-only analytic two-bone IK
+- mirror helpers
+- exact Undo/Redo and persistence
 
-Acceptance criteria:
-
-- pose shoulder / upper arm / forearm efficiently
-- elbow bends acceptably under weights
-- direct mesh/form correction remains possible after skeletal deformation
-- Key Arts may use different bone poses while preserving compatible semantic identity
+Canonical evaluation keeps Warp before projected Bone frames, constraints before FK, skin/rigid deformation before form correction, and clipping after final deformation.
 
 ---
 
-## Phase 8 — Multi-Key-Art Animation and Clip Sequencing
+## Phase 8 — Multi-Key-Art Animation and Clip Sequencing — COMPLETE IMPLEMENTATION / AUTOMATED PROOF
 
 Goal: move from isolated A -> B Transitions to reusable short MV shots.
 
-This phase reuses the existing TemporalProgram/timebase/evaluator architecture instead of inventing a second timeline model.
+The normative contracts are defined in [`phase8-animation-sequencing.md`](phase8-animation-sequencing.md), with the production proof recorded in [`phase8-production-proof.md`](phase8-production-proof.md).
 
-The normative Sequence ownership, ViewLane/ClipInstance boundary, mixer, and
-evaluation-stage contracts are defined in
-[`phase8-animation-sequencing.md`](phase8-animation-sequencing.md).
+Delivered includes:
 
-Work:
+### 8-1 Sequence / ViewLane foundation
 
-- chain `A -> B -> C -> D` Key Arts
-- persistent Clip / ClipInstance model where justified
-- deterministic Transition/Clip mixer
-- Key Art strip / sequence UI
-- reusable motion clips such as Blink / Breath / HairSway / HeadTilt
-- tracks for node/group transforms, bones, deformers, mesh/form states
-- loop behavior
-- ease presets compiled to existing Bezier data
-- graph editor only after track semantics stabilize
-- draw-order events where required
+- persistent `Sequence`
+- one owned `TemporalProgram` per Sequence
+- strict contiguous ViewLane coverage
+- KeyArtHold / TransitionInstance
+- deterministic boundary ownership
+- exact rational Transition retiming
 
-Acceptance criteria:
+### 8-2 AnimationClip / ClipInstance foundation
 
-- build at least three reusable short animation clips
-- combine ordinary rig motion with Key-Art transition motion
-- chain at least three Key Arts in one shot
-- scrub/play deterministically
-- export the resulting shot through the existing deterministic output path
+- reusable `AnimationClip`
+- owned clip TemporalPrograms
+- persistent `ClipInstance`
+- once / loop semantics
+- exact local-time projection
+- source offset / rational playback rate / weight / layer
+
+### 8-3 General typed animation tracks
+
+- TransformTrack
+- BoneTrack
+- DeformerTrack
+- MeshDeformationTrack
+- CameraTrack
+- opacity and discrete intent tracks
+- stable target identity and owner-aware validation
+
+### 8-4 Deterministic mixer
+
+- canonical contribution ordering
+- Transition/KeyArt semantic base + Clip overlays
+- Deformer before Warp
+- Bone mix before constraints/FK/skin
+- form correction before MeshDeformationTrack
+- Transform stage after rig geometry
+- final clipping and Sequence camera
+- renderer remains Sequence/Clip unaware
+
+### 8-5 Timeline authoring UX
+
+- Sequence selection/lifecycle
+- Key Art strip / ViewLane editing
+- scrub/playback/time display
+- Clip library and ClipInstance placement/editing
+- owner-aware track/keyframe editing
+- transient Clip-local authoring tick
+- one gesture = one history unit
+- drag cancel/no-op history protection
+
+### 8-6 Motion polish and production proof
+
+- Ease In / Ease Out / Ease In Out convenience compiled to explicit Bezier control points
+- reusable Blink / Breath / HairSway authored as ordinary typed AnimationClips
+- at least three distinct Key Arts in one Sequence
+- Transition retiming across A -> B -> C
+- node Transform + Warp + Bone + rigid/skin/form-correction coexistence
+- final-geometry clipping coexistence
+- deterministic looping and Clip reuse
+- Undo/Redo production regression coverage
+- Save/Open semantic equivalence
+- Preview / PNG / MP4 source-frame parity
+- realistic 5-second proof at 24 fps using the canonical 120000 ticks/sec timebase
+- automated Product and Windows packaging validation
+
+Phase 8 implementation is considered complete. The remaining manual packaged-Windows validation belongs to the current production gate and Phase 9 robustness work, not to a missing animation architecture feature.
+
+Deferred beyond Phase 8:
+
+- full graph editor
+- nested AnimationClips
+- reusable Camera clips
+- runtime IK
+- physics/procedural secondary motion
+- audio/NLE workflow
 
 ---
 
-## Phase 9 — Production robustness / Beta
+## Phase 9 — Production Robustness / Beta — NEXT
 
 Goal: turn the feature-complete core into a dependable internal MV production tool.
 
-Work:
+Primary work:
 
-- end-to-end Windows QA and regression closure
-- real large PSD / multi-Key-Art profiling
+- end-to-end packaged Windows QA and regression closure
+- real FLAMORIS PSD / multi-Key-Art project validation
+- actual Windows Media Foundation MP4 encoding and playback
+- large-project and multi-Key-Art profiling
 - missing-source and decode diagnostics
 - migration/recovery stress testing
-- export stress/cancellation cleanup testing
+- export stress/cancellation/temp-cleanup testing
 - render/performance profiling
-- production presets where justified
+- production presets only where real workflow evidence justifies them
 - dependency lockfile/provenance maintenance
 - public repository readiness where desired
 
 Acceptance criteria:
 
-- create an approximately 8-second multi-Key-Art Akino shot
+- create an approximately 8-second multi-Key-Art Akino shot using real artwork
+- use reusable animation clips in that shot
 - save, close, reopen, edit, preview, and export successfully
+- produce real PNG and H.264 MP4 output on Windows
 - repeated export from identical project state is deterministic
 - failures are actionable rather than silent
+- no production blocker remains from the Phase 1-8 architecture
 
 ### Production Beta checkpoint
 
@@ -355,61 +397,32 @@ At the end of Phase 9, FLAMORIS 2D is a focused internal production tool rather 
 
 ---
 
-## Phase 10 — AI-Assisted Part Decomposition and Authoring
+## Phase 10 — AI-Assisted Input and Authoring
 
 Goal: use AI to reduce setup work without hiding or replacing the deterministic editor model.
 
-### 10A — AI PNG Part Decomposition
-
-Build on the Phase 5 Light workflow rather than replacing it.
-
 Candidate capabilities:
 
-- semantic segmentation
-- improved alpha matting
-- character-part proposals such as hair / face / eye / mouth / clothing regions
-- semantic label suggestions
-- occlusion-aware hidden-part completion/inpainting as optional proposed artwork
+- semantic part proposals for flat images
+- improved mask/matting suggestions
+- hidden-part completion as optional proposed artwork
 - stacking-order suggestions
-- confidence / ambiguity metadata
-- side-by-side review before Apply
-
-Principles:
-
-- AI proposes; deterministic commands commit
-- accepted output becomes normal Scene/render assets/masks
-- model-private latent state is not required for future editing
-- low-confidence or ambiguous proposals must remain reviewable
-- AI failure must not prevent use of the Light path
-
-Acceptance criteria:
-
-- one flat character image can receive useful semantic part proposals
-- proposed masks/cutouts can be edited or rejected before Apply
-- optional hidden-part completion is clearly distinguished from observed source pixels
-- accepted results behave as ordinary FLAMORIS project data
-
-### 10B — AI correspondence / rig assistance / MCP workflow
-
-MCP/AI work:
-
-- production MCP server/adapter over existing typed commands/queries
-- transactional bulk edits and dry-run previews
-- semantic part mapping suggestions across Key Arts
-- Transition mode suggestions
+- semantic-label suggestions
 - correspondence anchor/vertex suggestions
-- optical-flow-assisted initialization where useful
-- auto clipping/group/pivot suggestions
+- Transition mode suggestions
+- clipping/group/pivot suggestions
 - optional rigging assistance
-- confidence and structured change summaries
+- transactional dry-run previews and structured change summaries
 
 Principle:
 
 > AI proposes; deterministic commands commit.
 
+Accepted output must become ordinary editable FLAMORIS Project data. Model-private latent state must never become required persistent authority.
+
 ---
 
-## Phase 11 — Bridges and advanced production features
+## Phase 11 — Bridges and Advanced Production Features
 
 Candidates:
 
@@ -437,20 +450,21 @@ Acceptance criteria should be defined per feature before implementation.
 - mandatory cloud/AI services
 - DAW/NLE replacement features
 
-Audio analysis/lip-sync may later integrate with FLAMORIS production workflows, but should reuse the established deterministic command/timeline boundaries rather than drive the core architecture prematurely.
+Audio analysis/lip-sync may later integrate with FLAMORIS production workflows, but should reuse the established deterministic command/timeline boundaries rather than drive core architecture prematurely.
 
 ---
 
 ## Near-term execution order
 
-1. Complete Windows manual QA for the current Phase 1-4 Product.
-2. Fix blocker/major production defects found by QA as focused Issues.
-3. Design and implement Phase 5A PNG Part Decomposition Light.
-4. Use real PNG/PSD clip production to decide which clipping/deformer/bone capabilities are actually needed first.
-5. Design Phase 8 Multi-Key-Art sequencing with production evidence from real authored clips.
-6. Add AI PNG decomposition only after the deterministic Light review/apply contract is stable.
+1. Complete packaged Windows manual QA for the Phase 8 production pipeline.
+2. Fix any blocker/major defects found by QA as focused Issues and small single-purpose commits.
+3. Close Phase 8 once real launch, Save/Open, PNG, and actual MP4 output are verified.
+4. Begin Phase 9 using a real approximately 8-second FLAMORIS/Akino shot as the production acceptance project.
+5. Profile and harden only the bottlenecks exposed by real production.
+6. Revisit input simplification / part decomposition after the main production loop is dependable.
+7. Add AI assistance only where it can propose ordinary deterministic edits without becoming persistent authority.
 
-This order deliberately favors easier source input and actual MV production over implementing every traditional rigging feature in advance.
+This order deliberately favors producing real MV shots and hardening the existing architecture over adding broad new feature families.
 
 ---
 
@@ -479,4 +493,4 @@ For each capability:
 6. merge only when acceptance criteria pass,
 7. tag meaningful checkpoints.
 
-Suggested checkpoints should be revised when the next public/internal release strategy is chosen; phase numbers should describe actual implemented order rather than preserve obsolete numbering for appearance alone.
+Large implementation work should be committed in resumable logical slices such as foundation / domain / evaluator / command / UI / tests / fixes. Phase numbers should describe actual architectural checkpoints rather than preserve an obsolete implementation order for appearance alone.
