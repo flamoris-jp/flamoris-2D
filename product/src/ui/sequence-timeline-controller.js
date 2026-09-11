@@ -16,6 +16,7 @@ import {
   projectTimelineItems,
   projectTimelineTime,
 } from "./timeline-primitives.js";
+import { compileEasePreset } from "./ease-presets.js";
 
 function defaultIdFactory() {
   let sequence = 0;
@@ -1027,6 +1028,16 @@ export class SequenceTimelineController {
     return this.updateKeyframe(trackId, channel, keyframeId, {
       interpolationToNext: interpolation(kind, controls),
     }, "Set keyframe interpolation");
+  }
+
+  applyEasePreset(trackId, channel, keyframeId, presetId) {
+    const track = this.activeProgram()?.tracks.find((entry) => entry.trackId === trackId);
+    const definition = track ? temporalChannelDefinition(track.kind, channel) : null;
+    if (!definition) throw new Error(`Unknown typed channel ${channel}.`);
+    if (definition.discrete) throw new Error("Ease presets apply only to continuous channels.");
+    return this.updateKeyframe(trackId, channel, keyframeId, {
+      interpolationToNext: compileEasePreset(presetId),
+    }, "Apply ease preset");
   }
 
   removeKeyframe(trackId, channel, keyframeId) {
