@@ -1,4 +1,5 @@
 import { temporalChannelDefinition } from "../core/temporal.js";
+import { listEasePresets } from "./ease-presets.js";
 
 function option(value, label) {
   const element = document.createElement("option");
@@ -268,6 +269,12 @@ export function createSequenceTimelineView({
     elements.sequenceKeyframeBezierControls.hidden =
       elements.sequenceKeyframeInterpolationSelect.value !== "bezier";
   });
+  elements.applySequenceEasePresetButton.addEventListener("click", () => act(() => {
+    const selection = controller()?.getState().selectedKeyframe;
+    if (!selection) throw new Error("Select a keyframe first.");
+    return controller().applyEasePreset(selection.trackId, selection.channel,
+      selection.keyframeId, elements.sequenceEasePresetSelect.value);
+  }, "Ease preset をexplicit Bezierへ適用しました"));
   elements.sequenceKeyframeTickInput.addEventListener("change", () => {
     const timelineState = controller()?.getState();
     if (!timelineState?.selectedKeyframe) {
@@ -499,6 +506,10 @@ export function createSequenceTimelineView({
     }
     const definition = track && currentChannel
       ? temporalChannelDefinition(track.kind, currentChannel) : null;
+    replaceOptions(elements.sequenceEasePresetSelect,
+      listEasePresets().map((preset) => option(preset.id,
+        `${preset.label} · ${preset.bezier.x1}, ${preset.bezier.y1}, ${preset.bezier.x2}, ${preset.bezier.y2}`)),
+      elements.sequenceEasePresetSelect.value || "ease-in-out");
     if (definition?.discrete) elements.sequenceKeyframeInterpolationSelect.value = "step";
     for (const entry of elements.sequenceKeyframeInterpolationSelect.options) {
       entry.disabled = Boolean(definition?.discrete && entry.value !== "step");
@@ -508,6 +519,8 @@ export function createSequenceTimelineView({
     elements.addSequenceKeyframeButton.disabled = !definition;
     elements.updateSequenceKeyframeButton.disabled = !selected;
     elements.removeSequenceKeyframeButton.disabled = !selected;
+    elements.sequenceEasePresetSelect.disabled = !selected || Boolean(definition?.discrete);
+    elements.applySequenceEasePresetButton.disabled = !selected || Boolean(definition?.discrete);
   }
 
   function render() {
