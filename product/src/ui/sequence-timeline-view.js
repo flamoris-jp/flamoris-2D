@@ -82,8 +82,33 @@ export function createSequenceTimelineView({
   setStatus,
   onSequencePreview = null,
 }) {
+  const programTicks = new Map();
+
   function controller() {
     return state.editor?.sequenceTimeline || null;
+  }
+
+  function programOwnerKey(timelineState) {
+    const owner = timelineState?.ownerContext;
+    return owner ? `${owner.kind}:${owner.id}` : null;
+  }
+
+  function programAuthoringTick(timelineState) {
+    const program = timelineState?.program;
+    if (!program) return 0;
+    const ownerKey = programOwnerKey(timelineState);
+    const stored = ownerKey ? programTicks.get(ownerKey) : null;
+    const fallback = timelineState.ownerContext?.kind === "Sequence"
+      ? timelineState.currentTick : 0;
+    const tick = Number.isSafeInteger(stored) ? stored : fallback;
+    return Math.min(program.durationTicks, Math.max(0, tick));
+  }
+
+  function rememberProgramTick(timelineState, timeTicks) {
+    const program = timelineState?.program;
+    const ownerKey = programOwnerKey(timelineState);
+    if (!program || !ownerKey || !Number.isSafeInteger(timeTicks)) return;
+    programTicks.set(ownerKey, Math.min(program.durationTicks, Math.max(0, timeTicks)));
   }
 
   function act(action, success = null) {
@@ -241,6 +266,12 @@ export function createSequenceTimelineView({
     elements.sequenceKeyframeBezierControls.hidden =
       elements.sequenceKeyframeInterpolationSelect.value !== "bezier";
   });
+  elements.sequenceKeyframeTickInput.addEventListener("change", () => {
+    const timelineState = controller()?.getState();
+    if (!timelineState?.selectedKeyframe) {
+      rememberProgramTick(timelineState, Number(elements.sequenceKeyframeTickInput.value));
+    }
+  });
 
   function keyframeDraft(timelineState) {
     const track = timelineState.selectedTrack;
@@ -266,13 +297,14 @@ export function createSequenceTimelineView({
   elements.addSequenceKeyframeButton.addEventListener("click", () => act(() => {
     const timelineState = controller()?.getState();
     const draft = keyframeDraft(timelineState);
+    rememberProgramTick(timelineState, draft.timeTicks);
     return controller().addKeyframe(draft.track.trackId, draft.channel, {
-      timeTicks: timelineState.currentTick,
+      timeTicks: draft.timeTicks,
       value: draft.value,
       interpolationKind: draft.interpolationKind,
       bezier: draft.bezier,
     });
-  }, "playhead に typed keyframe を追加しました"));
+  }, "program tick に typed keyframe を追加しました"));
   elements.updateSequenceKeyframeButton.addEventListener("click", () => act(() => {
     const timelineState = controller()?.getState();
     const selection = timelineState?.selectedKeyframe;
@@ -358,6 +390,7 @@ export function createSequenceTimelineView({
       const startX = event.clientX;
       const originalStart = instance.startTicks;
       const duration = instance.endTicks - instance.startTicks;
+      let commitPreview = false;
       pointerDrag({
         onMove(moveEvent) {
           const bounds = elements.sequenceClipLane.getBoundingClientRect();
@@ -365,11 +398,21 @@ export function createSequenceTimelineView({
             timelineState.sequence.durationTicks);
           const startTicks = Math.min(timelineState.sequence.durationTicks - duration,
             Math.max(0, originalStart + delta));
-          act(() => controller().previewClipInstance(instance.id,
-            { startTicks, endTicks: startTicks + duration }));
+          const accepted = act(() => {
+            controller().previewClipInstance(instance.id,
+              { startTicks, endTicks: startTicks + duration });
+            return true;
+          });
+          commitPreview = accepted === true && startTicks !== originalStart;
         },
-        onCommit() { act(() => controller().commitClipInstance(instance.id), "ClipInstance move を確定しました"); },
-        onCancel() { act(() => controller().selectClipInstance(instance.id)); },
+        onCommit() {
+          if (!commitPreview) {
+            act(() => controller().cancelClipPreview(instance.id));
+            return;
+          }
+          act(() => controller().commitClipInstance(instance.id), "ClipInstance move を確定しました");
+        },
+        onCancel() { act(() => controller().cancelClipPreview(instance.id)); },
       });
     });
     return button;
@@ -388,14 +431,25 @@ export function createSequenceTimelineView({
       controller().selectKeyframe(track.trackId, channel, keyframe.id)));
     button.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
+      let commitPreview = false;
       pointerDrag({
         onMove(moveEvent) {
-          act(() => controller().previewKeyframeTime(track.trackId, channel, keyframe.id,
-            tickFromPointer(moveEvent, elements.sequenceKeyframeLane,
-              timelineState.program.durationTicks)));
+          const timeTicks = tickFromPointer(moveEvent, elements.sequenceKeyframeLane,
+            timelineState.program.durationTicks);
+          const accepted = act(() => {
+            controller().previewKeyframeTime(track.trackId, channel, keyframe.id, timeTicks);
+            return true;
+          });
+          commitPreview = accepted === true && timeTicks !== keyframe.timeTicks;
         },
-        onCommit() { act(() => controller().commitKeyframePreview(), "Keyframe move を確定しました"); },
-        onCancel() { act(() => controller().selectKeyframe(track.trackId, channel, keyframe.id)); },
+        onCommit() {
+          if (!commitPreview) {
+            act(() => controller().cancelKeyframePreview());
+            return;
+          }
+          act(() => controller().commitKeyframePreview(), "Keyframe move を確定しました");
+        },
+        onCancel() { act(() => controller().cancelKeyframePreview()); },
       });
     });
     return button;
@@ -438,7 +492,7 @@ export function createSequenceTimelineView({
         }
       }
     } else {
-      setValueUnlessEditing(elements.sequenceKeyframeTickInput, timelineState?.currentTick || 0);
+      setValueUnlessEditing(elements.sequenceKeyframeTickInput, programAuthoringTick(timelineState));
       setValueUnlessEditing(elements.sequenceKeyframeValueInput, "");
     }
     const definition = track && currentChannel
