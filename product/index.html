@@ -540,6 +540,105 @@
           </section>
         </aside>
       </section>
+      <details id="sequenceTimelinePanel" class="sequence-timeline-panel" open>
+        <summary><strong>Sequence Timeline</strong><span id="sequenceTimelineContext">No active owner</span></summary>
+        <div class="sequence-timeline-toolbar">
+          <label>Sequence<select id="sequenceSelect"><option value="">— Select Sequence —</option></select></label>
+          <button id="createSequenceButton" type="button">New Sequence</button>
+          <label>Name<input id="sequenceNameInput" type="text" autocomplete="off" /></label>
+          <button id="renameSequenceButton" type="button" class="secondary">Rename</button>
+          <label>Duration ticks<input id="sequenceDurationTicksInput" type="number" min="1" step="1" /></label>
+          <button id="removeSequenceButton" type="button" class="secondary">Remove</button>
+        </div>
+        <div class="sequence-playback-toolbar">
+          <button id="sequenceStartButton" type="button" class="secondary">|◀</button>
+          <button id="sequencePlayButton" type="button">▶ Play</button>
+          <button id="sequencePauseButton" type="button" class="secondary">Pause</button>
+          <button id="sequenceEndButton" type="button" class="secondary">▶|</button>
+          <label>Preview<select id="sequencePlaybackModeSelect"><option value="once">Once</option><option value="loop">Loop</option></select></label>
+          <label>Display<select id="sequenceDisplayUnitSelect"><option value="ticks">Ticks</option><option value="seconds">Seconds</option><option value="frames">Frames</option></select></label>
+          <input id="sequencePlayheadInput" type="range" min="0" max="0" step="1" value="0" aria-label="Sequence playhead" />
+          <input id="sequenceTickInput" type="number" min="0" max="0" step="1" value="0" aria-label="Sequence tick" />
+          <output id="sequenceTimeOutput">0 ticks</output>
+        </div>
+        <div class="sequence-timeline-workspace">
+          <section class="sequence-lanes" aria-label="Sequence lanes">
+            <div class="sequence-lane-heading"><strong>ViewLane</strong><span>strict contiguous coverage</span></div>
+            <div id="sequenceViewLane" class="sequence-lane view-lane" aria-label="Key Art Strip"></div>
+            <div class="sequence-lane-tools">
+              <label>Key Art<select id="sequenceHoldKeyArtSelect"></select></label>
+              <label>Start<input id="sequenceViewStartInput" type="number" min="0" step="1" /></label>
+              <label>End<input id="sequenceViewEndInput" type="number" min="1" step="1" /></label>
+              <button id="insertSequenceHoldButton" type="button">Insert Hold</button>
+              <label>Transition<select id="sequenceTransitionSelect"></select></label>
+              <button id="insertSequenceTransitionButton" type="button">Insert Transition</button>
+              <button id="updateSequenceViewItemButton" type="button" class="secondary">Apply item</button>
+              <button id="moveSequenceViewEarlierButton" type="button" class="secondary">Move earlier</button>
+              <button id="moveSequenceViewLaterButton" type="button" class="secondary">Move later</button>
+              <button id="removeSequenceViewItemButton" type="button" class="secondary">Remove item</button>
+            </div>
+            <div class="sequence-lane-heading"><strong>Clip instances</strong><span>drag clip here · drag instance to move</span></div>
+            <div id="sequenceClipLane" class="sequence-lane clip-lane" aria-label="AnimationClip instances"></div>
+            <div class="sequence-lane-heading"><strong>Selected track / channel</strong><span>drag keyframe · commit on release</span></div>
+            <div id="sequenceKeyframeLane" class="sequence-lane keyframe-lane" aria-label="Typed keyframes"></div>
+          </section>
+
+          <aside class="sequence-timeline-inspector">
+            <fieldset>
+              <legend>Clip Library</legend>
+              <label>Clips<select id="animationClipSelect"><option value="">— Select clip —</option></select></label>
+              <div id="animationClipLibrary" class="clip-library" aria-label="Draggable AnimationClips"></div>
+              <label>Name<input id="animationClipNameInput" type="text" autocomplete="off" /></label>
+              <label>Duration ticks<input id="animationClipDurationInput" type="number" min="1" step="1" value="120000" /></label>
+              <label>Default loop<select id="animationClipDefaultLoopSelect"><option value="once">once</option><option value="loop">loop</option></select></label>
+              <div class="sequence-button-row"><button id="createAnimationClipButton" type="button">New</button><button id="updateAnimationClipButton" type="button" class="secondary">Update</button><button id="removeAnimationClipButton" type="button" class="secondary">Remove</button></div>
+              <button id="addClipInstanceButton" type="button">Add selected clip at playhead</button>
+            </fieldset>
+            <fieldset>
+              <legend>ClipInstance</legend>
+              <div class="sequence-field-grid">
+                <label>Start<input id="clipInstanceStartInput" type="number" min="0" step="1" /></label>
+                <label>End<input id="clipInstanceEndInput" type="number" min="1" step="1" /></label>
+                <label>Source offset<input id="clipInstanceOffsetInput" type="number" min="0" step="1" /></label>
+                <label>Loop<select id="clipInstanceLoopSelect"><option value="once">once</option><option value="loop">loop</option></select></label>
+                <label>Rate numerator<input id="clipInstanceRateNumeratorInput" type="number" min="1" step="1" /></label>
+                <label>Rate denominator<input id="clipInstanceRateDenominatorInput" type="number" min="1" step="1" /></label>
+                <label>Weight<input id="clipInstanceWeightInput" type="number" min="0" max="1" step="0.01" /></label>
+                <label>Layer<input id="clipInstanceLayerInput" type="number" step="1" /></label>
+              </div>
+              <label class="sequence-checkbox"><input id="clipInstanceEnabledInput" type="checkbox" /> Enabled</label>
+              <div class="sequence-button-row"><button id="updateClipInstanceButton" type="button">Apply</button><button id="removeClipInstanceButton" type="button" class="secondary">Remove</button></div>
+            </fieldset>
+            <fieldset>
+              <legend>Selected Program</legend>
+              <output id="sequenceProgramContext">No owner selected</output>
+              <div class="sequence-button-row"><button id="editSequenceProgramButton" type="button" class="secondary">Sequence camera</button><button id="editClipProgramButton" type="button" class="secondary">Selected clip</button></div>
+              <label>Track<select id="sequenceTrackSelect"><option value="">— Select track —</option></select></label>
+              <div class="sequence-field-grid">
+                <label>Kind<select id="sequenceTrackKindSelect"></select></label>
+                <label>Stable target<select id="sequenceTrackTargetSelect"></select></label>
+              </div>
+              <div class="sequence-button-row"><button id="addSequenceTrackButton" type="button">Add track</button><button id="removeSequenceTrackButton" type="button" class="secondary">Remove track</button></div>
+              <label>Channel<select id="sequenceChannelSelect"></select></label>
+              <label>Keyframe<select id="sequenceKeyframeSelect"><option value="">— Select keyframe —</option></select></label>
+              <label>Tick<input id="sequenceKeyframeTickInput" type="number" min="0" step="1" /></label>
+              <label>Value<input id="sequenceKeyframeValueInput" type="text" autocomplete="off" /></label>
+              <label>Interpolation<select id="sequenceKeyframeInterpolationSelect"><option value="step">step</option><option value="linear">linear</option><option value="bezier">bezier</option></select></label>
+              <div id="sequenceKeyframeBezierControls" class="sequence-field-grid" hidden>
+                <label>x1<input id="sequenceBezierX1Input" type="number" min="0" max="1" step="0.05" value="0.25" /></label>
+                <label>y1<input id="sequenceBezierY1Input" type="number" step="0.05" value="0.1" /></label>
+                <label>x2<input id="sequenceBezierX2Input" type="number" min="0" max="1" step="0.05" value="0.75" /></label>
+                <label>y2<input id="sequenceBezierY2Input" type="number" step="0.05" value="0.9" /></label>
+              </div>
+              <div class="sequence-button-row"><button id="addSequenceKeyframeButton" type="button">Add at playhead</button><button id="updateSequenceKeyframeButton" type="button">Update</button><button id="removeSequenceKeyframeButton" type="button" class="secondary">Remove</button></div>
+            </fieldset>
+            <fieldset>
+              <legend>Diagnostics</legend>
+              <ul id="sequenceDiagnosticsList" class="sequence-diagnostics"><li>Select a Sequence</li></ul>
+            </fieldset>
+          </aside>
+        </div>
+      </details>
     </main>
     <input id="projectOpenInput" type="file" accept=".fl2d,application/x-flamoris-2d+json" hidden />
     <input id="reimportPsdInput" type="file" accept=".psd,image/vnd.adobe.photoshop" hidden />

@@ -501,6 +501,28 @@ export class SequenceTimelineController {
       : entry), "Change ViewLane reference");
   }
 
+  updateViewItem(itemId, { startTicks, endTicks, referenceId }) {
+    const sequence = this.activeSequence();
+    const items = canonicalViewItems(sequence?.viewLaneItems || []);
+    const index = items.findIndex((entry) => entry.id === itemId);
+    if (index < 0) throw new Error(`Unknown ViewLane item ${itemId}.`);
+    if (index === 0 && startTicks !== 0) throw new Error("The first ViewLane item must start at tick 0.");
+    if (index === items.length - 1 && endTicks !== sequence.durationTicks) {
+      throw new Error("The last ViewLane item must end at the Sequence duration.");
+    }
+    const item = items[index];
+    if (item.kind === VIEW_LANE_ITEM_KINDS.KEY_ART_HOLD) {
+      this.session.query("keyart.get", { keyArtId: referenceId });
+      items[index] = { ...item, keyArtId: referenceId, startTicks, endTicks };
+    } else {
+      this.session.query("transition.get", { transitionId: referenceId });
+      items[index] = { ...item, transitionId: referenceId, startTicks, endTicks };
+    }
+    if (index > 0) items[index - 1] = { ...items[index - 1], endTicks: startTicks };
+    if (index < items.length - 1) items[index + 1] = { ...items[index + 1], startTicks: endTicks };
+    return this.commitViewItems(items, "Update ViewLane item");
+  }
+
   previewViewBoundary(leftItemId, rightItemId, boundaryTick) {
     const sequence = this.activeSequence();
     const left = sequence?.viewLaneItems.find((entry) => entry.id === leftItemId);
@@ -650,14 +672,21 @@ export class SequenceTimelineController {
     });
   }
 
-  updateClip(patch) {
+  updateClip(patch, { durationTicks = null } = {}) {
     return this.mutate(() => {
       const clip = this.selectedClip();
       if (!clip) throw new Error("Select an AnimationClip first.");
-      return this.session.execute({
+      const commands = [{
         type: "animation.clip.update",
         payload: { clipId: clip.id, clip: { ...persistentOwner(clip), ...cloneProject(patch) } },
-      }, { label: "Update AnimationClip" });
+      }];
+      if (durationTicks !== null && durationTicks !== clip.durationTicks) {
+        commands.push({
+          type: "animation.temporal.set_duration",
+          payload: { programId: clip.temporalProgramId, durationTicks },
+        });
+      }
+      return this.session.executeTransaction(commands, { label: "Update AnimationClip" });
     });
   }
 

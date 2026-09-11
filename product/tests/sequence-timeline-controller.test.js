@@ -158,6 +158,8 @@ test("Sequence scrub delegates to sequence.evaluate without persistence and insp
   assert.equal(timeline.getState().evaluation.activeViewLaneItem.keyArtId, "key_b");
   timeline.scrubToTick(300);
   assert.equal(timeline.getState().evaluation.activeViewLaneItem.id, "view_1");
+  assert.deepEqual(timeline.getState().evaluation,
+    originalQuery("sequence.evaluate", { sequenceId: "sequence", timeTicks: 300 }));
   assert.deepEqual(ticks, [100, 200, 300]);
   assert.deepEqual(session.project, before);
   assert.equal(session.history.length, history);
