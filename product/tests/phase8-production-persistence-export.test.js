@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { EditorSession } from "../src/commands/editor.js";
+import { planSequenceExportFrames } from "../src/core/export-frame-evaluator.js";
 import { ExportFrameRenderer } from "../src/core/export-frame-renderer.js";
 import { FrameSequenceExportJob } from "../src/core/frame-sequence-export.js";
 import { encodeRgba8Png } from "../src/core/png-frame-encoder.js";
@@ -11,11 +12,11 @@ import { renderEvaluatedViewport } from "../src/ui/viewport-renderer.js";
 import {
   PROOF_TICKS,
   buildPhase8ProductionProof,
+  proofTicks,
   semanticSnapshot,
 } from "./helpers/phase8-production-proof.js";
 
-const FRAME_RATE = Object.freeze({ numerator: 2400, denominator: 1 });
-const EXPORT_TICKS = Object.freeze([0, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550]);
+const FRAME_RATE = Object.freeze({ numerator: 24, denominator: 1 });
 
 function assertOneHistoryEdit(session, timeline, edit) {
   const before = structuredClone(session.project);
@@ -100,28 +101,30 @@ test("production ViewLane, ClipInstance move/resize, track, key, and ease edits 
   const { session, timeline } = buildPhase8ProductionProof();
   const original = structuredClone(session.project);
   const undoDepth = session.undoStack.length;
-  timeline.previewViewBoundary("hold_a", "view_transition_ab", 90);
+  timeline.previewViewBoundary("hold_a", "view_transition_ab", proofTicks(90));
   assert.deepEqual(session.project, original);
   assert.equal(session.undoStack.length, undoDepth);
   assertOneHistoryEdit(session, timeline, () => timeline.commitViewBoundary());
   assert.equal(session.query("sequence.evaluate",
-    { sequenceId: "sequence_proof", timeTicks: 95 }).activeViewLaneItem.kind,
+    { sequenceId: "sequence_proof", timeTicks: proofTicks(95) }).activeViewLaneItem.kind,
   "TransitionInstance");
 
   const beforeMove = structuredClone(session.project);
   const beforeMoveDepth = session.undoStack.length;
-  timeline.previewClipInstance("background_accent", { startTicks: 210, endTicks: 410 });
+  timeline.previewClipInstance("background_accent", {
+    startTicks: proofTicks(210), endTicks: proofTicks(410),
+  });
   assert.deepEqual(session.project, beforeMove);
   assert.equal(session.undoStack.length, beforeMoveDepth);
   assertOneHistoryEdit(session, timeline, () => timeline.commitClipInstance("background_accent"));
   assertOneHistoryEdit(session, timeline, () => timeline.commitClipInstance(
-    "background_accent", { endTicks: 390 }, "Resize ClipInstance"));
+    "background_accent", { endTicks: proofTicks(390) }, "Resize ClipInstance"));
 
   timeline.selectClip("clip_node_motion", { editProgram: true });
   assertOneHistoryEdit(session, timeline, () => timeline.addTrack("OpacityTrack",
     { nodeId: "background" }, { trackId: "accent_opacity" }));
   assertOneHistoryEdit(session, timeline, () => timeline.addKeyframe("accent_opacity", "opacity", {
-    keyframeId: "accent_opacity_key", timeTicks: 50, value: 0.8,
+    keyframeId: "accent_opacity_key", timeTicks: proofTicks(50), value: 0.8,
   }));
   assertOneHistoryEdit(session, timeline, () => timeline.updateKeyframe(
     "accent_opacity", "opacity", "accent_opacity_key", { value: 0.7 }));
@@ -138,10 +141,12 @@ test("scrub and drag preview remain transient in the production project", () => 
   const history = session.history.length;
   const undoDepth = session.undoStack.length;
   timeline.scrubToTick(PROOF_TICKS.transitionAB);
-  timeline.previewClipInstance("blink_hold_c", { startTicks: 430, endTicks: 470 });
+  timeline.previewClipInstance("blink_hold_c", {
+    startTicks: proofTicks(430), endTicks: proofTicks(470),
+  });
   assert.equal(timeline.getState().currentTick, PROOF_TICKS.transitionAB);
   assert.equal(timeline.getState().clipInstances.find(({ id }) => id === "blink_hold_c").startTicks,
-    430);
+    proofTicks(430));
   timeline.cancelClipPreview("blink_hold_c");
   assert.deepEqual(session.project, before);
   assert.equal(session.history.length, history);
@@ -166,9 +171,24 @@ test("Save/Open preserves stable semantic evaluation at every representative pro
 
 test("Preview, PNG source, and MP4 source share identical production EvaluatedFrames", async () => {
   const { project, session } = buildPhase8ProductionProof();
+  const planner = planSequenceExportFrames(project, "sequence_proof", FRAME_RATE);
+  const exportTicks = [...planner.frames()].map(({ timeTicks }) => timeTicks);
+  assert.deepEqual(planner.frameRate, FRAME_RATE);
+  assert.equal(planner.durationTicks, PROOF_TICKS.terminal);
+  assert.equal(planner.frameCount, 120);
+  assert.equal(planner.firstFrame().timeTicks, 0);
+  assert.equal(planner.frameAt(1).timeTicks, 5000);
+  assert.equal(planner.lastFrame().timeTicks, 595000);
+  assert.equal(exportTicks.includes(PROOF_TICKS.terminal), false);
   const assets = renderAssets(project);
   const previewPlans = new Map();
-  for (const timeTicks of [50, 150, 250, 350, 450]) {
+  for (const timeTicks of [
+    PROOF_TICKS.holdA,
+    PROOF_TICKS.transitionAB,
+    PROOF_TICKS.holdB,
+    PROOF_TICKS.transitionBC,
+    PROOF_TICKS.blinkC,
+  ]) {
     const evaluation = session.query("sequence.evaluate", { sequenceId: "sequence_proof", timeTicks });
     let plan = null;
     const report = renderEvaluatedViewport({
@@ -206,7 +226,7 @@ test("Preview, PNG source, and MP4 source share identical production EvaluatedFr
     suggestedName: "phase8-production-proof",
   });
   assert.equal(pngResult.ok, true);
-  assert.equal(pngResult.writtenFrames, EXPORT_TICKS.length);
+  assert.equal(pngResult.writtenFrames, planner.frameCount);
   assert.ok(pngWrites.every(({ bytes }) => bytes[0] === 137 && bytes[1] === 80));
 
   const mp4Records = [];
@@ -237,13 +257,13 @@ test("Preview, PNG source, and MP4 source share identical production EvaluatedFr
     suggestedName: "phase8-production-proof",
   });
   assert.equal(mp4Result.ok, true);
-  assert.equal(videoWrites.length, EXPORT_TICKS.length);
+  assert.equal(videoWrites.length, planner.frameCount);
   assert.deepEqual(videoEncodes[0].frameRate, FRAME_RATE);
-  assert.equal(videoEncodes[0].frameCount, EXPORT_TICKS.length);
-  assert.deepEqual(pngRecords.map(({ timeTicks }) => timeTicks), EXPORT_TICKS);
-  assert.deepEqual(mp4Records.map(({ timeTicks }) => timeTicks), EXPORT_TICKS);
+  assert.equal(videoEncodes[0].frameCount, planner.frameCount);
+  assert.deepEqual(pngRecords.map(({ timeTicks }) => timeTicks), exportTicks);
+  assert.deepEqual(mp4Records.map(({ timeTicks }) => timeTicks), exportTicks);
 
-  for (const timeTicks of EXPORT_TICKS) {
+  for (const timeTicks of exportTicks) {
     const expected = semanticSnapshot(session.query("sequence.evaluate",
       { sequenceId: "sequence_proof", timeTicks }));
     const png = pngRecords.find((entry) => entry.timeTicks === timeTicks);
@@ -255,6 +275,6 @@ test("Preview, PNG source, and MP4 source share identical production EvaluatedFr
       assert.deepEqual(mp4.renderPlan, previewPlans.get(timeTicks));
     }
   }
-  assert.equal(EXPORT_TICKS.includes(PROOF_TICKS.terminal), false,
+  assert.equal(exportTicks.includes(PROOF_TICKS.terminal), false,
     "export remains half-open while terminal inspection remains a Query concern");
 });
