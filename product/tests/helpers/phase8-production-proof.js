@@ -300,7 +300,7 @@ function authorBreath(timeline) {
   ]);
   timeline.addTrack("BoneTrack", { boneId: "chest_bone" }, { trackId: "breath_bone" });
   addScalarKeys(timeline, "breath_bone", "rotation", [
-    ["breath_bone_start", 0, 0], ["breath_bone_peak", 60, 0.16],
+    ["breath_bone_start", 0, 0], ["breath_bone_peak", 60, 0.4],
     ["breath_bone_end", 120, 0],
   ]);
   timeline.addTrack("MeshDeformationTrack", { meshId: "mesh_body" },
