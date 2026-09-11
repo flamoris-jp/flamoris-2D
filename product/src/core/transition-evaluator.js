@@ -34,6 +34,7 @@ import {
 function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
+
 function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
 }
