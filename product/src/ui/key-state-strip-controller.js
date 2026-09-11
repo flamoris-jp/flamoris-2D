@@ -1,18 +1,10 @@
+import { secondsToTicks, ticksToSeconds } from "../core/temporal.js";
 import {
-  TIMEBASE_TICKS_PER_SECOND,
-  secondsToTicks,
-  ticksToSeconds,
-} from "../core/temporal.js";
+  TIMELINE_PLAYBACK_MODES,
+  TransientPlaybackClock,
+} from "./timeline-primitives.js";
 
-export const PLAYBACK_MODES = Object.freeze(["once", "loop"]);
-
-function defaultScheduleFrame(callback) {
-  return requestAnimationFrame(callback);
-}
-
-function defaultCancelFrame(handle) {
-  cancelAnimationFrame(handle);
-}
+export const PLAYBACK_MODES = TIMELINE_PLAYBACK_MODES;
 
 function assertPlaybackMode(mode) {
   if (!PLAYBACK_MODES.includes(mode)) throw new Error(`Unknown playback mode ${mode}.`);
@@ -69,8 +61,8 @@ export class KeyStateStripController {
     onChange = null,
     onEndpointEdit = null,
     onPreview = null,
-    scheduleFrame = defaultScheduleFrame,
-    cancelFrame = defaultCancelFrame,
+    scheduleFrame,
+    cancelFrame,
     meshTools = null,
   } = {}) {
     this.transitionPreview = transitionPreview;
@@ -81,10 +73,17 @@ export class KeyStateStripController {
     this.scheduleFrame = scheduleFrame;
     this.cancelFrame = cancelFrame;
     this.meshTools = meshTools;
-    this.playbackMode = "once";
-    this.playing = false;
-    this.startedAtMs = null;
-    this.frameHandle = null;
+    this.clock = new TransientPlaybackClock({
+      onTick: (tick) => {
+        const evaluation = this.transitionPreview.setTick(tick);
+        this.onPreview?.(evaluation);
+      },
+      onStateChange: (reason) => this.notify(
+        reason === "frame" ? "key-state-playback-frame" : "key-state-playback",
+      ),
+      ...(scheduleFrame ? { scheduleFrame } : {}),
+      ...(cancelFrame ? { cancelFrame } : {}),
+    });
   }
 
   notify(reason) { this.onChange?.(reason, this); }
@@ -135,60 +134,26 @@ export class KeyStateStripController {
 
   setPlaybackMode(mode) {
     assertPlaybackMode(mode);
-    this.playbackMode = mode;
+    this.clock.setMode(mode);
     this.notify("key-state-playback-mode");
   }
 
   play(startTimeMs = null) {
     if (!this.transitionPreview.activeProgram()) throw new Error("No active Transition TemporalProgram.");
-    this.pause();
     this.endpointMesh.exitEditing();
-    this.transitionPreview.setTick(0);
-    this.onPreview?.(this.transitionPreview.evaluation);
-    this.playing = true;
-    this.startedAtMs = startTimeMs;
-    this.frameHandle = this.scheduleFrame((timestamp) => this.advance(timestamp));
-    this.notify("key-state-playback");
+    this.clock.play({
+      durationTicks: this.transitionPreview.activeProgram().durationTicks,
+      startTick: 0,
+      startTimeMs,
+    });
   }
 
   pause() {
-    if (this.frameHandle !== null) this.cancelFrame(this.frameHandle);
-    const changed = this.playing || this.frameHandle !== null;
-    this.frameHandle = null;
-    this.playing = false;
-    this.startedAtMs = null;
-    if (changed) this.notify("key-state-playback");
+    this.clock.pause();
   }
 
   advance(timestampMs) {
-    if (!this.playing) return;
-    if (!Number.isFinite(timestampMs)) throw new RangeError("Playback clock must provide finite milliseconds.");
-    if (this.startedAtMs === null) this.startedAtMs = timestampMs;
-    const program = this.transitionPreview.activeProgram();
-    if (!program) {
-      this.pause();
-      return;
-    }
-    const elapsedTicks = Math.max(0, Math.floor(
-      (timestampMs - this.startedAtMs) * TIMEBASE_TICKS_PER_SECOND / 1000,
-    ));
-    let tick;
-    if (this.playbackMode === "loop") {
-      tick = elapsedTicks % program.durationTicks;
-    } else {
-      tick = Math.min(program.durationTicks, elapsedTicks);
-    }
-    const evaluation = this.transitionPreview.setTick(tick);
-    this.onPreview?.(evaluation);
-    if (this.playbackMode === "once" && tick === program.durationTicks) {
-      this.playing = false;
-      this.frameHandle = null;
-      this.startedAtMs = null;
-      this.notify("key-state-playback");
-      return;
-    }
-    this.frameHandle = this.scheduleFrame((timestamp) => this.advance(timestamp));
-    this.notify("key-state-playback-frame");
+    this.clock.advance(timestampMs);
   }
 
   getState() {
@@ -213,8 +178,8 @@ export class KeyStateStripController {
           ? "preview" : activeStateId ? "edit" : "idle",
       }),
       durationSeconds: ticksToSeconds(durationTicks),
-      playing: this.playing,
-      playbackMode: this.playbackMode,
+      playing: this.clock.playing,
+      playbackMode: this.clock.mode,
       evaluation: preview.evaluation,
     };
   }
