@@ -305,6 +305,8 @@ export function queryAppElements(root = document) {
   sequenceKeyframeTickInput: root.querySelector("#sequenceKeyframeTickInput"),
   sequenceKeyframeValueInput: root.querySelector("#sequenceKeyframeValueInput"),
   sequenceKeyframeInterpolationSelect: root.querySelector("#sequenceKeyframeInterpolationSelect"),
+  sequenceEasePresetSelect: root.querySelector("#sequenceEasePresetSelect"),
+  applySequenceEasePresetButton: root.querySelector("#applySequenceEasePresetButton"),
   sequenceKeyframeBezierControls: root.querySelector("#sequenceKeyframeBezierControls"),
   sequenceBezierX1Input: root.querySelector("#sequenceBezierX1Input"),
   sequenceBezierY1Input: root.querySelector("#sequenceBezierY1Input"),

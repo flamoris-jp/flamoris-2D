@@ -139,6 +139,7 @@ src/ui/transition-preview-controller.js
 src/ui/key-state-strip-controller.js
 src/ui/key-state-strip-view.js
 src/ui/timeline-primitives.js
+src/ui/ease-presets.js
 src/ui/sequence-timeline-controller.js
 src/ui/sequence-timeline-view.js
 src/ui/transition-diagnostics-controller.js
