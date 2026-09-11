@@ -96,18 +96,20 @@ export function createSequenceTimelineView({
   function programAuthoringTick(timelineState) {
     const program = timelineState?.program;
     if (!program) return 0;
+    if (timelineState.ownerContext?.kind === "Sequence") {
+      return Math.min(program.durationTicks, Math.max(0, timelineState.currentTick));
+    }
     const ownerKey = programOwnerKey(timelineState);
     const stored = ownerKey ? programTicks.get(ownerKey) : null;
-    const fallback = timelineState.ownerContext?.kind === "Sequence"
-      ? timelineState.currentTick : 0;
-    const tick = Number.isSafeInteger(stored) ? stored : fallback;
+    const tick = Number.isSafeInteger(stored) ? stored : 0;
     return Math.min(program.durationTicks, Math.max(0, tick));
   }
 
   function rememberProgramTick(timelineState, timeTicks) {
     const program = timelineState?.program;
     const ownerKey = programOwnerKey(timelineState);
-    if (!program || !ownerKey || !Number.isSafeInteger(timeTicks)) return;
+    if (!program || !ownerKey || timelineState.ownerContext?.kind !== "AnimationClip" ||
+      !Number.isSafeInteger(timeTicks)) return;
     programTicks.set(ownerKey, Math.min(program.durationTicks, Math.max(0, timeTicks)));
   }
 
