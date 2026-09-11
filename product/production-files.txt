@@ -59,6 +59,7 @@ src/core/temporal.js
 src/core/angular.js
 src/core/transition-evaluator.js
 src/core/sequence-evaluator.js
+src/core/sequence-mixer.js
 src/core/mesh-form-correction-evaluator.js
 src/core/skin-mesh-evaluator.js
 src/core/clipping-evaluator.js

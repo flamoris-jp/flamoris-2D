@@ -1,5 +1,5 @@
 import { createProjectCanvasRenderTarget } from "./composition-render-target.js";
-import { evaluateTransitionExportFrame } from "./export-frame-evaluator.js";
+import { evaluateExportFrame } from "./export-frame-evaluator.js";
 import { createExportOffscreenRenderer } from "./export-offscreen-renderer.js";
 import { renderEvaluatedComposition } from "./shared-composition-renderer.js";
 
@@ -29,6 +29,9 @@ function classifyEvaluationFailure(error) {
   const message = error?.message || String(error);
   if (message.startsWith("Unknown Transition ")) {
     return diagnostic("export.missing_transition", message);
+  }
+  if (message.startsWith("Unknown Sequence ")) {
+    return diagnostic("export.missing_sequence", message);
   }
   if (message.startsWith("Unknown TemporalProgram ")) {
     return diagnostic("export.missing_temporal_program", message);
@@ -63,7 +66,8 @@ export class ExportFrameRenderer {
 
   render({
     project,
-    transitionId,
+    transitionId = null,
+    sequenceId = null,
     frameRate,
     frameIndex,
     outputWidth,
@@ -87,8 +91,9 @@ export class ExportFrameRenderer {
 
     let evaluatedFrame;
     try {
-      evaluatedFrame = evaluateTransitionExportFrame(project, {
+      evaluatedFrame = evaluateExportFrame(project, {
         transitionId,
+        sequenceId,
         frameRate,
         frameIndex,
       });
@@ -97,8 +102,18 @@ export class ExportFrameRenderer {
     }
 
     const diagnostics = invalidTransformDiagnostics(
-      evaluatedFrame.evaluatedTransition,
+      evaluatedFrame.evaluation,
     );
+    if (sequenceId && evaluatedFrame.evaluation.authoritative === false) {
+      diagnostics.push(diagnostic(
+        "export.non_authoritative_evaluation",
+        "Sequence evaluation contains structural animation diagnostics.",
+        { codes: evaluatedFrame.evaluation.diagnostics
+          .filter((entry) => entry.severity === "error")
+          .map((entry) => entry.code)
+          .sort() },
+      ));
+    }
     const assets = renderAssetMap(renderAssets);
     const resolveArtwork = (nodeId) => {
       const asset = assets.get(nodeId);
@@ -145,7 +160,7 @@ export class ExportFrameRenderer {
     let composition;
     try {
       composition = renderEvaluatedComposition({
-        evaluation: evaluatedFrame.evaluatedTransition,
+        evaluation: evaluatedFrame.evaluation,
         renderTarget,
         renderer,
         resolveArtwork,
@@ -185,7 +200,10 @@ export class ExportFrameRenderer {
     return {
       ok: true,
       frame: evaluatedFrame.frame,
-      evaluatedTransition: evaluatedFrame.evaluatedTransition,
+      evaluatedFrame: evaluatedFrame.evaluation,
+      ...(sequenceId
+        ? { evaluatedSequence: evaluatedFrame.evaluation }
+        : { evaluatedTransition: evaluatedFrame.evaluation }),
       renderTarget,
       renderPlan: composition.plan,
       offscreenResult: composition.output,

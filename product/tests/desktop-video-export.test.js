@@ -121,6 +121,34 @@ test("one-shot MP4 export renders ordered PNG frames behind an opaque Desktop se
   assert.equal(desktop.cancels.length, 0);
 });
 
+test("MP4 frame production preserves Sequence identity through the shared source-frame job", async () => {
+  const desktop = desktopHarness();
+  const project = fixture();
+  project.sequences = [{ id: "sequence", temporalProgramId: "sequence_program" }];
+  project.temporalPrograms.push({ id: "sequence_program", durationTicks: 120000,
+    tracks: [], events: [], regions: [] });
+  const requests = [];
+  const job = new DesktopMp4ExportJob({
+    desktopApi: desktop.api,
+    frameRenderer: {
+      render(input) {
+        requests.push(input);
+        return fakeFrameRenderer().render(input);
+      },
+    },
+    encodePng: async () => new Uint8Array([1]),
+  });
+  const result = await job.run(request({
+    project,
+    transitionId: null,
+    sequenceId: "sequence",
+  }));
+  assert.equal(result.ok, true);
+  assert.equal(requests.length, 2);
+  assert.ok(requests.every((entry) => entry.sequenceId === "sequence" &&
+    entry.transitionId === null));
+});
+
 test("cancel between frame production and encoding closes the Desktop video session", async () => {
   const desktop = desktopHarness();
   const controller = new AbortController();

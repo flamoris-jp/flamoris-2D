@@ -7,8 +7,9 @@ import {
   getTransitionDiagnostics,
 } from "../core/transition-evaluator.js";
 import {
+  evaluateExportFrame,
   evaluateTransitionExportFrame,
-  planTransitionExportFrames,
+  planEvaluatedExportFrames,
 } from "../core/export-frame-evaluator.js";
 import {
   clippingBindingForTarget,
@@ -647,9 +648,10 @@ export const projectQueries = {
     });
   },
   "export.get_frame_plan": (project, input) =>
-    planTransitionExportFrames(project, input.transitionId, input.frameRate).describe(),
+    planEvaluatedExportFrames(project, input, input.frameRate).describe(),
   "export.evaluate_frame": (project, input) =>
-    evaluateTransitionExportFrame(project, input),
+    input.sequenceId ? evaluateExportFrame(project, input) :
+      evaluateTransitionExportFrame(project, input),
 };
 
 export function queryProject(project, name, input = {}) {

@@ -1,5 +1,41 @@
+import { multiplyAffine } from "./transforms.js";
+
 function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function cameraMatrix(camera) {
+  if (!camera) return null;
+  if (![camera.positionX, camera.positionY, camera.rotation, camera.scale]
+    .every(Number.isFinite) || camera.scale <= 0) {
+    throw new TypeError("Evaluated camera must contain finite position/rotation and positive scale.");
+  }
+  const cosine = Math.cos(-camera.rotation);
+  const sine = Math.sin(-camera.rotation);
+  const a = cosine * camera.scale;
+  const b = sine * camera.scale;
+  const c = -sine * camera.scale;
+  const d = cosine * camera.scale;
+  return [
+    a,
+    b,
+    c,
+    d,
+    -(a * camera.positionX + c * camera.positionY),
+    -(b * camera.positionX + d * camera.positionY),
+  ];
+}
+
+function projectBatchesThroughCamera(batches, camera) {
+  const projection = cameraMatrix(camera);
+  if (!projection) return batches;
+  return batches.map((batch) => ({
+    ...batch,
+    renderInstances: batch.renderInstances.map((instance) => ({
+      ...instance,
+      transform: multiplyAffine(projection, instance.transform),
+    })),
+  }));
 }
 
 export function mixWeightedPremultiplied(samples) {
@@ -195,9 +231,16 @@ export function createEvaluatedRenderPlan(evaluatedTransition, {
   const supportedBatches = batches
     .filter((batch) => !conflictedDrawOrders.has(batch.drawOrder))
     .sort((left, right) => left.drawOrder - right.drawOrder);
+  const projectedBatches = projectBatchesThroughCamera(
+    supportedBatches, evaluatedTransition.camera,
+  );
   return {
-    batches: supportedBatches,
+    batches: projectedBatches,
     unsupportedReasons: [...new Set(unsupportedReasons)],
-    renderInstanceCount: supportedBatches.reduce((count, batch) => count + batch.renderInstances.length, 0),
+    renderInstanceCount: projectedBatches.reduce((count, batch) =>
+      count + batch.renderInstances.length, 0),
+    ...(evaluatedTransition.camera
+      ? { camera: structuredClone(evaluatedTransition.camera) }
+      : {}),
   };
 }

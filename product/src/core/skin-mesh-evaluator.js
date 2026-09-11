@@ -22,10 +22,15 @@ function withFkDiagnostics(mesh, binding, fk) {
 
 export function evaluateEndpointSkinMesh(project, {
   targetNodeId, keyArtId, topology, mesh, targetWorldTransform,
+  poseForBone = null, warpKeyformForDeformer = undefined, transformOverrides = null,
 }) {
   const binding = skinBindingForTarget(project, targetNodeId);
   if (!binding) return { mesh, diagnostics: [] };
-  const fk = evaluateEndpointProjectedBoneFk(project, keyArtId);
+  const fk = evaluateEndpointProjectedBoneFk(project, keyArtId, {
+    poseForBone,
+    warpKeyformForDeformer,
+    transformOverrides,
+  });
   if (fk.diagnostics.length) return withFkDiagnostics(mesh, binding, fk);
   return evaluateLinearBlendSkinning({
     mesh, topology, binding, bonePoses: fk.poses, targetWorldTransform,
@@ -40,6 +45,7 @@ function compatibleBindings(from, to) {
 export function evaluateMorphSkinMesh(project, {
   fromTargetNodeId, toTargetNodeId, fromKeyArtId, toKeyArtId,
   geometryWeight, topology, mesh, targetWorldTransform,
+  poseForBone = null, warpKeyformForDeformer = undefined, transformOverrides = null,
 }) {
   const fromBinding = skinBindingForTarget(project, fromTargetNodeId);
   const toBinding = skinBindingForTarget(project, toTargetNodeId);
@@ -62,7 +68,11 @@ export function evaluateMorphSkinMesh(project, {
     )] };
   }
   const fk = evaluateMorphProjectedBoneFk(
-    project, fromKeyArtId, toKeyArtId, geometryWeight,
+    project, fromKeyArtId, toKeyArtId, geometryWeight, {
+      poseForBone,
+      warpKeyformForDeformer,
+      transformOverrides,
+    },
   );
   if (fk.diagnostics.length) return withFkDiagnostics(mesh, fromBinding, fk);
   return evaluateLinearBlendSkinning({
