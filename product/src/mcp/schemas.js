@@ -16,6 +16,7 @@ const keyArtId = { ...nodeId };
 const semanticSlotId = { ...nodeId };
 
 export const querySchemas = {
+  "project.get_render_settings": emptyQuery(),
   "bone.list_two_bone_ik": emptyQuery(),
   "bone.get_two_bone_ik": idQuery("constraintId", nodeId),
   "bone.validate_two_bone_ik": emptyQuery(),
@@ -133,6 +134,7 @@ export const querySchemas = {
     additionalProperties: false,
   },
   "mesh.list_topologies": emptyQuery(),
+  "mesh.list": emptyQuery(),
   "mesh.get_keyform": idQuery("keyformId", nodeId),
   "mesh.list_keyforms": {
     type: "object",

@@ -33,6 +33,22 @@ function owners(project) {
   ].filter((owner) => typeof owner.temporalProgramId === "string" && owner.temporalProgramId);
 }
 
+export const TEMPORAL_OWNER_TRACK_KINDS = Object.freeze({
+  Transition: Object.freeze([
+    "GeometryBlendTrack", "AppearanceTrack", "OpacityTrack", "PresenceTrack",
+    "DrawOrderTrack", "ClippingTrack",
+  ]),
+  AnimationClip: Object.freeze([
+    "TransformTrack", "BoneTrack", "DeformerTrack", "MeshDeformationTrack",
+    "OpacityTrack", "PresenceTrack", "DrawOrderTrack", "ClippingTrack",
+  ]),
+  Sequence: Object.freeze(["CameraTrack"]),
+});
+
+export function temporalTrackKindsForOwner(ownerKind) {
+  return [...(TEMPORAL_OWNER_TRACK_KINDS[ownerKind] || [])];
+}
+
 export function temporalProgramOwners(project) {
   const result = new Map();
   for (const owner of owners(project)) {
@@ -80,14 +96,8 @@ export function validateTemporalProgramOwnerTracks(project) {
     const sequenceOwner = soleOwner?.kind === "Sequence" ? soleOwner : null;
     const clipOwner = soleOwner?.kind === "AnimationClip" ? soleOwner : null;
     const tracks = Array.isArray(program?.tracks) ? program.tracks : [];
-    const transitionKinds = new Set([
-      "GeometryBlendTrack", "AppearanceTrack", "OpacityTrack", "PresenceTrack",
-      "DrawOrderTrack", "ClippingTrack",
-    ]);
-    const clipKinds = new Set([
-      "TransformTrack", "BoneTrack", "DeformerTrack", "MeshDeformationTrack",
-      "OpacityTrack", "PresenceTrack", "DrawOrderTrack", "ClippingTrack",
-    ]);
+    const transitionKinds = new Set(TEMPORAL_OWNER_TRACK_KINDS.Transition);
+    const clipKinds = new Set(TEMPORAL_OWNER_TRACK_KINDS.AnimationClip);
 
     tracks.forEach((track, trackIndex) => {
       const path = "temporalPrograms." + programIndex + ".tracks." + trackIndex;

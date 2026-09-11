@@ -214,6 +214,7 @@ export function isEffectivelyVisible(project, nodeId) {
 }
 
 export const projectQueries = {
+  "project.get_render_settings": (project) => cloneProject(project.renderSettings),
   "project.get_summary": (project) => ({
     id: project.id,
     schemaVersion: project.schemaVersion,
@@ -519,6 +520,9 @@ export const projectQueries = {
   "mesh.list_topologies": (project) => [...project.meshTopologies]
     .sort((a, b) => a.id.localeCompare(b.id))
     .map((topology) => topologyProjection(project, topology)),
+  "mesh.list": (project) => [...project.meshes]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map(cloneProject),
   "mesh.get_vertex": (project, input) => {
     const topology = project.meshTopologies.find((entry) => entry.id === input.topologyId);
     if (!topology) throw new Error("Unknown MeshTopology " + input.topologyId + ".");

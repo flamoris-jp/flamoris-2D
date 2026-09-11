@@ -133,6 +133,7 @@ export function createViewportRenderer({
   selectedNodeDocumentBounds,
   endpointContext = () => null,
   transitionPreviewContext = () => null,
+  sequenceTimelineContext = () => null,
   autoMeshPreviewContext = () => null,
   correspondencePreviewContext = () => null,
   clippingAuthoringContext = () => null,
@@ -704,6 +705,34 @@ export function createViewportRenderer({
   }
 
   function render() {
+    const sequencePreview = sequenceTimelineContext();
+    if (sequencePreview?.sequence) {
+      evaluatedMeshPositions = new Float32Array();
+      clearLayerCanvas(elements.backgroundBelowCanvas);
+      clearLayerCanvas(elements.foregroundCanvas);
+      clearLayerCanvas(elements.overlayCanvas);
+      if (!state.view || !sequencePreview.evaluation) {
+        state.editor?.sequenceTimeline.setRenderReport({
+          unsupportedReasons: [state.view
+            ? "Sequence evaluation is unavailable."
+            : "Viewport transform is unavailable."],
+          renderInstanceCount: 0,
+        });
+        renderer.render(new Float32Array(), { originX: 0, originY: 0, scale: 1 });
+        return;
+      }
+      const resolveArtwork = (nodeId) =>
+        state.psdParts.find((part) => part.nodeId === nodeId)?.canvas || null;
+      const report = renderEvaluatedViewport({
+        evaluation: sequencePreview.evaluation,
+        view: viewportRenderTarget(),
+        renderer,
+        resolveArtwork,
+      });
+      state.editor?.sequenceTimeline.setRenderReport(report);
+      drawClippingMaskVisualization(sequencePreview.evaluation);
+      return;
+    }
     const transitionPreview = transitionPreviewContext();
     if (transitionPreview?.viewMode === "preview") {
       evaluatedMeshPositions = new Float32Array();

@@ -14,6 +14,7 @@ import { WeightAuthoringController } from "./weight-authoring-controller.js";
 import { FormCorrectionAuthoringController } from "./form-correction-authoring-controller.js";
 import { TwoBoneIkAuthoringController } from "./two-bone-ik-authoring-controller.js";
 import { BoneMirrorAuthoringController } from "./bone-mirror-authoring-controller.js";
+import { SequenceTimelineController } from "./sequence-timeline-controller.js";
 
 function filterTree(node, matches) {
   const children = node.children
@@ -44,12 +45,18 @@ export class EditorUiAdapter {
     this.filterText = "";
     this.activeTool = "translate";
     this.transformDrag = null;
+    this.sequenceTimeline = new SequenceTimelineController(session, {
+      onChange: (reason) => this.notify(reason),
+    });
     this.clippingAuthoring = new ClippingAuthoringController(session, {
       onChange: (reason) => this.notify(reason),
     });
     this.transitionAuthoring = new TransitionAuthoringController(session, {
       onChange: (reason) => {
         if (reason === "transition-selection") {
+          if (this.transitionAuthoring?.activeTransitionId) {
+            this.sequenceTimeline.selectSequence(null);
+          }
           this.keyStateStrip?.pause();
           this.transitionPreview?.activeTransitionChanged();
           this.transitionDiagnostics?.activeTransitionChanged();
@@ -88,7 +95,8 @@ export class EditorUiAdapter {
     this.meshTools = new MeshToolController(session, this.endpointMesh, {
       onChange: (reason) => this.notify(reason),
       isPreviewReadOnly: () => this.transitionPreview.getState().viewMode === "preview" ||
-        this.correspondencePreview.getState().previewActive,
+        this.correspondencePreview.getState().previewActive ||
+        Boolean(this.sequenceTimeline.selectedSequenceId),
     });
     this.keyStateStrip = new KeyStateStripController(this.transitionPreview, this.endpointMesh, {
       onChange: (reason) => this.notify(reason),
@@ -105,6 +113,7 @@ export class EditorUiAdapter {
 
     const sessionOnChange = session.onChange;
     session.onChange = (...args) => {
+      this.sequenceTimeline.projectChanged();
       sessionOnChange?.(...args);
       this.boneAuthoring.projectChanged();
       this.twoBoneIkAuthoring.projectChanged();

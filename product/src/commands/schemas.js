@@ -776,6 +776,12 @@ export const commandSchemas = {
     properties: { programId: nonEmptyString, track: temporalObject },
     additionalProperties: false,
   },
+  "animation.temporal.remove_track": {
+    type: "object",
+    required: ["programId", "trackId"],
+    properties: { programId: nonEmptyString, trackId: nonEmptyString },
+    additionalProperties: false,
+  },
   "animation.temporal.add_keyframe": {
     type: "object",
     required: ["programId", "trackId", "channel", "keyframe"],
