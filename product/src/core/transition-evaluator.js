@@ -548,6 +548,7 @@ function evaluateMorph(project, transition, part, slot, from, to, fromMesh, toMe
   if (presence !== "present") return { semanticSlotId: slot.id, presence, renderInstances: [] };
   const topology = entity(project, "meshTopologies", part.topologyId, "MeshTopology");
   let mesh = {
+    topologyId: topology.id,
     positions: lerpArray(fromMesh.positions, toMesh.positions, geometryWeight),
     indices: [...topology.indices],
   };
