@@ -1,33 +1,106 @@
 # FLAMORIS 2D
 
-FLAMORIS 2D is a PSD-native, Key-Art-transition and clip-first 2D rigging/animation editor for short MV shots.
+FLAMORIS 2D is a deterministic 2D animation editor for producing short moving-picture and MV shots from layered or flat artwork.
 
-## Phase 1 editor foundation
+The current production workflow is:
 
-Phase 1 connects the PSD prototype to a persistent, undoable Editor Core shared
-by the Windows Desktop shell, browser UI, and minimal headless/MCP-facing
-adapter. Windows Desktop is the production target; the browser shell remains a
-development-compatible adapter.
+```text
+PSD / PNG artwork
+  -> Scene / Mesh / Semantic Mapping
+  -> Clipping / Warp / Bones / Skinning where needed
+  -> Key Art A -> B -> C ...
+  -> reusable AnimationClips such as Blink / Breath / HairSway
+  -> deterministic Sequence preview
+  -> deterministic PNG / MP4 export
+  -> MV shot
+```
 
-Current runnable capability:
+FLAMORIS 2D is intentionally focused. It is not intended to reproduce every Live2D feature or become a general DAW/NLE.
 
-- direct layered PSD import with `ag-psd`
-- reconstruction using PSD document coordinates and stacking order
-- per-part Grid Mesh generation/editing
-- A/B deformation keyframes and silent preview
-- viewport zoom/pan and selected-part fit
-- `.fl2d` project open/save, Save As, Incremental Save, and Save Copy
-- dirty/save-point tracking and unsaved-change guards
-- separate Preferences and bounded Recovery snapshots
-- reviewed/manual PSD re-import applied as one Undo step
-- deterministic headless Query/Command smoke coverage
-- native Windows Open/Save dialogs, close handling, Recent Files, Recovery
-  storage, window title, and `.fl2d` file association
+## Current status
 
-Multi-Key-Art A→B→C transitions, clipping, deformers, bones, and the production
-timeline remain later phases.
+The Phase 1-8 production core is implemented.
+
+Current checkpoint:
+
+- Phase 1 Editor Core + Windows Desktop shell — complete
+- Phase 2 deterministic Key-Art Transition foundation and authoring — complete
+- Phase 3 production mesh topology / Contour AutoMesh / correspondence assistance — complete
+- Phase 4 deterministic PNG / Windows MP4 export — implementation complete
+- Phase 6 clipping + Warp/Lattice Deformer — complete
+- Phase 7 Bones / FK / rigid and weighted skinning / form correction / constraints / IK — complete
+- Phase 8 Multi-Key-Art Sequence / AnimationClip / deterministic mixer / timeline authoring — complete
+- Phase 9 Production Robustness / Internal Beta — current hardening stage
+
+The immediate production gate is real packaged-Windows end-to-end QA in Issue #78. Phase 9 hardening is tracked in Issue #79.
+
+Phase 5 flat-image part decomposition remains an experimental/deferred input-simplification track and does not block the current PSD/part-based production workflow.
+
+## Current capabilities
+
+### Project and editor core
+
+- versioned `.fl2d` Project model
+- stable Scene / mesh / rig identities
+- deterministic Query / Command / Transaction / EditorSession architecture
+- Undo / Redo and grouped history
+- Save / Save As / Incremental Save / Save Copy
+- dirty/save-point tracking, recovery, Recent Files, and native Windows dialogs
+- PSD import/re-import with document-coordinate placement
+- Windows Desktop shell and `.fl2d` file association
+- typed MCP-ready command/query boundaries
+
+### Mesh and Key Art authoring
+
+- Object / Edit / Deform / Topology authoring modes
+- stable mesh vertex IDs and optional semantic labels
+- add / remove / connect / subdivide topology operations
+- Grid Mesh and deterministic Contour AutoMesh
+- per-Key-Art MeshKeyforms over shared topology
+- deterministic correspondence assistance
+- explicit SemanticSlot correspondence across Key Arts
+
+### Transition, deformation, and rigging
+
+- canonical 120000 ticks/sec integer timebase
+- rational FPS conversion and deterministic sampling
+- Morph / Hold / Replace / Appear / Disappear / Occlusion
+- clipping with final evaluated geometry/alpha
+- Warp/Lattice Deformer with nested parent-first evaluation
+- Bones and deterministic FK
+- rigid Bone attachment
+- weighted skinning using stable mesh vertex IDs
+- MeshFormCorrection after skeletal deformation
+- rotation constraints
+- analytic two-bone IK as an authoring helper
+- mirror helpers
+
+### Sequence and reusable motion
+
+- persistent multi-Key-Art Sequence / ViewLane
+- KeyArtHold and retimed TransitionInstance placement
+- reusable AnimationClip / ClipInstance
+- Once / Loop playback semantics
+- TransformTrack / BoneTrack / DeformerTrack / MeshDeformationTrack / CameraTrack
+- reusable Blink / Breath / HairSway-style motion
+- deterministic typed contribution mixer
+- Sequence timeline, scrub, playback, clip placement, and keyframe editing
+- explicit Bezier interpolation with authoring ease presets
+
+### Preview and export
+
+- shared evaluated-frame path for preview and export
+- deterministic frame planning from rational FPS
+- viewport-independent offscreen rendering
+- deterministic PNG frame sequence export
+- Windows MP4/H.264 export boundary using FFmpeg with Media Foundation `h264_mf`
+- progress, cancellation, conflict handling, diagnostics, and temporary-frame cleanup paths
+
+The remaining real-device validation work belongs to Production QA / Phase 9 rather than missing animation architecture.
 
 ## Run Windows Desktop
+
+From the repository root:
 
 ```powershell
 npm install
@@ -35,12 +108,21 @@ npm test
 npm run desktop
 ```
 
-Create an unpacked Windows app with `npm run desktop:pack`, or an NSIS installer
-with `npm run desktop:dist`.
+Create an unpacked Windows app:
+
+```powershell
+npm run desktop:pack
+```
+
+Create an NSIS installer:
+
+```powershell
+npm run desktop:dist
+```
 
 ## Run browser shell
 
-From the repository root after Phase 0 integration:
+From the repository root:
 
 ```powershell
 npm install
@@ -50,6 +132,8 @@ npm start
 
 Open `http://127.0.0.1:4173`.
 
+The Windows Desktop application is the production target. The browser shell remains a development-compatible adapter.
+
 ## Repository boundaries
 
 ```text
@@ -57,34 +141,66 @@ product/   current editor/runtime implementation
 staging/   manual/visual acceptance setup and non-production fixtures
 test/      integration/system/staging checks outside Product runtime
 history/   superseded prototypes and historical material
-docs/      current design, research, ADRs
+docs/      current design, research, ADRs, and production proof
 ```
 
-Product must not depend on Staging, integration-test helpers, History, or private acceptance artwork. Production artifacts use an explicit allowlist or equivalent build boundary.
+Product code must not depend on Staging, integration-test helpers, History, or private acceptance artwork. Production artifacts use an explicit allowlist or equivalent build boundary.
 
 See `AGENTS.md` and `docs/repository-boundaries.md`.
 
-## Core design decisions
+## Architecture principles
 
-- PSD is a first-class source format.
-- Multiple Key Arts are first-class project states.
-- Shared mesh topology can have different per-Key-Art layout/keyforms.
-- Mesh Layout (位置決め) and Deform (変形) are separate semantic modes.
-- Key Art B can align/transform the whole shared mesh before vertex refinement.
-- Coarse meshes can be subdivided later without breaking existing A/B keyforms.
-- UI, tests, scripts, and MCP share one deterministic Command/Transaction core.
-- AI proposes; deterministic commands commit.
+- GitHub `main` is the reviewed source of truth.
+- Persistent animation time uses one canonical integer tick domain: 120000 ticks/sec.
+- `TemporalProgram` is shared by Transitions, Sequences, and AnimationClips rather than duplicated into parallel timing models.
+- Stable IDs, not display names or array positions, are authoritative for Scene, mesh, rig, and animation targets.
+- Major visual changes are represented by Key Arts; reusable ordinary motion is layered through AnimationClips.
+- Preview, PNG, and MP4 source frames share the same evaluated semantics.
+- The renderer consumes final evaluated geometry/compositing state and remains unaware of Sequence/Clip/Bone authoring semantics.
+- Persistent mutations go through deterministic Commands / Transactions and remain Undo/Redo-safe.
+- Transient UI state such as selection, playhead, hover, drag preview, and playback state does not become Project authority.
+- AI may propose edits in future phases, but accepted output must become ordinary deterministic Project data.
 
-## Current authority
+## Documentation
 
-`main` is the reviewed current implementation and design baseline.
+Current design index: `docs/README.md`
 
-The exact uploaded v0.3 snapshot remains preserved on `prototype/psd-import-zoom-pan-v0.3` for history/reference. It is not the branch for continuing Product development.
+Current roadmap: `docs/roadmap.md`
 
-Current design index: `docs/README.md`.
-Current roadmap: `docs/roadmap.md`.
-Phase 0 review: `docs/reviews/phase0-review-20260830.md`.
+Phase 8 sequencing design: `docs/phase8-animation-sequencing.md`
 
-Phase 2 begins only after the Phase 1 manual Akino acceptance pass is complete.
-Do not bypass these foundations to add later rig features directly to prototype
-UI state.
+Phase 8 production proof: `docs/phase8-production-proof.md`
+
+Documentation may mix Japanese and English. Use translation tools or AI translation where useful. Technical clarity and development continuity take priority over language uniformity.
+
+## Development workflow
+
+Use focused Issues and reviewable branches. Keep implementation commits small enough that interrupted work can resume safely.
+
+Typical flow:
+
+```text
+Issue
+  -> design / acceptance contract when needed
+  -> feature branch
+  -> small purpose-driven commits
+  -> focused + full regression tests
+  -> Pull Request review
+  -> merge to main
+```
+
+Non-trivial defects found during Production QA should become focused Issues rather than being hidden inside broad Phase umbrellas.
+
+## Current follow-up work
+
+- #78 — packaged Windows end-to-end Production QA
+- #79 — Phase 9 Production Robustness / Internal Beta
+- #58 — production UX cleanup and Japanese-first labels
+- #6 — dependency lockfile / reproducibility
+- #43 — public repository release preparation
+
+The public-release and licensing work in #43 is intentionally separate from current product hardening. Do not infer licensing of FLAMORIS creative assets from the software repository until that release work is completed.
+
+## Historical reference
+
+The original v0.3 prototype snapshot remains preserved on `prototype/psd-import-zoom-pan-v0.3` for history/reference. It is not the branch for continuing Product development.
