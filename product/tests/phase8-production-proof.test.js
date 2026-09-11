@@ -64,6 +64,10 @@ test("Blink, Breath, and HairSway are ordinary reusable typed AnimationClips", (
   assert.deepEqual(program("clip_blink").tracks.map((track) => track.kind), ["TransformTrack"]);
   assert.deepEqual(program("clip_blink").tracks[0].target,
     { semanticSlotId: "slot_eye", coordinateSpace: "node-local" });
+  assert.deepEqual(program("clip_blink").tracks[0].channels.scaleY.keyframes.map((keyframe) => [
+    keyframe.timeTicks,
+    keyframe.value,
+  ]), [[0, 1], [20, 0.08], [40, 1]]);
   assert.deepEqual(program("clip_breath").tracks.map((track) => track.kind),
     ["TransformTrack", "BoneTrack", "MeshDeformationTrack"]);
   assert.deepEqual(program("clip_hair_sway").tracks.map((track) => track.kind),
@@ -76,6 +80,18 @@ test("Blink, Breath, and HairSway are ordinary reusable typed AnimationClips", (
   assert.equal(new Set(blinkInstances.map((entry) => entry.clipId)).size, 1);
   assert.doesNotMatch(serializeProject(project),
     /BlinkTrack|BreathTrack|HairSwayTrack|blinkRenderer|proceduralBreath|proceduralHair/u);
+});
+
+test("ordinary node Transform motion coexists with all reusable motion in one frame", () => {
+  const { session } = buildPhase8ProductionProof();
+  const evaluation = session.query("sequence.evaluate",
+    { sequenceId: "sequence_proof", timeTicks: PROOF_TICKS.holdB });
+  assert.deepEqual(evaluation.activeClipInstances.map(({ clipInstanceId }) => clipInstanceId), [
+    "background_accent", "breath_loop", "hair_sway_loop",
+  ]);
+  const background = evaluation.evaluatedParts.find(({ semanticSlotId }) =>
+    semanticSlotId === "slot_background").renderInstances[0];
+  assert.equal(background.transform[4], 1);
 });
 
 test("looping clips wrap exact periods and stay inactive at the terminal Sequence tick", () => {
