@@ -1,6 +1,22 @@
 export { commandSchemas } from "../commands/schemas.js";
 
-export const MCP_SCHEMA_VERSION = 17;
+export const MCP_SCHEMA_VERSION = 18;
+
+export const importSchemas = {
+  "import.cutwork_flimg": {
+    type: "object",
+    required: ["fileName", "bytes"],
+    properties: {
+      fileName: { type: "string", minLength: 1 },
+      bytes: {
+        description: "The user-authorized .flimg archive bytes.",
+        type: "array",
+        items: { type: "integer", minimum: 0, maximum: 255 },
+      },
+    },
+    additionalProperties: false,
+  },
+};
 
 const nodeId = {
   type: "string",
