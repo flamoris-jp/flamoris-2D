@@ -5,6 +5,7 @@ export function queryAppElements(root = document) {
   fileActions: [...root.querySelectorAll("[data-file-action]")],
   projectOpenInput: root.querySelector("#projectOpenInput"),
   reimportPsdInput: root.querySelector("#reimportPsdInput"),
+  cutworkFlimgInput: root.querySelector("#cutworkFlimgInput"),
   unsavedDialog: root.querySelector("#unsavedDialog"),
   recoveryDialog: root.querySelector("#recoveryDialog"),
   recoveryDialogMessage: root.querySelector("#recoveryDialogMessage"),

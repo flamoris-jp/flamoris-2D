@@ -9,10 +9,20 @@ import { ProjectDocumentController } from "../src/io/project-files.js";
 import { parseProjectDocument } from "../src/io/project-json.js";
 import {
   documentTitle,
+  filePickerConfiguration,
   nextIncrementalFilePath,
   resolveUnsavedDecision,
   updateRecentFiles,
 } from "../src/desktop/shell-logic.js";
+
+test("Desktop source-art picker keeps Cutwork .flimg separate from native project Open", () => {
+  const cutwork = filePickerConfiguration("import-cutwork-flimg");
+  assert.equal(cutwork.requiredExtension, ".flimg");
+  assert.deepEqual(cutwork.filters, [{ name: "Cutwork Image", extensions: ["flimg"] }]);
+  const open = filePickerConfiguration("open");
+  assert.equal(open.requiredExtension, null);
+  assert.equal(open.filters.some((filter) => filter.extensions.includes("flimg")), false);
+});
 import {
   createDesktopProjectWriter,
   desktopFileFromPayload,
