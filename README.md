@@ -5,7 +5,7 @@ FLAMORIS 2D is a deterministic 2D animation editor for producing short moving-pi
 The current production workflow is:
 
 ```text
-PSD / PNG artwork
+PSD / PNG / Cutwork `.flimg` artwork
   -> Scene / Mesh / Semantic Mapping
   -> Clipping / Warp / Bones / Skinning where needed
   -> Key Art A -> B -> C ...
@@ -46,7 +46,7 @@ Phase 5 flat-image part decomposition remains an experimental/deferred input-sim
 - Undo / Redo and grouped history
 - Save / Save As / Incremental Save / Save Copy
 - dirty/save-point tracking, recovery, Recent Files, and native Windows dialogs
-- PSD import/re-import with document-coordinate placement
+- PSD import/re-import and Cutwork `.flimg` v1 source-art import with document-coordinate placement
 - Windows Desktop shell and `.fl2d` file association
 - typed MCP-ready command/query boundaries
 
