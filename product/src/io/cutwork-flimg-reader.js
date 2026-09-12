@@ -134,6 +134,9 @@ export async function readFlimgZip(input, {
       safeSlice(bytes, cursor + 46, nameLength, "ZIP entry name"),
       "ZIP entry name",
     ));
+    if (name === "manifest.json" && uncompressedSize > limits.maximumManifestBytes) {
+      throw error("manifest.json exceeds the size limit.", "flimg.size_limit_exceeded");
+    }
     const canonical = name.normalize("NFC").toLocaleLowerCase("en-US");
     if (exactNames.has(name) || canonicalNames.has(canonical)) {
       throw error(`Duplicate archive entry ${name}.`, "flimg.archive_entry_duplicate", { path: name });
