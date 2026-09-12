@@ -24,12 +24,29 @@ export function crc32(bytes) {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-async function decompress(bytes, format) {
+async function decompress(bytes, format, maximumOutputBytes = null) {
   if (typeof DecompressionStream !== "function") {
     throw new Error("This runtime cannot decompress image/archive data.");
   }
   const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream(format));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+  const reader = stream.getReader();
+  const parts = [];
+  let length = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const part = value instanceof Uint8Array ? value : new Uint8Array(value);
+      length += part.length;
+      if (maximumOutputBytes !== null && length > maximumOutputBytes) {
+        throw new Error("Decompressed data exceeds its declared size.");
+      }
+      parts.push(part);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return concat(parts, length);
 }
 
 function concat(parts, length) {
@@ -110,7 +127,7 @@ export async function decodePngRaster(input, {
   expectedWidth,
   expectedHeight,
   expectedColorType,
-  inflate = (bytes) => decompress(bytes, "deflate"),
+  inflate = (bytes, maximumOutputBytes) => decompress(bytes, "deflate", maximumOutputBytes),
 } = {}) {
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input || 0);
   if (bytes.length < 45 || !PNG_SIGNATURE.every((byte, index) => bytes[index] === byte)) {
@@ -173,7 +190,17 @@ export async function decodePngRaster(input, {
   const channels = header.colorType === 6 ? 4 : header.colorType === 0 ? 1 : 0;
   if (!channels) throw new Error("PNG color type is unsupported.");
   const compressed = concat(imageParts, imageLength);
-  const inflated = await inflate(compressed);
+  const expectedInflated = header.interlace === 0
+    ? (header.width * channels + 1) * header.height
+    : [
+      [0, 0, 8, 8], [4, 0, 8, 8], [0, 4, 4, 8], [2, 0, 4, 4],
+      [0, 2, 2, 4], [1, 0, 2, 2], [0, 1, 1, 2],
+    ].reduce((total, [startX, startY, stepX, stepY]) => {
+      const passWidth = header.width <= startX ? 0 : Math.ceil((header.width - startX) / stepX);
+      const passHeight = header.height <= startY ? 0 : Math.ceil((header.height - startY) / stepY);
+      return total + (passWidth ? (passWidth * channels + 1) * passHeight : 0);
+    }, 0);
+  const inflated = await inflate(compressed, expectedInflated);
   const pixels = header.interlace === 0
     ? unfilterRows(inflated, header.width, header.height, channels)
     : decodeAdam7(inflated, header.width, header.height, channels);

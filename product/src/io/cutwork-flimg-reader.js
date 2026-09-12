@@ -68,8 +68,8 @@ function locateEndRecord(bytes) {
   throw error("The ZIP end record is malformed.", "flimg.archive_malformed");
 }
 
-async function defaultInflateRaw(bytes) {
-  return pngInternals.decompress(bytes, "deflate-raw");
+async function defaultInflateRaw(bytes, maximumOutputBytes) {
+  return pngInternals.decompress(bytes, "deflate-raw", maximumOutputBytes);
 }
 
 export async function readFlimgZip(input, {
@@ -173,7 +173,7 @@ export async function readFlimgZip(input, {
     const compressed = bytes.subarray(dataStart, dataEnd);
     let content;
     try {
-      content = method === 0 ? compressed.slice() : await inflateRaw(compressed);
+      content = method === 0 ? compressed.slice() : await inflateRaw(compressed, uncompressedSize);
     } catch (cause) {
       throw error(`ZIP entry ${name} cannot be decompressed.`, "flimg.archive_malformed", { path: name }, cause);
     }
