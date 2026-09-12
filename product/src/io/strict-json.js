@@ -6,7 +6,7 @@ export function parseStrictJson(text) {
     throw new SyntaxError(`${message} at character ${cursor}.`);
   };
   const whitespace = () => {
-    while (/\s/u.test(text[cursor] || "")) cursor += 1;
+    while ([" ", "\t", "\n", "\r"].includes(text[cursor])) cursor += 1;
   };
   const string = () => {
     const start = cursor;
@@ -69,7 +69,7 @@ export function parseStrictJson(text) {
   };
   const object = () => {
     cursor += 1;
-    const result = {};
+    const result = Object.create(null);
     const names = new Set();
     whitespace();
     if (text[cursor] === "}") {

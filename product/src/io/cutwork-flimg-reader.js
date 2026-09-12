@@ -46,7 +46,8 @@ function decodeUtf8(bytes, label) {
 
 export function validateFlimgArchivePath(path) {
   if (!path || path !== path.normalize("NFC") || path.startsWith("/") ||
-    path.includes("\\") || path.endsWith("/") || path.includes(":")) {
+    path.includes("\\") || path.endsWith("/") || path.includes(":") ||
+    /[\u0000-\u001f\u007f]/u.test(path)) {
     throw error(`Archive path ${JSON.stringify(path)} is not canonical.`, "flimg.archive_path_invalid", { path });
   }
   const segments = path.split("/");
@@ -118,7 +119,7 @@ export async function readFlimgZip(input, {
     const localOffset = uint32(bytes, cursor + 42);
     const recordLength = 46 + nameLength + extraLength + commentLength;
     safeSlice(bytes, cursor, recordLength, "ZIP central directory record");
-    if ((flags & 1) !== 0 || ![0, 8].includes(method) ||
+    if ((flags & ~0x0808) !== 0 || ![0, 8].includes(method) ||
       [compressedSize, uncompressedSize, localOffset].includes(0xffffffff)) {
       throw error("The ZIP entry encoding is unsupported.", "flimg.archive_malformed");
     }
@@ -162,6 +163,12 @@ export async function readFlimgZip(input, {
     );
     if (localName !== name || localFlags !== flags || localMethod !== method) {
       throw error(`ZIP headers disagree for ${name}.`, "flimg.archive_malformed");
+    }
+    if ((flags & 0x0008) === 0 &&
+      (uint32(bytes, localOffset + 14) !== expectedCrc ||
+        uint32(bytes, localOffset + 18) !== compressedSize ||
+        uint32(bytes, localOffset + 22) !== uncompressedSize)) {
+      throw error(`ZIP local sizes disagree for ${name}.`, "flimg.archive_malformed");
     }
     const dataStart = localOffset + 30 + localNameLength + localExtraLength;
     const dataEnd = dataStart + compressedSize;
