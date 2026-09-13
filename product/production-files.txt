@@ -100,6 +100,10 @@ src/io/project-files.js
 src/io/psd-project.js
 src/io/psd-reimport-review.js
 src/io/raster-fingerprint.js
+src/io/strict-json.js
+src/io/png-raster.js
+src/io/cutwork-flimg-reader.js
+src/io/cutwork-flimg-project.js
 src/preferences.js
 src/mcp/adapter.js
 src/mcp/schemas.js
@@ -154,6 +158,7 @@ src/ui/desktop-frame-sequence-sink.js
 src/ui/desktop-video-export.js
 src/ui/export-dialog-view.js
 src/ui/psd-render-assets.js
+src/ui/cutwork-render-assets.js
 src/desktop/shell-logic.js
 src/desktop/atomic-write.js
 src/desktop/frame-sequence-files.js

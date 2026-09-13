@@ -26,6 +26,7 @@
               <button type="button" data-file-action="save-copy">Save Copy…</button>
               <hr />
               <button type="button" data-file-action="import-psd">Import PSD…</button>
+              <button type="button" data-file-action="import-cutwork-flimg">Import Cutwork Image…</button>
               <button type="button" data-file-action="reimport-psd">Re-import PSD…</button>
               <hr />
               <button type="button" data-file-action="preferences">Preferences…</button>
@@ -33,7 +34,7 @@
           </details>
           <button id="undoButton" type="button" class="secondary compact" title="Undo: No operation" disabled>↶ Undo</button>
           <button id="redoButton" type="button" class="secondary compact" title="Redo: No operation" disabled>↷ Redo</button>
-          <div class="status" id="status" aria-live="polite">PNG / PSDを読み込んでください</div>
+          <div class="status" id="status" aria-live="polite">PNG / PSD / Cutwork Imageを読み込んでください</div>
         </div>
       </header>
 
@@ -41,8 +42,8 @@
         <aside class="panel scene-panel" aria-label="シーンツリー">
           <div class="asset-buttons">
             <label class="file-button">
-              <span>PNG / PSDを開く</span>
-              <input id="fileInput" type="file" accept="image/png,.psd,image/vnd.adobe.photoshop" />
+              <span>Source Artを開く</span>
+              <input id="fileInput" type="file" accept="image/png,.psd,image/vnd.adobe.photoshop,.flimg,application/x-flamoris-cutwork" />
             </label>
           </div>
           <div class="panel-heading">
@@ -646,6 +647,7 @@
     </main>
     <input id="projectOpenInput" type="file" accept=".fl2d,application/x-flamoris-2d+json" hidden />
     <input id="reimportPsdInput" type="file" accept=".psd,image/vnd.adobe.photoshop" hidden />
+    <input id="cutworkFlimgInput" type="file" accept=".flimg,application/x-flamoris-cutwork" hidden />
 
     <dialog id="unsavedDialog" class="app-dialog">
       <form method="dialog">

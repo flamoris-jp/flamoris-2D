@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 import {
   MCP_SCHEMA_VERSION,
   commandSchemas,
+  importSchemas,
   querySchemas,
 } from "../src/mcp/schemas.js";
 
 test("MCP schema module imports with wired query and command schemas", () => {
-  assert.equal(MCP_SCHEMA_VERSION, 17);
+  assert.equal(MCP_SCHEMA_VERSION, 18);
   assert.equal(
     querySchemas["scene.get_node"].properties.nodeId.type,
     "string",
@@ -67,4 +68,5 @@ test("MCP schema module imports with wired query and command schemas", () => {
     .properties.sample.properties.offsets.items.properties.vertexId.type, "string");
   assert.equal(querySchemas["animation.deformation_sample.get"].properties.sampleId.type,
     "string");
+  assert.equal(importSchemas["import.cutwork_flimg"].properties.bytes.items.maximum, 255);
 });

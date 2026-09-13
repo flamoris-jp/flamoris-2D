@@ -6,6 +6,33 @@ import {
 
 export const RECENT_FILE_LIMIT = 10;
 
+export function filePickerConfiguration(purpose = "open") {
+  if (purpose === "import-psd" || purpose === "reimport-psd") {
+    return {
+      title: "Select PSD",
+      requiredExtension: ".psd",
+      filters: [{ name: "Adobe Photoshop", extensions: ["psd"] }],
+    };
+  }
+  if (purpose === "import-cutwork-flimg") {
+    return {
+      title: "Select Cutwork Image",
+      requiredExtension: ".flimg",
+      filters: [{ name: "Cutwork Image", extensions: ["flimg"] }],
+    };
+  }
+  return {
+    title: "Open",
+    requiredExtension: null,
+    filters: [
+      { name: "FLAMORIS 2D / Source", extensions: ["fl2d", "psd", "png"] },
+      { name: "FLAMORIS 2D Project", extensions: ["fl2d"] },
+      { name: "Adobe Photoshop", extensions: ["psd"] },
+      { name: "PNG Image", extensions: ["png"] },
+    ],
+  };
+}
+
 export function documentTitle({
   filePath = null,
   fileName = null,
