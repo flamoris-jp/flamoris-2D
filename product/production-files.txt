@@ -127,6 +127,8 @@ src/ui/form-correction-authoring-controller.js
 src/ui/two-bone-ik-authoring-controller.js
 src/ui/two-bone-ik-viewport-overlay.js
 src/ui/weight-viewport-overlay.js
+src/ui/workflow-modes.js
+src/ui/workflow-view.js
 src/ui/bone-viewport-overlay.js
 src/ui/deformer-viewport-overlay.js
 src/ui/correspondence-view.js
