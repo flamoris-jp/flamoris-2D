@@ -29,7 +29,7 @@ export const WORKFLOW_LABELS = Object.freeze({
 
 export const WORKFLOW_HINTS = Object.freeze({
   [WORKFLOW_MODES.ASSET]: "素材を開き、パーツと配置を確認します",
-  [WORKFLOW_MODES.MESH]: "頂点・辺・トポロジーとキーフォームを編集します",
+  [WORKFLOW_MODES.MESH]: "パーツを選び、メッシュを作成して構造と頂点配置を整えます",
   [WORKFLOW_MODES.RIG]: "ワープ、ボーン、ウェイト、補正、IKを設定します",
   [WORKFLOW_MODES.MOTION]: "キーアート、トランジション、クリップ、シーケンスを編集します",
   [WORKFLOW_MODES.PREVIEW]: "再生とスクラブで動きを確認します",
@@ -41,8 +41,8 @@ const WORKFLOW_EDITOR_TOOLS = Object.freeze({
     Object.freeze({ editorMode: EDITOR_MODES.OBJECT, label: "パーツ配置" }),
   ]),
   [WORKFLOW_MODES.MESH]: Object.freeze([
-    Object.freeze({ editorMode: EDITOR_MODES.TOPOLOGY, label: "トポロジー" }),
-    Object.freeze({ editorMode: EDITOR_MODES.DEFORM, label: "頂点位置" }),
+    Object.freeze({ editorMode: EDITOR_MODES.TOPOLOGY, label: "構造を編集" }),
+    Object.freeze({ editorMode: EDITOR_MODES.DEFORM, label: "頂点を配置" }),
   ]),
   [WORKFLOW_MODES.RIG]: Object.freeze([
     Object.freeze({ editorMode: EDITOR_MODES.OBJECT, label: "ワープ・ボーン" }),
@@ -91,7 +91,8 @@ export function projectWorkflowPanels(workflowMode, { hasProject = false } = {})
     assetControls: !empty && workflowMode === WORKFLOW_MODES.ASSET,
     sceneTree: !empty && [WORKFLOW_MODES.ASSET, WORKFLOW_MODES.MESH,
       WORKFLOW_MODES.RIG].includes(workflowMode),
-    legacyMesh: !empty && workflowMode === WORKFLOW_MODES.MESH,
+    legacyMesh: false,
+    meshPreparation: !empty && workflowMode === WORKFLOW_MODES.MESH,
     legacyMotion: !empty && workflowMode === WORKFLOW_MODES.MOTION,
     selectionInspector: !empty && [WORKFLOW_MODES.ASSET, WORKFLOW_MODES.RIG]
       .includes(workflowMode),

@@ -55,6 +55,23 @@ test("Issue 88 workflow navigation lives in the header and the canvas is declutt
   assert.doesNotMatch(workflow, /session\.execute|executeTransaction|localStorage|persistence/);
 });
 
+test("hidden Sequence Timeline wins over its open details presentation", async () => {
+  const css = await readFile(new URL("../src/styles/editor-panels.css", import.meta.url), "utf8");
+  assert.match(css, /\.sequence-timeline-panel\[hidden\]\s*\{[^}]*display:\s*none\s*!important/);
+});
+
+test("Mesh overlay uses a contrast outline and visibility is not a selection control", async () => {
+  const [viewport, scene] = await Promise.all([
+    readFile(new URL("../src/ui/viewport-renderer.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/ui/scene-editor-view.js", import.meta.url), "utf8"),
+  ]);
+  assert.match(viewport, /lineWidth = 4;[\s\S]*rgba\(8, 18, 18, \.88\)[\s\S]*lineWidth = 1\.6;/);
+  assert.match(viewport, /rgba\(255, 222, 139, \.96\)/);
+  assert.match(scene, /visibility\.textContent = node\.visible \? "👁" : "⊘"/);
+  assert.match(scene, /aria-label/);
+  assert.match(scene, /aria-pressed/);
+});
+
 test("Phase 8-5 timeline shell is reachable, wired, and keeps persistent authority in Core", async () => {
   const [html, app, adapter, controller, view, viewport, baseCss, panelCss] = await Promise.all([
     readFile(new URL("../index.html", import.meta.url), "utf8"),

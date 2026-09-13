@@ -24,6 +24,7 @@ function endpointKeyformKey(endpoint) {
 export class EndpointMeshController {
   constructor(session, transitionAuthoring, { onChange = null, idFactory } = {}) {
     this.session = session;
+    this.kind = "endpoint";
     this.transitionAuthoring = transitionAuthoring;
     this.onChange = onChange;
     this.idFactory = idFactory || defaultIdFactory();

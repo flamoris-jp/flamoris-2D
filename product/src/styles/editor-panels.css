@@ -12,7 +12,7 @@
 .workspace[data-layout="canvas-right"] .viewport-wrap { grid-column: 1; }
 .workspace[data-layout="canvas-right"] .inspector-panel { grid-column: 2; }
 .panel { border-right: 1px solid var(--line); background: var(--panel); }
-.panel[hidden], .sequence-timeline-panel[hidden] { display: none; }
+.panel[hidden], .sequence-timeline-panel[hidden] { display: none !important; }
 .controls { padding: 20px; display: flex; flex-direction: column; gap: 13px; }
 .scene-panel, .inspector-panel {
   min-height: 0;
@@ -27,6 +27,13 @@
 .inspector-panel { border-right: 0; border-left: 1px solid var(--line); }
 .asset-buttons { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .asset-buttons button, .asset-buttons .file-button { min-height: 36px; font-size: 11px; }
+.asset-buttons.has-project .file-button {
+  min-height: 30px;
+  border-color: rgba(129, 221, 205, .2);
+  background: rgba(129, 221, 205, .05);
+  color: #b5cfca;
+  font-size: 10px;
+}
 .panel-heading { display: flex; align-items: baseline; justify-content: space-between; }
 .panel-heading h2 { margin: 0; font: 500 15px Georgia, "Yu Mincho", serif; letter-spacing: .04em; }
 .panel-heading span { color: #6f8985; font: 9px ui-monospace, SFMono-Regular, Consolas, monospace; }
@@ -73,6 +80,8 @@
   font-size: 10px;
 }
 .tree-toggle:hover, .tree-state:hover { transform: none !important; background: rgba(129, 221, 205, .08); }
+.tree-state { color: #b7e9df; font-size: 12px; }
+.tree-state[aria-pressed="false"] { color: #657773; }
 .tree-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: default; }
 .tree-kind { color: #72948f; font-size: 9px; }
 .tree-lock { color: var(--gold); }
@@ -237,6 +246,18 @@ button:not(:disabled):hover, .file-button:hover { border-color: var(--mint); tra
   border-radius: 8px;
   background: rgba(0, 0, 0, .12);
 }
+.mesh-preparation-intro {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(255, 202, 103, .22);
+  border-radius: 8px;
+  background: rgba(255, 202, 103, .06);
+}
+.mesh-preparation-intro[hidden] { display: none; }
+.mesh-preparation-intro ol { margin: 0; padding-left: 20px; color: #c9dcd8; font-size: 10px; line-height: 1.7; }
+#endpointMeshContextControls { display: grid; gap: 9px; }
+#endpointMeshContextControls[hidden] { display: none; }
 .mesh-overlay-toggle { display: flex !important; grid-template-columns: auto 1fr; align-items: center; }
 .mesh-overlay-toggle input { width: auto; accent-color: var(--mint); }
 .selected-vertex-card { display: grid; gap: 8px; padding: 9px; border-radius: 7px; background: rgba(129, 221, 205, .05); }

@@ -4,6 +4,7 @@ import { EDITOR_MODES } from "../src/ui/editor-modes.js";
 import {
   defaultEditorModeForWorkflow,
   projectWorkflowPanels,
+  WORKFLOW_HINTS,
   WORKFLOW_LABELS,
   WORKFLOW_MODES,
   WORKFLOW_ORDER,
@@ -29,6 +30,14 @@ test("workflow maps to existing low-level editor modes without duplicating them"
   assert.equal(workflowForEditorMode(EDITOR_MODES.TOPOLOGY), WORKFLOW_MODES.MESH);
 });
 
+test("Mesh workflow presents structure and layout tasks instead of domain jargon", () => {
+  assert.deepEqual(
+    workflowEditorTools(WORKFLOW_MODES.MESH).map(({ label }) => label),
+    ["構造を編集", "頂点を配置"],
+  );
+  assert.match(WORKFLOW_HINTS[WORKFLOW_MODES.MESH], /パーツ/);
+});
+
 test("all low-level authoring capabilities remain reachable contextually", () => {
   const tools = [...workflowEditorTools(WORKFLOW_MODES.ASSET),
     ...workflowEditorTools(WORKFLOW_MODES.MESH),
@@ -45,6 +54,7 @@ test("panel projection hides unrelated authoring surfaces instead of disabling t
   const mesh = projectWorkflowPanels(WORKFLOW_MODES.MESH, { hasProject: true });
   assert.equal(mesh.meshAuthoring, true);
   assert.equal(mesh.meshContext, true);
+  assert.equal(mesh.legacyMesh, false);
   assert.equal(mesh.transitionPanel, false);
   assert.equal(mesh.motionAuthoring, false);
   assert.equal(mesh.sequenceTimeline, false);
