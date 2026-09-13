@@ -126,13 +126,13 @@ function allocateStableVertexIds(topologies, count, topology = null) {
  * ordinary EditorSession Command/Transaction path.
  */
 export class MeshToolController {
-  constructor(session, endpointMesh, {
+  constructor(session, meshContext, {
     onChange = null,
     registry = null,
     isPreviewReadOnly = () => false,
   } = {}) {
     this.session = session;
-    this.endpointMesh = endpointMesh;
+    this.meshContext = meshContext;
     this.onChange = onChange;
     this.registry = registry || createDefaultMeshToolRegistry();
     this.isPreviewReadOnly = isPreviewReadOnly;
@@ -143,6 +143,17 @@ export class MeshToolController {
   }
 
   notify(reason) { this.onChange?.(reason, this); }
+
+  setContextController(meshContext) {
+    if (!meshContext || typeof meshContext.getState !== "function" ||
+      typeof meshContext.activeKeyform !== "function") {
+      throw new TypeError("Mesh authoring context must expose state and an active MeshKeyform.");
+    }
+    if (this.meshContext === meshContext) return;
+    this.meshContext = meshContext;
+    this.selectedVertexIds.clear();
+    this.notify("mesh-context");
+  }
 
   setMode(mode) {
     if (!Object.values(MESH_AUTHORING_MODES).includes(mode)) {
@@ -193,7 +204,7 @@ export class MeshToolController {
   }
 
   activeTopology() {
-    const topologyId = this.endpointMesh.getState().selectedTopologyId;
+    const topologyId = this.meshContext.getState().selectedTopologyId;
     if (!topologyId) return null;
     return this.session.query("mesh.get_topology", { topologyId });
   }
@@ -217,7 +228,7 @@ export class MeshToolController {
     if (this.mode !== MESH_AUTHORING_MODES.DEFORM) {
       throw new Error("MeshKeyform deformation is available only in Deform Mode.");
     }
-    const keyform = this.endpointMesh.activeKeyform();
+    const keyform = this.meshContext.activeKeyform();
     if (!keyform) throw new Error("Select an endpoint MeshKeyform first.");
     return this.session.execute({
       type: "mesh_keyform.move_vertices",
@@ -327,14 +338,21 @@ export class MeshToolController {
     );
     let result;
     if (!topology) {
-      result = this.endpointMesh.createSharedTopologyAndKeyforms({
-        vertexIds,
-        indices: candidate.indices,
-        fromPositions: candidate.positions,
-        fromUvs: candidate.uvs,
-        toPositions: candidate.positions,
-        toUvs: candidate.uvs,
-      });
+      result = typeof this.meshContext.createGeneratedMesh === "function"
+        ? this.meshContext.createGeneratedMesh({
+          vertexIds,
+          indices: candidate.indices,
+          positions: candidate.positions,
+          uvs: candidate.uvs,
+        })
+        : this.meshContext.createSharedTopologyAndKeyforms({
+          vertexIds,
+          indices: candidate.indices,
+          fromPositions: candidate.positions,
+          fromUvs: candidate.uvs,
+          toPositions: candidate.positions,
+          toUvs: candidate.uvs,
+        });
     } else {
       result = this.session.execute({
         type: "mesh_topology.apply_generated_mesh",
