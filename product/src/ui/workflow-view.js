@@ -1,7 +1,6 @@
 import {
   projectWorkflowPanels,
   WORKFLOW_HINTS,
-  WORKFLOW_LABELS,
   WORKFLOW_MODES,
   workflowEditorTools,
 } from "./workflow-modes.js";
