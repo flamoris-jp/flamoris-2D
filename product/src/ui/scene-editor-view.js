@@ -19,10 +19,12 @@ export function createSceneEditorView({
   setStatus,
   updateEditorModeUi,
   updateZoomOutput,
+  canSelectMeshPreparationPart = () => false,
 }) {
   function selectSceneNode(nodeId) {
     const requestedNode = state.editor.getNode?.(nodeId) || null;
-    const nextNodeId = requestedNode?.kind === "deformer"
+    const nextNodeId = requestedNode?.kind === "deformer" ||
+      (requestedNode?.kind === "part" && canSelectMeshPreparationPart())
       ? nodeId
       : objectSelectionForMode(
         state.editorMode,
@@ -77,8 +79,10 @@ export function createSceneEditorView({
       const visibility = document.createElement("button");
       visibility.type = "button";
       visibility.className = "tree-state";
-      visibility.textContent = node.visible ? "◉" : "○";
+      visibility.textContent = node.visible ? "👁" : "⊘";
       visibility.title = node.visible ? "非表示にする" : "表示する";
+      visibility.setAttribute("aria-label", `${node.displayName}を${node.visible ? "非表示" : "表示"}にする`);
+      visibility.setAttribute("aria-pressed", String(node.visible));
       visibility.addEventListener("click", (event) => {
         event.stopPropagation();
         state.editor.setVisibility(node.id, !node.visible);

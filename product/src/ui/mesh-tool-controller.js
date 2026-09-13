@@ -46,55 +46,55 @@ export function createDefaultMeshToolRegistry() {
     .register({
       id: "deform.move",
       mode: MESH_AUTHORING_MODES.DEFORM,
-      label: "Move",
+      label: "頂点を移動",
       execute: (controller, input) => controller.commitDeformPositions(input.positions),
     })
     .register({
       id: "topology.select",
       mode: MESH_AUTHORING_MODES.TOPOLOGY,
-      label: "Select",
+      label: "頂点を選択",
       execute: (_controller, input) => input,
     })
     .register({
       id: "topology.add",
       mode: MESH_AUTHORING_MODES.TOPOLOGY,
-      label: "Add Vertex",
+      label: "頂点を追加",
       execute: (controller, input) => controller.addVertex(input),
     })
     .register({
       id: "topology.remove",
       mode: MESH_AUTHORING_MODES.TOPOLOGY,
-      label: "Remove Vertex",
+      label: "頂点を削除",
       execute: (controller, input) => controller.removeVertex(input),
     })
     .register({
       id: "topology.connect",
       mode: MESH_AUTHORING_MODES.TOPOLOGY,
-      label: "Create Triangle",
+      label: "面を作成",
       execute: (controller, input) => controller.connectVertices(input),
     })
     .register({
       id: "topology.subdivide",
       mode: MESH_AUTHORING_MODES.TOPOLOGY,
-      label: "Subdivide Edge",
+      label: "辺を分割",
       execute: (controller, input) => controller.subdivideEdge(input),
     })
     .register({
       id: "topology.set-label",
       mode: MESH_AUTHORING_MODES.TOPOLOGY,
-      label: "Set Label",
+      label: "頂点名を設定",
       execute: (controller, input) => controller.setSemanticLabel(input),
     })
     .register({
       id: "topology.clear-label",
       mode: MESH_AUTHORING_MODES.TOPOLOGY,
-      label: "Clear Label",
+      label: "頂点名を消去",
       execute: (controller, input) => controller.clearSemanticLabel(input),
     })
     .register({
       id: "topology.automesh",
       mode: MESH_AUTHORING_MODES.TOPOLOGY,
-      label: "Contour AutoMesh",
+      label: "輪郭から自動作成",
       execute: (controller, input) => controller.applyGeneratedMesh(input),
     });
 }
@@ -126,13 +126,13 @@ function allocateStableVertexIds(topologies, count, topology = null) {
  * ordinary EditorSession Command/Transaction path.
  */
 export class MeshToolController {
-  constructor(session, endpointMesh, {
+  constructor(session, meshContext, {
     onChange = null,
     registry = null,
     isPreviewReadOnly = () => false,
   } = {}) {
     this.session = session;
-    this.endpointMesh = endpointMesh;
+    this.meshContext = meshContext;
     this.onChange = onChange;
     this.registry = registry || createDefaultMeshToolRegistry();
     this.isPreviewReadOnly = isPreviewReadOnly;
@@ -143,6 +143,21 @@ export class MeshToolController {
   }
 
   notify(reason) { this.onChange?.(reason, this); }
+
+  setContextController(meshContext) {
+    if (!meshContext || typeof meshContext.getState !== "function" ||
+      typeof meshContext.activeKeyform !== "function") {
+      throw new TypeError("Mesh authoring context must expose state and an active MeshKeyform.");
+    }
+    if (this.meshContext === meshContext) return;
+    this.meshContext = meshContext;
+    this.selectedVertexIds.clear();
+    this.notify("mesh-context");
+  }
+
+  getContextController() {
+    return this.meshContext;
+  }
 
   setMode(mode) {
     if (!Object.values(MESH_AUTHORING_MODES).includes(mode)) {
@@ -193,7 +208,7 @@ export class MeshToolController {
   }
 
   activeTopology() {
-    const topologyId = this.endpointMesh.getState().selectedTopologyId;
+    const topologyId = this.meshContext.getState().selectedTopologyId;
     if (!topologyId) return null;
     return this.session.query("mesh.get_topology", { topologyId });
   }
@@ -217,7 +232,7 @@ export class MeshToolController {
     if (this.mode !== MESH_AUTHORING_MODES.DEFORM) {
       throw new Error("MeshKeyform deformation is available only in Deform Mode.");
     }
-    const keyform = this.endpointMesh.activeKeyform();
+    const keyform = this.meshContext.activeKeyform();
     if (!keyform) throw new Error("Select an endpoint MeshKeyform first.");
     return this.session.execute({
       type: "mesh_keyform.move_vertices",
@@ -327,14 +342,21 @@ export class MeshToolController {
     );
     let result;
     if (!topology) {
-      result = this.endpointMesh.createSharedTopologyAndKeyforms({
-        vertexIds,
-        indices: candidate.indices,
-        fromPositions: candidate.positions,
-        fromUvs: candidate.uvs,
-        toPositions: candidate.positions,
-        toUvs: candidate.uvs,
-      });
+      result = typeof this.meshContext.createGeneratedMesh === "function"
+        ? this.meshContext.createGeneratedMesh({
+          vertexIds,
+          indices: candidate.indices,
+          positions: candidate.positions,
+          uvs: candidate.uvs,
+        })
+        : this.meshContext.createSharedTopologyAndKeyforms({
+          vertexIds,
+          indices: candidate.indices,
+          fromPositions: candidate.positions,
+          fromUvs: candidate.uvs,
+          toPositions: candidate.positions,
+          toUvs: candidate.uvs,
+        });
     } else {
       result = this.session.execute({
         type: "mesh_topology.apply_generated_mesh",
@@ -360,6 +382,7 @@ export class MeshToolController {
       ? this.session.query("mesh.list_keyforms", { topologyId: topology.id })
       : [];
     return {
+      contextKind: this.meshContext.kind || "endpoint",
       mode: this.mode,
       activeToolId: this.activeToolId,
       tools: this.registry.list(this.mode),

@@ -66,7 +66,7 @@
         <aside id="scenePanel" class="panel scene-panel" aria-label="パーツ">
           <div id="assetControls" class="asset-buttons">
             <label class="file-button">
-              <span>素材を開く</span>
+              <span id="assetOpenLabel">素材を開く</span>
               <input id="fileInput" type="file" accept="image/png,.psd,image/vnd.adobe.photoshop,.flimg,application/x-flamoris-cutwork" />
             </label>
           </div>
@@ -84,7 +84,7 @@
           <div class="part-info" id="partInfo">単一PNGまたはPSDを読み込めます</div>
 
           <details id="legacyMeshLab" class="mesh-lab" open>
-            <summary>メッシュ</summary>
+            <summary>メッシュを作成</summary>
 
             <div id="legacyMeshControls" class="legacy-mesh-controls">
               <div class="field-grid">
@@ -388,11 +388,25 @@
             </div>
 
             <fieldset id="endpointMeshCard" class="part-transition-card">
-              <legend>メッシュ / キーフォーム</legend>
+              <legend>メッシュの準備</legend>
+              <section id="meshPreparationIntro" class="mesh-preparation-intro" hidden>
+                <ol>
+                  <li>左のパーツ一覧から描画パーツを選ぶ</li>
+                  <li>左の「メッシュを作成」でグリッドを作る</li>
+                  <li>構造を編集し、頂点配置を整える</li>
+                </ol>
+                <label class="authoring-field">編集するメッシュ
+                  <select id="meshPreparationKeyformSelect" disabled>
+                    <option value="">— メッシュ未作成 —</option>
+                  </select>
+                </label>
+                <output id="meshPreparationStatus" class="authoring-status">パーツを選択してください</output>
+              </section>
               <div class="endpoint-switch" role="group" aria-label="Legacy endpoint edit context" hidden>
                 <button id="editEndpointAButton" type="button">Edit A</button>
                 <button id="editEndpointBButton" type="button">Edit B</button>
               </div>
+              <div id="endpointMeshContextControls">
               <output id="activeEndpointLabel" class="authoring-status">Select Morph SemanticSlot</output>
               <label class="authoring-field">Shared MeshTopology
                 <select id="endpointTopologySelect" disabled><option value="">— Select topology —</option></select>
@@ -406,10 +420,12 @@
                 <select id="endpointBKeyformSelect" disabled><option value="">— Select keyform —</option></select>
               </label>
               <button id="createEndpointBKeyformButton" type="button" disabled>Create B keyform</button>
+              </div>
               <div class="mesh-authoring-tools">
                 <label class="authoring-field">メッシュツール
                   <select id="meshToolSelect" disabled><option value="">— Select tool —</option></select>
                 </label>
+                <output id="meshToolHelp" class="authoring-status">メッシュを作成すると編集できます</output>
                 <label class="mesh-overlay-toggle">
                   <input id="vertexIdOverlayInput" type="checkbox" />
                   頂点IDを表示
@@ -424,14 +440,14 @@
                     <input id="vertexSemanticLabelInput" type="text" autocomplete="off" placeholder="chin_tip" />
                   </label>
                   <div class="preview-buttons">
-                    <button id="setVertexSemanticLabelButton" type="button">Set label</button>
-                    <button id="clearVertexSemanticLabelButton" type="button" class="secondary">Clear</button>
+                  <button id="setVertexSemanticLabelButton" type="button">名前を設定</button>
+                  <button id="clearVertexSemanticLabelButton" type="button" class="secondary">名前を消す</button>
                   </div>
                 </section>
                 <div class="topology-actions" role="group" aria-label="Topology mutation commands">
-                  <button id="removeVertexButton" type="button">Remove selected</button>
-                  <button id="createTriangleButton" type="button">Create triangle (3)</button>
-                  <button id="subdivideEdgeButton" type="button">Subdivide edge (2)</button>
+                  <button id="removeVertexButton" type="button">選択した頂点を削除</button>
+                  <button id="createTriangleButton" type="button">3頂点を面でつなぐ</button>
+                  <button id="subdivideEdgeButton" type="button">2頂点間を分割</button>
                 </div>
                 <section id="autoMeshPanel" class="automesh-panel" aria-label="Mesh generator">
                   <label>Generator

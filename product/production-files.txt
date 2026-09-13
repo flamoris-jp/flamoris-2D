@@ -115,6 +115,7 @@ src/ui/editor-shortcuts.js
 src/ui/editor-modes.js
 src/ui/endpoint-mesh-controller.js
 src/ui/mesh-editing-controller.js
+src/ui/mesh-preparation-controller.js
 src/ui/mesh-tool-controller.js
 src/ui/automesh-preview-controller.js
 src/ui/correspondence-preview-controller.js

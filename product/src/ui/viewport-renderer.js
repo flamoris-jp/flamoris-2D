@@ -179,10 +179,9 @@ export function createViewportRenderer({
     if (!state.mesh || !state.view || vertices.length === 0) return;
     if (state.mode === "psd" && !isMeshAuthoringMode(state.editorMode)) return;
 
-    context.lineWidth = isMeshAuthoringMode(state.editorMode) ? 1.5 : 1;
-    context.strokeStyle = isMeshAuthoringMode(state.editorMode)
-      ? "rgba(255, 202, 103, 0.72)"
-      : "rgba(129, 221, 205, 0.48)";
+    const authoring = isMeshAuthoringMode(state.editorMode);
+    context.lineJoin = "round";
+    context.lineCap = "round";
     context.beginPath();
     for (let index = 0; index < state.mesh.indices.length; index += 3) {
       const triangle = state.mesh.indices.slice(index, index + 3);
@@ -201,7 +200,18 @@ export function createViewportRenderer({
       );
       context.lineTo(first.x, first.y);
     }
-    context.stroke();
+    if (authoring) {
+      context.lineWidth = 4;
+      context.strokeStyle = "rgba(8, 18, 18, .88)";
+      context.stroke();
+      context.lineWidth = 1.6;
+      context.strokeStyle = "rgba(255, 222, 139, .96)";
+      context.stroke();
+    } else {
+      context.lineWidth = 1;
+      context.strokeStyle = "rgba(129, 221, 205, 0.48)";
+      context.stroke();
+    }
 
     let weightByVertex = new Map();
     if (state.editorMode === EDITOR_MODES.WEIGHT) {
@@ -230,14 +240,15 @@ export function createViewportRenderer({
       const vertexId = endpointForVertices?.topology?.vertexIds?.[index];
       const weight = weightByVertex.get(vertexId);
       context.beginPath();
-      context.arc(point.x, point.y, state.selected.has(index) ? 5 : 3.5, 0, Math.PI * 2);
+      context.arc(point.x, point.y, state.selected.has(index) ? 5.5 : 4, 0, Math.PI * 2);
       context.fillStyle = state.selected.has(index) ? "#ffca67" : weight?.color || "#eafdf9";
       context.fill();
-      context.strokeStyle = state.selected.has(index) ? "#4f3412" : "#183a37";
+      context.lineWidth = state.selected.has(index) ? 2.5 : 2;
+      context.strokeStyle = "rgba(8, 18, 18, .94)";
       context.stroke();
     }
     const endpoint = endpointContext();
-    const meshToolState = state.editor?.meshTools.getState() || null;
+    const meshToolState = state.editor?.meshTools?.getState() || null;
     if (endpoint?.topology && meshToolState) {
       context.save();
       context.font = "600 10px ui-monospace, monospace";
@@ -263,12 +274,14 @@ export function createViewportRenderer({
       context.fillStyle = "#ffca67";
       context.font = "700 12px ui-monospace, monospace";
       const mode = state.editorMode === EDITOR_MODES.TOPOLOGY
-        ? "TOPOLOGY EDIT"
+        ? "構造を編集"
         : state.editorMode === EDITOR_MODES.WEIGHT
           ? "WEIGHT AUTHORING"
           : state.editorMode === EDITOR_MODES.FORM_CORRECTION
             ? "FORM CORRECTION"
-            : `DEFORM ENDPOINT ${endpoint.endpoint === "from" ? "A" : "B"}`;
+            : endpoint.endpoint
+              ? `頂点を配置・KEY STATE ${endpoint.endpoint === "from" ? "A" : "B"}`
+              : "頂点を配置";
       context.fillText(mode, 24, 33);
     }
     drawAutoMeshPreview(context);
