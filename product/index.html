@@ -190,11 +190,11 @@
               </div>
             </fieldset>
             <fieldset id="boneControls" hidden>
-              <legend>Bone Authoring</legend>
-              <label>Mode
+              <legend>ボーン</legend>
+              <label>編集
                 <select id="boneModeSelect">
-                  <option value="edit">Bone Edit</option>
-                  <option value="pose">Bone Pose</option>
+                  <option value="edit">構造を編集</option>
+                  <option value="pose">ポーズを編集</option>
                 </select>
               </label>
               <label>Active Key Art
@@ -219,8 +219,8 @@
               <output id="boneAuthoringStatus" class="deformer-grid-reason"></output>
             </fieldset>
             <fieldset id="rotationConstraintControls" hidden>
-              <legend>Rotation Constraint</legend>
-              <label class="clipping-toggle"><input id="rotationConstraintEnabledInput" type="checkbox" /> Enabled</label>
+              <legend>回転制限</legend>
+              <label class="clipping-toggle"><input id="rotationConstraintEnabledInput" type="checkbox" /> 有効</label>
               <div class="inspector-grid">
                 <label>Min°<input id="rotationConstraintMinInput" type="number" step="0.1" value="-180" /></label>
                 <label>Max°<input id="rotationConstraintMaxInput" type="number" step="0.1" value="180" /></label>
@@ -231,7 +231,7 @@
               </div>
             </fieldset>
             <fieldset id="boneMirrorControls" hidden>
-              <legend>Mirror Helper</legend>
+              <legend>左右反転</legend>
               <label>Source<select id="mirrorSourceBoneSelect"><option value="">— Source —</option></select></label>
               <label>Target<select id="mirrorTargetBoneSelect"><option value="">— Target —</option></select></label>
               <label>Key Art<select id="mirrorKeyArtSelect"><option value="">— Select Key Art —</option></select></label>
@@ -243,7 +243,7 @@
               <output id="boneMirrorStatus" class="deformer-grid-reason">Explicit pair only · no name guessing.</output>
             </fieldset>
             <fieldset id="ikControls" hidden>
-              <legend>Two-Bone IK</legend>
+              <legend>2ボーンIK</legend>
               <label>Active IK<select id="ikConstraintSelect"><option value="">— Select IK —</option></select></label>
               <label>Active Key Art<select id="ikKeyArtSelect"><option value="">— Select Key Art —</option></select></label>
               <div class="inspector-grid">
@@ -253,7 +253,7 @@
                 <span></span>
               </div>
               <label>Bend<select id="ikBendDirectionSelect"><option value="counterclockwise">Counterclockwise</option><option value="clockwise">Clockwise</option></select></label>
-              <label class="clipping-toggle"><input id="ikEnabledInput" type="checkbox" /> Enabled</label>
+              <label class="clipping-toggle"><input id="ikEnabledInput" type="checkbox" /> 有効</label>
               <div class="deformer-actions">
                 <button id="createIkConstraintButton" type="button" class="secondary">Create IK</button>
                 <button id="removeIkConstraintButton" type="button" class="secondary">Remove IK</button>
@@ -261,15 +261,15 @@
               <output id="ikAuthoringStatus" class="deformer-grid-reason"></output>
             </fieldset>
             <fieldset id="rigidBindingControls" hidden>
-              <legend>Rigid Bone Attachment</legend>
+              <legend>ボーンへ固定</legend>
               <label>Bone
                 <select id="rigidBindingBoneSelect"><option value="">— No attachment —</option></select>
               </label>
-              <label class="clipping-toggle"><input id="rigidBindingEnabledInput" type="checkbox" /> Enabled</label>
+              <label class="clipping-toggle"><input id="rigidBindingEnabledInput" type="checkbox" /> 有効</label>
               <button id="removeRigidBindingButton" type="button" class="secondary">Remove attachment</button>
             </fieldset>
             <fieldset id="weightAuthoringControls" hidden>
-              <legend>Weight Authoring</legend>
+              <legend>ウェイト</legend>
               <label>SkinBinding<select id="weightBindingSelect"><option value="">— Select binding —</option></select></label>
               <button id="createSkinBindingButton" type="button" class="secondary">Create binding for Part</button>
               <label>Active Bone<select id="weightBoneSelect"><option value="">— Select Bone —</option></select></label>
@@ -286,14 +286,14 @@
               <output id="weightAuthoringStatus" class="deformer-grid-reason"></output>
             </fieldset>
             <fieldset id="formCorrectionControls" hidden>
-              <legend>Form Correction</legend>
+              <legend>フォーム補正</legend>
               <label>Active Key Art<output id="formCorrectionKeyArtOutput">—</output></label>
               <label>Selected vertex<output id="formCorrectionVertexOutput">—</output></label>
               <button id="resetFormCorrectionButton" type="button" class="secondary">Reset correction</button>
               <output id="formCorrectionStatus" class="deformer-grid-reason"></output>
             </fieldset>
             <fieldset id="deformerControls" hidden>
-              <legend>Warp Deformer</legend>
+              <legend>ワープ</legend>
               <label>Grid preset
                 <select id="deformerGridSelect">
                   <option value="2">2x2</option>
@@ -312,7 +312,7 @@
               </div>
             </fieldset>
             <fieldset id="clippingControls" hidden>
-              <legend>Clipping</legend>
+              <legend>クリッピング</legend>
               <label class="clipping-toggle"><input id="clippingEnabledInput" type="checkbox" /> Enable clipping</label>
               <label>Clip To
                 <select id="clippingSourceSelect"><option value="">— Select source —</option></select>
@@ -359,7 +359,7 @@
             </details>
 
             <fieldset id="transitionMappingCard" class="mapping-card">
-              <legend>SemanticSlot Mapping</legend>
+              <legend>対応するパーツ</legend>
               <label class="authoring-field">SemanticSlot
                 <select id="semanticSlotSelect" disabled><option value="">— Select SemanticSlot —</option></select>
               </label>
@@ -369,7 +369,7 @@
             </fieldset>
 
             <fieldset id="partTransitionCard" class="part-transition-card">
-              <legend>PartTransition Mode</legend>
+              <legend>パーツの切り替え方</legend>
               <label class="authoring-field">Persistent mode
                 <select id="partTransitionModeSelect" disabled><option value="">— No PartTransition —</option></select>
               </label>
@@ -383,7 +383,7 @@
             </fieldset>
 
             <fieldset id="endpointMeshCard" class="part-transition-card">
-              <legend>Endpoint Mesh / Keyform</legend>
+              <legend>メッシュ / キーフォーム</legend>
               <div class="endpoint-switch" role="group" aria-label="Legacy endpoint edit context" hidden>
                 <button id="editEndpointAButton" type="button">Edit A</button>
                 <button id="editEndpointBButton" type="button">Edit B</button>
@@ -402,15 +402,15 @@
               </label>
               <button id="createEndpointBKeyformButton" type="button" disabled>Create B keyform</button>
               <div class="mesh-authoring-tools">
-                <label class="authoring-field">Mesh tool
+                <label class="authoring-field">メッシュツール
                   <select id="meshToolSelect" disabled><option value="">— Select tool —</option></select>
                 </label>
                 <label class="mesh-overlay-toggle">
                   <input id="vertexIdOverlayInput" type="checkbox" />
-                  Viewport Vertex ID overlay
+                  頂点IDを表示
                 </label>
                 <section class="selected-vertex-card" aria-label="Selected vertex identity">
-                  <strong>Vertex</strong>
+                  <strong>頂点</strong>
                   <dl>
                     <dt>ID</dt><dd><output id="selectedVertexIdOutput">—</output></dd>
                     <dt>Label</dt><dd><output id="selectedVertexLabelOutput">—</output></dd>
@@ -453,7 +453,7 @@
                 <output id="meshTopologyImpact" class="topology-impact">Deform Mode changes only the active MeshKeyform.</output>
               </div>
               <section id="correspondencePanel" class="correspondence-panel" aria-label="Correspondence assistance" hidden>
-                <h3>Correspondence Assistance</h3>
+                <h3>頂点対応の補助</h3>
                 <label>Direction
                   <select id="correspondenceDirectionSelect">
                     <option value="from-to">A → B</option>
@@ -494,7 +494,7 @@
             </fieldset>
 
             <fieldset id="transitionPreviewCard" class="transition-preview-card">
-              <legend>Key State / Preview</legend>
+              <legend>キーステート / プレビュー</legend>
               <section id="keyStateStrip" class="key-state-strip" aria-label="Key State Strip">
                 <div class="key-state-scale" aria-hidden="true"><span>0%</span><span>100%</span></div>
                 <div class="key-state-track">
@@ -528,8 +528,8 @@
               <output id="transitionPreviewAuthority" class="preview-authority" data-authority="no">Non-authoritative preview</output>
               <ul id="transitionPreviewReasons" class="preview-reasons"></ul>
 
-              <details class="typed-track-editor" open>
-                <summary>Transition-owned typed tracks</summary>
+              <details id="transitionTrackEditor" class="typed-track-editor" open>
+                <summary>トランジションのトラック</summary>
                 <label>Existing tracks<select id="transitionTrackSelect"><option value="">— Select typed track —</option></select></label>
                 <div class="track-add-grid">
                   <label>Kind<select id="transitionTrackKindSelect"></select></label>
@@ -555,7 +555,7 @@
             </fieldset>
 
             <fieldset id="transitionDiagnosticsCard" class="transition-diagnostics-card">
-              <legend>Transition Diagnostics</legend>
+              <legend>トランジション診断</legend>
               <output id="transitionDiagnosticsAuthority" class="preview-authority" data-authority="no">Non-authoritative preview</output>
               <p class="authoring-status">Validation, evaluator, and renderer reports share the preview authority contract.</p>
               <ul id="transitionDiagnosticsList" class="diagnostics-list">

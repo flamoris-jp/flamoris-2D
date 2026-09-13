@@ -233,6 +233,7 @@ export function queryAppElements(root = document) {
   keyStatePlayButton: root.querySelector("#keyStatePlayButton"),
   keyStatePauseButton: root.querySelector("#keyStatePauseButton"),
   transitionPreviewCard: root.querySelector("#transitionPreviewCard"),
+  transitionTrackEditor: root.querySelector("#transitionTrackEditor"),
   transitionViewAButton: root.querySelector("#transitionViewAButton"),
   transitionViewBButton: root.querySelector("#transitionViewBButton"),
   transitionViewPreviewButton: root.querySelector("#transitionViewPreviewButton"),

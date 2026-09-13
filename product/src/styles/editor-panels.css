@@ -7,6 +7,7 @@
   grid-template-columns: 300px minmax(0, 1fr) 280px;
 }
 .workspace[data-layout="canvas"] { grid-template-columns: minmax(0, 1fr); }
+.workspace[data-layout="left-canvas"] { grid-template-columns: 300px minmax(0, 1fr); }
 .workspace[data-layout="canvas-right"] { grid-template-columns: minmax(0, 1fr) 280px; }
 .workspace[data-layout="canvas-right"] .viewport-wrap { grid-column: 1; }
 .workspace[data-layout="canvas-right"] .inspector-panel { grid-column: 2; }

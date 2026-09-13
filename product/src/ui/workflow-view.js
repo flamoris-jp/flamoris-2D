@@ -37,6 +37,10 @@ function setToolOptions(select, tools, editorMode) {
     select.value = editorMode;
     return;
   }
+  if ([...select.children].some((option) => option.value === "")) {
+    select.value = "";
+    return;
+  }
   const placeholder = document.createElement("option");
   placeholder.value = "";
   placeholder.textContent = "編集対象を選択してください";
@@ -59,12 +63,20 @@ export function createWorkflowView({ state, elements }) {
     const workflowMode = state.workflowMode || WORKFLOW_MODES.ASSET;
     const projection = projectWorkflowPanels(workflowMode, { hasProject });
 
+    const editorProjectAvailable = Boolean(project);
+    const scenePanelVisible = projection.scenePanel;
+    const inspectorPanelVisible = projection.inspectorPanel &&
+      (editorProjectAvailable || projection.exportControls);
     elements.workspace.dataset.workflow = workflowMode;
     elements.workspace.dataset.layout = projection.empty
       ? "canvas"
-      : projection.scenePanel
+      : scenePanelVisible && inspectorPanelVisible
         ? "full"
-        : "canvas-right";
+        : scenePanelVisible
+          ? "left-canvas"
+          : inspectorPanelVisible
+            ? "canvas-right"
+            : "canvas";
     elements.workflowHint.textContent = projection.empty
       ? "最初に「素材を開く」から始めます"
       : WORKFLOW_HINTS[workflowMode];
@@ -84,14 +96,15 @@ export function createWorkflowView({ state, elements }) {
     show(elements.contextualModeSelector, showToolSelector);
     if (showToolSelector) setToolOptions(elements.editorModeSelect, tools, state.editorMode);
 
-    show(elements.scenePanel, projection.scenePanel);
+    show(elements.scenePanel, scenePanelVisible);
     show(elements.assetControls, projection.assetControls);
     show(elements.legacyMeshLab, projection.legacyMesh || projection.legacyMotion);
     show(elements.legacyMeshControls, projection.legacyMesh);
     show(elements.legacyMotionControls, projection.legacyMotion);
-    show(elements.inspectorPanel, projection.inspectorPanel);
+    show(elements.inspectorPanel, inspectorPanelVisible);
     show(elements.exportWorkflowPanel, projection.exportControls);
-    show(elements.transitionAuthoringPanel, projection.transitionPanel);
+    show(elements.transitionAuthoringPanel,
+      projection.transitionPanel && editorProjectAvailable);
 
     if (!projection.selectionInspector) {
       show(elements.inspectorEmpty, false);
@@ -112,6 +125,7 @@ export function createWorkflowView({ state, elements }) {
       show(elements.partTransitionCard, projection.motionAuthoring);
       show(elements.endpointMeshCard, projection.meshAuthoring);
       show(elements.transitionPreviewCard, projection.previewControls);
+      show(elements.transitionTrackEditor, projection.motionAuthoring);
       show(elements.transitionDiagnosticsCard, projection.transitionDiagnostics);
     }
 
