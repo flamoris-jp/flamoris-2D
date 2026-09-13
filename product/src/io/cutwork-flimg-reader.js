@@ -9,6 +9,7 @@ export const CUTWORK_FLIMG_LIMITS = Object.freeze({
   maximumArchiveBytes: 1024 * 1024 * 1024,
   maximumPhysicalArchiveBytes: 1088 * 1024 * 1024,
   maximumManifestBytes: 4 * 1024 * 1024,
+  maximumRasterWorkingSetBytes: 1024 * 1024 * 1024,
 });
 
 export class CutworkFlimgError extends Error {
@@ -301,6 +302,48 @@ function validateSourcePolygon(value, canvas, path) {
   });
 }
 
+function addRasterBudget(total, pixels, bytesPerPixel, limit, label) {
+  if (!Number.isSafeInteger(pixels) || pixels < 0 ||
+    !Number.isSafeInteger(bytesPerPixel) || bytesPerPixel < 0 ||
+    pixels > Math.floor(Number.MAX_SAFE_INTEGER / bytesPerPixel)) {
+    throw error(`Raster memory calculation overflowed for ${label}.`,
+      "flimg.size_limit_exceeded", { resource: "raster-working-set", label });
+  }
+  const bytes = pixels * bytesPerPixel;
+  if (total > Number.MAX_SAFE_INTEGER - bytes) {
+    throw error(`Raster memory calculation overflowed for ${label}.`,
+      "flimg.size_limit_exceeded", { resource: "raster-working-set", label });
+  }
+  const next = total + bytes;
+  if (next > limit) {
+    throw error("The .flimg raster working set exceeds the import limit.",
+      "flimg.size_limit_exceeded", {
+        resource: "raster-working-set",
+        estimatedBytes: next,
+        maximumBytes: limit,
+      });
+  }
+  return next;
+}
+
+function preflightRasterWorkingSet(canvas, layers, limits) {
+  const canvasPixels = canvas.width * canvas.height;
+  let total = 0;
+  // Original RGBA + materialized Base RGBA + the Base union Gray8 buffer.
+  total = addRasterBudget(total, canvasPixels, 9,
+    limits.maximumRasterWorkingSetBytes, "Original, Base, and Part union");
+  for (const layer of layers) {
+    if (layer.kind === "base") continue;
+    const pixels = layer.bounds.width * layer.bounds.height;
+    // Parts retain Gray8 and materialize RGBA. Patch/Repair retain decoded RGBA
+    // while the current materializer creates an independent render raster.
+    const bytesPerPixel = layer.kind === "part" ? 5 : 8;
+    total = addRasterBudget(total, pixels, bytesPerPixel,
+      limits.maximumRasterWorkingSetBytes, `layer ${layer.id}`);
+  }
+  return total;
+}
+
 async function readAsset(entries, path, expectedHash, dimensions, colorType, options) {
   const bytes = entries.get(path);
   if (!bytes) throw error(`Required asset ${path} is missing.`, "flimg.asset_missing", { path });
@@ -351,8 +394,10 @@ export async function readCutworkFlimg(input, options = {}) {
   exactKeys(manifest.canvas, ["width", "height", "colorSpace", "pixelFormat"], "canvas");
   const { width, height, colorSpace, pixelFormat } = manifest.canvas;
   const limits = options.limits || CUTWORK_FLIMG_LIMITS;
+  const canvasPixels = width * height;
   if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1 ||
-    width > limits.maximumDimension || height > limits.maximumDimension || width * height > limits.maximumPixels ||
+    width > limits.maximumDimension || height > limits.maximumDimension ||
+    !Number.isSafeInteger(canvasPixels) || canvasPixels > limits.maximumPixels ||
     colorSpace !== "srgb8" || pixelFormat !== "straight-bgra32") {
     throw error("Canvas metadata is invalid for .flimg v1.", "flimg.canvas_invalid");
   }
@@ -362,8 +407,7 @@ export async function readCutworkFlimg(input, options = {}) {
     typeof manifest.original.sourceName !== "string" || !manifest.original.sourceName.trim()) {
     throw error("Original metadata is invalid.", "flimg.manifest_malformed", { path: "original" });
   }
-  const original = await readAsset(entries, "assets/original.png", manifest.original.sha256,
-    canvas, 6, options);
+  requireHash(manifest.original.sha256, "original.sha256");
   if (!Array.isArray(manifest.layers)) {
     throw error("layers must be an array.", "flimg.manifest_malformed", { path: "layers" });
   }
@@ -405,12 +449,11 @@ export async function readCutworkFlimg(input, options = {}) {
     if (layer.asset !== asset) {
       throw error(`${path}.asset is not canonical for its stable ID.`, "flimg.layer_invalid", { path: `${path}.asset` });
     }
+    requireHash(layer.sha256, `${path}.sha256`);
     referenced.add(asset);
-    const raster = await readAsset(entries, asset, layer.sha256, bounds,
-      layer.kind === "part" ? 0 : 6, options);
     const normalized = { id, kind: layer.kind, name: layer.name,
       semanticName: layer.semanticName, visible: layer.visible, bounds, asset,
-      sha256: layer.sha256, pixels: raster.pixels };
+      sha256: layer.sha256 };
     if (layer.kind === "patch") {
       normalized.transform = validatePatchTransform(layer.transform, bounds, canvas, `${path}.transform`);
       normalized.sourcePolygon = validateSourcePolygon(layer.sourcePolygon, canvas, `${path}.sourcePolygon`);
@@ -424,6 +467,15 @@ export async function readCutworkFlimg(input, options = {}) {
   const unexpected = [...entries.keys()].filter((path) => !referenced.has(path));
   if (unexpected.length) {
     throw error("The archive contains unexpected assets.", "flimg.asset_unexpected", { paths: unexpected.sort() });
+  }
+  preflightRasterWorkingSet(canvas, layers, limits);
+  const original = await readAsset(entries, "assets/original.png", manifest.original.sha256,
+    canvas, 6, options);
+  for (const layer of layers) {
+    if (layer.kind === "base") continue;
+    const raster = await readAsset(entries, layer.asset, layer.sha256, layer.bounds,
+      layer.kind === "part" ? 0 : 6, options);
+    layer.pixels = raster.pixels;
   }
   return {
     format: manifest.format,

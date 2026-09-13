@@ -283,18 +283,18 @@ test("rejects duplicate IDs, missing/extra Base, and invalid stack bands", async
 test("rejects checksum, missing/unexpected asset, and invalid PNG format/dimensions", async () => {
   const validPart = part(PART_A, [255, 0]);
   await rejects("flimg.checksum_mismatch", fixture({
-    layers: [{ ...validPart, sha256: "0".repeat(64) }],
+    layers: [{ ...validPart, sha256: "0".repeat(64) }, baseLayer()],
   }));
   await rejects("flimg.asset_missing", fixture({
-    layers: [{ ...validPart, _bytes: undefined }],
+    layers: [{ ...validPart, _bytes: undefined }, baseLayer()],
   }));
   await rejects("flimg.asset_unexpected", fixture({
     extraEntries: [["layers/unexpected.png", Uint8Array.of(1)]],
   }));
   const invalidPng = Uint8Array.of(1, 2, 3, 4);
   await rejects("flimg.png_invalid", fixture({
-    layers: [assetLayer("repair", REPAIR, { x: 0, y: 0, width: 1, height: 1 }, invalidPng,
-      { _bytes: invalidPng }), baseLayer()],
+    layers: [baseLayer(), assetLayer("repair", REPAIR, { x: 0, y: 0, width: 1, height: 1 }, invalidPng,
+      { _bytes: invalidPng })],
   }));
   const rgbaPart = png(2, 1, rgba([1, 2, 3, 4, 5, 6, 7, 8]), 6);
   await rejects("flimg.png_invalid", fixture({
