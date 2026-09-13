@@ -181,6 +181,10 @@ function part(id, values, overrides = {}) {
     { _bytes: bytes, ...overrides });
 }
 
+function rasterBudgetLimits(maximumRasterWorkingSetBytes) {
+  return { ...CUTWORK_FLIMG_LIMITS, maximumRasterWorkingSetBytes };
+}
+
 test("imports minimal Original + Base as ordinary valid Key Art", async () => {
   const { archive, originalPixels } = fixture();
   const imported = await importCutworkFlimg(archive, {
@@ -329,6 +333,64 @@ test("enforces ZIP entry count and uncompressed size limits", async () => {
   await rejects("flimg.size_limit_exceeded", manifestLimited);
 });
 
+test("preflights the decoded and materialized raster working set before PNG decode", async () => {
+  const source = fixture();
+  let decoded = false;
+  const exact = await readCutworkFlimg(source.archive, {
+    limits: rasterBudgetLimits(54),
+  });
+  assert.equal(exact.layers.length, 1);
+  await assert.rejects(() => readCutworkFlimg(source.archive, {
+    limits: rasterBudgetLimits(53),
+    inflateZlib: async () => {
+      decoded = true;
+      throw new Error("PNG decode should not start after a failed preflight.");
+    },
+  }), (failure) => failure.code === "flimg.size_limit_exceeded" &&
+    failure.details?.resource === "raster-working-set" &&
+    failure.details?.estimatedBytes === 54);
+  assert.equal(decoded, false);
+});
+
+test("rejects the cumulative raster budget of many otherwise valid Parts", async () => {
+  const layers = Array.from({ length: 20 }, (_value, index) => part(
+    `20000000-0000-0000-0000-${String(index + 100).padStart(12, "0")}`,
+    [index, 255 - index],
+  ));
+  layers.push(baseLayer());
+  const source = fixture({ layers });
+  await assert.rejects(() => readCutworkFlimg(source.archive, {
+    limits: rasterBudgetLimits(200),
+  }), (failure) => failure.code === "flimg.size_limit_exceeded" &&
+    failure.details?.resource === "raster-working-set");
+});
+
+test("rejects raster budget multiplication overflow without allocating raster buffers", async () => {
+  const width = 50_000_000;
+  const height = 20_100_000;
+  const source = fixture({
+    manifest: {
+      canvas: { width, height, colorSpace: "srgb8", pixelFormat: "straight-bgra32" },
+    },
+    layers: [baseLayer({ bounds: { x: 0, y: 0, width, height } })],
+  });
+  let decoded = false;
+  await assert.rejects(() => readCutworkFlimg(source.archive, {
+    limits: {
+      ...CUTWORK_FLIMG_LIMITS,
+      maximumDimension: width,
+      maximumPixels: Number.MAX_SAFE_INTEGER,
+      maximumRasterWorkingSetBytes: Number.MAX_SAFE_INTEGER,
+    },
+    inflateZlib: async () => {
+      decoded = true;
+      throw new Error("PNG decode should not start after overflow.");
+    },
+  }), (failure) => failure.code === "flimg.size_limit_exceeded" &&
+    failure.details?.resource === "raster-working-set");
+  assert.equal(decoded, false);
+});
+
 test("bounds decompression by the ZIP entry's declared physical length", async () => {
   const archive = fixture().archive.slice();
   const endOffset = archive.length - 22;
@@ -460,6 +522,38 @@ test("UI domain path and MCP import operation produce equivalent Project state",
   assert.deepEqual(response, direct.result);
   assert.deepEqual(adapter.renderAssets, direct.renderAssets);
   assert.equal(adapter.session.isDirty, true);
+});
+
+test("domain import rejects the raster budget before constructing a UI candidate Project", async () => {
+  const source = fixture();
+  let allocatedIds = 0;
+  await assert.rejects(() => importCutworkFlimg(source.archive, {
+    limits: rasterBudgetLimits(53),
+    idFactory: () => {
+      allocatedIds += 1;
+      return `unexpected_${allocatedIds}`;
+    },
+  }), (failure) => failure.code === "flimg.size_limit_exceeded");
+  assert.equal(allocatedIds, 0);
+});
+
+test("headless raster-budget rejection leaves the current session unchanged", async () => {
+  const current = createProject({ name: "Current", width: 4, height: 4,
+    idFactory: createIdFactory("budget-unchanged") });
+  const session = new EditorSession(current);
+  let imported = false;
+  const adapter = new HeadlessProductAdapter(session, { onImported: () => { imported = true; } });
+  const before = structuredClone(session.project);
+  await assert.rejects(() => adapter.import("import.cutwork_flimg", {
+    fileName: "oversized.flimg",
+    bytes: fixture().archive,
+  }, { limits: rasterBudgetLimits(53) }),
+  (failure) => failure.code === "flimg.size_limit_exceeded");
+  assert.deepEqual(session.project, before);
+  assert.equal(session.history.length, 0);
+  assert.equal(session.isDirty, false);
+  assert.deepEqual(adapter.renderAssets, []);
+  assert.equal(imported, false);
 });
 
 test("failed MCP import leaves the current Project and session history unchanged", async () => {
