@@ -40,6 +40,21 @@ test("Phase 1 shell keeps File and sidebar controls reachable", async () => {
   assert.match(css, /\.inspector-form\[hidden\]\s*\{[^}]*display:\s*none/s);
 });
 
+test("Issue 88 workflow navigation lives in the header and the canvas is decluttered", async () => {
+  const [html, app, workflow] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../src/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/ui/workflow-view.js", import.meta.url), "utf8"),
+  ]);
+  assert.match(html, /素材[\s\S]*メッシュ[\s\S]*リグ[\s\S]*動き[\s\S]*プレビュー[\s\S]*書き出し/);
+  assert.ok(html.indexOf("workflow-toolbar") < html.indexOf("viewport-wrap"));
+  assert.doesNotMatch(html, /class=["']mode-selector["']/);
+  assert.match(html, /id=["']emptyOpenButton["'][^>]*>素材を開く</);
+  assert.match(app, /createWorkflowView/);
+  assert.match(workflow, /projectWorkflowPanels/);
+  assert.doesNotMatch(workflow, /session\.execute|executeTransaction|localStorage|persistence/);
+});
+
 test("Phase 8-5 timeline shell is reachable, wired, and keeps persistent authority in Core", async () => {
   const [html, app, adapter, controller, view, viewport, baseCss, panelCss] = await Promise.all([
     readFile(new URL("../index.html", import.meta.url), "utf8"),

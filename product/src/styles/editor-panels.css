@@ -11,6 +11,7 @@
 .workspace[data-layout="canvas-right"] .viewport-wrap { grid-column: 1; }
 .workspace[data-layout="canvas-right"] .inspector-panel { grid-column: 2; }
 .panel { border-right: 1px solid var(--line); background: var(--panel); }
+.panel[hidden], .sequence-timeline-panel[hidden] { display: none; }
 .controls { padding: 20px; display: flex; flex-direction: column; gap: 13px; }
 .scene-panel, .inspector-panel {
   min-height: 0;
