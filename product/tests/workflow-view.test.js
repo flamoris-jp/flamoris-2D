@@ -33,6 +33,7 @@ function fixture(workflowMode, { content = true } = {}) {
     "legacyMotionControls", "inspectorPanel", "exportWorkflowPanel",
     "transitionAuthoringPanel", "inspectorEmpty", "inspectorForm",
     "nodeTransformControls", "transitionAuthoringHeading", "activeTransitionField",
+    "meshAuthoringHeading",
     "transitionEndpointCard", "keyArtSummary", "transitionMappingCard",
     "partTransitionCard", "endpointMeshCard", "transitionPreviewCard",
     "transitionDiagnosticsCard", "sequenceTimelinePanel", "sequenceAuthoringToolbar",
@@ -76,6 +77,9 @@ test("workflow view applies contextual visibility after feature views render", (
     createWorkflowView(mesh).render();
     assert.equal(mesh.elements.scenePanel.hidden, false);
     assert.equal(mesh.elements.transitionAuthoringPanel.hidden, false);
+    assert.equal(mesh.elements.transitionAuthoringHeading.hidden, true);
+    assert.equal(mesh.elements.activeTransitionField.hidden, true);
+    assert.equal(mesh.elements.meshAuthoringHeading.hidden, false);
     assert.equal(mesh.elements.endpointMeshCard.hidden, false);
     assert.equal(mesh.elements.transitionPreviewCard.hidden, true);
     assert.equal(mesh.elements.sequenceTimelinePanel.hidden, true);
@@ -88,6 +92,9 @@ test("workflow view applies contextual visibility after feature views render", (
 
     const motion = fixture(WORKFLOW_MODES.MOTION);
     createWorkflowView(motion).render();
+    assert.equal(motion.elements.transitionAuthoringHeading.hidden, false);
+    assert.equal(motion.elements.activeTransitionField.hidden, false);
+    assert.equal(motion.elements.meshAuthoringHeading.hidden, true);
     assert.equal(motion.elements.endpointMeshCard.hidden, true);
     assert.equal(motion.elements.transitionPreviewCard.hidden, false);
     assert.equal(motion.elements.sequenceTimelinePanel.hidden, false);

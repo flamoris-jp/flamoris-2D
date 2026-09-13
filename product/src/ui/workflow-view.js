@@ -103,7 +103,7 @@ export function createWorkflowView({ state, elements }) {
     show(elements.inspectorPanel, inspectorPanelVisible);
     show(elements.exportWorkflowPanel, projection.exportControls);
     show(elements.transitionAuthoringPanel,
-      projection.transitionPanel && editorProjectAvailable);
+      (projection.transitionPanel || projection.meshContext) && editorProjectAvailable);
 
     if (!projection.selectionInspector) {
       show(elements.inspectorEmpty, false);
@@ -114,19 +114,18 @@ export function createWorkflowView({ state, elements }) {
       for (const key of RIG_CONTROL_KEYS) show(elements[key], false);
     }
 
-    if (projection.transitionPanel) {
-      show(elements.transitionAuthoringHeading, true);
-      show(elements.activeTransitionField, true);
-      show(elements.transitionEndpointCard, projection.motionAuthoring);
-      show(elements.keyArtSummary, projection.motionAuthoring);
-      show(elements.transitionMappingCard,
-        projection.motionAuthoring || projection.meshAuthoring);
-      show(elements.partTransitionCard, projection.motionAuthoring);
-      show(elements.endpointMeshCard, projection.meshAuthoring);
-      show(elements.transitionPreviewCard, projection.previewControls);
-      show(elements.transitionTrackEditor, projection.motionAuthoring);
-      show(elements.transitionDiagnosticsCard, projection.transitionDiagnostics);
-    }
+    show(elements.transitionAuthoringHeading, projection.transitionPanel);
+    show(elements.activeTransitionField, projection.transitionPanel);
+    show(elements.meshAuthoringHeading, projection.meshContext);
+    show(elements.transitionEndpointCard, projection.motionAuthoring);
+    show(elements.keyArtSummary, projection.motionAuthoring);
+    show(elements.transitionMappingCard,
+      projection.motionAuthoring || projection.meshContext);
+    show(elements.partTransitionCard, projection.motionAuthoring);
+    show(elements.endpointMeshCard, projection.meshContext);
+    show(elements.transitionPreviewCard, projection.previewControls);
+    show(elements.transitionTrackEditor, projection.motionAuthoring);
+    show(elements.transitionDiagnosticsCard, projection.transitionDiagnostics);
 
     show(elements.sequenceTimelinePanel, projection.sequenceTimeline);
     if (projection.sequenceTimeline) {

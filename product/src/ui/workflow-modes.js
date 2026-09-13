@@ -97,10 +97,9 @@ export function projectWorkflowPanels(workflowMode, { hasProject = false } = {})
       .includes(workflowMode),
     transformControls: !empty && workflowMode === WORKFLOW_MODES.ASSET,
     rigControls: !empty && workflowMode === WORKFLOW_MODES.RIG,
-    transitionPanel: !empty && [WORKFLOW_MODES.MESH, WORKFLOW_MODES.MOTION,
+    transitionPanel: !empty && [WORKFLOW_MODES.MOTION,
       WORKFLOW_MODES.PREVIEW].includes(workflowMode),
-    transitionSetup: !empty && [WORKFLOW_MODES.MESH, WORKFLOW_MODES.MOTION,
-      WORKFLOW_MODES.PREVIEW].includes(workflowMode),
+    meshContext: !empty && workflowMode === WORKFLOW_MODES.MESH,
     motionAuthoring: !empty && workflowMode === WORKFLOW_MODES.MOTION,
     meshAuthoring: !empty && workflowMode === WORKFLOW_MODES.MESH,
     previewControls: !empty && [WORKFLOW_MODES.MOTION, WORKFLOW_MODES.PREVIEW]

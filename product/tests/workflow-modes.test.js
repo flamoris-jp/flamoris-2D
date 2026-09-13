@@ -44,6 +44,8 @@ test("all low-level authoring capabilities remain reachable contextually", () =>
 test("panel projection hides unrelated authoring surfaces instead of disabling them", () => {
   const mesh = projectWorkflowPanels(WORKFLOW_MODES.MESH, { hasProject: true });
   assert.equal(mesh.meshAuthoring, true);
+  assert.equal(mesh.meshContext, true);
+  assert.equal(mesh.transitionPanel, false);
   assert.equal(mesh.motionAuthoring, false);
   assert.equal(mesh.sequenceTimeline, false);
   assert.equal(mesh.exportControls, false);

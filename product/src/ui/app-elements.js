@@ -151,6 +151,7 @@ export function queryAppElements(root = document) {
   transitionAuthoringPanel: root.querySelector("#transitionAuthoringPanel"),
   transitionAuthoringHeading: root.querySelector("#transitionAuthoringHeading"),
   activeTransitionField: root.querySelector("#activeTransitionField"),
+  meshAuthoringHeading: root.querySelector("#meshAuthoringHeading"),
   transitionEndpointCard: root.querySelector("#transitionEndpointCard"),
   keyArtSummary: root.querySelector("#keyArtSummary"),
   transitionMappingCard: root.querySelector("#transitionMappingCard"),
