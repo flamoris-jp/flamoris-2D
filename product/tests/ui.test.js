@@ -55,6 +55,11 @@ test("Issue 88 workflow navigation lives in the header and the canvas is declutt
   assert.doesNotMatch(workflow, /session\.execute|executeTransaction|localStorage|persistence/);
 });
 
+test("hidden Sequence Timeline wins over its open details presentation", async () => {
+  const css = await readFile(new URL("../src/styles/editor-panels.css", import.meta.url), "utf8");
+  assert.match(css, /\.sequence-timeline-panel\[hidden\]\s*\{[^}]*display:\s*none\s*!important/);
+});
+
 test("Phase 8-5 timeline shell is reachable, wired, and keeps persistent authority in Core", async () => {
   const [html, app, adapter, controller, view, viewport, baseCss, panelCss] = await Promise.all([
     readFile(new URL("../index.html", import.meta.url), "utf8"),
