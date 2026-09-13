@@ -650,3 +650,65 @@ test("mesh grid generation uses the production topology command in Mesh preparat
   assert.equal(calls[0][1].replaceExisting, false);
   assert.deepEqual(calls[0][1].candidate.positions.slice(0, 2), [10, 20]);
 });
+
+test("grid regeneration preserves attached A/B keyform shapes until explicit consent", () => {
+  const elements = {
+    generateButton: control(), resetButton: control(), captureAButton: control(),
+    captureBButton: control(), playButton: control(), editButton: control(),
+    timeSlider: control("0"), timeOutput: control(), durationInput: control("1"),
+    columnsInput: control("1"), rowsInput: control("1"), keyframeStatus: control(),
+    viewportWrap: { clientWidth: 100, clientHeight: 100 },
+  };
+  const state = {
+    image: { width: 2, height: 2 },
+    imageData: { width: 2, height: 2, data: new Uint8ClampedArray(16).fill(255) },
+    mesh: { baseVertices: [0, 0], vertexOffsets: [0, 0] },
+    partOffset: { x: 0, y: 0 }, selected: new Set(),
+    keyframes: { a: null, b: null }, currentTime: 0, previewMode: false,
+    playing: false, animationFrame: null,
+  };
+  const shapes = {
+    keyform_a: [0, 0, 2, 0, 2, 2],
+    keyform_b: [1, 1, 3, 1, 3, 3],
+  };
+  const originalShapes = structuredClone(shapes);
+  const calls = [];
+  const confirmations = [];
+  let allowReplacement = false;
+  const tools = {
+    activeTopology: () => ({ id: "topology_shared" }),
+    getState: () => ({ affectedKeyformIds: ["keyform_a", "keyform_b"] }),
+    execute: (toolId, payload) => {
+      calls.push([toolId, payload]);
+      for (const keyformId of Object.keys(shapes)) {
+        shapes[keyformId] = [...payload.candidate.positions];
+      }
+    },
+  };
+  const controller = createMeshEditingController({
+    state, elements,
+    renderer: { setMesh() {}, clearMesh() {}, setTexture() {} },
+    selectedPart: () => ({ name: "Face" }),
+    meshTools: () => tools,
+    persistGridMesh: () => true,
+    confirmGridReplacement: (request) => {
+      confirmations.push(request);
+      return allowReplacement;
+    },
+    setStatus() {}, render() {}, documentRoot: {}, requestFrame: () => 1,
+    cancelFrame() {}, now: () => 0,
+  });
+  controller.bind();
+
+  elements.generateButton.dispatch("click");
+  assert.equal(calls.length, 0);
+  assert.deepEqual(shapes, originalShapes);
+  assert.deepEqual(confirmations[0].affectedKeyformIds, ["keyform_a", "keyform_b"]);
+
+  allowReplacement = true;
+  elements.generateButton.dispatch("click");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], "topology.automesh");
+  assert.equal(calls[0][1].replaceExisting, true);
+  assert.notDeepEqual(shapes, originalShapes);
+});

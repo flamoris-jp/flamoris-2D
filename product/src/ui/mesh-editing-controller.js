@@ -15,6 +15,7 @@ export function createMeshEditingController({
   meshTools = () => null,
   persistGridMesh = () => false,
   canGenerateMesh = () => true,
+  confirmGridReplacement = ({ message }) => window.confirm(message),
   setStatus,
   render,
   documentRoot = document,
@@ -102,19 +103,36 @@ export function createMeshEditingController({
       }
       const tools = meshTools();
       if (!tools) throw new Error("メッシュ編集コンテキストを選択してください");
+      const activeTopology = tools.activeTopology();
+      let replaceExisting = false;
+      if (activeTopology) {
+        const affectedKeyformIds = tools.getState().affectedKeyformIds || [];
+        const message = `既存メッシュを再生成すると、接続された${affectedKeyformIds.length}個の` +
+          "キーフォームの頂点配置とUVをグリッドで初期化します。再生成しますか？";
+        const confirmed = confirmGridReplacement({
+          topologyId: activeTopology.id,
+          affectedKeyformIds: [...affectedKeyformIds],
+          message,
+        });
+        if (!confirmed) {
+          setStatus("グリッドメッシュの再生成をキャンセルしました");
+          return false;
+        }
+        replaceExisting = true;
+      }
       tools.execute("topology.automesh", {
         candidate: {
           positions,
           uvs: [...generated.uvs],
           indices: [...generated.indices],
         },
-        replaceExisting: Boolean(tools.activeTopology()),
+        replaceExisting,
       });
       const count = generated.baseVertices.length / 2;
       const part = selectedPart();
       setStatus(`${part?.name ? `${part.name}・` : ""}${columns} × ${rows} グリッド・` +
         `${count}頂点をProjectへ保存しました`);
-      return;
+      return true;
     }
     state.mesh = generated;
     state.selected.clear();
