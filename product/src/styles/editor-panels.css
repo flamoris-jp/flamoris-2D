@@ -80,6 +80,8 @@
   font-size: 10px;
 }
 .tree-toggle:hover, .tree-state:hover { transform: none !important; background: rgba(129, 221, 205, .08); }
+.tree-state { color: #b7e9df; font-size: 12px; }
+.tree-state[aria-pressed="false"] { color: #657773; }
 .tree-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: default; }
 .tree-kind { color: #72948f; font-size: 9px; }
 .tree-lock { color: var(--gold); }
