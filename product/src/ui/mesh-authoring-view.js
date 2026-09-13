@@ -32,6 +32,10 @@ export function createMeshAuthoringView({
     if (!elements.meshToolSelect.value) return null;
     return controller()?.setActiveTool(elements.meshToolSelect.value);
   }));
+  elements.meshPreparationKeyformSelect?.addEventListener("change", () => act(() =>
+    controller()?.getContextController().selectKeyform(
+      elements.meshPreparationKeyformSelect.value || null,
+    )));
   elements.vertexIdOverlayInput.addEventListener("change", () =>
     controller()?.setVertexIdOverlayVisible(elements.vertexIdOverlayInput.checked));
   elements.setVertexSemanticLabelButton.addEventListener("click", () => act(() => {
@@ -97,6 +101,19 @@ export function createMeshAuthoringView({
     const selectedCount = toolState?.selectedVertexIds.length || 0;
     const generator = elements.meshGeneratorSelect.value;
     const autoMeshState = autoMeshPreview.getState();
+    const context = controller()?.getContextController()?.getState() || null;
+    if (elements.meshPreparationKeyformSelect) {
+      const previousKeyformId = elements.meshPreparationKeyformSelect.value;
+      elements.meshPreparationKeyformSelect.replaceChildren(
+        option("", context?.keyforms?.length ? "— メッシュを選択 —" : "— メッシュ未作成 —"),
+        ...(context?.keyforms || []).map((keyform, index) =>
+          option(keyform.id, `メッシュ ${index + 1}・${keyform.id}`)),
+      );
+      elements.meshPreparationKeyformSelect.value =
+        context?.selectedKeyformId || previousKeyformId || "";
+      elements.meshPreparationKeyformSelect.disabled = !context?.editingEnabled ||
+        !context?.keyforms?.length;
+    }
     const previousTool = elements.meshToolSelect.value;
     elements.meshToolSelect.replaceChildren(
       option("", "— Select tool —"),
@@ -104,6 +121,20 @@ export function createMeshAuthoringView({
     );
     elements.meshToolSelect.value = toolState?.activeToolId || previousTool || "";
     elements.meshToolSelect.disabled = !toolState?.topology || previewMode;
+    elements.meshToolHelp.textContent = !context?.editingEnabled
+      ? context?.reason || "左のパーツ一覧から描画パーツを選択してください"
+      : !toolState?.topology
+        ? "左の「メッシュを作成」または輪郭の自動作成から始めます"
+        : topologyMode
+          ? "頂点追加はツールを選びキャンバスをクリック。削除・面作成・辺分割は頂点を選択します"
+          : "頂点をドラッグして、このキーアート上の配置を整えます";
+    if (elements.meshPreparationStatus) {
+      elements.meshPreparationStatus.textContent = !context?.editingEnabled
+        ? context?.reason || "パーツを選択してください"
+        : toolState?.topology
+          ? `${context.node?.displayName || "選択パーツ"}・${toolState.topology.vertexIds.length}頂点`
+          : `${context.node?.displayName || "選択パーツ"}・メッシュ未作成`;
+    }
     elements.vertexIdOverlayInput.checked = Boolean(toolState?.vertexIdOverlayVisible);
     elements.vertexIdOverlayInput.disabled = !toolState?.topology || previewMode;
     elements.selectedVertexIdOutput.textContent = selected?.id || "—";

@@ -5,6 +5,7 @@ import { EndpointMeshController } from "./endpoint-mesh-controller.js";
 import { TransitionPreviewController } from "./transition-preview-controller.js";
 import { TransitionDiagnosticsController } from "./transition-diagnostics-controller.js";
 import { MeshToolController } from "./mesh-tool-controller.js";
+import { MeshPreparationController } from "./mesh-preparation-controller.js";
 import { KeyStateStripController } from "./key-state-strip-controller.js";
 import { CorrespondencePreviewController } from "./correspondence-preview-controller.js";
 import { ClippingAuthoringController } from "./clipping-authoring-controller.js";
@@ -68,6 +69,9 @@ export class EditorUiAdapter {
     this.endpointMesh = new EndpointMeshController(session, this.transitionAuthoring, {
       onChange: (reason) => this.notify(reason),
     });
+    this.meshPreparation = new MeshPreparationController(session, {
+      onChange: (reason) => this.notify(reason),
+    });
     this.deformerAuthoring = new DeformerAuthoringController(session, this.endpointMesh, {
       onChange: (reason) => this.notify(reason),
     });
@@ -114,6 +118,7 @@ export class EditorUiAdapter {
     const sessionOnChange = session.onChange;
     session.onChange = (...args) => {
       this.sequenceTimeline.projectChanged();
+      this.meshPreparation.projectChanged();
       sessionOnChange?.(...args);
       this.boneAuthoring.projectChanged();
       this.twoBoneIkAuthoring.projectChanged();

@@ -76,11 +76,14 @@ test("prepared topology and keyform Undo/Redo and Save/Open preserve exact ident
 
 test("mesh preparation selection and active context remain transient", () => {
   const { session, preparation } = fixture();
-  const before = serializeProject(session.project);
+  const before = structuredClone(session.project);
   preparation.selectPart(null);
   preparation.selectPart("eye_right");
-  assert.equal(serializeProject(session.project), before);
-  assert.doesNotMatch(before, /selectedNodeId|selectedTopologyId|selectedKeyformId/);
+  assert.deepEqual(session.project, before);
+  assert.doesNotMatch(
+    JSON.stringify(session.project),
+    /selectedNodeId|selectedTopologyId|selectedKeyformId/,
+  );
 });
 
 test("MeshToolController can switch between preparation and endpoint contexts", () => {

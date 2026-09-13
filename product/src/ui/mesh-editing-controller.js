@@ -12,6 +12,9 @@ export function createMeshEditingController({
   elements,
   renderer,
   selectedPart,
+  meshTools = () => null,
+  persistGridMesh = () => false,
+  canGenerateMesh = () => true,
   setStatus,
   render,
   documentRoot = document,
@@ -21,7 +24,10 @@ export function createMeshEditingController({
 }) {
   function updateButtons() {
     const enabled = Boolean(state.image);
-    elements.generateButton.disabled = !enabled;
+    elements.generateButton.disabled = !enabled || !canGenerateMesh();
+    elements.generateButton.textContent = state.mesh
+      ? "グリッドメッシュを再生成"
+      : "グリッドメッシュを作成";
     elements.resetButton.disabled = !state.mesh;
     elements.captureAButton.disabled = !state.mesh;
     elements.captureBButton.disabled = !state.mesh;
@@ -81,13 +87,36 @@ export function createMeshEditingController({
       setStatus("透明部分しかないパーツです");
       return;
     }
-    state.mesh = generateGridMesh(
+    const generated = generateGridMesh(
       bounds,
       state.image.width,
       state.image.height,
       columns,
       rows,
     );
+    if (persistGridMesh()) {
+      const positions = [...generated.baseVertices];
+      for (let index = 0; index < positions.length; index += 2) {
+        positions[index] += state.partOffset.x;
+        positions[index + 1] += state.partOffset.y;
+      }
+      const tools = meshTools();
+      if (!tools) throw new Error("メッシュ編集コンテキストを選択してください");
+      tools.execute("topology.automesh", {
+        candidate: {
+          positions,
+          uvs: [...generated.uvs],
+          indices: [...generated.indices],
+        },
+        replaceExisting: Boolean(tools.activeTopology()),
+      });
+      const count = generated.baseVertices.length / 2;
+      const part = selectedPart();
+      setStatus(`${part?.name ? `${part.name}・` : ""}${columns} × ${rows} グリッド・` +
+        `${count}頂点をProjectへ保存しました`);
+      return;
+    }
+    state.mesh = generated;
     state.selected.clear();
     clearKeyframes();
     renderer.setMesh(state.mesh);
@@ -162,7 +191,13 @@ export function createMeshEditingController({
   }
 
   function bind() {
-    elements.generateButton.addEventListener("click", createMesh);
+    elements.generateButton.addEventListener("click", () => {
+      try {
+        createMesh();
+      } catch (error) {
+        setStatus(error.message);
+      }
+    });
     elements.resetButton.addEventListener("click", () => {
       returnToEdit();
       resetDeformation(state.mesh);

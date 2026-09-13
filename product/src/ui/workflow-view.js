@@ -103,6 +103,7 @@ export function createWorkflowView({ state, elements }) {
     }
     show(elements.legacyMeshLab, projection.meshPreparation || projection.legacyMotion);
     show(elements.legacyMeshControls, projection.meshPreparation);
+    show(elements.resetButton, projection.legacyMesh);
     show(elements.legacyMotionControls, projection.legacyMotion);
     show(elements.inspectorPanel, inspectorPanelVisible);
     show(elements.exportWorkflowPanel, projection.exportControls);
@@ -127,6 +128,9 @@ export function createWorkflowView({ state, elements }) {
       projection.motionAuthoring || projection.meshContext);
     show(elements.partTransitionCard, projection.motionAuthoring);
     show(elements.endpointMeshCard, projection.meshContext);
+    const preparationContext = state.editor?.meshTools?.getState().contextKind === "preparation";
+    show(elements.meshPreparationIntro, projection.meshContext && preparationContext);
+    show(elements.endpointMeshContextControls, projection.meshContext && !preparationContext);
     show(elements.transitionPreviewCard, projection.previewControls);
     show(elements.transitionTrackEditor, projection.motionAuthoring);
     show(elements.transitionDiagnosticsCard, projection.transitionDiagnostics);

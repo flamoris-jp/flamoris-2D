@@ -19,7 +19,7 @@ workflow/context boundary.
 | Grid regeneration becomes visible only after mode change | legacy UI leakage | `createMesh()` rebuilt only transient `state.mesh`; PSD part selection and the grid controls did not create/update ordinary `MeshTopology` / `MeshKeyform` state. Overlay visibility was also coupled to editor mode. |
 | Vertex drag not undone/redone | implementation bug caused by legacy UI leakage | In a real endpoint context pointer-up already calls `MeshToolController -> mesh_keyform.move_vertices`. Outside that context the same gesture mutates only `state.mesh.vertexOffsets`, so no history entry is created and Undo reaches the earlier visibility command. |
 | Sequence Timeline remains visible | workflow/UI projection regression | Workflow projection sets `hidden`, but the later `.sequence-timeline-panel[open] { display:grid }` CSS rule wins the cascade. |
-| Yellow mesh is hard to read | original specification/UX gap | Phase 3 required an overlay and stable-ID display but did not specify a contrast treatment. Keep it transient and use a dual-stroke/high-contrast overlay with selected handles. |
+| Yellow mesh is hard to read | original specification gap | Phase 3 required an overlay and stable-ID display but did not specify a contrast treatment. Keep it transient and use a dual-stroke/high-contrast overlay with selected handles. |
 | Part visibility control resembles selection | workflow/UI projection regression | `◉/○` is visually checkbox/radio-like. Use a familiar eye/hidden icon, an explicit accessible label, and keep row click as selection. |
 | Large open action dominates loaded source | workflow/UI projection regression | The same primary import treatment remains in the populated Asset step. Reduce it to a secondary replace/open action after content exists. |
 | Save/Open retains mesh | specification-compliant evidence | Existing serialization preserves production topology/keyform identity. Add coverage through the repaired grid bridge. |
@@ -73,4 +73,3 @@ expose actual animation deformation authoring in its proper Rig/Motion context.
 7. Save, close, and reopen; verify topology IDs, connectivity, and positions.
 8. Confirm Sequence Timeline is absent from Mesh and the overlay is legible on
    light and dark artwork.
-

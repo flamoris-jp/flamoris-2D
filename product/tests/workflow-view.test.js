@@ -29,7 +29,7 @@ function fixture(workflowMode, { content = true } = {}) {
   const elements = {};
   for (const key of [
     "workspace", "workflowHint", "contextualModeSelector", "editorModeSelect",
-    "scenePanel", "assetControls", "assetOpenLabel", "legacyMeshLab", "legacyMeshControls",
+    "scenePanel", "assetControls", "assetOpenLabel", "legacyMeshLab", "legacyMeshControls", "resetButton",
     "legacyMotionControls", "inspectorPanel", "exportWorkflowPanel",
     "transitionAuthoringPanel", "inspectorEmpty", "inspectorForm",
     "nodeTransformControls", "transitionAuthoringHeading", "activeTransitionField",

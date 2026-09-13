@@ -46,55 +46,55 @@ export function createDefaultMeshToolRegistry() {
     .register({
       id: "deform.move",
       mode: MESH_AUTHORING_MODES.DEFORM,
-      label: "Move",
+      label: "頂点を移動",
       execute: (controller, input) => controller.commitDeformPositions(input.positions),
     })
     .register({
       id: "topology.select",
       mode: MESH_AUTHORING_MODES.TOPOLOGY,
-      label: "Select",
+      label: "頂点を選択",
       execute: (_controller, input) => input,
     })
     .register({
       id: "topology.add",
       mode: MESH_AUTHORING_MODES.TOPOLOGY,
-      label: "Add Vertex",
+      label: "頂点を追加",
       execute: (controller, input) => controller.addVertex(input),
     })
     .register({
       id: "topology.remove",
       mode: MESH_AUTHORING_MODES.TOPOLOGY,
-      label: "Remove Vertex",
+      label: "頂点を削除",
       execute: (controller, input) => controller.removeVertex(input),
     })
     .register({
       id: "topology.connect",
       mode: MESH_AUTHORING_MODES.TOPOLOGY,
-      label: "Create Triangle",
+      label: "面を作成",
       execute: (controller, input) => controller.connectVertices(input),
     })
     .register({
       id: "topology.subdivide",
       mode: MESH_AUTHORING_MODES.TOPOLOGY,
-      label: "Subdivide Edge",
+      label: "辺を分割",
       execute: (controller, input) => controller.subdivideEdge(input),
     })
     .register({
       id: "topology.set-label",
       mode: MESH_AUTHORING_MODES.TOPOLOGY,
-      label: "Set Label",
+      label: "頂点名を設定",
       execute: (controller, input) => controller.setSemanticLabel(input),
     })
     .register({
       id: "topology.clear-label",
       mode: MESH_AUTHORING_MODES.TOPOLOGY,
-      label: "Clear Label",
+      label: "頂点名を消去",
       execute: (controller, input) => controller.clearSemanticLabel(input),
     })
     .register({
       id: "topology.automesh",
       mode: MESH_AUTHORING_MODES.TOPOLOGY,
-      label: "Contour AutoMesh",
+      label: "輪郭から自動作成",
       execute: (controller, input) => controller.applyGeneratedMesh(input),
     });
 }
@@ -153,6 +153,10 @@ export class MeshToolController {
     this.meshContext = meshContext;
     this.selectedVertexIds.clear();
     this.notify("mesh-context");
+  }
+
+  getContextController() {
+    return this.meshContext;
   }
 
   setMode(mode) {
@@ -378,6 +382,7 @@ export class MeshToolController {
       ? this.session.query("mesh.list_keyforms", { topologyId: topology.id })
       : [];
     return {
+      contextKind: this.meshContext.kind || "endpoint",
       mode: this.mode,
       activeToolId: this.activeToolId,
       tools: this.registry.list(this.mode),

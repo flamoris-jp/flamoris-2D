@@ -27,6 +27,7 @@ function matchingSlot(project, keyArtId, nodeId) {
 export class MeshPreparationController {
   constructor(session, { onChange = null, idFactory = null } = {}) {
     this.session = session;
+    this.kind = "preparation";
     this.onChange = onChange;
     this.idFactory = idFactory || defaultIdFactory();
     this.selectedNodeId = null;
@@ -37,6 +38,7 @@ export class MeshPreparationController {
   notify(reason) { this.onChange?.(reason, this); }
 
   selectPart(nodeId) {
+    if (this.selectedNodeId === nodeId) return this.getState();
     if (nodeId !== null) this.session.query("scene.get_node", { nodeId });
     this.selectedNodeId = nodeId;
     this.selectedTopologyId = null;

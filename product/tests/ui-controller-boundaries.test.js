@@ -470,6 +470,30 @@ test("scene view keeps the active selection locked in Edit Mode", () => {
   assert.deepEqual(selections, ["part_b"]);
 });
 
+test("Mesh preparation can switch the active render part in Edit Mode", () => {
+  const selections = [];
+  const state = {
+    editorMode: "topology",
+    editor: {
+      selectedNodeId: "part_a",
+      getNode: (nodeId) => ({ id: nodeId, kind: "part" }),
+      selectNode: (nodeId) => selections.push(nodeId),
+    },
+  };
+  const view = createSceneEditorView({
+    state,
+    elements: {},
+    desktopApi: null,
+    setStatus() {},
+    updateEditorModeUi() {},
+    updateZoomOutput() {},
+    canSelectMeshPreparationPart: () => true,
+  });
+
+  view.selectSceneNode("part_b");
+  assert.deepEqual(selections, ["part_b"]);
+});
+
 test("re-import view actions call only the existing review API", () => {
   const calls = [];
   const review = {
@@ -563,4 +587,66 @@ test("mesh controller preserves generation, A/B capture, and deformation reset",
   elements.resetButton.dispatch("click");
   assert.equal(state.mesh.vertexOffsets[0], 0);
   assert.equal(state.selected.size, 0);
+});
+
+test("mesh grid generation uses the production topology command in Mesh preparation", () => {
+  const elements = {
+    generateButton: control(),
+    resetButton: control(),
+    captureAButton: control(),
+    captureBButton: control(),
+    playButton: control(),
+    editButton: control(),
+    timeSlider: control("0"),
+    timeOutput: control(),
+    durationInput: control("1"),
+    columnsInput: control("1"),
+    rowsInput: control("1"),
+    keyframeStatus: control(),
+    viewportWrap: { clientWidth: 100, clientHeight: 100 },
+  };
+  const state = {
+    image: { width: 2, height: 2 },
+    imageData: {
+      width: 2,
+      height: 2,
+      data: new Uint8ClampedArray(16).fill(255),
+    },
+    mesh: null,
+    partOffset: { x: 10, y: 20 },
+    selected: new Set(),
+    keyframes: { a: null, b: null },
+    currentTime: 0,
+    previewMode: false,
+    playing: false,
+    animationFrame: null,
+  };
+  const calls = [];
+  const tools = {
+    activeTopology: () => null,
+    execute: (...args) => calls.push(args),
+  };
+  const controller = createMeshEditingController({
+    state,
+    elements,
+    renderer: { setMesh() {}, clearMesh() {}, setTexture() {} },
+    selectedPart: () => ({ name: "Face" }),
+    meshTools: () => tools,
+    persistGridMesh: () => true,
+    setStatus() {},
+    render() {},
+    documentRoot: {},
+    requestFrame: () => 1,
+    cancelFrame() {},
+    now: () => 0,
+  });
+  controller.bind();
+
+  elements.generateButton.dispatch("click");
+
+  assert.equal(state.mesh, null);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], "topology.automesh");
+  assert.equal(calls[0][1].replaceExisting, false);
+  assert.deepEqual(calls[0][1].candidate.positions.slice(0, 2), [10, 20]);
 });

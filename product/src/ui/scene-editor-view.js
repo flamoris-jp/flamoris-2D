@@ -19,10 +19,12 @@ export function createSceneEditorView({
   setStatus,
   updateEditorModeUi,
   updateZoomOutput,
+  canSelectMeshPreparationPart = () => false,
 }) {
   function selectSceneNode(nodeId) {
     const requestedNode = state.editor.getNode?.(nodeId) || null;
-    const nextNodeId = requestedNode?.kind === "deformer"
+    const nextNodeId = requestedNode?.kind === "deformer" ||
+      (requestedNode?.kind === "part" && canSelectMeshPreparationPart())
       ? nodeId
       : objectSelectionForMode(
         state.editorMode,

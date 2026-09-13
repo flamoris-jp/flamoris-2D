@@ -38,6 +38,7 @@ export function editModeAvailability({
   selectedPart,
   selectedNode,
   mesh,
+  allowMissingMesh = false,
 } = {}) {
   if (contentMode !== "psd") {
     return { allowed: false, reason: "Mesh authoring modeはPSD render partで使用できます" };
@@ -57,7 +58,7 @@ export function editModeAvailability({
   if (!selectedPart?.canvas || selectedPart.nodeId !== selectedNodeId) {
     return { allowed: false, reason: "選択partに編集可能なrender assetがありません" };
   }
-  if (!mesh) {
+  if (!mesh && !allowMissingMesh) {
     return { allowed: false, reason: "選択partのmesh edit pathを利用できません" };
   }
   return { allowed: true, reason: "" };

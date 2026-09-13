@@ -33,6 +33,7 @@ export function bindViewportInteractions({
   setStatus,
   selectedPart,
   endpointMesh = () => null,
+  meshContext = endpointMesh,
   meshTools = () => null,
   correspondencePreview = () => null,
   deformerAuthoring = () => null,
@@ -353,7 +354,7 @@ export function bindViewportInteractions({
     }
 
     const vertexIndex = nearestVertex(screenPoint);
-    const tools = endpointMesh()?.getState().editingEnabled ? meshTools() : null;
+    const tools = meshContext()?.getState().editingEnabled ? meshTools() : null;
     state.selected = updateVertexSelection(
       state.selected,
       vertexIndex,
