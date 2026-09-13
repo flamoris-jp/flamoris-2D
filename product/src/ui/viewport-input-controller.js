@@ -600,14 +600,14 @@ export function bindViewportInteractions({
       return;
     }
     if (state.drag) {
-      const endpoint = endpointMesh();
+      const context = meshContext();
       const tools = meshTools();
-      if (endpoint?.getState().editingEnabled && endpoint.activeKeyform()) {
+      if (context?.getState().editingEnabled && context.activeKeyform()) {
         if (event.type !== "pointercancel") {
           const positions = [...getDeformedVertices(state.mesh)];
           if (tools) tools.execute("deform.move", { positions });
-          else endpoint.commitActiveMeshPositions(positions);
-          setStatus(`${state.selected.size}頂点をendpoint MeshKeyformへ反映しました`);
+          else context.commitActiveMeshPositions(positions);
+          setStatus(`${state.selected.size}頂点をMeshKeyformへ1件のUndo操作として反映しました`);
         } else {
           state.mesh.vertexOffsets.fill(0);
           render();

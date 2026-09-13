@@ -6,6 +6,7 @@ import { deserializeProject, serializeProject } from "../src/io/project-json.js"
 import { createIdFactory, createProject, createSceneNode } from "../src/model/project.js";
 import { MeshPreparationController } from "../src/ui/mesh-preparation-controller.js";
 import { MeshToolController, MESH_AUTHORING_MODES } from "../src/ui/mesh-tool-controller.js";
+import { bindViewportInteractions } from "../src/ui/viewport-input-controller.js";
 
 function fixture() {
   const project = createProject({
@@ -43,6 +44,20 @@ const candidate = {
   indices: [0, 1, 2, 0, 2, 3],
 };
 
+function eventTarget(extra = {}) {
+  const listeners = new Map();
+  return {
+    ...extra,
+    addEventListener(type, listener) {
+      if (!listeners.has(type)) listeners.set(type, []);
+      listeners.get(type).push(listener);
+    },
+    dispatch(type, event = {}) {
+      for (const listener of listeners.get(type) || []) listener(event);
+    },
+  };
+}
+
 test("grid/AutoMesh preparation creates one production mesh transaction", () => {
   const { session, preparation, tools } = fixture();
   tools.execute("topology.automesh", { candidate });
@@ -72,6 +87,84 @@ test("prepared topology and keyform Undo/Redo and Save/Open preserve exact ident
   preparation.projectChanged();
   assert.deepEqual(session.project, createdProject);
   assert.deepEqual(deserializeProject(serializeProject(session.project)), createdProject);
+});
+
+test("prepared vertex drag commits before earlier visibility history and supports Undo/Redo", () => {
+  const { session, preparation, tools } = fixture();
+  tools.execute("topology.automesh", { candidate });
+  session.execute({
+    type: "scene.set_visibility",
+    payload: { nodeId: "eye_right", visible: false },
+  });
+  tools.setMode(MESH_AUTHORING_MODES.DEFORM);
+  const mesh = {
+    baseVertices: [...candidate.positions],
+    vertexOffsets: new Float32Array(candidate.positions.length),
+    uvs: [...candidate.uvs],
+    indices: [...candidate.indices],
+  };
+  const overlayCanvas = eventTarget({
+    getBoundingClientRect: () => ({ left: 0, top: 0 }),
+    setPointerCapture() {},
+  });
+  const state = {
+    mode: "psd",
+    editorMode: "deform",
+    editor: {
+      worldTransform: () => [1, 0, 0, 1, 0, 0],
+      transitionPreview: { getState: () => ({ viewMode: "endpoint-a" }) },
+    },
+    previewMode: false,
+    spacePressed: false,
+    view: { scale: 1, originX: 0, originY: 0 },
+    mesh,
+    selected: new Set(),
+    partOffset: { x: 0, y: 0 },
+    drag: null,
+  };
+  bindViewportInteractions({
+    state,
+    elements: {
+      overlayCanvas,
+      viewportWrap: eventTarget({ classList: { add() {}, remove() {} } }),
+    },
+    viewportRenderer: { screenPointForPart: (x, y) => ({ x, y }) },
+    returnToEdit() {},
+    zoomAtScreenPoint() {},
+    panViewBy() {},
+    setEditorMode() {},
+    undoProject() {},
+    redoProject() {},
+    render() {},
+    setStatus() {},
+    selectedPart: () => ({
+      nodeId: "eye_right", left: 20, top: 10, width: 40, height: 20,
+    }),
+    endpointMesh: () => null,
+    meshContext: () => preparation,
+    meshTools: () => tools,
+    loadFile() {},
+    windowTarget: eventTarget(),
+  });
+
+  overlayCanvas.dispatch("pointerdown", {
+    button: 0, pointerId: 1, clientX: 20, clientY: 10, shiftKey: false,
+  });
+  overlayCanvas.dispatch("pointermove", {
+    pointerId: 1, clientX: 24, clientY: 13,
+  });
+  assert.deepEqual(preparation.activeKeyform().positions, candidate.positions);
+  overlayCanvas.dispatch("pointerup", { pointerId: 1 });
+
+  assert.equal(session.history.at(-1).commandTypes[0], "mesh_keyform.move_vertices");
+  assert.deepEqual(preparation.activeKeyform().positions.slice(0, 2), [24, 13]);
+  assert.equal(session.project.scene.nodes.eye_right.visible, false);
+  session.undo();
+  assert.deepEqual(preparation.activeKeyform().positions, candidate.positions);
+  assert.equal(session.project.scene.nodes.eye_right.visible, false);
+  session.redo();
+  assert.deepEqual(preparation.activeKeyform().positions.slice(0, 2), [24, 13]);
+  assert.equal(session.project.scene.nodes.eye_right.visible, false);
 });
 
 test("mesh preparation selection and active context remain transient", () => {
