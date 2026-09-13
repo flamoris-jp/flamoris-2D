@@ -12,7 +12,7 @@
 .workspace[data-layout="canvas-right"] .viewport-wrap { grid-column: 1; }
 .workspace[data-layout="canvas-right"] .inspector-panel { grid-column: 2; }
 .panel { border-right: 1px solid var(--line); background: var(--panel); }
-.panel[hidden], .sequence-timeline-panel[hidden] { display: none; }
+.panel[hidden], .sequence-timeline-panel[hidden] { display: none !important; }
 .controls { padding: 20px; display: flex; flex-direction: column; gap: 13px; }
 .scene-panel, .inspector-panel {
   min-height: 0;
@@ -27,6 +27,13 @@
 .inspector-panel { border-right: 0; border-left: 1px solid var(--line); }
 .asset-buttons { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .asset-buttons button, .asset-buttons .file-button { min-height: 36px; font-size: 11px; }
+.asset-buttons.has-project .file-button {
+  min-height: 30px;
+  border-color: rgba(129, 221, 205, .2);
+  background: rgba(129, 221, 205, .05);
+  color: #b5cfca;
+  font-size: 10px;
+}
 .panel-heading { display: flex; align-items: baseline; justify-content: space-between; }
 .panel-heading h2 { margin: 0; font: 500 15px Georgia, "Yu Mincho", serif; letter-spacing: .04em; }
 .panel-heading span { color: #6f8985; font: 9px ui-monospace, SFMono-Regular, Consolas, monospace; }

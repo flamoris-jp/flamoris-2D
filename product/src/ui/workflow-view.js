@@ -97,8 +97,12 @@ export function createWorkflowView({ state, elements }) {
 
     show(elements.scenePanel, scenePanelVisible);
     show(elements.assetControls, projection.assetControls);
-    show(elements.legacyMeshLab, projection.legacyMesh || projection.legacyMotion);
-    show(elements.legacyMeshControls, projection.legacyMesh);
+    if (elements.assetOpenLabel) {
+      elements.assetOpenLabel.textContent = hasProject ? "別の素材を開く…" : "素材を開く";
+      elements.assetControls.classList.toggle("has-project", hasProject);
+    }
+    show(elements.legacyMeshLab, projection.meshPreparation || projection.legacyMotion);
+    show(elements.legacyMeshControls, projection.meshPreparation);
     show(elements.legacyMotionControls, projection.legacyMotion);
     show(elements.inspectorPanel, inspectorPanelVisible);
     show(elements.exportWorkflowPanel, projection.exportControls);

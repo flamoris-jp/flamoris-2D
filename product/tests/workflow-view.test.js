@@ -29,7 +29,7 @@ function fixture(workflowMode, { content = true } = {}) {
   const elements = {};
   for (const key of [
     "workspace", "workflowHint", "contextualModeSelector", "editorModeSelect",
-    "scenePanel", "assetControls", "legacyMeshLab", "legacyMeshControls",
+    "scenePanel", "assetControls", "assetOpenLabel", "legacyMeshLab", "legacyMeshControls",
     "legacyMotionControls", "inspectorPanel", "exportWorkflowPanel",
     "transitionAuthoringPanel", "inspectorEmpty", "inspectorForm",
     "nodeTransformControls", "transitionAuthoringHeading", "activeTransitionField",
@@ -76,6 +76,8 @@ test("workflow view applies contextual visibility after feature views render", (
     const mesh = fixture(WORKFLOW_MODES.MESH);
     createWorkflowView(mesh).render();
     assert.equal(mesh.elements.scenePanel.hidden, false);
+    assert.equal(mesh.elements.legacyMeshLab.hidden, false);
+    assert.equal(mesh.elements.legacyMeshControls.hidden, false);
     assert.equal(mesh.elements.transitionAuthoringPanel.hidden, false);
     assert.equal(mesh.elements.transitionAuthoringHeading.hidden, true);
     assert.equal(mesh.elements.activeTransitionField.hidden, true);
@@ -89,6 +91,7 @@ test("workflow view applies contextual visibility after feature views render", (
     assert.equal(rig.elements.transitionAuthoringPanel.hidden, true);
     assert.equal(rig.elements.inspectorForm.hidden, false);
     assert.equal(rig.elements.contextualModeSelector.hidden, false);
+    assert.equal(rig.elements.legacyMeshLab.hidden, true);
 
     const motion = fixture(WORKFLOW_MODES.MOTION);
     createWorkflowView(motion).render();

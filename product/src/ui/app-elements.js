@@ -32,6 +32,7 @@ export function queryAppElements(root = document) {
   emptyOpenButton: root.querySelector("#emptyOpenButton"),
   scenePanel: root.querySelector("#scenePanel"),
   assetControls: root.querySelector("#assetControls"),
+  assetOpenLabel: root.querySelector("#assetOpenLabel"),
   legacyMeshLab: root.querySelector("#legacyMeshLab"),
   legacyMeshControls: root.querySelector("#legacyMeshControls"),
   legacyMotionControls: root.querySelector("#legacyMotionControls"),
