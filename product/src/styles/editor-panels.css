@@ -6,6 +6,10 @@
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr) 280px;
 }
+.workspace[data-layout="canvas"] { grid-template-columns: minmax(0, 1fr); }
+.workspace[data-layout="canvas-right"] { grid-template-columns: minmax(0, 1fr) 280px; }
+.workspace[data-layout="canvas-right"] .viewport-wrap { grid-column: 1; }
+.workspace[data-layout="canvas-right"] .inspector-panel { grid-column: 2; }
 .panel { border-right: 1px solid var(--line); background: var(--panel); }
 .controls { padding: 20px; display: flex; flex-direction: column; gap: 13px; }
 .scene-panel, .inspector-panel {
@@ -76,6 +80,7 @@
 .mesh-lab summary { cursor: pointer; color: #97b2ad; font-size: 11px; }
 .mesh-lab[open] { display: grid; gap: 9px; }
 .mesh-lab[open] summary { margin-bottom: 3px; }
+.legacy-mesh-controls { display: grid; gap: 9px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
 button, .file-button {
@@ -179,6 +184,9 @@ button:not(:disabled):hover, .file-button:hover { border-color: var(--mint); tra
   padding-top: 14px;
   border-top: 1px solid var(--line);
 }
+.export-workflow-panel { display: grid; gap: 12px; }
+.export-workflow-panel[hidden] { display: none; }
+.export-workflow-panel p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.7; }
 .transition-authoring.unavailable { opacity: .62; }
 .transition-authoring [hidden] { display: none; }
 .transition-authoring fieldset {

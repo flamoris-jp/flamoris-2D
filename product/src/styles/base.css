@@ -32,19 +32,67 @@ button:disabled { cursor: not-allowed; opacity: 0.38; }
 .topbar {
   position: relative;
   z-index: 100;
-  min-height: 82px;
-  padding: 16px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  min-height: 96px;
+  padding: 10px 18px 8px;
+  display: grid;
+  gap: 8px;
   border-bottom: 1px solid var(--line);
   background: rgba(7, 16, 15, 0.78);
   backdrop-filter: blur(18px);
 }
+.topbar-main { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 
 .eyebrow { margin: 0 0 2px; color: var(--mint); font-size: 10px; font-weight: 800; letter-spacing: .35em; }
 h1 { margin: 0; font-family: Georgia, "Yu Mincho", serif; font-size: 23px; font-weight: 500; letter-spacing: .04em; }
 .status { max-width: 48vw; color: var(--muted); font-size: 12px; text-align: right; }
 .topbar-actions { display: flex; align-items: center; gap: 8px; }
 .compact { min-height: 32px; padding: 0 12px; font-size: 11px; }
+
+.workflow-toolbar { min-width: 0; display: flex; align-items: center; gap: 12px; }
+.workflow-navigation { display: flex; align-items: center; gap: 4px; }
+.workflow-navigation > i { color: #506863; font-style: normal; }
+.workflow-navigation button {
+  min-height: 30px;
+  padding: 0 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-color: transparent;
+  background: transparent;
+  color: #91aaa6;
+  font-size: 11px;
+}
+.workflow-navigation button span {
+  width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(129, 221, 205, .25);
+  border-radius: 50%;
+  font: 9px ui-monospace, monospace;
+}
+.workflow-navigation button.active {
+  border-color: rgba(255, 202, 103, .42);
+  color: #ffe5aa;
+  background: rgba(255, 202, 103, .1);
+}
+.contextual-mode-selector { display: flex; align-items: center; gap: 6px; color: #718a86; font-size: 9px; }
+.contextual-mode-selector[hidden] { display: none; }
+.contextual-mode-selector select {
+  min-height: 28px;
+  padding: 0 28px 0 9px;
+  border: 1px solid rgba(129, 221, 205, .28);
+  border-radius: 7px;
+  background: #102422;
+  color: #dceeea;
+  font-size: 10px;
+}
+.workflow-hint {
+  min-width: 0;
+  overflow: hidden;
+  color: #718a86;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 

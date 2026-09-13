@@ -10,45 +10,69 @@
   <body>
     <main class="app-shell">
       <header class="topbar">
-        <div>
-          <p class="eyebrow">FLAMORIS</p>
-          <h1 id="projectTitle">Untitled.fl2d</h1>
+        <div class="topbar-main">
+          <div>
+            <p class="eyebrow">FLAMORIS</p>
+            <h1 id="projectTitle">Untitled.fl2d</h1>
+          </div>
+          <div class="topbar-actions">
+            <details id="fileMenu" class="file-menu">
+              <summary>ファイル</summary>
+              <div class="file-menu-popup">
+              <button type="button" data-file-action="new">新規</button>
+              <button type="button" data-file-action="open">開く…</button>
+              <button type="button" data-file-action="save">保存</button>
+              <button type="button" data-file-action="save-as">名前を付けて保存…</button>
+              <button type="button" data-file-action="save-incremental">連番保存</button>
+              <button type="button" data-file-action="save-copy">コピーを保存…</button>
+              <hr />
+              <button type="button" data-file-action="import-psd">PSDを読み込む…</button>
+              <button type="button" data-file-action="import-cutwork-flimg">Cutwork画像を読み込む…</button>
+              <button type="button" data-file-action="reimport-psd">PSDを再読み込み…</button>
+              <hr />
+              <button type="button" data-file-action="preferences">設定…</button>
+              </div>
+            </details>
+            <button id="undoButton" type="button" class="secondary compact" title="元に戻す操作はありません" disabled>↶ 元に戻す</button>
+            <button id="redoButton" type="button" class="secondary compact" title="やり直す操作はありません" disabled>↷ やり直す</button>
+            <div class="status" id="status" aria-live="polite">素材を開いてください</div>
+          </div>
         </div>
-        <div class="topbar-actions">
-          <details id="fileMenu" class="file-menu">
-            <summary>File</summary>
-            <div class="file-menu-popup">
-              <button type="button" data-file-action="new">New</button>
-              <button type="button" data-file-action="open">Open…</button>
-              <button type="button" data-file-action="save">Save</button>
-              <button type="button" data-file-action="save-as">Save As…</button>
-              <button type="button" data-file-action="save-incremental">Save Incremental</button>
-              <button type="button" data-file-action="save-copy">Save Copy…</button>
-              <hr />
-              <button type="button" data-file-action="import-psd">Import PSD…</button>
-              <button type="button" data-file-action="import-cutwork-flimg">Import Cutwork Image…</button>
-              <button type="button" data-file-action="reimport-psd">Re-import PSD…</button>
-              <hr />
-              <button type="button" data-file-action="preferences">Preferences…</button>
-            </div>
-          </details>
-          <button id="undoButton" type="button" class="secondary compact" title="Undo: No operation" disabled>↶ Undo</button>
-          <button id="redoButton" type="button" class="secondary compact" title="Redo: No operation" disabled>↷ Redo</button>
-          <div class="status" id="status" aria-live="polite">PNG / PSD / Cutwork Imageを読み込んでください</div>
+        <div class="workflow-toolbar">
+          <nav id="workflowNavigation" class="workflow-navigation" aria-label="制作工程">
+            <button type="button" data-workflow-mode="asset" class="active" aria-current="step"><span>1</span>素材</button>
+            <i aria-hidden="true">›</i>
+            <button type="button" data-workflow-mode="mesh"><span>2</span>メッシュ</button>
+            <i aria-hidden="true">›</i>
+            <button type="button" data-workflow-mode="rig"><span>3</span>リグ</button>
+            <i aria-hidden="true">›</i>
+            <button type="button" data-workflow-mode="motion"><span>4</span>動き</button>
+            <i aria-hidden="true">›</i>
+            <button type="button" data-workflow-mode="preview"><span>5</span>プレビュー</button>
+            <i aria-hidden="true">›</i>
+            <button type="button" data-workflow-mode="export"><span>6</span>書き出し</button>
+          </nav>
+          <label id="contextualModeSelector" class="contextual-mode-selector" for="editorModeSelect">
+            <span>ツール</span>
+            <select id="editorModeSelect" aria-label="工程内ツール">
+              <option value="object">パーツ配置</option>
+            </select>
+          </label>
+          <output id="workflowHint" class="workflow-hint">素材を開き、パーツと配置を確認します</output>
         </div>
       </header>
 
       <section class="workspace">
-        <aside class="panel scene-panel" aria-label="シーンツリー">
-          <div class="asset-buttons">
+        <aside id="scenePanel" class="panel scene-panel" aria-label="パーツ">
+          <div id="assetControls" class="asset-buttons">
             <label class="file-button">
-              <span>Source Artを開く</span>
+              <span>素材を開く</span>
               <input id="fileInput" type="file" accept="image/png,.psd,image/vnd.adobe.photoshop,.flimg,application/x-flamoris-cutwork" />
             </label>
           </div>
           <div class="panel-heading">
-            <h2>Scene Tree</h2>
-            <span>Project Query</span>
+            <h2>パーツ</h2>
+            <span>シーン</span>
           </div>
           <label class="search-field">
             <span class="sr-only">シーンを検索</span>
@@ -59,9 +83,10 @@
           </div>
           <div class="part-info" id="partInfo">単一PNGまたはPSDを読み込めます</div>
 
-          <details class="mesh-lab" open>
-            <summary>Mesh Lab</summary>
+          <details id="legacyMeshLab" class="mesh-lab" open>
+            <summary>メッシュ</summary>
 
+            <div id="legacyMeshControls" class="legacy-mesh-controls">
             <div class="field-grid">
               <label>
                 横の分割数
@@ -75,10 +100,11 @@
 
             <button id="generateButton" type="button" disabled>メッシュを再生成</button>
             <button id="resetButton" type="button" class="secondary" disabled>変形をリセット</button>
+            </div>
 
-            <section class="timeline-card" aria-labelledby="timelineTitle">
+            <section id="legacyMotionControls" class="timeline-card" aria-labelledby="timelineTitle">
               <div class="section-heading">
-                <h2 id="timelineTitle">Animation Prototype</h2>
+                <h2 id="timelineTitle">簡易モーション</h2>
                 <span id="keyframeStatus">A ―　B ―</span>
               </div>
               <div class="keyframe-buttons">
@@ -108,17 +134,6 @@
         </aside>
 
         <section class="viewport-wrap" id="viewportWrap">
-          <label class="mode-selector" for="editorModeSelect">
-            <span>Mode</span>
-            <select id="editorModeSelect" aria-label="Editor mode">
-              <option value="object">Object Mode</option>
-              <option value="deform">Deform Mode</option>
-              <option value="topology">Topology Edit Mode</option>
-              <option value="weight">Weight Authoring Mode</option>
-              <option value="form-correction">Form Correction Mode</option>
-              <option value="ik">IK Mode</option>
-            </select>
-          </label>
           <div class="transform-toolbar" aria-label="変形ツール">
             <button type="button" class="transform-tool active" data-transform-tool="translate" title="移動 (V)">移動</button>
             <button type="button" class="transform-tool" data-transform-tool="rotate" title="回転 (R)">回転</button>
@@ -136,14 +151,15 @@
           <canvas id="overlayCanvas" aria-label="メッシュ編集キャンバス"></canvas>
           <div class="empty-state" id="emptyState">
             <span class="empty-mark">✦</span>
-            <strong>PNG / PSD</strong>
-            <span>PSDはパーツ座標と重なり順を直接読み込みます</span>
+            <strong>最初に素材を開く</strong>
+            <span>PNG / PSD / Cutwork Imageに対応</span>
+            <button id="emptyOpenButton" type="button">素材を開く</button>
           </div>
         </section>
 
-        <aside class="panel inspector-panel" aria-label="インスペクター">
+        <aside id="inspectorPanel" class="panel inspector-panel" aria-label="プロパティ">
           <div class="panel-heading">
-            <h2>Inspector</h2>
+            <h2>プロパティ</h2>
             <span id="inspectorKind">未選択</span>
           </div>
           <div id="inspectorEmpty" class="panel-empty">Scene TreeまたはCanvasからノードを選択</div>
@@ -309,18 +325,27 @@
             </fieldset>
           </form>
 
-          <section id="transitionAuthoringPanel" class="transition-authoring" aria-labelledby="transitionAuthoringTitle">
+          <section id="exportWorkflowPanel" class="export-workflow-panel" hidden>
             <div class="panel-heading">
-              <h2 id="transitionAuthoringTitle">Transition Authoring</h2>
-              <span>Phase 2C-4</span>
+              <h2>書き出し</h2>
+              <span>Preview / Export</span>
+            </div>
+            <p>トランジション、解像度、FPS、形式を確認して書き出します。</p>
+            <button id="exportOpenButton" type="button">書き出し設定を開く…</button>
+          </section>
+
+          <section id="transitionAuthoringPanel" class="transition-authoring" aria-labelledby="transitionAuthoringTitle">
+            <div id="transitionAuthoringHeading" class="panel-heading">
+              <h2 id="transitionAuthoringTitle">動き</h2>
+              <span>トランジション</span>
             </div>
 
-            <label class="authoring-field">Active Transition
+            <label id="activeTransitionField" class="authoring-field">使用するトランジション
               <select id="activeTransitionSelect"><option value="">— No Project —</option></select>
             </label>
 
-            <fieldset class="endpoint-card">
-              <legend>A / B Key Art</legend>
+            <fieldset id="transitionEndpointCard" class="endpoint-card">
+              <legend>A / B キーアート</legend>
               <label><strong>A</strong> Start Key Art<select id="transitionFromKeyArtSelect"><option value="">— Key Art —</option></select></label>
               <label><strong>B</strong> End Key Art<select id="transitionToKeyArtSelect"><option value="">— Key Art —</option></select></label>
               <label>Duration ticks<input id="transitionDurationInput" type="number" min="1" step="1" value="120000" /></label>
@@ -328,12 +353,12 @@
               <output id="transitionEndpointStatus" class="authoring-status">Projectを開くとAuthoringを開始できます</output>
             </fieldset>
 
-            <details class="keyart-summary" open>
-              <summary>Key Art list</summary>
+            <details id="keyArtSummary" class="keyart-summary" open>
+              <summary>キーアート一覧</summary>
               <ul id="keyArtList"><li class="panel-empty">Key Artがありません</li></ul>
             </details>
 
-            <fieldset class="mapping-card">
+            <fieldset id="transitionMappingCard" class="mapping-card">
               <legend>SemanticSlot Mapping</legend>
               <label class="authoring-field">SemanticSlot
                 <select id="semanticSlotSelect" disabled><option value="">— Select SemanticSlot —</option></select>
@@ -343,7 +368,7 @@
               <label><strong>B</strong> mapped node<select id="semanticToNodeSelect" disabled><option value="">— Unmapped —</option></select></label>
             </fieldset>
 
-            <fieldset class="part-transition-card">
+            <fieldset id="partTransitionCard" class="part-transition-card">
               <legend>PartTransition Mode</legend>
               <label class="authoring-field">Persistent mode
                 <select id="partTransitionModeSelect" disabled><option value="">— No PartTransition —</option></select>
@@ -542,8 +567,8 @@
         </aside>
       </section>
       <details id="sequenceTimelinePanel" class="sequence-timeline-panel" open>
-        <summary><strong>Sequence Timeline</strong><span id="sequenceTimelineContext">No active owner</span></summary>
-        <div class="sequence-timeline-toolbar">
+        <summary><strong>シーケンスタイムライン</strong><span id="sequenceTimelineContext">対象なし</span></summary>
+        <div id="sequenceAuthoringToolbar" class="sequence-timeline-toolbar">
           <label>Sequence<select id="sequenceSelect"><option value="">— Select Sequence —</option></select></label>
           <button id="createSequenceButton" type="button">New Sequence</button>
           <label>Name<input id="sequenceNameInput" type="text" autocomplete="off" /></label>
@@ -562,7 +587,7 @@
           <input id="sequenceTickInput" type="number" min="0" max="0" step="1" value="0" aria-label="Sequence tick" />
           <output id="sequenceTimeOutput">0 ticks</output>
         </div>
-        <div class="sequence-timeline-workspace">
+        <div id="sequenceAuthoringWorkspace" class="sequence-timeline-workspace">
           <section class="sequence-lanes" aria-label="Sequence lanes">
             <div class="sequence-lane-heading"><strong>ViewLane</strong><span>strict contiguous coverage</span></div>
             <div id="sequenceViewLane" class="sequence-lane view-lane" aria-label="Key Art Strip"></div>
@@ -586,7 +611,7 @@
 
           <aside class="sequence-timeline-inspector">
             <fieldset>
-              <legend>Clip Library</legend>
+              <legend>クリップ</legend>
               <label>Clips<select id="animationClipSelect"><option value="">— Select clip —</option></select></label>
               <div id="animationClipLibrary" class="clip-library" aria-label="Draggable AnimationClips"></div>
               <label>Name<input id="animationClipNameInput" type="text" autocomplete="off" /></label>
