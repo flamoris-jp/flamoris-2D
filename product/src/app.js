@@ -53,6 +53,15 @@ import { AutoMeshPreviewController } from "./ui/automesh-preview-controller.js";
 import { createCorrespondenceView } from "./ui/correspondence-view.js";
 import { createViewportCameraController } from "./ui/viewport-camera-controller.js";
 import { createSequenceTimelineView } from "./ui/sequence-timeline-view.js";
+import {
+  defaultEditorModeForWorkflow,
+  WORKFLOW_HINTS,
+  WORKFLOW_MODES,
+  WORKFLOW_ORDER,
+  workflowForEditorMode,
+  workflowOwnsEditorMode,
+} from "./ui/workflow-modes.js";
+import { createWorkflowView } from "./ui/workflow-view.js";
 
 const desktopApi = window.flamorisDesktop || null;
 const appStorage = desktopApi?.storage || localStorage;
@@ -61,6 +70,7 @@ const elements = queryAppElements(document);
 
 const state = {
   mode: "empty",
+  workflowMode: WORKFLOW_MODES.ASSET,
   editorMode: EDITOR_MODES.OBJECT,
   editTargetNodeId: null,
   image: null,
@@ -99,6 +109,8 @@ const autoMeshPreview = new AutoMeshPreviewController({
     render();
   },
 });
+
+const workflowView = createWorkflowView({ state, elements });
 
 const preferencesStore = createPreferencesStore(appStorage);
 let preferences = preferencesStore.load();
@@ -221,6 +233,7 @@ const keyStateStripView = createKeyStateStripView({
   elements,
   setStatus,
   onEndpointEdit: () => {
+    state.workflowMode = WORKFLOW_MODES.MESH;
     state.editorMode = EDITOR_MODES.DEFORM;
     state.editor?.meshTools.setMode(EDITOR_MODES.DEFORM);
     syncEndpointMeshViewport();
@@ -372,9 +385,7 @@ function currentEditModeAvailability() {
 function updateEditorModeUi() {
   elements.editorModeSelect.value = state.editorMode;
   elements.editorModeSelect.disabled = state.mode !== "psd";
-  elements.editorModeSelect.title = state.mode === "png"
-    ? "単一PNGは既存のmesh editingを使用します"
-    : "TabでObject/Deform Modeを切り替え。Topology EditはModeメニューから選択";
+  elements.editorModeSelect.title = "現在の工程で使う編集ツール";
   const editing = isMeshAuthoringMode(state.editorMode);
   elements.viewportWrap.classList.toggle("edit-mode", editing);
   const transformToolbar = elements.transformTools[0]?.parentElement;
@@ -382,6 +393,7 @@ function updateEditorModeUi() {
 }
 
 function setEditorMode(requestedMode) {
+  state.workflowMode = workflowForEditorMode(requestedMode, state.workflowMode);
   if (state.mode === "png") {
     state.editorMode = EDITOR_MODES.DEFORM;
     state.editTargetNodeId = null;
@@ -395,7 +407,7 @@ function setEditorMode(requestedMode) {
     state.transformGesture = null;
     state.editor.cancelTransformDrag();
     autoMeshPreview.clear();
-    setStatus("IK Mode・target handle dragはpointer-upでBone poseへbakeされます");
+    setStatus("IK・ターゲットをドラッグし、離した時にボーン姿勢へ反映します");
   } else if (isMeshAuthoringMode(requestedMode)) {
     const availability = currentEditModeAvailability();
     if (!availability.allowed) {
@@ -411,7 +423,7 @@ function setEditorMode(requestedMode) {
       state.editorMode = EDITOR_MODES.OBJECT;
       state.editTargetNodeId = null;
       updateEditorModeUi();
-      setStatus("Topology Edit Modeには、endpoint workflowでAまたはBのpartを選択してください。");
+      setStatus("トポロジー編集には、メッシュ工程でAまたはBのパーツを選択してください。");
       renderEditorUi();
       render();
       return false;
@@ -453,18 +465,18 @@ function setEditorMode(requestedMode) {
     state.transformGesture = null;
     state.editor.cancelTransformDrag();
     const label = {
-      [EDITOR_MODES.TOPOLOGY]: "Topology Edit",
-      [EDITOR_MODES.DEFORM]: "Deform",
-      [EDITOR_MODES.WEIGHT]: "Weight Authoring",
-      [EDITOR_MODES.FORM_CORRECTION]: "Form Correction",
+      [EDITOR_MODES.TOPOLOGY]: "トポロジー",
+      [EDITOR_MODES.DEFORM]: "頂点位置",
+      [EDITOR_MODES.WEIGHT]: "ウェイト",
+      [EDITOR_MODES.FORM_CORRECTION]: "フォーム補正",
     }[state.editorMode];
-    setStatus(`${state.editor.getNode(state.editTargetNodeId).displayName}・${label} Mode`);
+    setStatus(`${state.editor.getNode(state.editTargetNodeId).displayName}・${label}`);
   } else {
     state.editorMode = EDITOR_MODES.OBJECT;
     state.editTargetNodeId = null;
     state.drag = null;
     state.selected.clear();
-    setStatus("Object Mode・scene selectionとTransformを有効化しました");
+    setStatus("パーツの選択と変形を有効にしました");
   }
   updateEditorModeUi();
   renderEditorUi();
@@ -489,6 +501,7 @@ async function loadImage(source, label) {
   state.editor?.keyStateStrip.pause();
   state.editor?.sequenceTimeline.pause();
   state.mode = "png";
+  state.workflowMode = WORKFLOW_MODES.ASSET;
   state.editorMode = EDITOR_MODES.DEFORM;
   state.editTargetNodeId = null;
   state.psdParts = [];
@@ -540,6 +553,36 @@ function renderEditorUi() {
   transitionDiagnosticsView.render();
   meshAuthoringView.render();
   correspondenceView.render();
+  workflowView.render();
+}
+
+function setWorkflowMode(requestedMode) {
+  if (!WORKFLOW_ORDER.includes(requestedMode)) return false;
+  state.workflowMode = requestedMode;
+  const ownsCurrentMode = workflowOwnsEditorMode(requestedMode, state.editorMode);
+  let nextEditorMode = ownsCurrentMode
+    ? state.editorMode
+    : defaultEditorModeForWorkflow(requestedMode, { contentMode: state.mode });
+  if (requestedMode === WORKFLOW_MODES.MESH && state.mode === "psd" &&
+    (!currentEditModeAvailability().allowed ||
+      !state.editor?.endpointMesh.getState().editingEnabled)) {
+    nextEditorMode = EDITOR_MODES.OBJECT;
+  }
+  if (state.mode !== "empty" && nextEditorMode !== state.editorMode) {
+    setEditorMode(nextEditorMode);
+  }
+  if (requestedMode === WORKFLOW_MODES.PREVIEW) {
+    state.editor?.endpointMesh.exitEditing();
+    if (state.editor?.transitionAuthoring.activeTransition()) {
+      state.editor.transitionPreview.selectViewMode("preview");
+    }
+  }
+  renderEditorUi();
+  render();
+  setStatus(state.mode === "empty"
+    ? "素材を開いて制作を始めます"
+    : WORKFLOW_HINTS[requestedMode]);
+  return true;
 }
 
 function handleEditorChange(reason) {
@@ -642,6 +685,7 @@ function attachProject(project, {
     preferences,
   });
   state.editor = editor;
+  state.workflowMode = WORKFLOW_MODES.ASSET;
   state.editorMode = EDITOR_MODES.OBJECT;
   state.editTargetNodeId = null;
   if (desktopApi && !filePath) desktopApi.clearAssociation();
@@ -1474,8 +1518,12 @@ meshEditingController.bind();
 elements.fitAllButton.addEventListener("click", fitDocumentView);
 elements.fitPartButton.addEventListener("click", fitSelectedPartView);
 elements.editorModeSelect.addEventListener("change", () => {
-  setEditorMode(elements.editorModeSelect.value);
+  if (elements.editorModeSelect.value) setEditorMode(elements.editorModeSelect.value);
 });
+elements.workflowButtons.forEach((button) => {
+  button.addEventListener("click", () => setWorkflowMode(button.dataset.workflowMode));
+});
+elements.emptyOpenButton.addEventListener("click", () => elements.fileInput.click());
 
 bindViewportInteractions({
   state,
@@ -1512,6 +1560,7 @@ if (!desktopApi) {
 updateButtons();
 updateZoomOutput();
 resizeCanvases();
+workflowView.render();
 elements.recoveryDialog.addEventListener("close", () => {
   if (elements.recoveryDialog.returnValue !== "restore") {
     setStatus("Recoveryは現在のProjectへ復元していません");

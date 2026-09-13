@@ -26,16 +26,16 @@ function buildDialog() {
   dialog.setAttribute("aria-labelledby", "exportDialogTitle");
   dialog.innerHTML = `
     <form method="dialog">
-      <h2 id="exportDialogTitle">Export</h2>
-      <label>Transition
+      <h2 id="exportDialogTitle">書き出し</h2>
+      <label>トランジション
         <select data-export="transition"></select>
       </label>
-      <label>Resolution
+      <label>解像度
         <select data-export="resolution-preset"></select>
       </label>
       <div class="field-grid">
-        <label>Width <input data-export="width" type="number" min="1" step="1" /></label>
-        <label>Height <input data-export="height" type="number" min="1" step="1" /></label>
+        <label>幅 <input data-export="width" type="number" min="1" step="1" /></label>
+        <label>高さ <input data-export="height" type="number" min="1" step="1" /></label>
       </div>
       <label>FPS
         <select data-export="fps-preset"></select>
@@ -44,22 +44,22 @@ function buildDialog() {
         <label>Numerator <input data-export="fps-numerator" type="number" min="1" step="1" /></label>
         <label>Denominator <input data-export="fps-denominator" type="number" min="1" step="1" /></label>
       </div>
-      <label>Format
+      <label>形式
         <select data-export="format">
           <option value="mp4">MP4 · H.264</option>
           <option value="png-sequence">PNG sequence</option>
         </select>
       </label>
       <dl class="identity-list">
-        <div><dt>Destination</dt><dd><output data-export="destination">Native dialog on Export</output></dd></div>
+        <div><dt>保存先</dt><dd><output data-export="destination">書き出し時に選択</output></dd></div>
       </dl>
       <progress data-export="progress" max="1" value="0"></progress>
-      <output data-export="status" class="authoring-status">Ready</output>
+      <output data-export="status" class="authoring-status">準備完了</output>
       <ul data-export="diagnostics" class="diagnostics-list"></ul>
       <div class="dialog-actions">
-        <button data-export="close" type="button" class="secondary">Close</button>
-        <button data-export="cancel" type="button" class="secondary" disabled>Cancel</button>
-        <button data-export="start" type="button">Export</button>
+        <button data-export="close" type="button" class="secondary">閉じる</button>
+        <button data-export="cancel" type="button" class="secondary" disabled>キャンセル</button>
+        <button data-export="start" type="button">書き出す</button>
       </div>
     </form>`;
   document.body.append(dialog);
@@ -80,14 +80,16 @@ export function createExportDialogView({
   setStatus,
   desktopApi = globalThis.flamorisDesktop || null,
 } = {}) {
-  const openButton = document.createElement("button");
-  openButton.type = "button";
-  openButton.className = "secondary";
-  openButton.textContent = "Export…";
-  openButton.title = "Export the active Transition";
-  const anchor = elements.activeTransitionSelect?.closest("label") ||
-    elements.activeTransitionSelect;
-  anchor?.insertAdjacentElement("afterend", openButton);
+  const openButton = elements.exportOpenButton || document.createElement("button");
+  if (!elements.exportOpenButton) {
+    openButton.type = "button";
+    openButton.className = "secondary";
+    openButton.textContent = "書き出し…";
+    openButton.title = "使用中のトランジションを書き出す";
+    const anchor = elements.activeTransitionSelect?.closest("label") ||
+      elements.activeTransitionSelect;
+    anchor?.insertAdjacentElement("afterend", openButton);
+  }
 
   const dialog = buildDialog();
   const transitionSelect = queryDialog(dialog, "transition");
@@ -291,7 +293,7 @@ export function createExportDialogView({
       defaultFpsId,
     );
     formatSelect.value = desktopApi ? "mp4" : "png-sequence";
-    destinationOutput.textContent = "Native dialog on Export";
+    destinationOutput.textContent = "書き出し時に選択";
     if (jobController.getState().status !== "running") jobController.reset();
     applyResolutionPreset();
     applyFpsPreset();
