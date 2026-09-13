@@ -27,6 +27,7 @@ import {
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   documentTitle,
+  filePickerConfiguration,
   nextIncrementalFilePath,
   resolveUnsavedDecision,
   updateRecentFiles,
@@ -210,6 +211,7 @@ function installMenu() {
       { label: "Save Copy…", click: () => sendMenuAction("save-copy") },
       { type: "separator" },
       { label: "Import PSD…", click: () => sendMenuAction("import-psd") },
+      { label: "Import Cutwork Image…", click: () => sendMenuAction("import-cutwork-flimg") },
       { label: "Re-import PSD…", click: () => sendMenuAction("reimport-psd") },
       { type: "separator" },
       { label: "Preferences…", click: () => sendMenuAction("preferences") },
@@ -293,18 +295,6 @@ async function handleWindowClose() {
   mainWindow?.close();
 }
 
-function fileDialogFilters(purpose) {
-  if (purpose === "import-psd" || purpose === "reimport-psd") {
-    return [{ name: "Adobe Photoshop", extensions: ["psd"] }];
-  }
-  return [
-    { name: "FLAMORIS 2D / Source", extensions: ["fl2d", "psd", "png"] },
-    { name: "FLAMORIS 2D Project", extensions: ["fl2d"] },
-    { name: "Adobe Photoshop", extensions: ["psd"] },
-    { name: "PNG Image", extensions: ["png"] },
-  ];
-}
-
 async function filePayload(filePath) {
   const extension = extname(filePath).toLocaleLowerCase();
   if (extension === ".fl2d") {
@@ -317,7 +307,9 @@ async function filePayload(filePath) {
   }
   const mimeType = extension === ".psd"
     ? "image/vnd.adobe.photoshop"
-    : "image/png";
+    : extension === ".flimg"
+      ? "application/x-flamoris-cutwork"
+      : "image/png";
   return {
     name: basename(filePath),
     filePath,
@@ -436,20 +428,21 @@ function registerIpc() {
 
   ipcMain.handle("desktop:open-file", async (event, options) => {
     assertTrusted(event);
-    const purpose = ["open", "import-psd", "reimport-psd"].includes(options?.purpose)
+    const purpose = ["open", "import-psd", "reimport-psd", "import-cutwork-flimg"].includes(options?.purpose)
       ? options.purpose
       : "open";
+    const picker = filePickerConfiguration(purpose);
     const result = await dialog.showOpenDialog(mainWindow, {
-      title: purpose === "open" ? "Open" : "Select PSD",
+      title: picker.title,
       defaultPath: associatedDirectory(),
       properties: ["openFile"],
-      filters: fileDialogFilters(purpose),
+      filters: picker.filters,
     });
     if (result.canceled || !result.filePaths[0]) return null;
     const filePath = result.filePaths[0];
     const extension = extname(filePath).toLocaleLowerCase();
-    if (purpose !== "open" && extension !== ".psd") {
-      throw new Error("A .psd file is required.");
+    if (picker.requiredExtension && extension !== picker.requiredExtension) {
+      throw new Error(`A ${picker.requiredExtension} file is required.`);
     }
     const payload = await filePayload(filePath);
     if (purpose === "open" && extension === ".fl2d") {

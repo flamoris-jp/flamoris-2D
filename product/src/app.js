@@ -2,6 +2,7 @@ import { createViewTransform } from "./mesh.js";
 import { MeshRenderer } from "./renderer.js";
 import { collectPsdParts } from "./psd.js";
 import { createProjectFromPsd } from "./io/psd-project.js";
+import { importCutworkFlimg } from "./io/cutwork-flimg-project.js";
 import { createIdFactory, createProject } from "./model/project.js";
 import {
   createRecoveryStore,
@@ -32,6 +33,7 @@ import {
   hydratePsdRenderAssets,
   serializePsdRenderAssets,
 } from "./ui/psd-render-assets.js";
+import { createCutworkRenderAssets } from "./ui/cutwork-render-assets.js";
 import { ReimportRenderHistory } from "./ui/reimport-render-history.js";
 import {
   clearLayerCanvas,
@@ -718,6 +720,18 @@ async function loadPsd(file) {
   setStatus(`${file.name}・${parts.length}パーツ・Editor Core接続済み`);
 }
 
+async function loadCutworkFlimg(file) {
+  setStatus("Cutwork Imageを検証・変換中…");
+  const imported = await importCutworkFlimg(await file.arrayBuffer(), {
+    fileName: file.name,
+    projectName: file.name,
+  });
+  const parts = createCutworkRenderAssets(imported.renderAssets);
+  attachProject(imported.project, { parts, mode: "psd", saved: false });
+  setStatus(`${file.name}・Cutwork ${parts.length}レイヤー・Key Art変換済み`);
+  return imported.result;
+}
+
 async function loadFile(file, { skipConfirmation = false } = {}) {
   if (!file) return;
   const lower = file.name.toLowerCase();
@@ -725,6 +739,11 @@ async function loadFile(file, { skipConfirmation = false } = {}) {
     if (lower.endsWith(".psd")) {
       if (!skipConfirmation && !await confirmProjectReplacement()) return;
       await loadPsd(file);
+      return;
+    }
+    if (lower.endsWith(".flimg")) {
+      if (!skipConfirmation && !await confirmProjectReplacement()) return;
+      await loadCutworkFlimg(file);
       return;
     }
     if (lower.endsWith(".png") || file.type === "image/png") {
@@ -737,7 +756,7 @@ async function loadFile(file, { skipConfirmation = false } = {}) {
       }
       return;
     }
-    throw new Error("PNGかPSDを選んでね");
+    throw new Error("PNG、PSD、またはCutwork .flimgを選んでね");
   } catch (error) {
     console.error(error);
     setStatus(error.message || String(error));
@@ -1012,6 +1031,21 @@ async function choosePsdFile(action) {
   }
 }
 
+async function chooseCutworkFile() {
+  if (!desktopApi) {
+    elements.cutworkFlimgInput.click();
+    return;
+  }
+  if (!await confirmProjectReplacement()) return;
+  try {
+    const payload = await desktopApi.openFile({ purpose: "import-cutwork-flimg" });
+    const file = desktopFileFromPayload(payload);
+    if (file) await loadCutworkFlimg(file);
+  } catch (error) {
+    setStatus(error.message || String(error));
+  }
+}
+
 async function openDesktopProjectFrom(source, filePath) {
   if (!desktopApi || !await confirmProjectReplacement()) return;
   try {
@@ -1037,6 +1071,8 @@ async function handleFileAction(action) {
     await performSave(action);
   } else if (action === "import-psd" || action === "reimport-psd") {
     await choosePsdFile(action);
+  } else if (action === "import-cutwork-flimg") {
+    await chooseCutworkFile();
   } else if (action === "preferences") openPreferences();
   else if (action === "undo") undoProject();
   else if (action === "redo") redoProject();
@@ -1053,6 +1089,17 @@ elements.projectOpenInput.addEventListener("change", async () => {
 elements.reimportPsdInput.addEventListener("change", async () => {
   await analyzePsdReimport(elements.reimportPsdInput.files?.[0]);
   elements.reimportPsdInput.value = "";
+});
+elements.cutworkFlimgInput.addEventListener("change", async () => {
+  const file = elements.cutworkFlimgInput.files?.[0];
+  if (file && await confirmProjectReplacement()) {
+    try { await loadCutworkFlimg(file); }
+    catch (error) {
+      console.error(error);
+      setStatus(error.message || String(error));
+    }
+  }
+  elements.cutworkFlimgInput.value = "";
 });
 elements.savePreferencesButton.addEventListener("click", savePreferences);
 elements.applyReimportButton.addEventListener("click", (event) => {
