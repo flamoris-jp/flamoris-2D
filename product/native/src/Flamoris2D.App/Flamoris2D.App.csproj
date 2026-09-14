@@ -23,5 +23,8 @@
     <None Include="..\..\..\src\**\*.js"
           Link="src\%(RecursiveDir)%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\package.json"
+          Link="package.json"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
