@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { spawn } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -191,6 +192,37 @@ test("Product Host entry graph is free of unowned DOM and Canvas globals", async
   const portablePaths = audit.modules.map((file) => file.replaceAll("\\", "/"));
   assert.ok(portablePaths.some((file) => file.endsWith("commands/editor.js")));
   assert.ok(portablePaths.some((file) => file.endsWith("io/png-raster.js")));
+});
+
+test("browser dependency inventory covers every required disposition", async () => {
+  const inventory = JSON.parse(await readFile(
+    new URL("../product-host/browser-dependencies.json", import.meta.url),
+    "utf8",
+  ));
+  const classifications = new Set(inventory.entries.map((entry) => entry.classification));
+  assert.deepEqual(classifications, new Set([
+    "plain Node-compatible Product code",
+    "environment adapter required",
+    "native adapter candidate",
+    "deferred renderer concern",
+  ]));
+  const sources = inventory.entries.flatMap((entry) => entry.sources);
+  for (const required of [
+    "src/app.js",
+    "src/io/png-raster.js",
+    "src/core/export-offscreen-renderer.js",
+    "src/renderer.js",
+    "src/ui/desktop-project-files.js",
+  ]) {
+    assert.ok(sources.includes(required), `Missing dependency classification for ${required}.`);
+  }
+  assert.match(await readFile(new URL("../src/app.js", import.meta.url), "utf8"), /window\.agPsd/);
+  assert.match(await readFile(new URL("../src/io/png-raster.js", import.meta.url), "utf8"),
+    /DecompressionStream/);
+  assert.match(
+    await readFile(new URL("../src/core/export-offscreen-renderer.js", import.meta.url), "utf8"),
+    /OffscreenCanvas/,
+  );
 });
 
 test("framed child process starts, responds, shuts down, and surfaces crash", async (context) => {

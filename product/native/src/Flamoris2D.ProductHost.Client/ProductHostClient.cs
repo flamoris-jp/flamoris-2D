@@ -61,7 +61,20 @@ public sealed class ProductHostClient : IAsyncDisposable
         _readerTask = ReadLoopAsync(_process.StandardOutput.BaseStream, _lifetime.Token);
         _stderrTask = ReadDiagnosticsAsync(_process.StandardError, _lifetime.Token);
 
-        var response = await SendAsync("protocol.handshake", new { }, false, false, cancellationToken);
+        using var startupTimeout = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken, _lifetime.Token);
+        startupTimeout.CancelAfter(TimeSpan.FromSeconds(10));
+        ProductHostResponse response;
+        try
+        {
+            response = await SendAsync(
+                "protocol.handshake", new { }, false, false, startupTimeout.Token);
+        }
+        catch
+        {
+            if (!_process.HasExited) _process.Kill(true);
+            throw;
+        }
         var payload = response.Payload;
         var handshake = new ProductHostHandshake(
             payload.GetProperty("protocolVersion").GetInt32(),
@@ -139,14 +152,18 @@ public sealed class ProductHostClient : IAsyncDisposable
         _shutdownRequested = true;
         if (!process.HasExited)
         {
+            using var shutdownTimeout = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken, _lifetime.Token);
+            shutdownTimeout.CancelAfter(TimeSpan.FromSeconds(5));
             try
             {
-                await SendAsync("host.shutdown", new { }, false, false, cancellationToken);
-                await process.WaitForExitAsync(cancellationToken);
+                await SendAsync("host.shutdown", new { }, false, false, shutdownTimeout.Token);
+                await process.WaitForExitAsync(shutdownTimeout.Token);
             }
-            catch when (!cancellationToken.IsCancellationRequested)
+            catch
             {
                 if (!process.HasExited) process.Kill(true);
+                if (cancellationToken.IsCancellationRequested) throw;
             }
         }
         _projectionGate.Invalidate();
@@ -237,7 +254,7 @@ public sealed class ProductHostClient : IAsyncDisposable
         var requestId = root.GetProperty("requestId").GetString() ?? "";
         var documentToken = root.TryGetProperty("documentToken", out var tokenElement) &&
             tokenElement.ValueKind == JsonValueKind.String ? tokenElement.GetString() : null;
-        var revision = root.TryGetProperty("revision", out var revisionElement) &&
+        long? revision = root.TryGetProperty("revision", out var revisionElement) &&
             revisionElement.ValueKind == JsonValueKind.Number ? revisionElement.GetInt64() : null;
         if (!root.GetProperty("ok").GetBoolean())
         {

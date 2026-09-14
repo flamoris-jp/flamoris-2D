@@ -159,8 +159,9 @@ Locally exercised on Node 24:
 - Undo/Redo with monotonic host revision;
 - stale mutation rejection;
 - shared WPF/headless history ordering;
-- representative schema-15 `.fl2d` serialize/reopen; and
-- transitive browser-global audit.
+- representative schema-15 `.fl2d` serialize/reopen;
+- transitive browser-global audit; and
+- machine-readable coverage of all four browser-dependency dispositions.
 
 The Windows-native CI job additionally:
 
