@@ -344,3 +344,158 @@ evaluate -> canonical revision/tick result
 
 MCP never drives WPF controls or viewport pixels. WPF never implements a hidden mutation because a command is inconvenient. Semantic AI operations return/propose ordinary commands and diagnostics, then commit through the same transaction queue. A visible change event lets WPF update Parts, Properties, canvas, and history when MCP edits the active document.
 
+## 13. Recovery UX and required Product contract
+
+Recovery is offered on the startup/empty-document surface as a clear card, not as a modal that repeatedly blocks launch. The card identifies the project/display name, snapshot time, and whether more versions exist. `ファイル > 復元` opens the same surface later.
+
+The three actions have deliberately different semantics:
+
+| Action | Result | Snapshot retention | Future prompting |
+| --- | --- | --- | --- |
+| `復元して開く` | validate first, then replace the live document with a dirty `Recovered` session | retain until a successful intentional Save/Save As or explicit discard | no repeated prompt for the same open session |
+| `今回は復元しない` | continue without opening Recovery | retain all snapshots | suppress the blocking/card emphasis for this app session; show the card again on a later launch and keep `ファイル > 復元` available |
+| `復元データを破棄` | after a destructive confirmation, delete the selected recovery lineage/versions | delete | do not prompt again unless a new snapshot is created |
+
+Closing the card is equivalent to `今回は復元しない`, never to deletion. Save failure retains Recovery. A corrupt newest snapshot does not trap startup: validation reports it, the UI offers an older valid version where available, and deletion remains explicit.
+
+The current ADR 0004/0005 behavior establishes separation from `.fl2d`, dirty-on-restore, and clear-on-intentional-save, but it does not fully define lineage, per-session dismissal, or discard granularity. Before native document lifecycle is implemented, a Recovery ADR must define:
+
+- stable snapshot and lineage identity;
+- metadata safe to show before restore;
+- latest-versus-specific-version restore;
+- retention after session dismissal, successful Save, Save Copy, and failed Save;
+- deletion scope and confirmation;
+- bounds/eviction and behavior for corrupt or future-version snapshots; and
+- Product Host methods that manipulate snapshots without making WPF parse Project payloads.
+
+WPF stores only the current app-session dismissal state. It does not mark a snapshot as restored or discarded by rewriting Project content.
+
+## 14. Packaging and deployment direction
+
+The native application targets Windows x64 and the repository-supported .NET LTS baseline, initially .NET 10 to align with Cutwork. Packaging is built from an explicit Product allowlist and contains only:
+
+- the WPF application and required .NET runtime when self-contained;
+- the version-matched Product Host JavaScript bundle and runtime;
+- native renderer dependencies selected by the renderer ADR;
+- the approved FFmpeg binary/process support where export requires it;
+- localization/resources, icons, licenses, and `.fl2d` association metadata; and
+- no tests, staging/private artwork, browser UI assets, or historical sources.
+
+During migration the Electron build remains the default production artifact. Native preview packages do not claim the `.fl2d` association by default, preventing two shells from racing for document ownership. The release switch occurs only after parity closure. At that point the production workflow stops packaging Electron, Chromium, `index.html`, DOM views, and browser-only adapters.
+
+The installer/update decision remains separate: choose MSIX or a signed installer/portable pair based on file association, update, code-signing, and distribution requirements. A self-contained WPF package plus bundled Product Host is the test baseline; “single executable” is not a goal if it obscures runtime provenance or update safety.
+
+Product Host and WPF versions declare a supported protocol range. Startup fails clearly on incompatibility; it never silently falls back to reduced command semantics. Crash logs exclude Project/raster contents unless the user explicitly exports a diagnostic package.
+
+## 15. Staged migration plan
+
+Every stage is a separate issue and one or more reviewable PRs. Each PR keeps commits purpose-driven (contract/foundation, controller, UI, tests, review fixes). The Electron editor remains runnable until Stage 9.
+
+| Stage | Scope | Exit evidence |
+| --- | --- | --- |
+| 0. accept design | review this document and ADR 0006; open pending ADR issues | approved authority map; no Product implementation |
+| 1. Product Host boundary proof | protocol/schema handshake, one `EditorSession`, query/command/transaction/Undo/Redo, revision events, one raster transfer, process supervision | boundary checks from ADR 0006 pass; existing JS tests stay green |
+| 2. native shell foundation | WPF solution, menu/global commands, workflow strip, common panel grid, localization, focus/shortcut map, empty state | shell hands-on matches common grammar; no document copy in C# |
+| 3. document + Source/Object | Open/Save/Save As, atomic write, recent files, accepted Recovery contract, PSD/`.flimg`, Parts/Object selection, visibility/lock/name/properties | round-trip and recovery tests; packaged DPI/file-dialog pass |
+| 4. viewport + Mesh | native read-only render plan first, camera/picking/overlay, then Mesh structure/layout tools and one-gesture history | render parity fixtures; topology/layout/Undo/Redo/save-open hands-on pass; legacy writable mesh absent |
+| 5. Rig | Warp/Bone rest editing, SkinBinding/weights, clipping, constraints and helpers | existing rig commands/evaluators reused; gesture and overlay acceptance |
+| 6. Deform / Key State | Key State strip, Warp keyforms, Bone pose, mesh/form offsets, IK pose authoring | Layout remains unchanged by Deform; per-tool one-undo tests |
+| 7. Animation | Sequence/Clip/ClipInstance/typed-track authoring, virtualized Timeline, transport/zoom near Timeline | 120000-tick parity; drag/drop/resize/keyframe edits commit once |
+| 8. Preview + Export parity | native preview, read-only scrub, render diagnostics, frame/video export, FFmpeg process service | preview/export agree on canonical fixtures; cancellation and failure tests |
+| 9. production cutover | full production-shot acceptance, make WPF package default, remove Electron build inputs and browser shell from Product artifact, preserve history docs | all retirement criteria pass and cutover PR is reviewed |
+
+No stage ports a lower Product layer merely because its JavaScript implementation feels inconvenient. If interoperability itself becomes the measured bottleneck, propose a bounded replacement behind the same conformance contract.
+
+## 16. Test and acceptance strategy
+
+Issue #92 changes documentation only, so it requires Markdown/link review rather than a broad test run. Follow-up implementation stages use four layers:
+
+1. **Product conformance:** existing JavaScript tests remain green and canonical Query/Command/evaluation fixtures are versioned.
+2. **Protocol tests:** schema mismatch, transaction atomicity, revision conflict, process death, cancellation, large asset transfer, and structured errors.
+3. **C# unit/component tests:** workspace/context transitions, command availability/routing, coordinate conversion, gesture lifecycle, projection invalidation, Recovery decisions, and timeline pixel/tick mapping.
+4. **Packaged Windows acceptance:** real pointer/focus/DPI behavior, representative artwork, file dialogs, save/reopen, recovery, timeline feel, preview, and export inspection.
+
+Automated image comparison protects renderer semantics, but does not replace hands-on assessment of pointer latency, overlay legibility, timeline navigation, or first-time comprehension.
+
+## 17. Risk register
+
+| Risk | Impact | Mitigation / stop condition |
+| --- | --- | --- |
+| C# projection becomes a second Project truth | data loss and MCP divergence | immutable revisioned projections; all writes through Product Host; architecture tests reject C# serialization as authority |
+| JS/C# protocol drift | missing or misinterpreted commands | schema/version handshake, generated/validated DTOs where useful, compatibility tests, fail closed |
+| interop latency harms dragging | broken editing feel | local gesture previews; one commit on release; do not round-trip every pointer move |
+| MCP edits during a human gesture | lost update | expected revision and serialized queue; cancel/refresh on conflict |
+| raster/bulk IPC copies exhaust memory | crashes on large PSD/`.flimg` | framed streaming or handles, size budgets, cancellation, bounded caches, representative stress test |
+| native renderer changes compositing | preview/export mismatch | canonical render plans, golden fixtures, premultiplied-alpha/clipping tests, retain Electron until parity |
+| WPF DPI/focus/pointer capture bugs | wrong hit tests or shortcuts | one coordinate service/input router, multi-DPI packaged tests, lost-capture cancellation |
+| Timeline creates too many WPF elements | poor scroll/zoom performance | custom drawing/virtualization, viewport-range realization, benchmark dense sequences |
+| Recovery UI deletes or repeatedly nags | work loss or loss of trust | explicit three-action contract, session-only dismissal, destructive confirmation, corrupted-snapshot fallback |
+| dual shell period confuses file association | wrong app opens or saves | Electron remains default; native preview does not register association until cutover |
+| bundled runtimes increase package/security burden | size and update complexity | explicit allowlist/SBOM/licenses, pinned versions, signed release, no generic Product Host surface |
+| feature-by-feature port preserves accidental DOM structure | native UI stays confusing | workflow/context acceptance is semantic; retire views rather than translating components |
+| migration stalls indefinitely | permanent double maintenance | capability ledger, stage exit gates, no new Electron-only feature without WPF migration disposition |
+
+## 18. Electron/JS shell retirement criteria
+
+Electron may be removed from the production artifact only when all of the following are true:
+
+### Authority and compatibility
+
+- WPF and MCP edit the same live `EditorSession` through the Product Host.
+- No C# persistent Project model, alternate history, UI-only mesh, or generic property mutation exists.
+- `.fl2d` schema v15 and supported legacy documents parse, migrate, save, and reopen without semantic change.
+- Stable IDs, validation diagnostics, 120000-tick time, evaluator order, and command/transaction behavior pass conformance fixtures.
+- PSD and Cutwork `.flimg` imports preserve current validation and resource boundaries.
+
+### Workflow capability
+
+- A first-time user can follow `素材 -> メッシュ -> リグ -> 変形 -> アニメーション -> プレビュー -> 書き出し` without internal type names.
+- Object/Part selection, visibility, lock, and name editing are distinct and dependable.
+- Mesh structure and Key Art layout are usable and semantically separate from Deform.
+- Warp, Bone, weights, clipping, constraints, form correction, and IK capabilities required by current production are reachable.
+- Sequence, reusable clips, instances, typed tracks/keyframes, playback, timeline zoom/scroll, Preview, and Export are reachable.
+- Unrelated Timeline/authoring panels are absent from workflows that do not need them.
+
+### Interaction and visual parity
+
+- Each persistent gesture is one semantic Undo unit; cancel/lost capture commits nothing.
+- Canvas picking, pan/zoom, overlays, keyboard focus, and shortcuts pass packaged Windows checks at 100/125/150/200% DPI.
+- Mesh/rig overlays remain legible on light and dark artwork.
+- Native preview and export match canonical evaluated/render fixtures within accepted exact or documented perceptual tolerances.
+- Representative production-sized projects meet accepted pointer-preview, playback, memory, and timeline-navigation budgets established by the renderer/performance ADRs.
+
+### Document lifecycle and release
+
+- Open, Save, Save As, incremental/copy behavior retained where supported, recent files, unsaved close, file association, and atomic write are verified.
+- Recovery offers Restore, session-only decline, and explicit discard with the documented retention behavior.
+- Product Host crash/protocol mismatch produces a recoverable, non-destructive state.
+- A complete representative short-shot pass succeeds: import -> Parts -> Mesh -> Rig -> Deform -> Animation -> Preview -> export -> save -> close -> reopen.
+- The WPF package passes clean-machine installation/launch/uninstall and file-association checks.
+- The release build allowlist contains no Electron/Chromium, DOM views, browser-only UI adapters, staging/private assets, or tests.
+- A reviewed cutover PR updates CI/package ownership and records ADR 0005 as superseded; rollback remains possible through the last Electron release/tag.
+
+Retiring the Electron shell does **not** require rewriting the authoritative JavaScript Product/Core. Retiring the JavaScript Product Host is a different future decision with its own ADR and complete conformance proof.
+
+## 19. ADR-required questions
+
+| Question | Status / gate |
+| --- | --- |
+| WPF versus WinUI and Product Host versus embedded/full rewrite | proposed decision in ADR 0006; must be accepted before Stage 1 |
+| native preview/export renderer backend and measurable budgets | new ADR before Stage 4 |
+| Recovery lineage, retention, discard, and corrupt-snapshot behavior | new or superseding ADR before Stage 3 |
+| installer/update/signing strategy and bundled-runtime policy | ADR before Stage 9 release switch |
+| live desktop MCP attachment, authentication/capability, and multi-client ownership | ADR before exposing live desktop MCP beyond local development |
+| internal `DEFORM` compatibility naming versus an explicit Mesh Layout command rename | ADR only if persistent command/schema compatibility changes; otherwise document adapter mapping |
+| eventual JavaScript Product Host replacement | no decision now; ADR required only if a future proposal ports authoritative Product semantics |
+
+## 20. Design acceptance checklist
+
+- The survival/replacement boundary is explicit in Sections 3–4.
+- C# shell, Product Host, revision, file, and render responsibilities are explicit in Sections 6 and 14.
+- The common FLAMORIS grammar and all required screen states are explicit in Sections 7–8.
+- Selection, Parts/Properties, viewport/input/overlay, history, Timeline, and MCP authority are explicit in Sections 9–12.
+- Recovery choices and missing Product contract are explicit in Section 13.
+- Small migration stages, risks, and a concrete Electron stop condition are explicit in Sections 15–18.
+- Long-lived unresolved choices are routed to ADRs in Section 19.
+- This proposal changes no implementation file and does not pretend the Electron implementation never existed.
+
