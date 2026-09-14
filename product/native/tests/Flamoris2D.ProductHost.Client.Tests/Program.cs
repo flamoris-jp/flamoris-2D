@@ -37,6 +37,9 @@ static void TestViewportGeometry()
     }
     var world = new Affine2(0, 2, -3, 0, 10, 20);
     Near(world.Inverse(world.Apply(point)), point);
+    var collapsed = new Affine2(0, 0, 0, 1, 0, 0);
+    Assert(!collapsed.IsInvertible, "Collapsed targets must not be pickable.");
+    AssertThrows<InvalidOperationException>(() => collapsed.Inverse(point));
     double[] positions = [10, 20, 30, 40];
     var screen = camera.ToView(world.Apply(new(10, 20)));
     Assert(VertexPicking.Hit(positions, new(screen.X + 7, screen.Y), camera, world) == 0, "DIP hit radius failed.");

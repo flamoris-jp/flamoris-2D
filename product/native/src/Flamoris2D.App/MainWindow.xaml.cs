@@ -65,7 +65,11 @@ public partial class MainWindow : Window, IAsyncDisposable
             HostStatusIndicator.Fill = Brushes.SeaGreen;
             HostStatusText.Text =
                 $"接続済み · protocol {handshake.ProtocolVersion} · schema {handshake.ProductSchemaVersion}";
-            if (createDocument) await _client.CreateSessionAsync("名称未設定", 1920, 1080);
+            if (createDocument)
+            {
+                await _client.CreateSessionAsync("名称未設定", 1920, 1080);
+                _hasHandsOn = false;
+            }
             if (_client.DocumentToken is { } token) AttachDocumentWorkspace(token);
             await RefreshProjectionAsync();
             StatusText.Text = "Product HostのEditorSessionに接続しました。";
@@ -128,8 +132,6 @@ public partial class MainWindow : Window, IAsyncDisposable
     private async void NewDocument_Click(object sender, RoutedEventArgs e)
     {
         if (_loadingArtwork || _meshBusy || !ConfirmDiscardHandsOn()) return;
-        _hasHandsOn = false;
-        ClearMeshProjection();
         if (_client?.IsRunning != true)
         {
             await ConnectHostAsync(createDocument: true);
@@ -138,6 +140,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         try
         {
             await _client.CreateSessionAsync("名称未設定", 1920, 1080);
+            _hasHandsOn = false;
             AttachDocumentWorkspace(_client.DocumentToken!);
             await RefreshProjectionAsync();
             StatusText.Text = "新しいProduct Host documentを作成しました。";
