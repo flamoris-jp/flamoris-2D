@@ -153,6 +153,8 @@ remain gated by the Recovery ADR described in the accepted migration design.
 
 Locally exercised on Node 24:
 
+`node --test product/tests/product-host.test.js`: 11/11 pass.
+
 - protocol handshake and version/schema disclosure;
 - health, child startup, framed round-trip, graceful shutdown, and forced process death;
 - Query, Command, multi-command Transaction, validation atomicity;

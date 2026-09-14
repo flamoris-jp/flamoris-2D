@@ -56,8 +56,10 @@ async function sceneTree(service) {
 
 test("protocol handshake and health disclose reviewed versions", async () => {
   const service = new ProductHostService();
-  const handshake = await send(service, "protocol.handshake");
+  const handshakeRequest = request("protocol.handshake");
+  const handshake = (await service.handle(handshakeRequest)).response;
   assert.equal(handshake.ok, true);
+  assert.equal(handshake.requestId, handshakeRequest.requestId);
   assert.equal(handshake.payload.protocolVersion, 1);
   assert.equal(handshake.payload.productSchemaVersion, 15);
   assert.equal(handshake.payload.mcpSchemaVersion, 18);
@@ -65,6 +67,31 @@ test("protocol handshake and health disclose reviewed versions", async () => {
   assert.deepEqual(health.payload, {
     status: "healthy", documentOpen: false, documentToken: null,
   });
+  const mismatch = (await service.handle({
+    ...request("protocol.handshake"),
+    protocolVersion: 2,
+  })).response;
+  assert.equal(mismatch.ok, false);
+  assert.equal(mismatch.error.code, "protocol.version_unsupported");
+});
+
+test("mutation response and change event carry the same authority tags", async () => {
+  const service = await createService();
+  const root = await sceneTree(service);
+  const envelope = request("session.execute", {
+    command: {
+      type: "scene.rename_node",
+      payload: { nodeId: root.id, displayName: "Event proof" },
+    },
+  }, { documentToken: service.documentToken, expectedRevision: 0 });
+  const result = await service.handle(envelope);
+  assert.equal(result.response.requestId, envelope.requestId);
+  assert.equal(result.response.documentToken, service.documentToken);
+  assert.equal(result.response.revision, 1);
+  assert.equal(result.events.length, 1);
+  assert.equal(result.events[0].event, "document.changed");
+  assert.equal(result.events[0].documentToken, result.response.documentToken);
+  assert.equal(result.events[0].revision, result.response.revision);
 });
 
 test("query, command and transaction round-trip through one EditorSession", async () => {
