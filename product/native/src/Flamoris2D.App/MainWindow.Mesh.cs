@@ -250,12 +250,19 @@ public partial class MainWindow
     {
         if (_meshBusy || _client is null || MeshCanvas.NodeId is not { } nodeId) return;
         var client = _client; var token = MeshCanvas.DocumentToken!; var keyformId = MeshCanvas.KeyformId;
+        var previousIds = MeshCanvas.VertexIds.ToHashSet();
         SetMeshBusy(true); CancelGenerated();
         try
         {
             client.AssertCurrent(token, revision);
             await client.EditMeshAsync(nodeId, keyformId, edit, revision);
             await RefreshProjectionAsync();
+            var added = MeshCanvas.VertexIds.Where(id => !previousIds.Contains(id)).ToArray();
+            if (MeshCanvas.NodeId == nodeId && added.Length == 1 && MeshCanvas.VertexIds.Length == previousIds.Count + 1)
+            {
+                MeshCanvas.Selected.Clear(); MeshCanvas.Selected.Add(added[0]);
+                UpdateMeshProperties(); MeshCanvas.InvalidateVisual();
+            }
             StatusText.Text = "メッシュ操作を確定しました。Ctrl+Zでこの操作を戻せます（保存不可）。";
         }
         catch (Exception error)
