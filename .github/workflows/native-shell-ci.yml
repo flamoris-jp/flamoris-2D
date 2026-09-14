@@ -1,0 +1,57 @@
+name: Native Shell Boundary
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "product/native/**"
+      - "product/product-host/**"
+      - "product/src/**"
+      - "product/tests/product-host.test.js"
+      - "product/package.json"
+      - ".github/workflows/native-shell-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-native-boundary:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Product Host protocol tests
+        run: node --test product/tests/product-host.test.js
+
+      - name: Build native solution
+        run: dotnet build product/native/Flamoris2D.Native.sln -c Release
+
+      - name: C# client and crash-invalidation tests
+        run: dotnet run --project product/native/tests/Flamoris2D.ProductHost.Client.Tests -c Release --no-build -- product/product-host/main.mjs
+
+      - name: WPF XAML and Product Host smoke launch
+        run: dotnet run --project product/native/src/Flamoris2D.App -c Release --no-build -- --smoke-test
+
+      - name: Publish hands-on candidate
+        run: dotnet publish product/native/src/Flamoris2D.App -c Release -r win-x64 --self-contained false -o out/native-win-x64
+
+      - name: Upload hands-on candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: flamoris2d-native-phase1-win-x64
+          path: out/native-win-x64
+          if-no-files-found: error
