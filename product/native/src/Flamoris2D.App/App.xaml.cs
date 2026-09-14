@@ -13,6 +13,8 @@ public partial class App : Application
             try
             {
                 var window = new MainWindow(autoConnect: false);
+                window.Show();
+                await window.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                 await window.RunSmokeProofAsync();
                 await window.DisposeAsync();
                 Shutdown(0);

@@ -32,6 +32,6 @@ decoder.on("error", (error) => {
 });
 
 stdin.pipe(decoder);
-await new Promise((resolve) => stdin.on("close", resolve));
+await new Promise((resolve) => stdin.on("close", () => { service.generation?.cancel(); resolve(); }));
 await queue;
 await service.assets.close();

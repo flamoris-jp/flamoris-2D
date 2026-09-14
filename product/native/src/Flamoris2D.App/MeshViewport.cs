@@ -23,6 +23,7 @@ public sealed class MeshViewport : FrameworkElement
     public string[] VertexIds { get; private set; } = [];
     public double[] Positions { get; private set; } = [];
     public int[] Triangles { get; private set; } = [];
+    public IReadOnlyDictionary<string, string> VertexLabels { get; private set; } = new Dictionary<string, string>();
     public HashSet<string> Selected { get; } = [];
     public bool MeshEnabled { get; set; }
     public bool Structure { get; set; } = true;
@@ -66,6 +67,10 @@ public sealed class MeshViewport : FrameworkElement
             ? topology.GetProperty("vertexIds").EnumerateArray().Select(v => v.GetString()!).ToArray() : [];
         Triangles = topology.ValueKind == JsonValueKind.Object
             ? topology.GetProperty("indices").EnumerateArray().Select(v => v.GetInt32()).ToArray() : [];
+        VertexLabels = topology.ValueKind == JsonValueKind.Object && topology.TryGetProperty("vertexMetadata", out var metadata)
+            ? metadata.EnumerateObject().ToDictionary(v => v.Name,
+                v => v.Value.TryGetProperty("semanticLabel", out var label) ? label.GetString() ?? "" : "")
+            : new Dictionary<string, string>();
         Selected.IntersectWith(VertexIds);
         SelectionChanged?.Invoke();
         InvalidateVisual();
@@ -77,7 +82,7 @@ public sealed class MeshViewport : FrameworkElement
     {
         Cancel(); DocumentToken = null; Revision = -1; NodeId = KeyformId = null;
         Artwork = Array.Empty<ArtworkProjection>(); Positions = []; VertexIds = []; Triangles = [];
-        Selected.Clear(); GeneratedPreview = null; InvalidateVisual();
+        Selected.Clear(); VertexLabels = new Dictionary<string, string>(); GeneratedPreview = null; InvalidateVisual();
     }
     public void Fit()
     {
@@ -145,9 +150,12 @@ public sealed class MeshViewport : FrameworkElement
             var selected = i < ids.Length && Selected.Contains(ids[i]);
             dc.DrawEllipse(selected ? Brushes.Yellow : colour, new Pen(Brushes.Black, 1.5), p, selected ? 5.5 : 4, selected ? 5.5 : 4);
             if (ShowIds && i < ids.Length)
-                dc.DrawText(new FormattedText(ids[i], CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
-                    new Typeface("Consolas"), 11, Brushes.White, VisualTreeHelper.GetDpi(this).PixelsPerDip),
-                    new Point(p.X + 7, p.Y - 12));
+            {
+                var label = new FormattedText(ids[i], CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+                    new Typeface("Consolas"), 11, Brushes.White, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                dc.DrawRectangle(Brushes.Black, null, new Rect(p.X + 6, p.Y - 13, label.Width + 2, label.Height + 2));
+                dc.DrawText(label, new Point(p.X + 7, p.Y - 12));
+            }
         }
     }
     protected override void OnMouseWheel(MouseWheelEventArgs e)

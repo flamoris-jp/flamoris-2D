@@ -18,6 +18,7 @@ public partial class MainWindow : Window, IAsyncDisposable
     private ProductHostClient? _client;
     private EditingContext _editingContext = EditingContext.Source;
     private bool _closingAfterShutdown;
+    private bool _disposed;
     private readonly TargetWorkspace _targets = new();
     private bool _updatingTargets;
     private bool _targetMutationPending;
@@ -78,10 +79,11 @@ public partial class MainWindow : Window, IAsyncDisposable
     private async Task RefreshProjectionAsync()
     {
         var client = _client;
-        if (client?.DocumentToken is null) return;
+        if (_disposed || client?.DocumentToken is null) return;
         await _refreshGate.WaitAsync();
         try
         {
+            if (_disposed || !ReferenceEquals(client, _client)) return;
             var snapshot = await client.GetWorkspaceAsync();
             if (!ReferenceEquals(client, _client) || !client.HasAuthoritativeProjection ||
                 snapshot.DocumentToken != client.DocumentToken || snapshot.Revision != client.Revision)
@@ -187,7 +189,7 @@ public partial class MainWindow : Window, IAsyncDisposable
     }
 
     private void Client_DocumentChanged(object? sender, DocumentChangedEventArgs e) =>
-        Dispatcher.InvokeAsync(() => _ = RefreshAfterChangeAsync(e));
+        Dispatcher.InvokeAsync(() => { if (!_disposed && ReferenceEquals(sender, _client)) _ = RefreshAfterChangeAsync(e); });
 
     private async Task RefreshAfterChangeAsync(DocumentChangedEventArgs e)
     {
@@ -203,8 +205,10 @@ public partial class MainWindow : Window, IAsyncDisposable
     }
 
     private void Client_AuthorityLost(object? sender, AuthorityLostEventArgs e) =>
-        Dispatcher.InvokeAsync(() => ShowAuthorityLost(
-            "Product Hostとの接続を失いました。staleな表示を破棄し、保存と編集を停止しました。"));
+        Dispatcher.InvokeAsync(() => {
+            if (!_disposed && ReferenceEquals(sender, _client)) ShowAuthorityLost(
+                "Product Hostとの接続を失いました。staleな表示を破棄し、保存と編集を停止しました。");
+        });
 
     private void ShowAuthorityLost(string message)
     {
@@ -489,12 +493,12 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (_client is not null)
-        {
-            await _client.DisposeAsync();
-            _client = null;
-        }
-        _refreshGate.Dispose();
+        if (_disposed) return;
+        _disposed = true;
+        _meshWork?.Cancel();
+        var client = _client; _client = null;
+        if (client is not null) await client.DisposeAsync();
+        // Pending refresh continuations still release this managed semaphore; no WaitHandle is allocated.
     }
 
 }

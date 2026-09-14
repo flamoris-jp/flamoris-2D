@@ -20,6 +20,9 @@ public partial class MainWindow
     private string _structureTool = "選択", _layoutTool = "移動";
     private CancellationTokenSource? _meshWork;
     private long _generatedRevision = -1;
+    private long _vertexLabelRevision = -1;
+    private string? _labelVertexId;
+    private string _labelProjectionText = "";
     private sealed record MeshChoice(string Id, string Label);
 
     private void InitializeMeshUi()
@@ -145,6 +148,7 @@ public partial class MainWindow
     {
         if (!_meshReady) return;
         MeshCanvas.Clear(); _textures.Clear(); _textureToken = null; _meshChoices.Clear();
+        _labelVertexId = null; _vertexLabelRevision = -1; _labelProjectionText = ""; VertexLabelEditor.Text = "";
         ApplyGeneratedButton.IsEnabled = false; _generatedRevision = -1;
     }
     private void ConfigureMeshContext()
@@ -170,6 +174,7 @@ public partial class MainWindow
         var mesh = _editingContext == EditingContext.Mesh;
         if (mesh && ToolList.SelectedItem is string tool)
         {
+            if (MeshCanvas.Tool != tool) { CancelGenerated(); if (!_loadingArtwork) _meshWork?.Cancel(); }
             MeshCanvas.Tool = tool;
             if (MeshCanvas.Structure) _structureTool = tool; else _layoutTool = tool;
             var mode = MeshCanvas.Structure ? "構造" : "位置決め";
@@ -211,6 +216,19 @@ public partial class MainWindow
     {
         if (!_meshReady) return;
         MeshPropertiesText.Text = $"{MeshCanvas.VertexIds.Length} 頂点 / {MeshCanvas.Triangles.Length / 3} 面\n選択: {string.Join(", ", MeshCanvas.Selected)}";
+        if (MeshCanvas.Selected.Count == 1)
+        {
+            var id = MeshCanvas.Selected.Single();
+            var index = Array.IndexOf(MeshCanvas.VertexIds, id);
+            if (index >= 0) MeshPropertiesText.Text += $"\n位置: {MeshCanvas.Positions[index * 2]:0.##}, {MeshCanvas.Positions[index * 2 + 1]:0.##}";
+            if (_labelVertexId != id || VertexLabelEditor.Text == _labelProjectionText)
+            {
+                _labelVertexId = id; _vertexLabelRevision = MeshCanvas.Revision;
+                _labelProjectionText = MeshCanvas.VertexLabels.GetValueOrDefault(id) ?? "";
+                VertexLabelEditor.Text = _labelProjectionText;
+            }
+        }
+        else { _labelVertexId = null; _vertexLabelRevision = -1; VertexLabelEditor.Text = _labelProjectionText = ""; }
         var labelEnabled = MeshCanvas.MeshEnabled && MeshCanvas.Structure && MeshCanvas.Selected.Count == 1 && !_meshBusy;
         VertexLabelButton.IsEnabled = ClearVertexLabelButton.IsEnabled = labelEnabled;
         MeshActionButton.IsEnabled = !_meshBusy && MeshCanvas.Selected.Count == (MeshCanvas.Tool == "辺を分割" ? 2 : 3);
@@ -245,9 +263,17 @@ public partial class MainWindow
         await CommitMeshAsync(MeshCanvas.Tool == "辺を分割" ? MeshEdit.Subdivide(MeshCanvas.Selected.ToArray()) :
             MeshEdit.Triangle(MeshCanvas.Selected.ToArray()), MeshCanvas.Revision);
     private async void SetVertexLabel_Click(object sender, RoutedEventArgs e)
-    { if (MeshCanvas.Selected.Count == 1) await CommitMeshAsync(MeshEdit.Label(MeshCanvas.Selected.Single(), VertexLabelEditor.Text.Trim()), MeshCanvas.Revision); }
+    {
+        if (_labelVertexId is not { } id) return;
+        await CommitMeshAsync(MeshEdit.Label(id, VertexLabelEditor.Text.Trim()), _vertexLabelRevision);
+        _labelVertexId = null; UpdateMeshProperties();
+    }
     private async void ClearVertexLabel_Click(object sender, RoutedEventArgs e)
-    { if (MeshCanvas.Selected.Count == 1) await CommitMeshAsync(MeshEdit.ClearLabel(MeshCanvas.Selected.Single()), MeshCanvas.Revision); }
+    {
+        if (_labelVertexId is not { } id) return;
+        await CommitMeshAsync(MeshEdit.ClearLabel(id), _vertexLabelRevision);
+        _labelVertexId = null; UpdateMeshProperties();
+    }
     private void FitArtwork_Click(object sender, RoutedEventArgs e) => MeshCanvas.Fit();
     private void SelectAllVertices_Click(object sender, RoutedEventArgs e) => MeshCanvas.SelectAll();
     private void CancelMeshWork_Click(object sender, RoutedEventArgs e) { _meshWork?.Cancel(); MeshCanvas.Cancel(); CancelGenerated(); }

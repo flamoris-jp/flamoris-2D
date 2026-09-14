@@ -21,6 +21,8 @@ public partial class MainWindow
         await RefreshProjectionAsync();
         SwitchContext(EditingContext.Mesh, false);
         MeshCanvas.Fit();
+        if (MeshCanvas.ActualWidth <= 0 || MeshCanvas.ActualHeight <= 0)
+            throw new InvalidOperationException("WPF smoke must show and arrange the real viewport.");
         if (MeshCanvas.Artwork.Count != 1 || MeshCanvas.VertexIds.Length != 9)
             throw new InvalidOperationException("WPF artwork/initial mesh projection is missing.");
         var nodeId = MeshCanvas.NodeId;

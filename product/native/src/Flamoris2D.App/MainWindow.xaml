@@ -326,6 +326,7 @@
                     <DockPanel>
                         <TextBlock DockPanel.Dock="Top" Style="{StaticResource PanelHeader}"
                                    Text="{DynamicResource Panel.Properties}" />
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel Margin="10,2">
                             <TextBlock Text="選択対象" Foreground="#AEB0B5" />
                             <TextBlock x:Name="SelectedTargetText" Text="—"
@@ -353,6 +354,7 @@
                                 </WrapPanel>
                             </StackPanel>
                         </StackPanel>
+                        </ScrollViewer>
                     </DockPanel>
                 </Border>
             </Grid>

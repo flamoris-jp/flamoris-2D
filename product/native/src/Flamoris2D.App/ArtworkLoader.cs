@@ -9,10 +9,14 @@ public static class ArtworkLoader
 {
     public static (int Width, int Height) InspectPng(string path)
     {
-        var info = new FileInfo(path);
-        if (info.Length < 33 || info.Length > 32 * 1024 * 1024)
-            throw new InvalidDataException("PNGは32 MiB以下にしてください。");
         using var file = File.OpenRead(path);
+        return InspectStream(file);
+    }
+    private static (int Width, int Height) InspectStream(Stream file)
+    {
+        if (file.Length < 33 || file.Length > 32 * 1024 * 1024)
+            throw new InvalidDataException("PNGは32 MiB以下にしてください。");
+        file.Position = 0;
         Span<byte> header = stackalloc byte[24];
         file.ReadExactly(header);
         ReadOnlySpan<byte> signature = [137, 80, 78, 71, 13, 10, 26, 10];
@@ -27,9 +31,10 @@ public static class ArtworkLoader
     public static byte[] DecodePng(string path, int width, int height, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        // Inspect again before creating a decoder; still validate the actual decoded frame dimensions.
-        if (InspectPng(path) != (width, height)) throw new IOException("読み込み中にPNGが変更されました。");
         using var file = File.OpenRead(path);
+        // Validate the same locked stream that the decoder consumes, not a reopened path.
+        if (InspectStream(file) != (width, height)) throw new IOException("読み込み中にPNGが変更されました。");
+        file.Position = 0;
         var decoder = new PngBitmapDecoder(file, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
         var frame = decoder.Frames[0];
         if (frame.PixelWidth != width || frame.PixelHeight != height)
