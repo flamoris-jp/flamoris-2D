@@ -34,6 +34,8 @@ The audit compared:
 
 The audit found a healthy separation in the lower layers and an overly concentrated browser bootstrap at the top. `product/src/app.js` currently coordinates document lifecycle, workflow, selection, controller choice, viewport synchronization, recovery, and rendering. UI controllers generally respect Command/Query authority, but several also own transient gesture previews and selection. `workflow-modes.js` is correctly transient, while the DOM projection and CSS cascade remain fragile. `viewport-input-controller.js` combines routing for object, mesh, deformer, bone, weight, form-correction, IK, camera, drag/drop, and keyboard modifiers. That is the primary migration seam.
 
+Not every file outside `ui/` is automatically Node-hostable. Current PSD decode is entered through browser-global `window.agPsd`; PNG inflation uses Web APIs; and export rasterization explicitly requires `OffscreenCanvas`. The Product Host proof must audit the transitive runtime graph and separate portable Product semantics from browser-bound decode/render adapters. “Preserve Core” does not mean pretending browser globals work in a plain child process.
+
 Issue #90 is important evidence: the mature `MeshTopology` / `MeshKeyform` and history contracts survived, while legacy `state.mesh` and workflow projection made the production UI appear to have a second mesh truth. The WPF design must remove that ambiguity rather than recreate it.
 
 Cutwork demonstrates the desired family resemblance: conventional Windows menu and toolbar, a compact left tool rail, a central document canvas, right-side editing targets, contextual tool options near the top, centralized input routing, and one gesture per undo unit. FLAMORIS 2D adopts that grammar without importing Cutwork domain code.
@@ -82,6 +84,7 @@ Cutwork demonstrates the desired family resemblance: conventional Windows menu a
 | Canvas/WebGL viewport backend | port | Native renderer consumes canonical plans; transient preview overlays stay in C# |
 | export evaluator/planner | preserve + interop | Keep frame/tick planning and diagnostics |
 | export raster backend | port after parity proof | Use the same native composition semantics as preview where practical |
+| `window.agPsd`, Web codec APIs, `OffscreenCanvas` adapters | interop proof then port/replace environment adapter | preserve parse/resource/composition contracts; prove Node compatibility or supply typed native adapter without moving semantics into WPF views |
 | FFmpeg process/IPC host | port | C# process service preserves validated argument and cancellation semantics |
 | transient workflow mode and editing context | port behavior | One WPF `WorkspaceContext`, never serialized into Project |
 | scene/part selection, tool selection, hover, playhead | port behavior | One transient WPF authority, stable-ID based; publish context to feature controllers |
@@ -150,6 +153,8 @@ The Product Host runs as a supervised child process with a versioned, length-fra
 - no generic JavaScript evaluation, arbitrary property path, filesystem, or process method exists;
 - health, graceful shutdown, crash detection, and protocol mismatch have typed errors; and
 - a Product Host crash cannot cause WPF to save a client-side projection as if it were authoritative.
+
+Only modules proven free of DOM/Canvas globals may be loaded directly into the plain Product Host. Stage 1 records the transitive module audit. Browser-dependent decode or raster adapters are either replaced by Node-compatible adapters with identical contracts or moved to a typed native service; they never leak into WPF view code or redefine Project/import/render semantics.
 
 The C# shell may cache projections and rasters by `(documentToken, revision, assetId)`. Cache invalidation is presentation behavior. It never changes Product state.
 
@@ -443,7 +448,7 @@ Every stage is a separate issue and one or more reviewable PRs. Each PR keeps co
 | Stage | Scope | Exit evidence |
 | --- | --- | --- |
 | 0. accept design | review this document and ADR 0006; open pending ADR issues | approved authority map; no Product implementation |
-| 1. Product Host boundary proof | protocol/schema handshake, one `EditorSession`, query/command/transaction/Undo/Redo, revision events, one raster transfer, process supervision | boundary checks from ADR 0006 pass; existing JS tests stay green |
+| 1. Product Host boundary proof | transitive Node-runtime audit, protocol/schema handshake, one `EditorSession`, query/command/transaction/Undo/Redo, revision events, one PSD/PNG raster transfer, process supervision | browser-global dependencies have explicit adapters; ADR 0006 boundary checks pass; existing JS tests stay green |
 | 2. native shell foundation | WPF solution, menu/global commands, workflow strip, common panel grid, localization, focus/shortcut map, empty state | shell hands-on matches common grammar; no document copy in C# |
 | 3. document + Source/Object | Open/Save/Save As, atomic write, recent files, accepted Recovery contract, PSD/`.flimg`, Parts/Object selection, visibility/lock/name/properties | round-trip and recovery tests; packaged DPI/file-dialog pass |
 | 4. viewport + Mesh | native read-only render plan first, camera/picking/overlay, then Mesh structure/layout tools and one-gesture history | render parity fixtures; topology/layout/Undo/Redo/save-open hands-on pass; legacy writable mesh absent |
@@ -476,6 +481,7 @@ Automated image comparison protects renderer semantics, but does not replace han
 | MCP edits during a human gesture | lost update | expected revision and serialized queue; cancel/refresh on conflict |
 | raster/bulk IPC copies exhaust memory | crashes on large PSD/`.flimg` | framed streaming or handles, size budgets, cancellation, bounded caches, representative stress test |
 | native renderer changes compositing | preview/export mismatch | canonical render plans, golden fixtures, premultiplied-alpha/clipping tests, retain Electron until parity |
+| browser-only decode/render dependency is mistaken for portable Core | Product Host cannot open or render real projects | transitive runtime audit in Stage 1; explicit adapter ownership for `window.agPsd`, Web codecs, and `OffscreenCanvas`; fail the proof before feature migration |
 | WPF DPI/focus/pointer capture bugs | wrong hit tests or shortcuts | one coordinate service/input router, multi-DPI packaged tests, lost-capture cancellation |
 | Timeline creates too many WPF elements | poor scroll/zoom performance | custom drawing/virtualization, viewport-range realization, benchmark dense sequences |
 | Recovery UI deletes or repeatedly nags | work loss or loss of trust | explicit three-action contract, session-only dismissal, destructive confirmation, corrupted-snapshot fallback |

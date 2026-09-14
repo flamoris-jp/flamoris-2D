@@ -31,7 +31,9 @@ WPF is preferred over WinUI 3 because FLAMORIS currently needs mature desktop co
 
 ### Product authority
 
-Keep the existing JavaScript Product/Core authoritative during the shell migration. Run it in a child Product Host process launched and supervised by the WPF app. The Product Host owns exactly one live `EditorSession` per opened document and serializes all mutations.
+Keep the existing JavaScript Product/Core authoritative during the shell migration. Run its Node-compatible graph in a child Product Host process launched and supervised by the WPF app. The Product Host owns exactly one live `EditorSession` per opened document and serializes all mutations.
+
+Current runtime placement is not proof of portability: PSD loading currently enters through `window.agPsd`, PNG decoding uses Web APIs, and export rasterization requires `OffscreenCanvas`. The boundary-proof stage must inventory the transitive module graph. Browser-bound decode/render mechanisms may be replaced by Node-compatible or typed native adapters, but their parse, resource-limit, render-plan, and compositing contracts remain authoritative. WPF views do not absorb those semantics.
 
 The Product Host exposes a versioned local protocol with:
 
@@ -140,3 +142,4 @@ Before feature migration starts, a follow-up implementation issue must prove:
 7. One representative `.fl2d` opens, queries, serializes, and round-trips without schema change.
 8. A representative raster asset crosses the bulk boundary without routine JSON/base64 amplification.
 9. Killing the Product Host does not cause the WPF shell to write or present a fabricated Project state.
+10. The transitive Product Host module graph has no unowned DOM/Canvas global; representative PSD and `.flimg` inputs identify the adapter responsible for every decode/materialization step.
