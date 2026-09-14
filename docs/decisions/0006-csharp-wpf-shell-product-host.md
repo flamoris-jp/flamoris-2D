@@ -1,6 +1,6 @@
 # ADR 0006: C# WPF shell with a versioned JavaScript Product Host
 
-Status: proposed for Issue #92
+Status: accepted by PR #93; Phase 1 implementation tracked by Issue #94
 
 Primary design: [`../csharp-wpf-ui-migration.md`](../csharp-wpf-ui-migration.md)
 

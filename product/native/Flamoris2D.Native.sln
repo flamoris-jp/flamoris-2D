@@ -1,0 +1,30 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flamoris2D.ProductHost.Client", "src\Flamoris2D.ProductHost.Client\Flamoris2D.ProductHost.Client.csproj", "{3CF7085D-3D75-4B52-B285-9E2C54A8B16C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flamoris2D.App", "src\Flamoris2D.App\Flamoris2D.App.csproj", "{7D63CE05-0AF5-4FC9-A86E-B8EF0EE86B23}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flamoris2D.ProductHost.Client.Tests", "tests\Flamoris2D.ProductHost.Client.Tests\Flamoris2D.ProductHost.Client.Tests.csproj", "{BCC6326C-CF31-490B-B98C-FEF2236B2C6F}"
+EndProject
+Global
+    GlobalSection(SolutionConfigurationPlatforms) = preSolution
+        Debug|Any CPU = Debug|Any CPU
+        Release|Any CPU = Release|Any CPU
+    EndGlobalSection
+    GlobalSection(ProjectConfigurationPlatforms) = postSolution
+        {3CF7085D-3D75-4B52-B285-9E2C54A8B16C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {3CF7085D-3D75-4B52-B285-9E2C54A8B16C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {3CF7085D-3D75-4B52-B285-9E2C54A8B16C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {3CF7085D-3D75-4B52-B285-9E2C54A8B16C}.Release|Any CPU.Build.0 = Release|Any CPU
+        {7D63CE05-0AF5-4FC9-A86E-B8EF0EE86B23}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {7D63CE05-0AF5-4FC9-A86E-B8EF0EE86B23}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {7D63CE05-0AF5-4FC9-A86E-B8EF0EE86B23}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {7D63CE05-0AF5-4FC9-A86E-B8EF0EE86B23}.Release|Any CPU.Build.0 = Release|Any CPU
+        {BCC6326C-CF31-490B-B98C-FEF2236B2C6F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {BCC6326C-CF31-490B-B98C-FEF2236B2C6F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {BCC6326C-CF31-490B-B98C-FEF2236B2C6F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {BCC6326C-CF31-490B-B98C-FEF2236B2C6F}.Release|Any CPU.Build.0 = Release|Any CPU
+    EndGlobalSection
+EndGlobal

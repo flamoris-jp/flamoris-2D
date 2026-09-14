@@ -16,9 +16,11 @@
 - [`key-art-transition.md`](key-art-transition.md) — multi-Key-Art A→B→C transition model
 - [`mcp-design.md`](mcp-design.md) — MCP-ready command/transaction architecture
 - [`repository-boundaries.md`](repository-boundaries.md) — Product / Staging / Test / History separation, testing and CI boundary
+- [`csharp-wpf-ui-migration.md`](csharp-wpf-ui-migration.md) — accepted native WPF shell and JavaScript Product Host migration design
 - [`research/rigging-tools.md`](research/rigging-tools.md) — reference research from Inochi2D/Inochi Creator, Live2D Cubism, Stretchy Studio, Iki, Godot, and Synfig
 - [`research/key-art-transition-research.md`](research/key-art-transition-research.md) — correspondence/morphing research notes
 - [`reviews/phase1c-implementation-20260831.md`](reviews/phase1c-implementation-20260831.md) — Phase 1C implementation coverage and remaining real-Akino manual acceptance
+- [`reviews/issue-94-native-foundation.md`](reviews/issue-94-native-foundation.md) — Phase 1 Product Host, WPF shell, browser audit, and Windows acceptance record
 
 Repository-wide AI/automation rules live at [`../AGENTS.md`](../AGENTS.md).
 
@@ -29,6 +31,7 @@ Repository-wide AI/automation rules live at [`../AGENTS.md`](../AGENTS.md).
 - [`decisions/0003-mesh-layout-vs-deform-mode.md`](decisions/0003-mesh-layout-vs-deform-mode.md) — separate Mesh Layout (位置決め) from Deform (変形), including topology/Key-Art/MCP implications
 - [`decisions/0004-project-files-recovery-and-psd-reimport.md`](decisions/0004-project-files-recovery-and-psd-reimport.md) — `.fl2d`, save points, Preferences/Recovery, reviewed PSD re-import, and the minimal headless boundary
 - [`decisions/0005-windows-desktop-shell.md`](decisions/0005-windows-desktop-shell.md) — Electron Windows shell, native file semantics, Recovery storage, Recent Files, and security boundary
+- [`decisions/0006-csharp-wpf-shell-product-host.md`](decisions/0006-csharp-wpf-shell-product-host.md) — accepted WPF shell with a versioned out-of-process JavaScript Product Host
 - [`reviews/phase1-desktop-implementation-20260901.md`](reviews/phase1-desktop-implementation-20260901.md) — Desktop implementation coverage and Windows manual acceptance
 
 ## Earlier draft
