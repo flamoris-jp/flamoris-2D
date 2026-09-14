@@ -22,6 +22,12 @@ public partial class MainWindow : Window, IAsyncDisposable
     private bool _updatingTargets;
     private bool _targetMutationPending;
     private long _propertyRevision = -1;
+    private TargetProjection? _propertySnapshot;
+
+    private bool HasPropertyDraft => _propertySnapshot is { } original &&
+        (DisplayNameEditor.Text != original.DisplayName ||
+         TargetVisibleEditor.IsChecked != original.Visible ||
+         TargetLockedEditor.IsChecked != original.Locked);
 
     public MainWindow(bool autoConnect = true)
     {
@@ -97,8 +103,9 @@ public partial class MainWindow : Window, IAsyncDisposable
             Title = $"FLAMORIS 2D — {projectName}";
             RevisionText.Text = $"revision {client.Revision}";
             TargetList.IsEnabled = !_targetMutationPending;
-            // Do not replace a user's uncommitted text with an unsolicited refresh.
-            if (!DisplayNameEditor.IsKeyboardFocusWithin) UpdateSelectionEditor();
+            // A draft outlives keyboard focus and retains its starting revision.
+            if (_propertySnapshot?.Id != _targets.SelectedId || !HasPropertyDraft)
+                UpdateSelectionEditor();
         }
         catch (StaleProjectionException)
         {
@@ -106,7 +113,6 @@ public partial class MainWindow : Window, IAsyncDisposable
         }
         catch (ProductHostException error) when (error.Code == "revision.conflict")
         {
-            ClearProjection();
             StatusText.Text = "revision競合を検出しました。authoritative projectionを再取得してください。";
         }
         finally
@@ -206,6 +212,8 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private void ClearProjection()
     {
+        _propertySnapshot = null;
+        _propertyRevision = -1;
         _targets.Invalidate();
         TargetList.ItemsSource = null;
         TargetList.IsEnabled = false;
@@ -294,6 +302,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             SelectedTargetText.Text = "—";
             DisplayNameEditor.IsEnabled = ApplyNameButton.IsEnabled = false;
             TargetVisibleEditor.IsEnabled = TargetLockedEditor.IsEnabled = false;
+            _propertySnapshot = null;
             return;
         }
         SelectedTargetText.Text = $"{target.DisplayName} · {target.StateText}";
@@ -301,6 +310,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         TargetVisibleEditor.IsChecked = target.Visible;
         TargetLockedEditor.IsChecked = target.Locked;
         _propertyRevision = _targets.Revision;
+        _propertySnapshot = target;
         DisplayNameEditor.IsEnabled = ApplyNameButton.IsEnabled = !_targetMutationPending;
         TargetVisibleEditor.IsEnabled = TargetLockedEditor.IsEnabled = !_targetMutationPending;
     }
@@ -326,6 +336,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         if (_targetMutationPending || _client?.HasAuthoritativeProjection != true) return;
         _targetMutationPending = true;
         TargetList.IsEnabled = ApplyNameButton.IsEnabled = false;
+        DisplayNameEditor.IsEnabled = TargetVisibleEditor.IsEnabled = TargetLockedEditor.IsEnabled = false;
         try
         {
             await mutate();
@@ -418,6 +429,20 @@ public partial class MainWindow : Window, IAsyncDisposable
         await _client.UndoAsync();
         await _client.RedoAsync();
         await RefreshProjectionAsync();
+        var draftRevision = _propertyRevision;
+        DisplayNameEditor.Text = "Uncommitted draft";
+        TargetVisibleEditor.IsChecked = false;
+        ViewportHost.Focus();
+        await _client.RenameNodeAsync(rootId, "External update");
+        await RefreshProjectionAsync();
+        if (DisplayNameEditor.Text != "Uncommitted draft" || TargetVisibleEditor.IsChecked != false ||
+            _propertyRevision != draftRevision)
+            throw new InvalidOperationException("Refresh replaced an unfocused property draft or its revision.");
+        await MutateTargetAsync(() => _client.ApplyTargetPropertiesAsync(
+            rootId, DisplayNameEditor.Text, false, false, draftRevision));
+        if (_targets.Selected?.DisplayName != "External update" ||
+            DisplayNameEditor.Text != "External update" || _targets.Selected?.Visible != true)
+            throw new InvalidOperationException("Stale property draft overwrote a newer Product edit.");
         var selectedBefore = _targets.SelectedId;
         var revision = _targets.Revision;
         await MutateTargetAsync(() => _client.SetTargetVisibilityAsync(rootId, false, revision));
