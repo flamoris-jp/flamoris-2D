@@ -108,6 +108,41 @@ public sealed class ProductHostClient : IAsyncDisposable
         SendAsync("session.query", new { name = "scene.get_tree", input = new { includeHidden = true } },
             false, true, cancellationToken);
 
+    public Task<ProductHostResponse> GetWorkspaceAsync(CancellationToken cancellationToken = default) =>
+        SendAsync("session.workspace", new { }, false, true, cancellationToken);
+
+    public Task<ProductHostResponse> ApplyTargetPropertiesAsync(
+        string nodeId, string displayName, bool visible, bool locked, long expectedRevision,
+        CancellationToken cancellationToken = default) =>
+        SendAsync("session.executeTransaction", new
+        {
+            commands = new[]
+            {
+                ProductCommand.RenameNode(nodeId, displayName).ToWireValue(),
+                ProductCommand.SetVisibility(nodeId, visible).ToWireValue(),
+                ProductCommand.SetLocked(nodeId, locked).ToWireValue(),
+            },
+            label = "対象のプロパティを変更",
+        }, true, true, cancellationToken, expectedRevision);
+
+    public Task<ProductHostResponse> SetTargetVisibilityAsync(
+        string nodeId, bool visible, long expectedRevision,
+        CancellationToken cancellationToken = default) =>
+        SendAsync("session.execute", new
+        {
+            command = ProductCommand.SetVisibility(nodeId, visible).ToWireValue(),
+            label = "対象の表示を変更",
+        }, true, true, cancellationToken, expectedRevision);
+
+    public Task<ProductHostResponse> SetTargetLockedAsync(
+        string nodeId, bool locked, long expectedRevision,
+        CancellationToken cancellationToken = default) =>
+        SendAsync("session.execute", new
+        {
+            command = ProductCommand.SetLocked(nodeId, locked).ToWireValue(),
+            label = "対象のロックを変更",
+        }, true, true, cancellationToken, expectedRevision);
+
     public Task<ProductHostResponse> RenameNodeAsync(
         string nodeId,
         string displayName,
@@ -196,7 +231,8 @@ public sealed class ProductHostClient : IAsyncDisposable
         object payload,
         bool mutating,
         bool documentScoped,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        long? expectedRevision = null)
     {
         var process = _process;
         if (process is null || process.HasExited)
@@ -215,7 +251,7 @@ public sealed class ProductHostClient : IAsyncDisposable
             ["payload"] = payload,
         };
         if (documentScoped) request["documentToken"] = _projectionGate.DocumentToken;
-        if (mutating) request["expectedRevision"] = _projectionGate.Revision;
+        if (mutating) request["expectedRevision"] = expectedRevision ?? _projectionGate.Revision;
 
         var completion = new TaskCompletionSource<JsonElement>(
             TaskCreationOptions.RunContinuationsAsynchronously);

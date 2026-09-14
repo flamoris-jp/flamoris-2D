@@ -66,5 +66,8 @@ public sealed class ProductCommand
     public static ProductCommand SetVisibility(string nodeId, bool visible) =>
         new("scene.set_visibility", new { nodeId, visible });
 
+    public static ProductCommand SetLocked(string nodeId, bool locked) =>
+        new("scene.set_locked", new { nodeId, locked });
+
     internal object ToWireValue() => new { type = Type, payload = Payload };
 }
