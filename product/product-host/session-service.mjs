@@ -31,6 +31,7 @@ const METHODS = new Set([
   "session.redo",
   "session.serialize",
   "session.history",
+  "session.workspace",
   "headless.capabilities",
   "headless.query",
   "headless.execute",
@@ -185,6 +186,17 @@ export class ProductHostService {
     switch (request.method) {
       case "session.query":
         return document.session.query(payload.name, payload.input || {});
+      case "session.workspace":
+        // One serialized read: do not combine tree/history from different revisions in WPF.
+        return {
+          summary: document.session.query("project.get_summary", {}),
+          tree: document.session.query("scene.get_tree", { includeHidden: true }),
+          canUndo: document.session.undoStack.length > 0,
+          canRedo: document.session.redoStack.length > 0,
+          isDirty: document.session.isDirty,
+          editorRevision: document.session.currentRevision,
+          savedRevision: document.session.savedRevision,
+        };
       case "session.execute":
         return document.session.execute(payload.command, { label: payload.label });
       case "session.executeTransaction":
