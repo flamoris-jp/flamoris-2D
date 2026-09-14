@@ -8,7 +8,7 @@ Precedents: Issues #92/#94, merged PRs #93/#95, ADRs 0003–0006.
 ## Reading the ledger
 
 `migrated` means the named, bounded UI action is connected and protected, not that its
-entire workflow is complete. `pending` is work in this open checkpoint.
+entire workflow is complete. No unresolved `pending` rows are hidden in this checkpoint.
 `deferred` requires the named gate below; it never means removed. `superseded` requires
 an explicit replacement. A Product command reachable through the existing generic
 Host facade is **not** a migrated native tool.
@@ -31,6 +31,18 @@ the end prevents future schema additions from disappearing into grouped prose.
 G2 is a concrete data-loss risk if the Phase 1 proof were simply wired to a native
 Open/Save dialog. Its empty-document round-trip does **not** prove artwork round-trip.
 Do not enable native file writes until that gap and G1 are closed.
+
+G1 is tracked by [#97](https://github.com/flamoris-jp/flamoris-2D/issues/97) and
+[proposed ADR 0007](decisions/0007-native-recovery-lifecycle.md). G2/G3 are tracked by
+[#98](https://github.com/flamoris-jp/flamoris-2D/issues/98). Neither is self-approved.
+
+The migrated target subset is protected by `product-host.test.js`, native client
+`TestTargetWorkspace` / `TestTargetPropertiesAsync`, and WPF `RunSmokeProofAsync`.
+The Host supplies tree/summary/history as one `session.workspace` projection. WPF
+stores only disposable immutable projections, selection and uncommitted field drafts;
+Apply uses the draft's starting revision and the existing three-command transaction.
+Host loss invalidates the projection. The same existing EditorSession history remains
+authoritative for WPF and headless/MCP operations.
 
 ## UI evidence and interaction hierarchy
 
@@ -70,7 +82,7 @@ Test names omit `tests/`; owner paths omit `src/` unless noted.
 
 | Capability | Current owner | Command / Query / evaluator | Native workflow | Sub-context | Native UI location | Status | Protecting tests | Disposition / remaining work |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| New document | `app.js`, `model/project.js` | `session.create` | Source | Document | menu | pending | `product-host.test.js` | Phase 1 creates empty session; unsaved replacement policy G1 |
+| New document | `app.js`, `model/project.js` | `session.create` | Source | Document | menu | deferred | `product-host.test.js` | Phase 1 creates empty session; unsaved replacement policy G1 |
 | Open .fl2d + legacy migration | `io/project-json.js`, `desktop/main.mjs` | `parseProjectDocument` | Source | Document | menu/dialog | deferred | `phase1c.test.js`, `desktop-shell.test.js` | G1/G2; no native dialog yet |
 | Save / Save As | `io/project-files.js` | `serializeProject`, `EditorSession.markSaved` | Source | Document | menu/dialog | deferred | `phase1c.test.js`, `desktop-shell.test.js` | G1/G2; Host save receipt missing |
 | Save Incremental | `io/project-files.js` | `incrementalFilename`, exclusive writer | Source | Document | menu/dialog | deferred | `phase1c.test.js`, `desktop-shell.test.js` | preserve no-overwrite behavior; G1/G2 |
@@ -83,10 +95,10 @@ Test names omit `tests/`; owner paths omit `src/` unless noted.
 | PSD import / negative bounds | `psd.js`, `io/psd-project.js`, `app.js` | `window.agPsd.readPsd`, `createProjectFromPsd` | Source | Import | menu/dialog | deferred | `psd.test.js`, `psd-project.test.js`, `psd-document-clipping.test.js` | Node decode adapter and G2 |
 | Cutwork .flimg import | `io/cutwork-flimg-reader.js`, `io/cutwork-flimg-project.js` | `importCutworkFlimg` | Source | Import | menu/dialog | deferred | `cutwork-flimg-import.test.js` | G2; preserve archive and materialized working-set limits |
 | PSD re-import analyze/review/apply | `io/psd-reimport-review.js`, `ui/reimport-render-history.js` | `source.apply_psd_reimport` | Source | Update | menu/review dialog | deferred | `phase1c.test.js`, `psd-project.test.js` | G2; ambiguous match blocks; assets follow Undo |
-| Parts hierarchy / row selection | `ui/editor-adapter.js`, `ui/scene-editor-view.js` | `scene.get_tree` | Source | Object / Part | right Targets | pending | `editor-ui-adapter.test.js` | stable-ID transient selection; hidden row remains selected |
-| Name | `ui/scene-editor-view.js` | `scene.rename_node` | Source | Object / Part | right Properties | pending | `editor-core.test.js`, native client tests | existing Phase 1 action; stale-draft protection required |
-| Visibility vs selection | `ui/scene-editor-view.js` | `scene.set_visibility` | Source | Object / Part | right Targets / Properties | pending | `editor-ui-adapter.test.js` | eye affects addressed row, never changes target |
-| Lock | `ui/scene-editor-view.js` | `scene.set_locked` | Source | Object / Part | right Targets / Properties | pending | `editor-core.test.js` | lock is distinct from visibility/selection |
+| Parts hierarchy / row selection | `ui/editor-adapter.js`, `ui/scene-editor-view.js` | `scene.get_tree` | Source | Object / Part | right Targets | migrated | `editor-ui-adapter.test.js` | stable-ID transient selection; hidden row remains selected |
+| Name | `ui/scene-editor-view.js` | `scene.rename_node` | Source | Object / Part | right Properties | migrated | `editor-core.test.js`, native client tests | typed Properties transaction; stale-draft rejection, including after focus leaves the form |
+| Visibility vs selection | `ui/scene-editor-view.js` | `scene.set_visibility` | Source | Object / Part | right Targets / Properties | migrated | `editor-ui-adapter.test.js` | eye affects addressed row, never changes target |
+| Lock | `ui/scene-editor-view.js` | `scene.set_locked` | Source | Object / Part | right Targets / Properties | migrated | `editor-core.test.js` | lock is distinct from visibility/selection |
 | Group / reparent | `ui/editor-adapter.js` | `scene.create_group`, `scene.reparent_node` | Source | Hierarchy | right Targets | deferred | `editor-ui-adapter.test.js` | requires usable source workflow; G1/G2 |
 | Transform / pivot | `ui/editor-adapter.js`, `ui/canvas-interaction.js` | `scene.set_transform` complete node-local replacement | Source | Object | left Move / right Properties | deferred | `editor-ui-adapter.test.js`, `mcp-schemas.test.js` | G2/G3; no partial generic property mutation |
 | Stable-ID search / target details | `queries/project.js` | `scene.search`, `scene.get_node` | Source | Object | right Targets / Properties | deferred | `editor-core.test.js` | G1/G2; not a native search yet |
@@ -146,8 +158,8 @@ Test names omit `tests/`; owner paths omit `src/` unless noted.
 
 ## Checkpoint exit
 
-Stage A: ledger + public contract coverage. Stage B: only explicitly completed
-Object/Part actions may move to migrated. Stages B document/import and C–H stay
+Stage A: ledger + exact public contract coverage completed. Stage B: hierarchy/selection,
+name, visibility and lock are the only migrated native Object/Part actions. Stages B document/import and C–H stay
 gated as above. Stage I real Windows shot and Stage J retirement are not complete.
 No Project schema, evaluator order, timebase or MCP schema changes are authorized here.
 
@@ -255,14 +267,14 @@ these dispositions. Query entries include Product-only export queries as well as
 | Command | `animation.temporal.add_event` | `src/commands/temporal-command-handlers.js` | Animation > Sequence / Clip / Tracks | deferred |
 | Command | `animation.temporal.add_region` | `src/commands/temporal-command-handlers.js` | Animation > Sequence / Clip / Tracks | deferred |
 | Command | `source.apply_psd_reimport` | `src/commands/scene-command-handlers.js` | Source > Object / Document | deferred |
-| Command | `scene.rename_node` | `src/commands/scene-command-handlers.js` | Source > Object / Document | pending |
+| Command | `scene.rename_node` | `src/commands/scene-command-handlers.js` | Source > Object / Document | migrated |
 | Command | `scene.set_transform` | `src/commands/scene-command-handlers.js` | Source > Object / Document | deferred |
-| Command | `scene.set_visibility` | `src/commands/scene-command-handlers.js` | Source > Object / Document | pending |
-| Command | `scene.set_locked` | `src/commands/scene-command-handlers.js` | Source > Object / Document | pending |
+| Command | `scene.set_visibility` | `src/commands/scene-command-handlers.js` | Source > Object / Document | migrated |
+| Command | `scene.set_locked` | `src/commands/scene-command-handlers.js` | Source > Object / Document | migrated |
 | Command | `scene.create_group` | `src/commands/scene-command-handlers.js` | Source > Object / Document | deferred |
 | Command | `scene.reparent_node` | `src/commands/scene-command-handlers.js` | Source > Object / Document | deferred |
 | Query | `project.get_render_settings` | `src/queries/project.js` | Source > Object / Document | deferred |
-| Query | `project.get_summary` | `src/queries/project.js` | Source > Object / Document | pending |
+| Query | `project.get_summary` | `src/queries/project.js` | Source > Object / Document | migrated |
 | Query | `project.validate` | `src/queries/project.js` | Source > Object / Document | deferred |
 | Query | `clipping.get_for_node` | `src/queries/project.js` | Rig > Clipping | deferred |
 | Query | `clipping.list` | `src/queries/project.js` | Rig > Clipping | deferred |
@@ -300,7 +312,7 @@ these dispositions. Query entries include Product-only export queries as well as
 | Query | `mesh_form.get_for_context` | `src/queries/project.js` | Deform > Correction | deferred |
 | Query | `mesh_form.validate` | `src/queries/project.js` | Deform > Correction | deferred |
 | Query | `mesh_form.evaluate` | `src/queries/project.js` | Deform > Correction | deferred |
-| Query | `scene.get_tree` | `src/queries/project.js` | Source > Object / Document | pending |
+| Query | `scene.get_tree` | `src/queries/project.js` | Source > Object / Document | migrated |
 | Query | `scene.get_node` | `src/queries/project.js` | Source > Object / Document | deferred |
 | Query | `scene.search` | `src/queries/project.js` | Source > Object / Document | deferred |
 | Query | `animation.get_program` | `src/queries/project.js` | Animation > Sequence / Clip / Tracks | deferred |
@@ -333,4 +345,3 @@ these dispositions. Query entries include Product-only export queries as well as
 | Query | `sequence.project_clip_instances` | `src/queries/project.js` | Animation > Sequence / Clip / Tracks | deferred |
 | Query | `export.get_frame_plan` | `src/queries/project.js` | Export > Output | deferred |
 | Query | `export.evaluate_frame` | `src/queries/project.js` | Export > Output | deferred |
-

@@ -44,9 +44,26 @@ Run the app normally and verify:
 2. Ctrl+1 through Ctrl+7 switches Source, Mesh, Rig, Deform, Animation, Preview, Export;
 3. only Animation allocates the bottom Timeline surface;
 4. left active tool, top tool meaning, right target selection, and Properties remain distinct;
-5. renaming a selected target runs a Product Command and Undo/Redo follows Product history;
+5. applying name/visibility/lock in Properties runs one Product transaction and one Undo restores all three;
 6. ending the Product Host process clears projected state and disables editing;
 7. restart creates a new authoritative Phase 1 session and does not claim recovery of the lost one.
+
+Issue #96 additionally requires checking that a row visibility/lock action addresses
+that row without changing the selected target, hidden/locked targets remain selected,
+and context switching preserves selection. Uncommitted Properties inputs retain their
+starting revision even after losing focus. If Product changes in the meantime, Apply
+rejects the old draft and reloads the current state. Ctrl+Z inside a textbox is text
+editing, not Project Undo. These routed-input checks still need a human Windows pass.
+
+The automated smoke checks transaction/history, retained unfocused drafts, stale Apply,
+visibility/lock projection and seven-context selection/time-surface behavior. It does
+not simulate a full mouse/keyboard session or open production artwork. The foundation
+New/restart commands create empty sessions and are not a finished dirty-close lifecycle.
+
+See [`../../docs/native-capability-map.md`](../../docs/native-capability-map.md) for the
+exact migrated subset and the Recovery, bulk-asset and renderer gates. `session.workspace`
+is an additive bundled Host/client read returning tree, summary and history availability
+at one tagged revision; it introduces no Project or MCP schema change.
 
 Full document recovery, native rendering, import, Save/Open, packaging of the Node runtime, and
 Electron retirement are intentionally later phases.
