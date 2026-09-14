@@ -124,10 +124,26 @@ public sealed partial class ProductHostClient
         long revision, CancellationToken cancellationToken = default) =>
         SendAsync("mesh.tool", new { nodeId, keyformId, context = edit.Context, tool = edit.Tool, input = edit.Input },
             true, true, cancellationToken, revision);
-    public Task<ProductHostResponse> GenerateMeshAsync(string nodeId, bool contour, int columns, int rows,
+    public async Task<ProductHostResponse> GenerateMeshAsync(string nodeId, bool contour, int columns, int rows,
         double alphaThreshold, double density, double cornerSensitivity, double interiorDensity,
-        long revision, CancellationToken cancellationToken = default) =>
-        SendAsync("mesh.generatePreview", new { nodeId, kind = contour ? "contour" : "grid", columns, rows,
-            settings = new { alphaThreshold, density, cornerSensitivity, interiorDensity } },
-            true, true, cancellationToken, revision);
+        long revision, CancellationToken cancellationToken = default)
+    {
+        var previewId = Guid.NewGuid().ToString();
+        try
+        {
+            return await SendAsync("mesh.generatePreview", new { nodeId, previewId, kind = contour ? "contour" : "grid", columns, rows,
+                settings = new { alphaThreshold, density, cornerSensitivity, interiorDensity } },
+                true, true, cancellationToken, revision);
+        }
+        catch (OperationCanceledException)
+        {
+            try
+            {
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                await SendAsync("mesh.cancelPreview", new { previewId }, false, true, timeout.Token);
+            }
+            catch { /* Worker also has a hard wall-time bound. */ }
+            throw;
+        }
+    }
 }

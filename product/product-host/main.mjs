@@ -11,6 +11,8 @@ const decoder = new ControlFrameDecoder();
 let queue = Promise.resolve();
 
 decoder.on("data", (request) => {
+  // Cancellation only signals the matching bounded preview worker. Responses/mutations stay serialized.
+  service.cancelMeshPreview(request);
   queue = queue.then(async () => {
     const { response, events } = await service.handle(request);
     await writeControlFrame(stdout, response);

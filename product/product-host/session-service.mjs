@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { Worker } from "node:worker_threads";
 import { EditorSession } from "../src/commands/editor.js";
 import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
 import { MCP_SCHEMA_VERSION } from "../src/mcp/schemas.js";
@@ -44,6 +45,7 @@ const METHODS = new Set([
   "mesh.projection",
   "mesh.tool",
   "mesh.generatePreview",
+  "mesh.cancelPreview",
 ]);
 
 function structuredError(error) {
@@ -85,6 +87,37 @@ export class ProductHostService {
     this.shutdownRequested = false;
     this.assets = new RasterAssets(() => ({ token: this.documentToken, revision: this.revision }));
     this.bulkEndpoint = null;
+    this.generation = null;
+  }
+
+  cancelMeshPreview(request) {
+    if (request?.protocolVersion === PRODUCT_HOST_PROTOCOL_VERSION && request.method === "mesh.cancelPreview" &&
+        request.documentToken === this.documentToken && request.payload?.previewId === this.generation?.id)
+      this.generation?.cancel();
+  }
+
+  async generateBoundedPreview(asset, input) {
+    if (this.generation || typeof input.previewId !== "string" || input.previewId.length > 80)
+      throw new Error("Generation already running or missing preview ID.");
+    const token = this.documentToken, revision = this.revision;
+    const worker = new Worker(new URL("./mesh-generation-worker.mjs", import.meta.url), {
+      workerData: { asset: { width: asset.width, height: asset.height, bytes: asset.bytes }, input },
+      resourceLimits: { maxOldGenerationSizeMb: 128, maxYoungGenerationSizeMb: 16, stackSizeMb: 2 },
+    });
+    let timeout;
+    try {
+      const result = await new Promise((resolve, reject) => {
+        this.generation = { id: input.previewId, cancel: () => reject(new Error("生成を中止しました。")) };
+        timeout = setTimeout(() => reject(new Error("生成が10秒の体験版上限を超えました。")), 10000);
+        worker.once("message", message => message.error ? reject(new Error(message.error)) : resolve(message.result));
+        worker.once("error", reject);
+        worker.once("exit", code => { if (code) reject(new Error("生成Workerが終了しました。密度や画像サイズを下げてください。")); });
+      });
+      this.assets.assertCurrent(token, revision);
+      return result;
+    } finally {
+      clearTimeout(timeout); this.generation = null; await worker.terminate();
+    }
   }
 
   get revision() {
@@ -236,8 +269,11 @@ export class ProductHostService {
       case "mesh.generatePreview": {
         this.#assertExpectedRevision(request, document);
         const id = document.bindings?.get(payload.nodeId);
-        return generateMeshPreview(this.assets.get(id, document.token, document.revision), payload);
+        return this.generateBoundedPreview(this.assets.get(id, document.token, document.revision), payload);
       }
+      case "mesh.cancelPreview":
+        this.cancelMeshPreview(request);
+        return { cancelled: true };
       case "session.query":
         return document.session.query(payload.name, payload.input || {});
       case "session.workspace":

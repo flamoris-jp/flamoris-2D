@@ -125,7 +125,7 @@ test("Grid and Contour use preview then explicit ordinary Product apply", async 
   for (const kind of ["grid", "contour"]) {
     const before = structuredClone(host.document.session.project);
     const revision = host.revision;
-    const preview = await send(host, "mesh.generatePreview", { nodeId, kind, columns: 3, rows: 4 });
+    const preview = await send(host, "mesh.generatePreview", { nodeId, previewId: kind, kind, columns: 3, rows: 4 });
     assert.equal(preview.ok, true);
     assert.ok(preview.payload.candidate.positions.length >= 6);
     assert.equal(host.revision, revision);
@@ -135,4 +135,17 @@ test("Grid and Contour use preview then explicit ordinary Product apply", async 
     await send(host, "session.undo");
     assert.deepEqual(host.document.session.project, before);
   }
+});
+
+test("generation cancellation terminates its worker without changing revision or history", async () => {
+  const { host, nodeId } = await proof();
+  const before = structuredClone(host.document.session.project);
+  const revision = host.revision;
+  const pending = send(host, "mesh.generatePreview", { nodeId, previewId: "cancel", kind: "contour" });
+  await send(host, "mesh.cancelPreview", { previewId: "cancel" });
+  const result = await pending;
+  assert.equal(result.ok, false);
+  assert.equal(host.generation, null);
+  assert.equal(host.revision, revision);
+  assert.deepEqual(host.document.session.project, before);
 });
