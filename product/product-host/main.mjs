@@ -6,6 +6,7 @@ import { assertNodeRuntimeCapabilities } from "./runtime-audit.mjs";
 
 assertNodeRuntimeCapabilities();
 const service = new ProductHostService();
+service.bulkEndpoint = await service.assets.start();
 const decoder = new ControlFrameDecoder();
 let queue = Promise.resolve();
 
@@ -31,3 +32,4 @@ decoder.on("error", (error) => {
 stdin.pipe(decoder);
 await new Promise((resolve) => stdin.on("close", resolve));
 await queue;
+await service.assets.close();

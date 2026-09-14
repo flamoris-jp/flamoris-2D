@@ -4,6 +4,8 @@ import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
 import { MCP_SCHEMA_VERSION } from "../src/mcp/schemas.js";
 import { createProject, PROJECT_SCHEMA_VERSION } from "../src/model/project.js";
 import { parseProjectDocument, serializeProject } from "../src/io/project-json.js";
+import { RasterAssets } from "./raster-assets.mjs";
+import { createHandsOnProject, meshContext, executeMeshTool, generateMeshPreview } from "./mesh-hands-on.mjs";
 import {
   PRODUCT_HOST_PROTOCOL_VERSION,
   ProductHostProtocolError,
@@ -16,6 +18,7 @@ const MUTATING_METHODS = new Set([
   "session.redo",
   "headless.execute",
   "headless.executeTransaction",
+  "mesh.tool",
 ]);
 
 const METHODS = new Set([
@@ -36,6 +39,11 @@ const METHODS = new Set([
   "headless.query",
   "headless.execute",
   "headless.executeTransaction",
+  "assets.reserve",
+  "handsOn.open",
+  "mesh.projection",
+  "mesh.tool",
+  "mesh.generatePreview",
 ]);
 
 function structuredError(error) {
@@ -75,6 +83,8 @@ export class ProductHostService {
     this.createToken = createToken;
     this.document = null;
     this.shutdownRequested = false;
+    this.assets = new RasterAssets(() => ({ token: this.documentToken, revision: this.revision }));
+    this.bulkEndpoint = null;
   }
 
   get revision() {
@@ -87,6 +97,7 @@ export class ProductHostService {
 
   #openProject(project) {
     const session = new EditorSession(project);
+    this.assets.clear();
     this.document = {
       token: this.createToken(),
       revision: 0,
@@ -138,6 +149,7 @@ export class ProductHostService {
         productSchemaVersion: PROJECT_SCHEMA_VERSION,
         mcpSchemaVersion: MCP_SCHEMA_VERSION,
         runtime: { name: "node", minimumMajor: 24, actual: process.versions.node },
+        bulk: this.bulkEndpoint,
       };
     }
     if (request.method === "host.health") {
@@ -184,6 +196,48 @@ export class ProductHostService {
     }
 
     switch (request.method) {
+      case "assets.reserve":
+        this.#assertExpectedRevision(request, document);
+        return this.assets.reserve(payload, document.token, document.revision);
+      case "handsOn.open": {
+        this.#assertExpectedRevision(request, document);
+        if (!Array.isArray(payload.assetIds) || payload.assetIds.length > 16 ||
+            new Set(payload.assetIds).size !== payload.assetIds.length)
+          throw new Error("Invalid artwork selection.");
+        const assets = payload.assetIds.map(id => this.assets.get(id, document.token, document.revision));
+        const { project, bindings } = createHandsOnProject(assets);
+        const session = new EditorSession(project);
+        // Bootstrap through ordinary Product transactions, then attach this validated session.
+        for (const [nodeId, id] of bindings) {
+          const asset = assets.find(a => a.id === id);
+          const preview = generateMeshPreview(asset, { kind: "grid", columns: 2, rows: 2 });
+          executeMeshTool(session, { nodeId, context: "structure", tool: "topology.automesh",
+            input: { candidate: preview.candidate } });
+        }
+        const token = this.createToken();
+        this.assets.adopt(payload.assetIds, document.token, document.revision, token);
+        this.document = { token, revision: 0, session, headless: new HeadlessProductAdapter(session), bindings };
+        return { documentToken: token, revision: 0, proofOnly: true,
+          summary: session.query("project.get_summary", {}) };
+      }
+      case "mesh.projection": {
+        const state = payload.nodeId ? meshContext(document.session, payload).preparation.getState() : null;
+        const artwork = [...(document.bindings || [])].map(([nodeId, id]) => {
+          const asset = this.assets.get(id, document.token, document.revision);
+          const node = document.session.query("scene.get_node", { nodeId });
+          return { id, nodeId, width: asset.width, height: asset.height, byteLength: asset.byteLength,
+            visible: node.effectiveVisible, locked: node.locked, bounds: node.bounds,
+            worldTransform: node.worldTransform };
+        });
+        return { state, artwork, proofOnly: Boolean(document.bindings) };
+      }
+      case "mesh.tool":
+        return executeMeshTool(document.session, payload);
+      case "mesh.generatePreview": {
+        this.#assertExpectedRevision(request, document);
+        const id = document.bindings?.get(payload.nodeId);
+        return generateMeshPreview(this.assets.get(id, document.token, document.revision), payload);
+      }
       case "session.query":
         return document.session.query(payload.name, payload.input || {});
       case "session.workspace":
@@ -206,6 +260,7 @@ export class ProductHostService {
       case "session.redo":
         return document.session.redo();
       case "session.serialize":
+        if (document.bindings) throw new Error("Hands-on artwork sessions cannot be saved. Production persistence is not implemented.");
         return { document: serializeProject(document.session.project, payload.spacing ?? 2) };
       case "session.history":
         return {
