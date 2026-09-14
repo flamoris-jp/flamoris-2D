@@ -9,6 +9,8 @@
     "desktop": "electron .",
     "desktop:pack": "electron-builder --win --dir",
     "desktop:dist": "electron-builder --win nsis",
+    "product-host": "node product-host/main.mjs",
+    "test:product-host": "node --test tests/product-host.test.js",
     "test": "node --check desktop/main.mjs && node --check desktop/preload.cjs && node --test tests/*.test.js"
   },
   "dependencies": {
