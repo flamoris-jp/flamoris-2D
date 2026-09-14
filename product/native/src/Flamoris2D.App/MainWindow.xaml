@@ -268,11 +268,23 @@
                                  BorderBrush="#41444A" SelectionChanged="TargetList_SelectionChanged">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <StackPanel Margin="5,4">
-                                        <TextBlock Text="{Binding DisplayName}" />
-                                        <TextBlock Text="{Binding Kind}" FontSize="10"
-                                                   Foreground="#AEB0B5" />
-                                    </StackPanel>
+                                    <DockPanel Margin="2,4">
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                            <Button Content="{Binding VisibilityText, Mode=OneWay}"
+                                                    Focusable="False" Padding="3,2" Margin="2,0"
+                                                    ToolTip="表示だけを切り替えます。選択対象は変えません。"
+                                                    Click="TargetVisibility_Click" />
+                                            <Button Content="{Binding LockText, Mode=OneWay}"
+                                                    Focusable="False" Padding="3,2" Margin="2,0"
+                                                    ToolTip="ロックだけを切り替えます。選択対象は変えません。"
+                                                    Click="TargetLocked_Click" />
+                                        </StackPanel>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding IndentedName}" />
+                                            <TextBlock Text="{Binding StateText}" FontSize="10"
+                                                       Foreground="#AEB0B5" />
+                                        </StackPanel>
+                                    </DockPanel>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
@@ -290,12 +302,16 @@
                             <TextBlock Text="表示名" Foreground="#AEB0B5" />
                             <TextBox x:Name="DisplayNameEditor" Margin="0,4,0,7"
                                      IsEnabled="False" />
-                            <Button x:Name="ApplyNameButton" Content="Product Commandで適用"
+                            <CheckBox x:Name="TargetVisibleEditor" Content="表示する" Foreground="White"
+                                      IsEnabled="False" Margin="0,3" />
+                            <CheckBox x:Name="TargetLockedEditor" Content="ロックする" Foreground="White"
+                                      IsEnabled="False" Margin="0,3,0,9" />
+                            <Button x:Name="ApplyNameButton" Content="変更を確定"
                                     HorizontalAlignment="Left" Padding="9,4"
                                     IsEnabled="False" Click="ApplyName_Click" />
                             <TextBlock Margin="0,16,0,0" Foreground="#8F9298"
                                        TextWrapping="Wrap"
-                                       Text="このpanelはrevision-tagged projectionのみを表示します。ProjectやUndo stackはWPFに保持しません。" />
+                                       Text="表示とロックは選択とは別です。確定した変更は、まとめて1回で元に戻せます。" />
                         </StackPanel>
                     </DockPanel>
                 </Border>

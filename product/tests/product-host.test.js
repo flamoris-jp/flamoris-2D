@@ -94,6 +94,44 @@ test("mutation response and change event carry the same authority tags", async (
   assert.equal(result.events[0].revision, result.response.revision);
 });
 
+test("workspace is a single revision-tagged disposable projection with Product history state", async () => {
+  const service = await createService();
+  const token = service.documentToken;
+  const before = await send(service, "session.workspace", {}, { documentToken: token });
+  assert.equal(before.ok, true);
+  assert.equal(before.payload.isDirty, false);
+  assert.equal(before.payload.savedRevision, 0);
+  const nodeId = before.payload.tree.id;
+  const change = await send(service, "session.executeTransaction", { commands: [
+    { type: "scene.rename_node", payload: { nodeId, displayName: "Hidden target" } },
+    { type: "scene.set_visibility", payload: { nodeId, visible: false } },
+    { type: "scene.set_locked", payload: { nodeId, locked: true } },
+  ] }, { documentToken: token, expectedRevision: 0 });
+  assert.equal(change.ok, true);
+  const after = await send(service, "session.workspace", {}, { documentToken: token });
+  assert.equal(after.revision, 1);
+  assert.equal(after.payload.tree.id, nodeId);
+  assert.equal(after.payload.tree.visible, false);
+  assert.equal(after.payload.tree.effectiveVisible, false);
+  assert.equal(after.payload.tree.locked, true);
+  assert.equal(after.payload.isDirty, true);
+  assert.equal(after.payload.canUndo, true);
+  after.payload.tree.displayName = "Client projection only";
+  assert.equal((await sceneTree(service)).displayName, "Hidden target");
+  const history = await send(service, "session.history", {}, { documentToken: token });
+  assert.equal(history.payload.entries.length, 1);
+  await send(service, "session.undo", {}, { documentToken: token, expectedRevision: 1 });
+  const undone = await send(service, "session.workspace", {}, { documentToken: token });
+  assert.equal(undone.revision, 2);
+  assert.equal(undone.payload.editorRevision, 0);
+  assert.equal(undone.payload.isDirty, false);
+  assert.equal(undone.payload.tree.visible, true);
+  assert.equal(undone.payload.tree.locked, false);
+  assert.equal(undone.payload.canRedo, true);
+  const invalidToken = await send(service, "session.workspace", {}, { documentToken: "old" });
+  assert.equal(invalidToken.error.code, "document.token_stale");
+});
+
 test("query, command and transaction round-trip through one EditorSession", async () => {
   const service = await createService();
   const summary = await send(service, "session.query", {
