@@ -20,7 +20,7 @@ public sealed class ProductHostClient : IAsyncDisposable
     private long _requestSequence;
     private int _authorityLost;
     private bool _shutdownRequested;
-    private bool _projectionStale;
+    private volatile bool _projectionStale;
 
     public event EventHandler<DocumentChangedEventArgs>? DocumentChanged;
     public event EventHandler<AuthorityLostEventArgs>? AuthorityLost;
@@ -310,6 +310,7 @@ public sealed class ProductHostClient : IAsyncDisposable
         var token = root.GetProperty("documentToken").GetString();
         var revision = root.GetProperty("revision").GetInt64();
         if (token is null) return;
+        var previouslyAccepted = _projectionGate.Revision;
         try
         {
             _projectionGate.Accept(token, revision);
@@ -318,6 +319,7 @@ public sealed class ProductHostClient : IAsyncDisposable
         {
             return;
         }
+        if (revision > previouslyAccepted) _projectionStale = true;
         var method = root.GetProperty("payload").GetProperty("method").GetString() ?? "";
         DocumentChanged?.Invoke(this, new DocumentChangedEventArgs(token, revision, method));
     }

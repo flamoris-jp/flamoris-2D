@@ -2,7 +2,7 @@ using System.Windows;
 
 namespace Flamoris.Flamoris2D.App;
 
-public partial class App
+public partial class App : Application
 {
     protected override async void OnStartup(StartupEventArgs e)
     {

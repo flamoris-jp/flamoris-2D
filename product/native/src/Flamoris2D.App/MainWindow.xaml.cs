@@ -9,7 +9,7 @@ using Flamoris.Flamoris2D.ProductHost;
 
 namespace Flamoris.Flamoris2D.App;
 
-public partial class MainWindow : IAsyncDisposable
+public partial class MainWindow : Window, IAsyncDisposable
 {
     private readonly Dictionary<EditingContext, string> _activeTools = [];
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
@@ -184,11 +184,20 @@ public partial class MainWindow : IAsyncDisposable
     }
 
     private void Client_DocumentChanged(object? sender, DocumentChangedEventArgs e) =>
-        Dispatcher.InvokeAsync(async () =>
+        Dispatcher.InvokeAsync(() => _ = RefreshAfterChangeAsync(e));
+
+    private async Task RefreshAfterChangeAsync(DocumentChangedEventArgs e)
+    {
+        RevisionText.Text = $"revision {e.Revision}";
+        try
         {
-            RevisionText.Text = $"revision {e.Revision}";
-            await RefreshProjectionAsync();
-        });
+            if (_client?.IsRunning == true) await RefreshProjectionAsync();
+        }
+        catch (Exception error)
+        {
+            StatusText.Text = $"projection更新に失敗しました: {error.Message}";
+        }
+    }
 
     private void Client_AuthorityLost(object? sender, AuthorityLostEventArgs e) =>
         Dispatcher.InvokeAsync(() => ShowAuthorityLost(

@@ -188,8 +188,9 @@ test("Product Host entry graph is free of unowned DOM and Canvas globals", async
   assert.doesNotThrow(assertNodeRuntimeCapabilities);
   const audit = await auditModuleGraph(new URL("../product-host/session-service.mjs", import.meta.url));
   assert.equal(audit.violations.length, 0, JSON.stringify(audit.violations, null, 2));
-  assert.ok(audit.modules.some((file) => file.endsWith("commands/editor.js")));
-  assert.ok(audit.modules.some((file) => file.endsWith("io/png-raster.js")));
+  const portablePaths = audit.modules.map((file) => file.replaceAll("\\", "/"));
+  assert.ok(portablePaths.some((file) => file.endsWith("commands/editor.js")));
+  assert.ok(portablePaths.some((file) => file.endsWith("io/png-raster.js")));
 });
 
 test("framed child process starts, responds, shuts down, and surfaces crash", async (context) => {
