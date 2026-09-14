@@ -259,6 +259,55 @@ Rig defines what can move: lattice structure/bind state, Bone rest hierarchy/len
 
 This separation is a UI/context projection over existing domains. If an existing command does not state whether it changes rest/bind data or pose/keyform data, migration pauses for an ADR instead of guessing.
 
+### 8.3 Required screen-state specifications
+
+These are the acceptance wireframes expressed as region contracts. They all use the fixed grammar from Section 7; a mode may change a region's contents or collapse it, but may not move its responsibility elsewhere.
+
+**A. Object / Part selection (`素材`)**
+
+- Left contains Select and Transform tools only.
+- Top shows transform/pivot options only when Transform is active.
+- Right upper shows Parts/Objects with row selection plus separate eye and lock affordances.
+- Right lower shows the selected source/object properties.
+- Bottom is absent and the center remains the visual priority.
+
+**B. Mesh Layout (`メッシュ`)**
+
+- Left contains Select, Add, Remove, Connect/Triangle, Subdivide, and AutoMesh as appropriate to `構造`; `配置` exposes move/selection tools instead.
+- Top names the active Key Art, Part, mesh, and local context, then shows only that tool's options.
+- Right upper retains Parts and mesh target selection; right lower shows topology/layout, stable vertex details, labels, and diagnostics.
+- The mesh stays visible with high contrast in both `構造` and `配置`.
+- Bottom is absent; a Sequence Timeline must not consume Mesh space.
+
+**C. Rig (`リグ`)**
+
+- Left contains Warp, Bone, Bind/Weight, Clipping, and Constraint construction tools.
+- Top shows active rig target and operation settings.
+- Right upper keeps the owning Part/Object visible and adds the relevant rig hierarchy/target view.
+- Right lower shows selected rig element, binding, or constraint properties.
+- Bottom is absent.
+
+**D. Deform / Key State (`変形`)**
+
+- Left contains mesh-deform, Warp-control, Bone-pose, form-correction, and IK pose tools that are valid for the chosen target.
+- Top always identifies the active Key Art/Key State and active pose target.
+- Right retains Parts/targets above and pose/deformation properties below.
+- Bottom shows the compact Key State strip, never the full Sequence Timeline.
+- Canvas styling makes this state visually distinct from Mesh `配置`; topology operations are unavailable.
+
+**E. Animation (`アニメーション`)**
+
+- Left/top contain animation selection and authoring tools, not rig-construction tools.
+- Right upper exposes Parts/animated targets and Clip context; right lower exposes the selected clip/instance/track/keyframe.
+- Bottom intentionally shows the full Timeline.
+- Timeline play, time display, snap, unit, and horizontal scale controls live in the Timeline header.
+
+**F. Preview / Export**
+
+- Preview hides authoring tool rails and properties that cannot affect viewing; it keeps only sequence choice, transport, scrub, display quality, and diagnostics.
+- Export hides the Timeline and authoring overlays and shows output target, range, size, alpha/format, destination, progress, cancel, and diagnostics.
+- Neither state changes Project authoring data merely by entering or leaving it.
+
 ## 9. Selection, Parts, and Properties authority
 
 `WorkspaceContext` is the one transient selection authority for the WPF client. It stores stable IDs in scoped slots rather than one overloaded selection:
@@ -498,4 +547,3 @@ Retiring the Electron shell does **not** require rewriting the authoritative Jav
 - Small migration stages, risks, and a concrete Electron stop condition are explicit in Sections 15–18.
 - Long-lived unresolved choices are routed to ADRs in Section 19.
 - This proposal changes no implementation file and does not pretend the Electron implementation never existed.
-

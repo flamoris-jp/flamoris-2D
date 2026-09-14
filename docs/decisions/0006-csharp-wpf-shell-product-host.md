@@ -2,6 +2,8 @@
 
 Status: proposed for Issue #92
 
+Primary design: [`../csharp-wpf-ui-migration.md`](../csharp-wpf-ui-migration.md)
+
 ## Context
 
 FLAMORIS 2D has a mature JavaScript Product implementation: Project schema v15, stable identity, validation/migration, typed Query/Command/Transaction operations, `EditorSession` Undo/Redo, deterministic rig/transition/sequence evaluation, importers, and MCP schemas. The Electron/DOM shell is replaceable, but those semantics are not disposable.
@@ -138,4 +140,3 @@ Before feature migration starts, a follow-up implementation issue must prove:
 7. One representative `.fl2d` opens, queries, serializes, and round-trips without schema change.
 8. A representative raster asset crosses the bulk boundary without routine JSON/base64 amplification.
 9. Killing the Product Host does not cause the WPF shell to write or present a fabricated Project state.
-
