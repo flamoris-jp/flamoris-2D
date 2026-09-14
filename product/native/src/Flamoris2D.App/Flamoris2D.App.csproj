@@ -21,7 +21,7 @@
           Link="ProductHost\%(RecursiveDir)%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\..\src\**\*.js"
-          Link="ProductHost\src\%(RecursiveDir)%(Filename)%(Extension)"
+          Link="src\%(RecursiveDir)%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
