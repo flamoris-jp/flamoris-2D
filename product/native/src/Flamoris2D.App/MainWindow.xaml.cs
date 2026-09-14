@@ -483,6 +483,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             if (_targets.SelectedId != selectedBefore)
                 throw new InvalidOperationException("Context switching changed object selection.");
         }
+        await RunMeshSmokeAsync();
         await _client.ShutdownAsync();
     }
 
