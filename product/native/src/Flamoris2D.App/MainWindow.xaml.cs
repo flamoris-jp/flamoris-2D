@@ -135,14 +135,21 @@ public partial class MainWindow : Window, IAsyncDisposable
             await ConnectHostAsync(createDocument: true);
             return;
         }
-        await _client.CreateSessionAsync("名称未設定", 1920, 1080);
-        AttachDocumentWorkspace(_client.DocumentToken!);
-        await RefreshProjectionAsync();
-        StatusText.Text = "新しいProduct Host documentを作成しました。";
+        try
+        {
+            await _client.CreateSessionAsync("名称未設定", 1920, 1080);
+            AttachDocumentWorkspace(_client.DocumentToken!);
+            await RefreshProjectionAsync();
+            StatusText.Text = "新しいProduct Host documentを作成しました。";
+        }
+        catch (Exception error) { StatusText.Text = $"新規セッションを作成できませんでした: {error.Message}"; }
     }
 
-    private async void Refresh_Click(object sender, RoutedEventArgs e) =>
-        await RefreshProjectionAsync();
+    private async void Refresh_Click(object sender, RoutedEventArgs e)
+    {
+        try { await RefreshProjectionAsync(); }
+        catch (Exception error) { StatusText.Text = $"状態を更新できませんでした: {error.Message}"; }
+    }
 
     private async void ApplyName_Click(object sender, RoutedEventArgs e)
     {

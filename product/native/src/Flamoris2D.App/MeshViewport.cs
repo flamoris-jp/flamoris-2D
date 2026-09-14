@@ -38,7 +38,7 @@ public sealed class MeshViewport : FrameworkElement
     private Point2? _pan;
     private (Point2 Point, int Vertex)? _click;
     private Affine2 World => Artwork.FirstOrDefault(a => a.NodeId == NodeId)?.World ?? Affine2.Identity;
-    private bool Pickable => Artwork.Any(a => a.NodeId == NodeId && a.Visible && !a.Locked);
+    private bool Pickable => World.IsInvertible && Artwork.Any(a => a.NodeId == NodeId && a.Visible && !a.Locked);
     public event Action<MeshEdit, long>? CommitRequested;
     public event Action<string>? TargetPicked;
     public event Action? SelectionChanged;
@@ -175,7 +175,7 @@ public sealed class MeshViewport : FrameworkElement
         if (e.ChangedButton != MouseButton.Left || Busy) return;
         if (!MeshEnabled)
         {
-            foreach (var art in Artwork.Reverse().Where(a => a.Visible && !a.Locked))
+            foreach (var art in Artwork.Reverse().Where(a => a.Visible && !a.Locked && a.World.IsInvertible))
             {
                 var p = art.World.Inverse(Camera.ToDocument(point));
                 if (p.X >= 0 && p.Y >= 0 && p.X < art.Bitmap.PixelWidth && p.Y < art.Bitmap.PixelHeight)

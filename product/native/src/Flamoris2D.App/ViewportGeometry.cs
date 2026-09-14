@@ -29,6 +29,7 @@ public sealed class ViewportCamera
 public readonly record struct Affine2(double A, double B, double C, double D, double X, double Y)
 {
     public static Affine2 Identity => new(1, 0, 0, 1, 0, 0);
+    public bool IsInvertible => Math.Abs(A * D - B * C) >= 1e-12;
     public Point2 Apply(Point2 p) => new(A * p.X + C * p.Y + X, B * p.X + D * p.Y + Y);
     public Point2 Inverse(Point2 p)
     {
