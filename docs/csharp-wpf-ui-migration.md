@@ -1,6 +1,6 @@
 # C# / WPF editor shell migration design
 
-Status: proposed for Issue #92  
+Status: accepted by PR #93; Phase 1 implementation tracked by Issue #94  
 Baseline audited: `main` at `2d9dd7cc5ec2fd67f845a34a1a692ce07387346d`  
 Decision record: [`decisions/0006-csharp-wpf-shell-product-host.md`](decisions/0006-csharp-wpf-shell-product-host.md)
 
