@@ -7,6 +7,7 @@
     <AssemblyName>Flamoris2D.ProductHost.Client.Tests</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\..\src\Flamoris2D.App\TargetWorkspace.cs" Link="TargetWorkspace.cs" />
     <ProjectReference Include="..\..\src\Flamoris2D.ProductHost.Client\Flamoris2D.ProductHost.Client.csproj" />
   </ItemGroup>
 </Project>

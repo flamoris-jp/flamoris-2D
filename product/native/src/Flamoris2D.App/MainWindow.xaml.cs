@@ -18,6 +18,10 @@ public partial class MainWindow : Window, IAsyncDisposable
     private ProductHostClient? _client;
     private EditingContext _editingContext = EditingContext.Source;
     private bool _closingAfterShutdown;
+    private readonly TargetWorkspace _targets = new();
+    private bool _updatingTargets;
+    private bool _targetMutationPending;
+    private long _propertyRevision = -1;
 
     public MainWindow(bool autoConnect = true)
     {
@@ -54,6 +58,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             HostStatusText.Text =
                 $"接続済み · protocol {handshake.ProtocolVersion} · schema {handshake.ProductSchemaVersion}";
             if (createDocument) await _client.CreateSessionAsync("名称未設定", 1920, 1080);
+            if (_client.DocumentToken is { } token) _targets.Attach(token);
             await RefreshProjectionAsync();
             StatusText.Text = "Product HostのEditorSessionに接続しました。";
         }
@@ -70,23 +75,30 @@ public partial class MainWindow : Window, IAsyncDisposable
         await _refreshGate.WaitAsync();
         try
         {
-            var selectedId = (TargetList.SelectedItem as TargetProjection)?.Id;
-            var summary = await client.GetProjectSummaryAsync();
-            var tree = await client.GetSceneTreeAsync();
-            var targets = FlattenTree(tree.Payload).ToArray();
-            TargetList.ItemsSource = targets;
-            TargetList.SelectedItem = targets.FirstOrDefault(item => item.Id == selectedId)
-                ?? targets.FirstOrDefault();
-            var history = await client.GetHistoryAsync();
-            var canUndo = history.Payload.GetProperty("canUndo").GetBoolean();
-            var canRedo = history.Payload.GetProperty("canRedo").GetBoolean();
+            var snapshot = await client.GetWorkspaceAsync();
+            if (!ReferenceEquals(client, _client) || !client.HasAuthoritativeProjection ||
+                snapshot.DocumentToken != client.DocumentToken || snapshot.Revision != client.Revision)
+                throw new StaleProjectionException(snapshot.Revision ?? -1, client.Revision);
+            _targets.Apply(snapshot.DocumentToken!, snapshot.Revision!.Value,
+                snapshot.Payload.GetProperty("tree"));
+            _updatingTargets = true;
+            try
+            {
+                TargetList.ItemsSource = _targets.Targets;
+                TargetList.SelectedItem = _targets.Selected;
+            }
+            finally { _updatingTargets = false; }
+            var canUndo = snapshot.Payload.GetProperty("canUndo").GetBoolean();
+            var canRedo = snapshot.Payload.GetProperty("canRedo").GetBoolean();
             UndoMenuItem.IsEnabled = UndoButton.IsEnabled = canUndo;
             RedoMenuItem.IsEnabled = RedoButton.IsEnabled = canRedo;
             RefreshButton.IsEnabled = true;
-            var projectName = summary.Payload.GetProperty("displayName").GetString() ?? "名称未設定";
+            var projectName = snapshot.Payload.GetProperty("summary").GetProperty("displayName").GetString() ?? "名称未設定";
             Title = $"FLAMORIS 2D — {projectName}";
             RevisionText.Text = $"revision {client.Revision}";
-            UpdateSelectionEditor();
+            TargetList.IsEnabled = !_targetMutationPending;
+            // Do not replace a user's uncommitted text with an unsolicited refresh.
+            if (!DisplayNameEditor.IsKeyboardFocusWithin) UpdateSelectionEditor();
         }
         catch (StaleProjectionException)
         {
@@ -103,19 +115,6 @@ public partial class MainWindow : Window, IAsyncDisposable
         }
     }
 
-    private static IEnumerable<TargetProjection> FlattenTree(JsonElement node, int depth = 0)
-    {
-        yield return new TargetProjection(
-            node.GetProperty("id").GetString() ?? "",
-            node.GetProperty("displayName").GetString() ?? "",
-            node.GetProperty("kind").GetString() ?? "",
-            depth);
-        if (!node.TryGetProperty("children", out var children)) yield break;
-        foreach (var child in children.EnumerateArray())
-            foreach (var descendant in FlattenTree(child, depth + 1))
-                yield return descendant;
-    }
-
     private async void NewDocument_Click(object sender, RoutedEventArgs e)
     {
         if (_client?.IsRunning != true)
@@ -124,6 +123,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             return;
         }
         await _client.CreateSessionAsync("名称未設定", 1920, 1080);
+        _targets.Attach(_client.DocumentToken!);
         await RefreshProjectionAsync();
         StatusText.Text = "新しいProduct Host documentを作成しました。";
     }
@@ -133,25 +133,14 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async void ApplyName_Click(object sender, RoutedEventArgs e)
     {
-        if (_client is null || TargetList.SelectedItem is not TargetProjection target) return;
+        if (_client is null || _targets.Selected is not TargetProjection target || _targetMutationPending) return;
         var name = DisplayNameEditor.Text.Trim();
         if (name.Length == 0) return;
-        try
-        {
-            await _client.RenameNodeAsync(target.Id, name, "WPF: rename target");
-            await RefreshProjectionAsync();
-            ViewportHost.Focus();
-        }
-        catch (ProductHostException error) when (error.Code == "revision.conflict")
-        {
-            ClearProjection();
-            StatusText.Text = "別clientの変更を検出しました。最新状態を取得します。";
-            await RefreshProjectionAsync();
-        }
-        catch (Exception error)
-        {
-            StatusText.Text = $"Commandに失敗しました: {error.Message}";
-        }
+        var visible = TargetVisibleEditor.IsChecked == true;
+        var locked = TargetLockedEditor.IsChecked == true;
+        if (name == target.DisplayName && visible == target.Visible && locked == target.Locked) return;
+        await MutateTargetAsync(() => _client.ApplyTargetPropertiesAsync(
+            target.Id, name, visible, locked, _propertyRevision));
     }
 
     private async void Undo_Click(object sender, RoutedEventArgs e)
@@ -217,11 +206,15 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private void ClearProjection()
     {
+        _targets.Invalidate();
         TargetList.ItemsSource = null;
+        TargetList.IsEnabled = false;
         SelectedTargetText.Text = "—";
         DisplayNameEditor.Text = "";
         DisplayNameEditor.IsEnabled = false;
         ApplyNameButton.IsEnabled = false;
+        TargetVisibleEditor.IsEnabled = TargetLockedEditor.IsEnabled = false;
+        TargetVisibleEditor.IsChecked = TargetLockedEditor.IsChecked = false;
         RefreshButton.IsEnabled = false;
         UndoMenuItem.IsEnabled = UndoButton.IsEnabled = false;
         RedoMenuItem.IsEnabled = RedoButton.IsEnabled = false;
@@ -286,25 +279,79 @@ public partial class MainWindow : Window, IAsyncDisposable
         ActiveToolSettingsText.Text = $"{tool} — {definition.ClickMeaning}";
     }
 
-    private void TargetList_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
+    private void TargetList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_updatingTargets) return;
+        _targets.Select((TargetList.SelectedItem as TargetProjection)?.Id);
         UpdateSelectionEditor();
+    }
 
     private void UpdateSelectionEditor()
     {
-        if (TargetList.SelectedItem is not TargetProjection target ||
+        if (_targets.Selected is not TargetProjection target ||
             _client?.HasAuthoritativeProjection != true)
         {
             SelectedTargetText.Text = "—";
             DisplayNameEditor.IsEnabled = ApplyNameButton.IsEnabled = false;
+            TargetVisibleEditor.IsEnabled = TargetLockedEditor.IsEnabled = false;
             return;
         }
-        SelectedTargetText.Text = $"{new string('　', target.Depth)}{target.DisplayName} · {target.Kind}";
+        SelectedTargetText.Text = $"{target.DisplayName} · {target.StateText}";
         DisplayNameEditor.Text = target.DisplayName;
-        DisplayNameEditor.IsEnabled = ApplyNameButton.IsEnabled = true;
+        TargetVisibleEditor.IsChecked = target.Visible;
+        TargetLockedEditor.IsChecked = target.Locked;
+        _propertyRevision = _targets.Revision;
+        DisplayNameEditor.IsEnabled = ApplyNameButton.IsEnabled = !_targetMutationPending;
+        TargetVisibleEditor.IsEnabled = TargetLockedEditor.IsEnabled = !_targetMutationPending;
+    }
+
+    private async void TargetVisibility_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (_client is null || sender is not FrameworkElement { DataContext: TargetProjection target }) return;
+        var revision = _targets.Revision;
+        await MutateTargetAsync(() => _client.SetTargetVisibilityAsync(target.Id, !target.Visible, revision));
+    }
+
+    private async void TargetLocked_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (_client is null || sender is not FrameworkElement { DataContext: TargetProjection target }) return;
+        var revision = _targets.Revision;
+        await MutateTargetAsync(() => _client.SetTargetLockedAsync(target.Id, !target.Locked, revision));
+    }
+
+    private async Task MutateTargetAsync(Func<Task<ProductHostResponse>> mutate)
+    {
+        if (_targetMutationPending || _client?.HasAuthoritativeProjection != true) return;
+        _targetMutationPending = true;
+        TargetList.IsEnabled = ApplyNameButton.IsEnabled = false;
+        try
+        {
+            await mutate();
+            await RefreshProjectionAsync();
+            ViewportHost.Focus();
+            StatusText.Text = "対象の変更を確定しました。選択対象は維持しています。";
+        }
+        catch (ProductHostException error) when (error.Code == "revision.conflict")
+        {
+            ViewportHost.Focus();
+            await RefreshProjectionAsync();
+            StatusText.Text = "編集開始後に状態が変わりました。未確定の入力を破棄して最新状態を表示しました。";
+        }
+        catch (Exception error) { StatusText.Text = $"変更できませんでした: {error.Message}"; }
+        finally
+        {
+            _targetMutationPending = false;
+            TargetList.IsEnabled = _client?.HasAuthoritativeProjection == true;
+            UpdateSelectionEditor();
+        }
     }
 
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        // Text editing owns its Undo/Redo and navigation. Never undo the Project from a textbox.
+        if (e.OriginalSource is TextBoxBase && e.Key != Key.Escape) return;
         if (Keyboard.Modifiers == ModifierKeys.Control &&
             e.Key >= Key.D1 && e.Key <= Key.D7)
         {
@@ -370,11 +417,23 @@ public partial class MainWindow : Window, IAsyncDisposable
             "WPF smoke transaction");
         await _client.UndoAsync();
         await _client.RedoAsync();
+        await RefreshProjectionAsync();
+        var selectedBefore = _targets.SelectedId;
+        var revision = _targets.Revision;
+        await MutateTargetAsync(() => _client.SetTargetVisibilityAsync(rootId, false, revision));
+        if (_targets.SelectedId != selectedBefore || _targets.Selected?.Visible != false)
+            throw new InvalidOperationException("Visibility must not change target selection.");
+        revision = _targets.Revision;
+        await MutateTargetAsync(() => _client.SetTargetLockedAsync(rootId, true, revision));
+        if (_targets.Selected?.Locked != true)
+            throw new InvalidOperationException("Lock projection did not refresh.");
         foreach (var definition in EditingContextCatalog.All)
         {
             SwitchContext(definition.Context, returnFocus: false);
             if ((TimeSurface.Visibility == Visibility.Visible) != definition.ShowTimeSurface)
                 throw new InvalidOperationException("Contextual time surface visibility is incorrect.");
+            if (_targets.SelectedId != selectedBefore)
+                throw new InvalidOperationException("Context switching changed object selection.");
         }
         await _client.ShutdownAsync();
     }
@@ -389,5 +448,4 @@ public partial class MainWindow : Window, IAsyncDisposable
         _refreshGate.Dispose();
     }
 
-    private sealed record TargetProjection(string Id, string DisplayName, string Kind, int Depth);
 }
