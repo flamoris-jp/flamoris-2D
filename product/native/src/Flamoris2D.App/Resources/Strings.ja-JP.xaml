@@ -1,0 +1,20 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:system="clr-namespace:System;assembly=mscorlib">
+    <system:String x:Key="App.Title">FLAMORIS 2D</system:String>
+    <system:String x:Key="Menu.File">ファイル(_F)</system:String>
+    <system:String x:Key="Menu.New">新規(_N)</system:String>
+    <system:String x:Key="Menu.Save">保存(_S)</system:String>
+    <system:String x:Key="Menu.Exit">終了(_X)</system:String>
+    <system:String x:Key="Menu.Edit">編集(_E)</system:String>
+    <system:String x:Key="Menu.Undo">元に戻す(_U)</system:String>
+    <system:String x:Key="Menu.Redo">やり直し(_R)</system:String>
+    <system:String x:Key="Menu.View">表示(_V)</system:String>
+    <system:String x:Key="Menu.FocusViewport">キャンバスにフォーカス</system:String>
+    <system:String x:Key="Menu.Help">ヘルプ(_H)</system:String>
+    <system:String x:Key="Menu.About">このアプリについて</system:String>
+    <system:String x:Key="Panel.Tools">アクティブツール</system:String>
+    <system:String x:Key="Panel.Targets">パーツ / オブジェクト</system:String>
+    <system:String x:Key="Panel.Properties">プロパティ</system:String>
+    <system:String x:Key="Panel.Timeline">タイムライン</system:String>
+</ResourceDictionary>

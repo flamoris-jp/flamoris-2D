@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Flamoris.Flamoris2D.App</RootNamespace>
+    <AssemblyName>Flamoris2D</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Product>FLAMORIS 2D</Product>
+    <Description>Native FLAMORIS 2D editor shell foundation.</Description>
+    <VersionPrefix>0.4.0</VersionPrefix>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Flamoris2D.ProductHost.Client\Flamoris2D.ProductHost.Client.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\product-host\**\*"
+          Link="ProductHost\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\src\**\*.js"
+          Link="ProductHost\src\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
