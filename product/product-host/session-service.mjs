@@ -221,7 +221,7 @@ export class ProductHostService {
           summary: session.query("project.get_summary", {}) };
       }
       case "mesh.projection": {
-        const state = payload.nodeId ? meshContext(document.session, payload).preparation.getState() : null;
+        const state = payload.nodeId ? meshContext(document.session, payload, false).preparation.getState() : null;
         const artwork = [...(document.bindings || [])].map(([nodeId, id]) => {
           const asset = this.assets.get(id, document.token, document.revision);
           const node = document.session.query("scene.get_node", { nodeId });

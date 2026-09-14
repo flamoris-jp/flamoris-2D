@@ -35,6 +35,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         _autoConnect = autoConnect;
         foreach (var definition in EditingContextCatalog.All)
             _activeTools[definition.Context] = definition.Tools[0];
+        InitializeMeshUi();
         Loaded += MainWindow_Loaded;
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         SwitchContext(EditingContext.Source, returnFocus: false);
@@ -102,10 +103,11 @@ public partial class MainWindow : Window, IAsyncDisposable
             var projectName = snapshot.Payload.GetProperty("summary").GetProperty("displayName").GetString() ?? "名称未設定";
             Title = $"FLAMORIS 2D — {projectName}";
             RevisionText.Text = $"revision {client.Revision}";
-            TargetList.IsEnabled = !_targetMutationPending;
+            TargetList.IsEnabled = !_targetMutationPending && !_meshBusy;
             // A draft outlives keyboard focus and retains its starting revision.
             if (_propertySnapshot?.Id != _targets.SelectedId || !HasPropertyDraft)
                 UpdateSelectionEditor();
+            await RefreshMeshAsync(client);
         }
         catch (StaleProjectionException)
         {
@@ -123,6 +125,9 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async void NewDocument_Click(object sender, RoutedEventArgs e)
     {
+        if (_loadingArtwork || _meshBusy || !ConfirmDiscardHandsOn()) return;
+        _hasHandsOn = false;
+        ClearMeshProjection();
         if (_client?.IsRunning != true)
         {
             await ConnectHostAsync(createDocument: true);
@@ -139,7 +144,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async void ApplyName_Click(object sender, RoutedEventArgs e)
     {
-        if (_client is null || _targets.Selected is not TargetProjection target || _targetMutationPending) return;
+        if (_client is null || _targets.Selected is not TargetProjection target || _targetMutationPending || _meshBusy) return;
         var name = DisplayNameEditor.Text.Trim();
         if (name.Length == 0) return;
         var visible = TargetVisibleEditor.IsChecked == true;
@@ -151,7 +156,8 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async void Undo_Click(object sender, RoutedEventArgs e)
     {
-        if (_client is null) return;
+        if (_client is null || _meshBusy || _loadingArtwork) return;
+        MeshCanvas.Cancel(); CancelGenerated();
         try
         {
             await _client.UndoAsync();
@@ -166,7 +172,8 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async void Redo_Click(object sender, RoutedEventArgs e)
     {
-        if (_client is null) return;
+        if (_client is null || _meshBusy || _loadingArtwork) return;
+        MeshCanvas.Cancel(); CancelGenerated();
         try
         {
             await _client.RedoAsync();
@@ -212,6 +219,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private void ClearProjection()
     {
+        ClearMeshProjection();
         _propertySnapshot = null;
         _propertyRevision = -1;
         _targets.Invalidate();
@@ -234,6 +242,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private void WorkflowContext_Click(object sender, RoutedEventArgs e)
     {
+        if (_loadingArtwork || _meshBusy) return;
         if (sender is ToggleButton { Tag: string value } &&
             Enum.TryParse<EditingContext>(value, out var context))
             SwitchContext(context, returnFocus: true);
@@ -256,6 +265,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         TimeSurfaceRow.Height = definition.ShowTimeSurface
             ? new GridLength(190) : new GridLength(0);
         UpdateToolSettings();
+        ConfigureMeshContext();
         if (returnFocus) ViewportHost.Focus();
     }
 
@@ -276,6 +286,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         {
             _activeTools[_editingContext] = tool;
             UpdateToolSettings();
+            SetMeshTool();
             ViewportHost.Focus();
         }
     }
@@ -287,11 +298,14 @@ public partial class MainWindow : Window, IAsyncDisposable
         ActiveToolSettingsText.Text = $"{tool} — {definition.ClickMeaning}";
     }
 
-    private void TargetList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void TargetList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_updatingTargets) return;
         _targets.Select((TargetList.SelectedItem as TargetProjection)?.Id);
         UpdateSelectionEditor();
+        MeshCanvas.Cancel(); CancelGenerated();
+        try { await RefreshProjectionAsync(); }
+        catch (Exception error) { StatusText.Text = error.Message; }
     }
 
     private void UpdateSelectionEditor()
@@ -333,7 +347,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async Task MutateTargetAsync(Func<Task<ProductHostResponse>> mutate)
     {
-        if (_targetMutationPending || _client?.HasAuthoritativeProjection != true) return;
+        if (_targetMutationPending || _meshBusy || _client?.HasAuthoritativeProjection != true) return;
         _targetMutationPending = true;
         TargetList.IsEnabled = ApplyNameButton.IsEnabled = false;
         DisplayNameEditor.IsEnabled = TargetVisibleEditor.IsEnabled = TargetLockedEditor.IsEnabled = false;
@@ -363,6 +377,12 @@ public partial class MainWindow : Window, IAsyncDisposable
     {
         // Text editing owns its Undo/Redo and navigation. Never undo the Project from a textbox.
         if (e.OriginalSource is TextBoxBase && e.Key != Key.Escape) return;
+        if (e.Key == Key.Escape)
+        {
+            _meshWork?.Cancel(); MeshCanvas.Cancel(); CancelGenerated(); MeshCanvas.Focus();
+            e.Handled = true; return;
+        }
+        if (_meshBusy || _loadingArtwork) return;
         if (Keyboard.Modifiers == ModifierKeys.Control &&
             e.Key >= Key.D1 && e.Key <= Key.D7)
         {
@@ -406,6 +426,9 @@ public partial class MainWindow : Window, IAsyncDisposable
     private async void MainWindow_Closing(object? sender, CancelEventArgs e)
     {
         if (_closingAfterShutdown) return;
+        if (!ConfirmDiscardHandsOn()) { e.Cancel = true; return; }
+        _meshWork?.Cancel();
+        MeshCanvas.Cancel();
         e.Cancel = true;
         _closingAfterShutdown = true;
         await DisposeAsync();

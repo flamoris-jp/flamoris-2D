@@ -27,10 +27,11 @@ export function createHandsOnProject(assets) {
   return { project, bindings };
 }
 
-export function meshContext(session, input) {
+export function meshContext(session, input, strict = true) {
   const preparation = new MeshPreparationController(session);
   preparation.selectPart(input.nodeId);
-  if (input.keyformId) preparation.selectKeyform(input.keyformId);
+  if (input.keyformId && (strict || preparation.getState().keyforms.some(k => k.id === input.keyformId)))
+    preparation.selectKeyform(input.keyformId);
   const tools = new MeshToolController(session, preparation);
   tools.setMode(input.context === "layout" ? MESH_AUTHORING_MODES.DEFORM : MESH_AUTHORING_MODES.TOPOLOGY);
   return { preparation, tools };
