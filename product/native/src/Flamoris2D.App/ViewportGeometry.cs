@@ -60,6 +60,7 @@ public sealed class LayoutGesture
     private readonly double[] _start;
     private readonly int[] _indices;
     private readonly Point2 _anchor;
+    private bool _cancelled;
     public LayoutGesture(string token, long revision, double[] positions, int[] indices, Point2 anchor)
     { Token = token; Revision = revision; _start = (double[])positions.Clone(); _indices = (int[])indices.Clone(); _anchor = anchor; }
     public string Token { get; }
@@ -67,12 +68,14 @@ public sealed class LayoutGesture
     public double[]? Preview { get; private set; }
     public void Move(Point2 current, bool snap)
     {
+        if (_cancelled) return;
         var dx = current.X - _anchor.X;
         var dy = current.Y - _anchor.Y;
         if (snap) { dx = Math.Round(dx); dy = Math.Round(dy); }
         Preview = (double[])_start.Clone();
         foreach (var i in _indices) { Preview[i * 2] += dx; Preview[i * 2 + 1] += dy; }
     }
-    public double[]? Finish(string token, long revision) => token == Token && revision == Revision &&
+    public void Cancel() { _cancelled = true; Preview = null; }
+    public double[]? Finish(string token, long revision) => !_cancelled && token == Token && revision == Revision &&
         Preview is { } p && !_start.SequenceEqual(p) ? (double[])p.Clone() : null;
 }

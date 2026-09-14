@@ -92,6 +92,7 @@ public sealed class MeshViewport : FrameworkElement
     }
     public void Cancel()
     {
+        _drag?.Cancel();
         _drag = null; _click = null; _pan = null;
         if (IsMouseCaptured) ReleaseMouseCapture();
         InvalidateVisual();
@@ -205,7 +206,8 @@ public sealed class MeshViewport : FrameworkElement
     {
         var point = PointOf(e.GetPosition(this));
         if (_pan is { } start) { Camera.Pan(point.X - start.X, point.Y - start.Y); _pan = point; }
-        else _drag?.Move(Local(point), Snap);
+        else if (_drag is not null) _drag.Move(Local(point), Snap);
+        else return;
         InvalidateVisual();
     }
     protected override void OnMouseUp(MouseButtonEventArgs e)

@@ -50,6 +50,9 @@ static void TestViewportGeometry()
     Assert(moved.SequenceEqual(new double[] { 14, 25, 30, 40 }), "Selected-only snapped move failed.");
     gesture.Move(new(0, 0), false);
     Assert(gesture.Finish("document", 7) is null, "Return-to-start must be a no-op.");
+    gesture.Move(new(10, 20), false);
+    gesture.Cancel();
+    Assert(gesture.Finish("document", 7) is null && gesture.Preview is null, "Cancelled drag must produce no command.");
 }
 
 static async Task TestMeshArtworkAsync(string hostPath)

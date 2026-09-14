@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { ProductHostService } from "../product-host/session-service.mjs";
 import { RasterAssets } from "../product-host/raster-assets.mjs";
+import { request as httpRequest } from "node:http";
+import { auditModuleGraph } from "../product-host/runtime-audit.mjs";
 
 let sequence = 0;
 async function send(host, method, payload = {}, overrides = {}) {
@@ -148,4 +150,61 @@ test("generation cancellation terminates its worker without changing revision or
   assert.equal(host.generation, null);
   assert.equal(host.revision, revision);
   assert.deepEqual(host.document.session.project, before);
+});
+
+test("interrupted raster upload frees the reservation and bytes", async t => {
+  const assets = new RasterAssets(() => ({ token: "doc", revision: 0 }));
+  const endpoint = await assets.start(); t.after(() => assets.close());
+  const item = assets.reserve({ name: "abort", width: 1024, height: 1024 }, "doc", 0);
+  const req = httpRequest(`${endpoint.url}/raster/${item.id}`, { method: "PUT", headers: {
+    Authorization: `Bearer ${endpoint.secret}`, "X-Document-Token": "doc", "X-Revision": "0",
+    "Content-Length": item.byteLength,
+  } });
+  req.on("error", () => {});
+  req.write(Buffer.alloc(1024));
+  const deadline = Date.now() + 2000;
+  while (!assets.entries.get(item.id)?.uploading && Date.now() < deadline)
+    await new Promise(resolve => setTimeout(resolve, 5));
+  assert.equal(assets.entries.get(item.id)?.uploading, true);
+  req.destroy();
+  while (assets.entries.has(item.id) && Date.now() < deadline)
+    await new Promise(resolve => setTimeout(resolve, 5));
+  assert.equal(assets.entries.size, 0);
+});
+
+test("semantic labels and headless Mesh edits use the same native history", async () => {
+  const { host, nodeId } = await proof();
+  const state = await projection(host, nodeId);
+  const vertexId = state.topology.vertexIds[0];
+  assert.equal((await tool(host, nodeId, "topology.set-label", { vertexId, semanticLabel: "eye_corner" })).ok, true);
+  assert.equal((await projection(host, nodeId)).topology.vertexMetadata[vertexId].semanticLabel, "eye_corner");
+  const before = structuredClone(host.document.session.project);
+  const positions = [...state.activeKeyform.positions]; positions[0] += 5;
+  const headless = await send(host, "headless.execute", { command: { type: "mesh_keyform.move_vertices",
+    payload: { keyformId: state.activeKeyform.id, positions } } });
+  assert.equal(headless.ok, true);
+  await send(host, "session.undo");
+  assert.deepEqual(host.document.session.project, before);
+  assert.equal((await tool(host, nodeId, "topology.clear-label", { vertexId })).ok, true);
+  await send(host, "session.undo");
+  assert.deepEqual(host.document.session.project, before);
+});
+
+test("hidden and locked targets reject native tools without changing revision", async () => {
+  const { host, nodeId } = await proof();
+  for (const [type, property, value] of [["scene.set_locked", "locked", true], ["scene.set_visibility", "visible", false]]) {
+    await send(host, "session.execute", { command: { type, payload: { nodeId, [property]: value } } });
+    const revision = host.revision;
+    assert.equal((await tool(host, nodeId, "topology.add", { position: { x: 1, y: 1 }, uv: { x: 0, y: 0 } })).ok, false);
+    assert.equal(host.revision, revision);
+    await send(host, "session.undo");
+  }
+  const [assetId] = host.assets.entries.keys();
+  assert.ok(host.assets.get(assetId, host.documentToken, host.revision).bytes);
+  assert.throws(() => host.assets.get(assetId, host.documentToken, host.revision - 1), /old document/);
+});
+
+test("generation worker transitive graph has no unowned browser globals", async () => {
+  const audit = await auditModuleGraph(new URL("../product-host/mesh-generation-worker.mjs", import.meta.url));
+  assert.deepEqual(audit.violations, []);
 });

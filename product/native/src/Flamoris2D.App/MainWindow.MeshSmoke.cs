@@ -15,7 +15,7 @@ public partial class MainWindow
         var pixels = Enumerable.Repeat((byte)255, 64 * 32 * 4).ToArray();
         var id = await client.UploadRasterAsync(64, 32, "Smoke eye", pixels);
         await client.OpenHandsOnAsync([id]);
-        ClearMeshProjection(); _targets.Attach(client.DocumentToken!);
+        AttachDocumentWorkspace(client.DocumentToken!);
         await RefreshProjectionAsync();
         TargetList.SelectedItem = _targets.Targets.First(t => t.Kind == "part");
         await RefreshProjectionAsync();

@@ -55,6 +55,7 @@ public partial class MainWindow
         _meshWork = new CancellationTokenSource();
         var cancellation = _meshWork.Token;
         CancelArtworkButton.Visibility = Visibility.Visible;
+        CancelArtworkButton.IsEnabled = true;
         SetMeshBusy(true);
         try
         {
@@ -74,10 +75,10 @@ public partial class MainWindow
             client.AssertCurrent(token, revision);
             cancellation.ThrowIfCancellationRequested();
             // Once replacement is submitted, await its acknowledgement (do not leave an ambiguous live token).
+            CancelArtworkButton.IsEnabled = false;
             await client.OpenHandsOnAsync(handles.ToArray());
             _hasHandsOn = true;
-            ClearMeshProjection();
-            _targets.Attach(client.DocumentToken!);
+            AttachDocumentWorkspace(client.DocumentToken!);
             await RefreshProjectionAsync();
             var part = _targets.Targets.FirstOrDefault(t => t.Kind == "part");
             TargetList.SelectedItem = part;
@@ -150,6 +151,11 @@ public partial class MainWindow
         MeshCanvas.Clear(); _textures.Clear(); _textureToken = null; _meshChoices.Clear();
         _labelVertexId = null; _vertexLabelRevision = -1; _labelProjectionText = ""; VertexLabelEditor.Text = "";
         ApplyGeneratedButton.IsEnabled = false; _generatedRevision = -1;
+    }
+    private void AttachDocumentWorkspace(string token)
+    {
+        ClearProjection();
+        _targets.Attach(token);
     }
     private void ConfigureMeshContext()
     {
@@ -292,6 +298,7 @@ public partial class MainWindow
         var client = _client; var token = MeshCanvas.DocumentToken!; var revision = MeshCanvas.Revision;
         _meshWork = new CancellationTokenSource(); SetMeshBusy(true); CancelGenerated();
         CancelArtworkButton.Visibility = Visibility.Visible;
+        CancelArtworkButton.IsEnabled = true;
         try
         {
             client.AssertCurrent(token, revision);
