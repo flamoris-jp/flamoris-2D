@@ -65,8 +65,12 @@ new snapshot with a visible warning and preserves all existing bytes. Explicit d
 is the way to reclaim unrelated/corrupt data.
 
 Initial native document transport: 128 MiB per encoded document; 256 MiB aggregate
-reserved/transferring document bytes; at most two handles; two HTTP connections shared
-with raster transport. These are admission limits, not measured peak-RSS claims.
+reserved/transferring document bytes; at most two document handles. The authenticated
+loopback server shared with raster transport permits at most sixteen simultaneous HTTP
+connections and uses a one-second idle keep-alive timeout so pooled clients do not
+exhaust the socket cap. Connection capacity is not an asset/document memory budget;
+raster and document byte/handle limits remain independently enforced. These are
+admission limits, not measured peak-RSS claims.
 Raster materialization separately checks dimensions, count and current+candidate bytes
 before decode. Limit failures leave the current document intact; no hidden asset eviction.
 Documents beyond this admission policy are rejected without replacing the live document.
