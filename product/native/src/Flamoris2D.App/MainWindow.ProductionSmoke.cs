@@ -62,7 +62,11 @@ public partial class MainWindow
         await client.EditTimelineAsync(new(sequenceId,clipId),TimelineEdit.AddKey(meshTrackId,"deformation",0,AnimationValue.Deformation(sampleId,0)),client.Revision);
         await client.EditTimelineAsync(new(sequenceId,clipId),TimelineEdit.AddKey(meshTrackId,"deformation",960000,AnimationValue.Deformation(sampleId,1)),client.Revision);
         await client.EditTimelineAsync(new(sequenceId),TimelineEdit.PlaceClip(clipId,new(0,960000,0,1,1,false,1,0,true)),client.Revision);
-        await RefreshProjectionAsync();await ScrubAsync(480000);var evaluated=FramePixels(MeshCanvas.EvaluatedFrame);
+        await RefreshProjectionAsync();await ScrubAsync(480000);
+        // Context changes schedule projection refreshes. Settle that serialized queue
+        // before reading pixels; a superseded render intentionally returns early.
+        await RefreshProjectionAsync();if(_timeTicks!=480000)throw new Exception("Scrub did not settle at the requested Product tick.");
+        var evaluated=FramePixels(MeshCanvas.EvaluatedFrame);
         SwitchContext(EditingContext.Preview,false);await RefreshProjectionAsync();if(!evaluated.SequenceEqual(FramePixels(MeshCanvas.EvaluatedFrame)))throw new Exception("Animation/Preview frame mismatch.");
         var directory=Path.Combine(fixtureDirectory,"native-eight-second-frames");if(Directory.Exists(directory))Directory.Delete(directory,true);
         SwitchContext(EditingContext.Export,false);await RefreshProjectionAsync();
