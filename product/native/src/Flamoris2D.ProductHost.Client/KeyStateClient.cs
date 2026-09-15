@@ -32,6 +32,9 @@ public sealed class KeyStateEdit
     public static KeyStateEdit Mode(string mode,bool holdFrom=true,string? compositeGroupId=null)=>new("transition.mode",new {mode,configuration=new {holdEndpoint=holdFrom?"from":"to",compositeGroupId}});
     public static KeyStateEdit SharedTopology(string topologyId,string fromKeyformId,string toKeyformId)=>new("transition.topology",new {topologyId,fromKeyformId,toKeyformId});
     public static KeyStateEdit Alignment(string keyformId,double x,double y,double rotation,double scaleX,double scaleY,double pivotX,double pivotY)=>new("mesh.align",new {keyformId,x,y,rotation,scaleX,scaleY,pivotX,pivotY});
+    public static KeyStateEdit VertexUv(string keyformId,string vertexId,double u,double v)=>new("mesh.uv",new {keyformId,vertexId,u,v});
+    public static KeyStateEdit RemoveKeyform(string keyformId)=>new("mesh.removeKeyform",new {keyformId});
+    public static KeyStateEdit RemoveTopology(string topologyId)=>new("mesh.removeTopology",new {topologyId});
     public static KeyStateEdit ApplyCorrespondence(CorrespondencePin[] pins,string preset,bool reverse)=>new("correspondence.apply",new {pins=pins.Select(p=>p.Wire),preset,reverse});
     public static KeyStateEdit CreateSample(string? meshId,string topologyId,VertexOffset[] offsets)=>new("sample.create",new {meshId,topologyId,offsets=offsets.Select(o=>o.Wire)});
     public static KeyStateEdit UpdateSample(string sampleId,VertexOffset[] offsets)=>new("sample.update",new {sampleId,offsets=offsets.Select(o=>o.Wire)});

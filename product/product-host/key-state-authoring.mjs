@@ -95,7 +95,10 @@ export function executeKeyStateTool(session,{context={},tool,input={}}) {
       return session.executeTransaction([command('transition.update',{transitionId:transition.id,transition:{...transition,displayName:input.displayName}}),
         command('animation.temporal.set_duration',{programId:transition.temporalProgramId,durationTicks:secondsToTicks(input.durationSeconds)})]);
     }
-    case 'transition.remove':return run('transition.remove',{transitionId:context.transitionId});
+    case 'transition.remove': {
+      const transition=session.query('transition.get',{transitionId:context.transitionId});
+      return session.executeTransaction([command('transition.remove',{transitionId:transition.id}),command('animation.temporal.remove_program',{programId:transition.temporalProgramId})],{label:'Remove Transition and its owned program'});
+    }
     case 'transition.mode':return a.setPartMode(input.mode,input.configuration||{});
     case 'transition.topology': {
       const part=a.getState().selectedSemanticSlot?.partTransition;
@@ -111,6 +114,15 @@ export function executeKeyStateTool(session,{context={},tool,input={}}) {
     }
     case 'transition.clearOverride':return run('transition.clear_diagnostic_override',{transitionId:context.transitionId,...input});
     case 'correspondence.apply':return correspondence(session,context,input,true);
+    case 'mesh.removeKeyform':editableKeyform(session,input.keyformId);return run('mesh_keyform.remove',{keyformId:input.keyformId});
+    case 'mesh.removeTopology':return run('mesh_topology.remove',{topologyId:input.topologyId});
+    case 'mesh.uv': {
+      const keyform=editableKeyform(session,input.keyformId),topology=session.query('mesh.get_topology',{topologyId:keyform.topologyId});
+      const index=topology.vertexIds.indexOf(input.vertexId);if(index<0)throw new Error('Select a stable mesh vertex.');
+      if(!Number.isFinite(input.u)||!Number.isFinite(input.v))throw new Error('UV requires finite coordinates.');
+      const uvs=[...keyform.uvs];uvs[index*2]=input.u;uvs[index*2+1]=input.v;
+      return run('mesh_keyform.update',{keyformId:keyform.id,keyform:{...keyform,uvs}});
+    }
     case 'mesh.align': {
       const keyform=editableKeyform(session,input.keyformId);
       if(keyform.keyArtId!==context.keyArtId)throw new Error('Select the mesh Key Art before alignment.');

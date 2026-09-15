@@ -53,7 +53,7 @@ public partial class MainWindow
         {
             ActionButton(artPanel,"この状態を複製して次の原画を作る",()=>RunKeyStateAsync(()=>KeyStateEdit.DuplicateArt(name.Text),context,revision));
             ActionButton(artPanel,"原画名を更新",()=>RunKeyStateAsync(()=>KeyStateEdit.RenameArt(name.Text),context,revision));
-            ActionButton(artPanel,"原画を削除",()=>RunKeyStateAsync(KeyStateEdit.RemoveArt,context,revision));
+            ActionButton(artPanel,"原画を削除（参照中は不可）",()=>RunKeyStateAsync(KeyStateEdit.RemoveArt,context,revision));
             var member=ArrayOf(selected,"members").FirstOrDefault(m=>String(m,"nodeId")==_targets.SelectedId);
             if(member.ValueKind==JsonValueKind.Object)
             {
@@ -71,6 +71,24 @@ public partial class MainWindow
         }
         BuildTransitionPanel(state,context,revision);
         if(_editingContext==EditingContext.Deform)BuildSamplePanel(state,context,revision);
+        if(_editingContext==EditingContext.Mesh)BuildMeshResourcePanel(state,context,revision);
+    }
+    private void BuildMeshResourcePanel(JsonElement state,KeyStateContext context,long revision)
+    {
+        var panel=Section(KeyStatePanel,"画像の割当・メッシュの削除");
+        if(MeshCanvas.KeyformId is { } keyformId)
+        {
+            var form=ArrayOf(state,"keyforms").First(k=>String(k,"id")==keyformId);var uvs=Property(form,"uvs").EnumerateArray().Select(v=>v.GetDouble()).ToArray();
+            var vertex=Choices(panel,"画像の割当を編集する頂点",MeshCanvas.VertexIds.Select((v,i)=>new EntityChoice(v,$"頂点 {i+1} · {v}")),MeshCanvas.Selected.FirstOrDefault());
+            var u=Field(panel,"U（画像の左0 → 右1）",0);var v=Field(panel,"V（画像の上0 → 下1）",0);
+            void SetUv(){var i=Array.IndexOf(MeshCanvas.VertexIds,(vertex.SelectedItem as EntityChoice)?.Id);if(i>=0){u.Text=uvs[i*2].ToString(System.Globalization.CultureInfo.InvariantCulture);v.Text=uvs[i*2+1].ToString(System.Globalization.CultureInfo.InvariantCulture);}}
+            SetUv();vertex.SelectionChanged+=(_,_)=>SetUv();
+            ActionButton(panel,"選択頂点の画像割当を更新",()=>RunKeyStateAsync(()=>KeyStateEdit.VertexUv(keyformId,Chosen(vertex),ReadNumber(u),ReadNumber(v)),context,revision));
+            ActionButton(panel,"この原画のメッシュ配置を削除",()=>RunKeyStateAsync(()=>KeyStateEdit.RemoveKeyform(keyformId),context,revision));
+        }
+        Note(panel,"他の原画・遷移・リグ・変形が参照するデータは削除できません。参照先を自動で消す操作ではありません。");
+        var topology=Choices(panel,"削除する未使用のメッシュ構造",ArrayOf(state,"topologies").Select(t=>new EntityChoice(String(t,"id")!,String(t,"id")!)));
+        ActionButton(panel,"未使用のメッシュ構造を削除",()=>RunKeyStateAsync(()=>KeyStateEdit.RemoveTopology(Chosen(topology)),context,revision));
     }
     private void BuildObjectPanel(JsonElement state,KeyStateContext context,long revision)
     {

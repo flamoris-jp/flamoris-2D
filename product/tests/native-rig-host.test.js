@@ -60,6 +60,17 @@ test('native Bone/Warp/Skin/form tools commit through one history and preserve e
  await tool('clipping.enabled',{enabled:false});await tool('clipping.remove');
  await tool('bone.moveDocument',{start:{x:0,y:0},end:{x:2,y:1},pose:true});
  await tool('bone.createAt',{start:{x:10,y:10},end:{x:15,y:15}});
+ const rootBone=context.boneId;
+ await tool('bone.create',{displayName:'middle',length:10});context.boneId=Object.values(host.document.session.project.scene.nodes).find(b=>b.displayName==='middle').id;
+ const middleBone=context.boneId;await tool('bone.create',{displayName:'end',length:4});
+ const endBone=Object.values(host.document.session.project.scene.nodes).find(b=>b.displayName==='end').id;context.boneId=rootBone;
+ await tool('ik.create',{rootBoneId:rootBone,midBoneId:middleBone,endBoneId:endBone,bendDirection:'counterclockwise',enabled:true});
+ const ik=(await send(host,'rig.projection',context)).ikConstraints[0].id;
+ await tool('ik.enabled',{constraintId:ik,enabled:false});await tool('ik.bend',{constraintId:ik,bendDirection:'clockwise'});await tool('ik.enabled',{constraintId:ik,enabled:true});
+ await tool('ik.target',{constraintId:ik,target:{x:24,y:8}});await tool('ik.remove',{constraintId:ik});
+ context.boneId=null;await tool('bone.create',{displayName:'mirror target',length:12});context.boneId=rootBone;
+ const targetBone=Object.values(host.document.session.project.scene.nodes).find(b=>b.displayName==='mirror target').id;
+ await tool('bone.mirror',{targetBoneId:targetBone,axisX:16,pose:false});await tool('bone.mirror',{targetBoneId:targetBone,axisX:16,pose:true});
  const rendered=await send(host,'render.project',{keyArtId});assert.equal(rendered.plan.unsupportedReasons.length,0);
  const before=structuredClone(host.document.session.project);
  const revision=host.revision;

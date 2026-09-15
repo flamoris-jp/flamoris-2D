@@ -25,6 +25,14 @@ test('native Key Art states, endpoint topology and correspondence retain exact s
  const state=await send('mesh.projection',{nodeId,keyArtId:b});assert.equal(state.state.available,true);assert.equal(state.state.keyArt.id,b);
  const bform=state.state.activeKeyform,slotId=state.state.semanticSlot.id;
  await key('mesh.align',{keyformId:bform.id,x:4,y:2,rotation:0,scaleX:1,scaleY:1,pivotX:0,pivotY:0},{keyArtId:b});
+ const beforeUv=structuredClone(h.document.session.project);
+ await key('mesh.uv',{keyformId:bform.id,vertexId:original.meshTopologies[0].vertexIds[0],u:.2,v:.3},{keyArtId:b});
+ assert.deepEqual(h.document.session.project.meshKeyforms.find(k=>k.id===bform.id).uvs.slice(0,2),[.2,.3]);
+ await send('session.undo');assert.deepEqual(h.document.session.project,beforeUv);await send('session.redo');
+ await send('session.execute',{command:{type:'scene.set_locked',payload:{nodeId,locked:true}}});
+ const locked=structuredClone(h.document.session.project);
+ await assert.rejects(()=>key('mesh.align',{keyformId:bform.id,x:1,y:0,rotation:0,scaleX:1,scaleY:1,pivotX:0,pivotY:0},{keyArtId:b}),/ロック/);
+ assert.deepEqual(h.document.session.project,locked);await send('session.undo');
  assert.deepEqual(h.document.session.project.meshKeyforms.find(k=>k.keyArtId===keyArtId).positions,original.meshKeyforms[0].positions);
  const transition=await key('transition.create',{displayName:'A to B',fromKeyArtId:keyArtId,toKeyArtId:b,durationSeconds:2});
  const context={keyArtId,transitionId:transition.transitionId,semanticSlotId:slotId};
@@ -48,4 +56,12 @@ test('native Key Art states, endpoint topology and correspondence retain exact s
  const frame=await send('render.project',{transitionId:transition.transitionId,timeTicks:120000});assert.equal(frame.artwork.length,1);
  const saved=await send('session.serialize');await send('session.open',{document:saved.document});
  assert.deepEqual((await send('render.project',{transitionId:transition.transitionId,timeTicks:120000})).plan,frame.plan);
+ for(const [tool,input] of [
+  ['transition.remove',{}],['mesh.removeKeyform',{keyformId:bform.id}],['mesh.removeKeyform',{keyformId:original.meshKeyforms[0].id}],
+  ['sample.remove',{sampleId:sample.sampleId}],['sample.removeTarget',{meshId:sample.meshId}],['mesh.removeTopology',{topologyId:bform.topologyId}],
+ ]) {
+  const before=structuredClone(h.document.session.project);await key(tool,input,context);const after=structuredClone(h.document.session.project);
+  await send('session.undo');assert.deepEqual(h.document.session.project,before,tool+' undo');await send('session.redo');assert.deepEqual(h.document.session.project,after,tool+' redo');
+  if(tool==='transition.remove')context.transitionId=null;
+ }
 });
