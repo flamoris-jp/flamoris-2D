@@ -8,10 +8,89 @@ if (args.Length != 1)
 var hostPath = Path.GetFullPath(args[0]);
 TestStaleProjectionGate();
 TestTargetWorkspace();
+TestViewportGeometry();
 await TestRoundTripAsync(hostPath);
 await TestTargetPropertiesAsync(hostPath);
+await TestMeshArtworkAsync(hostPath);
 await TestCrashInvalidationAsync(hostPath);
 Console.WriteLine("Product Host C# client tests passed.");
+
+static void TestViewportGeometry()
+{
+    static void Near(Point2 actual, Point2 expected)
+    { Assert(Math.Abs(actual.X - expected.X) < 1e-8 && Math.Abs(actual.Y - expected.Y) < 1e-8, "Coordinate round-trip drift."); }
+    var camera = new ViewportCamera();
+    camera.Fit(800, 600, 1920, 1080);
+    var point = new Point2(234, 432);
+    Near(camera.ToDocument(camera.ToView(point)), point);
+    var anchor = new Point2(123, 231);
+    var anchored = camera.ToDocument(anchor);
+    camera.Zoom(anchor, 1.2);
+    Near(camera.ToDocument(anchor), anchored);
+    var previous = camera.ToView(point);
+    camera.Pan(10, -20);
+    Near(camera.ToView(point), new(previous.X + 10, previous.Y - 20));
+    foreach (var dpi in new[] { 1.0, 1.25, 1.5, 2.0 })
+    {
+        var dip = camera.ToView(point);
+        Near(camera.DeviceToDocument(new(dip.X * dpi, dip.Y * dpi), dpi, dpi), point);
+    }
+    var world = new Affine2(0, 2, -3, 0, 10, 20);
+    Near(world.Inverse(world.Apply(point)), point);
+    var collapsed = new Affine2(0, 0, 0, 1, 0, 0);
+    Assert(!collapsed.IsInvertible, "Collapsed targets must not be pickable.");
+    AssertThrows<InvalidOperationException>(() => collapsed.Inverse(point));
+    double[] positions = [10, 20, 30, 40];
+    var screen = camera.ToView(world.Apply(new(10, 20)));
+    Assert(VertexPicking.Hit(positions, new(screen.X + 7, screen.Y), camera, world) == 0, "DIP hit radius failed.");
+    Assert(VertexPicking.Hit(positions, new(screen.X + 9, screen.Y), camera, world) == -1, "Hit radius grew with zoom.");
+    var gesture = new LayoutGesture("document", 7, positions, [0], new(0, 0));
+    Assert(gesture.Finish("document", 7) is null, "Click/no-op must not create a command.");
+    gesture.Move(new(4.4, 5.4), true);
+    Assert(positions[0] == 10 && positions[1] == 20, "Preview mutated the authoritative projection.");
+    Assert(gesture.Finish("other", 7) is null && gesture.Finish("document", 8) is null, "Stale drag committed.");
+    var moved = gesture.Finish("document", 7)!;
+    Assert(moved.SequenceEqual(new double[] { 14, 25, 30, 40 }), "Selected-only snapped move failed.");
+    gesture.Move(new(0, 0), false);
+    Assert(gesture.Finish("document", 7) is null, "Return-to-start must be a no-op.");
+    gesture.Move(new(10, 20), false);
+    gesture.Cancel();
+    Assert(gesture.Finish("document", 7) is null && gesture.Preview is null, "Cancelled drag must produce no command.");
+}
+
+static async Task TestMeshArtworkAsync(string hostPath)
+{
+    await using var client = new ProductHostClient();
+    await client.StartAsync(hostPath);
+    await client.CreateSessionAsync("Raster boundary");
+    var bytes = Enumerable.Repeat((byte)255, 32 * 32 * 4).ToArray();
+    var id = await client.UploadRasterAsync(32, 32, "右目", bytes);
+    await client.OpenHandsOnAsync([id]);
+    var projection = await client.GetMeshAsync(null);
+    var nodeId = projection.Payload.GetProperty("artwork")[0].GetProperty("nodeId").GetString()!;
+    var received = await client.DownloadRasterAsync(id, bytes.Length, client.DocumentToken!, client.Revision);
+    Assert(bytes.SequenceEqual(received), "Binary raster round-trip changed bytes.");
+    var mesh = await client.GetMeshAsync(nodeId);
+    var keyform = mesh.Payload.GetProperty("state").GetProperty("activeKeyform");
+    var keyformId = keyform.GetProperty("id").GetString()!;
+    var before = keyform.GetProperty("positions").EnumerateArray().Select(v => v.GetDouble()).ToArray();
+    await client.SetNodeVisibilityAsync(nodeId, true);
+    var startingRevision = client.Revision;
+    var after = (double[])before.Clone(); after[0] += 2;
+    await client.EditMeshAsync(nodeId, keyformId, MeshEdit.Move(after), startingRevision);
+    var history = await client.GetHistoryAsync();
+    Assert(history.Payload.GetProperty("entries").EnumerateArray().Last().GetProperty("commandTypes")[0].GetString() == "mesh_keyform.move_vertices",
+        "Native drag failed to enter Product history.");
+    await client.UndoAsync();
+    var undo = await client.GetMeshAsync(nodeId);
+    Assert(undo.Payload.GetProperty("state").GetProperty("activeKeyform").GetProperty("positions").EnumerateArray()
+        .Select(v => v.GetDouble()).SequenceEqual(before), "Undo restored visibility instead of Mesh.");
+    await client.RedoAsync();
+    var redo = await client.GetMeshAsync(nodeId);
+    Assert(redo.Payload.GetProperty("state").GetProperty("activeKeyform").GetProperty("positions").EnumerateArray()
+        .Select(v => v.GetDouble()).SequenceEqual(after), "Redo did not restore the Mesh edit.");
+    AssertThrows<StaleProjectionException>(() => client.AssertCurrent(client.DocumentToken!, startingRevision));
+}
 
 static void TestTargetWorkspace()
 {

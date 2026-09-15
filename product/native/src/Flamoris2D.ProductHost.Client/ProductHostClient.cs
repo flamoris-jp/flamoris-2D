@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace Flamoris.Flamoris2D.ProductHost;
 
-public sealed class ProductHostClient : IAsyncDisposable
+public sealed partial class ProductHostClient : IAsyncDisposable
 {
     public const int ProtocolVersion = 1;
     private const int MaximumFrameBytes = 8 * 1024 * 1024;
@@ -76,6 +76,7 @@ public sealed class ProductHostClient : IAsyncDisposable
             throw;
         }
         var payload = response.Payload;
+        ConfigureBulk(payload);
         var handshake = new ProductHostHandshake(
             payload.GetProperty("protocolVersion").GetInt32(),
             payload.GetProperty("productSchemaVersion").GetInt32(),
@@ -232,7 +233,8 @@ public sealed class ProductHostClient : IAsyncDisposable
         bool mutating,
         bool documentScoped,
         CancellationToken cancellationToken,
-        long? expectedRevision = null)
+        long? expectedRevision = null,
+        bool replacingDocument = false)
     {
         var process = _process;
         if (process is null || process.HasExited)
@@ -277,7 +279,7 @@ public sealed class ProductHostClient : IAsyncDisposable
             }
 
             var root = await completion.Task.WaitAsync(cancellationToken);
-            return ParseResponse(root, documentScoped, mutating);
+            return ParseResponse(root, documentScoped && !replacingDocument, mutating);
         }
         finally
         {

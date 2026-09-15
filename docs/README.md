@@ -18,6 +18,7 @@
 - [`repository-boundaries.md`](repository-boundaries.md) — Product / Staging / Test / History separation, testing and CI boundary
 - [`csharp-wpf-ui-migration.md`](csharp-wpf-ui-migration.md) — accepted native WPF shell and JavaScript Product Host migration design
 - [`native-capability-map.md`](native-capability-map.md) — Issue #96 legacy/native capability ledger and explicit parity gates
+- [`native-mesh-hands-on.md`](native-mesh-hands-on.md) — PNG hands-on asset/viewport boundary, Mesh semantics and Windows操作手順
 - [`research/rigging-tools.md`](research/rigging-tools.md) — reference research from Inochi2D/Inochi Creator, Live2D Cubism, Stretchy Studio, Iki, Godot, and Synfig
 - [`research/key-art-transition-research.md`](research/key-art-transition-research.md) — correspondence/morphing research notes
 - [`reviews/phase1c-implementation-20260831.md`](reviews/phase1c-implementation-20260831.md) — Phase 1C implementation coverage and remaining real-Akino manual acceptance

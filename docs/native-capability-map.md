@@ -1,7 +1,7 @@
 # Issue #96 Native capability parity map
 
 Status: active migration contract; **not native production parity**.
-Baseline: `main` at `defb46c28907c1262db1390c17bdaba00f9752a3` (merged PR #95).
+Baseline for Mesh hands-on: `main` at `63372daa44ddf6c862cac7c47a34ca388437a104` (merged PR #99).
 Issue: [#96](https://github.com/flamoris-jp/flamoris-2D/issues/96).
 Precedents: Issues #92/#94, merged PRs #93/#95, ADRs 0003–0006.
 
@@ -17,6 +17,19 @@ Paths below are relative to `product/`. Tests below are existing semantic safety
 nets unless explicitly identified as native tests. A passing Product test does not
 prove WPF interaction or visual parity. The exact public Command/Query ledger at
 the end prevents future schema additions from disappearing into grouped prose.
+
+## Mesh-first checkpoint scope
+
+The explicit Mesh-first request authorizes a disposable PNG hands-on path and an isolated
+provisional WPF-native reference-art renderer before final renderer selection. See
+[native-mesh-hands-on.md](native-mesh-hands-on.md) for transport, semantics, limits and
+Windows instructions. #97 is intentionally not a blocking dependency of this proof.
+#98 is partially addressed, not closed. No renderer ADR is self-accepted.
+
+For the newly migrated Mesh rows, `migrated` is bounded to supplied PNG Parts in this
+proof session. It is **not** native production persistence, full artwork composition,
+multiple-Key-Art authoring or Windows visual acceptance. Existing Product compatibility
+and rejection rules are reused, not reduced to fit a replacement native model.
 
 ## Genuine gates and baseline gaps
 
@@ -106,20 +119,25 @@ Test names omit `tests/`; owner paths omit `src/` unless noted.
 | Undo / Redo / Transaction | `commands/editor.js` | one `EditorSession` | all | History | menu/toolbar | migrated | `product-host.test.js`, native client tests | Phase 1 primitive, not authoring parity |
 | Headless shared history | `mcp/adapter.js` | same session commands | all | Session | Host | migrated | `product-host.test.js` | adapter proof only; live transport G5 |
 | Host crash / stale rejection | native client and shell | token/revision invalidation | all | Session | banner/status | migrated | native client tests | no state saved from WPF projection |
+| PNG hands-on raster delivery | `product-host/raster-assets.mjs`, native `ArtworkLoader` | token/revision-qualified binary handles | Source | Disposable proof | menu / viewport | migrated | `native-mesh-host.test.js`, native binary client test | bounded BGRA8, auth, cancellation, TTL/close cleanup; not production import |
+| Mesh vertex picking / drag | native `MeshViewport`, `ViewportGeometry` | local preview then existing typed Product tool/command | Mesh | Structure / Layout | canvas | migrated | native geometry/gesture tests, Host history tests | DIP hit radius; capture/Esc cancellation; no pointer-move writes |
+| Cross-Key-Art endpoint / correspondence workspace | `ui/endpoint-mesh-controller.js` | keyform / semantic-slot queries | Mesh | Layout | top Options | deferred | `endpoint-mesh.test.js` | proof creates one Key Art; endpoint switching/pins UI still needs multi-Key-Art source workflow |
+| Whole-mesh rotation/scale alignment | `ui/endpoint-mesh-controller.js` | keyform positions | Mesh | Layout | top Options | deferred | `endpoint-mesh.test.js` | current native all-vertex operation is translation only; no capability silently removed |
+| Mesh Save/reopen parity | `io/project-json.js` | serialization + source envelope | Mesh | Document | menu | deferred | Product persistence tests | G1/G2; proof explicitly cannot save; Electron retained |
 | Raster/bulk transfer + lifetime | `ui/psd-render-assets.js`, `ui/cutwork-render-assets.js` | source assets / render instances | Source | Artwork | viewport | deferred | `cutwork-flimg-import.test.js`, `psd-document-clipping.test.js` | G2; no base64 workaround |
-| Zoom / pan / fit / DPI | `ui/viewport-camera-controller.js` | document/display transforms | all | Viewport | canvas / View menu | deferred | `viewport-camera-controller.test.js` | G3/G4 |
+| Zoom / pan / fit / DPI | `ui/viewport-camera-controller.js` | document/display transforms | all | Viewport | canvas / View menu | migrated | `native-mesh-host.test.js`, native geometry/client tests, WPF mesh smoke | provisional reference-art viewport; native coordinate/DPI tests; G4 hands-on still required |
 | Picking / overlap / overlays | `ui/viewport-input-controller.js`, `ui/viewport-renderer.js` | evaluated stable-ID targets | all | Viewport | canvas | deferred | `editor-ui-adapter.test.js`, `ui-controller-boundaries.test.js` | G3; no viewport geometry authority |
 | Capture/cancel/local preview | `ui/canvas-interaction.js`, feature controllers | one command on completion | all | Gesture | canvas | deferred | `editor-ui-adapter.test.js`, `sequence-timeline-controller.test.js` | G3; no pointer-move persistent commands |
-| Mesh target / active keyform | `ui/mesh-editing-controller.js`, `ui/endpoint-mesh-controller.js` | `mesh.get_topology`, `mesh.get_keyform` | Mesh | Layout | right Targets / top Options | deferred | `endpoint-mesh.test.js`, `editor-modes.test.js` | G2/G3; stable IDs required |
-| Add Vertex | `ui/mesh-tool-controller.js` | `mesh_topology.add_vertex` | Mesh | Structure | left Add | deferred | `phase3-mesh-topology.test.js` | G3; propagate compatible keyforms |
-| Remove / dissolve | `ui/mesh-tool-controller.js` | `mesh_topology.remove_vertex` | Mesh | Structure | left Remove | deferred | `phase3-mesh-topology.test.js` | same compatibility/rejection semantics; G3 |
-| Connect / triangle | `ui/mesh-tool-controller.js` | `mesh_topology.create_triangle` | Mesh | Structure | left Connect | deferred | `phase3-mesh-topology.test.js` | connect is triangle creation, not invented edge model; G3 |
-| Subdivide edge | `ui/mesh-tool-controller.js` | `mesh_topology.subdivide_edge` | Mesh | Structure | left Subdivide | deferred | `phase3-mesh-topology.test.js` | G3; stable vertex propagation |
-| Vertex IDs / semantic labels | `ui/mesh-tool-controller.js` | topology label commands | Mesh | Structure | overlay / right Properties | deferred | `phase3-mesh-topology.test.js` | G3; labels are not identity |
-| Grid / Contour AutoMesh | `ui/mesh-preparation-controller.js`, `core/contour-automesh.js` | `mesh_topology.apply_generated_mesh` | Mesh | Generate | left Generate / top Options | deferred | `contour-automesh.test.js`, `mesh-preparation-controller.test.js` | G2/G3; preview then explicit apply |
+| Mesh target / active keyform | `ui/mesh-editing-controller.js`, `ui/endpoint-mesh-controller.js` | `mesh.get_topology`, `mesh.get_keyform` | Mesh | Layout | right Targets / top Options | migrated | `native-mesh-host.test.js`, native geometry/client tests, WPF mesh smoke | PNG proof Parts and mesh choice; cross-Key-Art endpoint workflow remains deferred |
+| Add Vertex | `ui/mesh-tool-controller.js` | `mesh_topology.add_vertex` | Mesh | Structure | left Add | migrated | `native-mesh-host.test.js`, native geometry/client tests, WPF mesh smoke | existing controller/command; stable-ID allocation and compatible-keyform validation unchanged |
+| Remove / dissolve | `ui/mesh-tool-controller.js` | `mesh_topology.remove_vertex` | Mesh | Structure | left Remove | migrated | `native-mesh-host.test.js`, native geometry/client tests, WPF mesh smoke | existing remove-with-incident-faces semantics; not a new retriangulating dissolve algorithm |
+| Connect / triangle | `ui/mesh-tool-controller.js` | `mesh_topology.create_triangle` | Mesh | Structure | left Connect | migrated | `native-mesh-host.test.js`, native geometry/client tests, WPF mesh smoke | select 3 stable vertices then explicit Create; existing triangle validation retained |
+| Subdivide edge | `ui/mesh-tool-controller.js` | `mesh_topology.subdivide_edge` | Mesh | Structure | left Subdivide | migrated | `native-mesh-host.test.js`, native geometry/client tests, WPF mesh smoke | select 2 edge endpoints then explicit split; existing stable-ID/keyform propagation retained |
+| Vertex IDs / semantic labels | `ui/mesh-tool-controller.js` | topology label commands | Mesh | Structure | overlay / right Properties | migrated | `native-mesh-host.test.js`, native geometry/client tests, WPF mesh smoke | optional high-contrast IDs; selected vertex label/clear in Properties, revision-qualified |
+| Grid / Contour AutoMesh | `ui/mesh-preparation-controller.js`, `core/contour-automesh.js` | `mesh_topology.apply_generated_mesh` | Mesh | Generate | left Generate / top Options | migrated | `native-mesh-host.test.js`, native geometry/client tests, WPF mesh smoke | existing helpers; cancellable bounded worker; orange preview then explicit ordinary Product apply |
 | Correspondence / pins | `ui/correspondence-preview-controller.js`, `core/correspondence-solver.js` | normal MeshKeyform output | Mesh | Layout | top Options / overlay | deferred | `correspondence-preview.test.js`, `correspondence-solver.test.js` | G3; no opaque solver state |
-| Layout vertex / whole mesh alignment | `ui/endpoint-mesh-controller.js` | `mesh_keyform.move_vertices` | Mesh | Layout | left Move / top Options | deferred | `endpoint-mesh.test.js`, `editor-ui-adapter.test.js` | G3; internal DEFORM compatibility name is Layout |
-| Mesh overlay visibility / contrast | `ui/viewport-renderer.js`, `ui/mesh-authoring-view.js` | topology/keyform projections | Mesh | Structure / Layout | canvas / top Options | deferred | `workflow-view.test.js`, `editor-modes.test.js` | G3/G4; geometry never disappears with tool switch |
+| Layout vertex / whole mesh alignment | `ui/endpoint-mesh-controller.js` | `mesh_keyform.move_vertices` | Mesh | Layout | left Move / top Options | migrated | `native-mesh-host.test.js`, native geometry/client tests, WPF mesh smoke | selected/all-vertex translation through keyform positions; UVs unchanged; rotation/scale alignment deferred |
+| Mesh overlay visibility / contrast | `ui/viewport-renderer.js`, `ui/mesh-authoring-view.js` | topology/keyform projections | Mesh | Structure / Layout | canvas / top Options | migrated | `native-mesh-host.test.js`, native geometry/client tests, WPF mesh smoke | independent checkbox; high contrast in Structure and Layout; selected hidden/locked target suppresses handles |
 | Legacy writable mesh cache | `mesh.js`, compatibility renderer | `state.mesh/baseVertices/vertexOffsets` | Mesh | none | none | superseded | `editor-ui-adapter.test.js` | use Product MeshTopology/MeshKeyform; never revive as writer |
 | Bone creation / rest / hierarchy | `ui/bone-authoring-controller.js` | Bone commands + FK | Rig | Bone | left Add/Move / right Properties | deferred | `bone-authoring-controller.test.js`, `phase7-bone-fk-domain.test.js` | G3 |
 | Bone pose / reset / ghost | `ui/bone-authoring-controller.js` | `bone.set_keyform`, `bone.reset_keyform` | Deform | Pose | left Move / top Key Art | deferred | `bone-authoring-controller.test.js` | G3; rest and pose distinct |
@@ -159,7 +177,9 @@ Test names omit `tests/`; owner paths omit `src/` unless noted.
 ## Checkpoint exit
 
 Stage A: ledger + exact public contract coverage completed. Stage B: hierarchy/selection,
-name, visibility and lock are the only migrated native Object/Part actions. Stages B document/import and C–H stay
+name, visibility and lock remain connected. The Mesh-first checkpoint adds bounded PNG
+assets, provisional reference-art viewport and the explicitly migrated Stage D actions.
+Production Stage B document/import, final Stage C renderer and later authoring remain
 gated as above. Stage I real Windows shot and Stage J retirement are not complete.
 No Project schema, evaluator order, timebase or MCP schema changes are authorized here.
 
@@ -238,17 +258,17 @@ these dispositions. Query entries include Product-only export queries as well as
 | Command | `mesh_topology.create` | `src/commands/transition-command-handlers.js` | Mesh > Structure | deferred |
 | Command | `mesh_topology.update` | `src/commands/transition-command-handlers.js` | Mesh > Structure | deferred |
 | Command | `mesh_topology.remove` | `src/commands/transition-command-handlers.js` | Mesh > Structure | deferred |
-| Command | `mesh_topology.add_vertex` | `src/commands/mesh-topology-command-handlers.js` | Mesh > Structure | deferred |
-| Command | `mesh_topology.remove_vertex` | `src/commands/mesh-topology-command-handlers.js` | Mesh > Structure | deferred |
-| Command | `mesh_topology.create_triangle` | `src/commands/mesh-topology-command-handlers.js` | Mesh > Structure | deferred |
-| Command | `mesh_topology.subdivide_edge` | `src/commands/mesh-topology-command-handlers.js` | Mesh > Structure | deferred |
-| Command | `mesh_topology.set_vertex_label` | `src/commands/mesh-topology-command-handlers.js` | Mesh > Structure | deferred |
-| Command | `mesh_topology.clear_vertex_label` | `src/commands/mesh-topology-command-handlers.js` | Mesh > Structure | deferred |
-| Command | `mesh_topology.apply_generated_mesh` | `src/commands/mesh-topology-command-handlers.js` | Mesh > Structure | deferred |
+| Command | `mesh_topology.add_vertex` | `src/commands/mesh-topology-command-handlers.js` | Mesh > Structure | migrated |
+| Command | `mesh_topology.remove_vertex` | `src/commands/mesh-topology-command-handlers.js` | Mesh > Structure | migrated |
+| Command | `mesh_topology.create_triangle` | `src/commands/mesh-topology-command-handlers.js` | Mesh > Structure | migrated |
+| Command | `mesh_topology.subdivide_edge` | `src/commands/mesh-topology-command-handlers.js` | Mesh > Structure | migrated |
+| Command | `mesh_topology.set_vertex_label` | `src/commands/mesh-topology-command-handlers.js` | Mesh > Structure | migrated |
+| Command | `mesh_topology.clear_vertex_label` | `src/commands/mesh-topology-command-handlers.js` | Mesh > Structure | migrated |
+| Command | `mesh_topology.apply_generated_mesh` | `src/commands/mesh-topology-command-handlers.js` | Mesh > Structure | migrated |
 | Command | `mesh_keyform.create` | `src/commands/transition-command-handlers.js` | Mesh > Layout | deferred |
 | Command | `mesh_keyform.update` | `src/commands/transition-command-handlers.js` | Mesh > Layout | deferred |
 | Command | `mesh_keyform.remove` | `src/commands/transition-command-handlers.js` | Mesh > Layout | deferred |
-| Command | `mesh_keyform.move_vertices` | `src/commands/mesh-topology-command-handlers.js` | Mesh > Layout | deferred |
+| Command | `mesh_keyform.move_vertices` | `src/commands/mesh-topology-command-handlers.js` | Mesh > Layout | migrated |
 | Command | `transition.create` | `src/commands/transition-command-handlers.js` | Deform > Key State / Transition | deferred |
 | Command | `transition.update` | `src/commands/transition-command-handlers.js` | Deform > Key State / Transition | deferred |
 | Command | `transition.remove` | `src/commands/transition-command-handlers.js` | Deform > Key State / Transition | deferred |
@@ -313,7 +333,7 @@ these dispositions. Query entries include Product-only export queries as well as
 | Query | `mesh_form.validate` | `src/queries/project.js` | Deform > Correction | deferred |
 | Query | `mesh_form.evaluate` | `src/queries/project.js` | Deform > Correction | deferred |
 | Query | `scene.get_tree` | `src/queries/project.js` | Source > Object / Document | migrated |
-| Query | `scene.get_node` | `src/queries/project.js` | Source > Object / Document | deferred |
+| Query | `scene.get_node` | `src/queries/project.js` | Source > Object / Document | migrated |
 | Query | `scene.search` | `src/queries/project.js` | Source > Object / Document | deferred |
 | Query | `animation.get_program` | `src/queries/project.js` | Animation > Sequence / Clip / Tracks | deferred |
 | Query | `animation.list_tracks` | `src/queries/project.js` | Animation > Sequence / Clip / Tracks | deferred |
@@ -327,12 +347,12 @@ these dispositions. Query entries include Product-only export queries as well as
 | Query | `semantic_slot.get` | `src/queries/project.js` | Deform > Key State / Transition | deferred |
 | Query | `semantic_slot.list` | `src/queries/project.js` | Deform > Key State / Transition | deferred |
 | Query | `semantic_slot.get_mapping` | `src/queries/project.js` | Deform > Key State / Transition | deferred |
-| Query | `mesh.get_topology` | `src/queries/project.js` | Mesh > Structure | deferred |
-| Query | `mesh.list_topologies` | `src/queries/project.js` | Mesh > Structure | deferred |
+| Query | `mesh.get_topology` | `src/queries/project.js` | Mesh > Structure | migrated |
+| Query | `mesh.list_topologies` | `src/queries/project.js` | Mesh > Structure | migrated |
 | Query | `mesh.list` | `src/queries/project.js` | Mesh > Structure | deferred |
 | Query | `mesh.get_vertex` | `src/queries/project.js` | Mesh > Structure | deferred |
 | Query | `mesh.get_keyform` | `src/queries/project.js` | Mesh > Structure | deferred |
-| Query | `mesh.list_keyforms` | `src/queries/project.js` | Mesh > Structure | deferred |
+| Query | `mesh.list_keyforms` | `src/queries/project.js` | Mesh > Structure | migrated |
 | Query | `transition.get` | `src/queries/project.js` | Deform > Key State / Transition | deferred |
 | Query | `transition.list` | `src/queries/project.js` | Deform > Key State / Transition | deferred |
 | Query | `transition.get_authoring` | `src/queries/project.js` | Deform > Key State / Transition | deferred |

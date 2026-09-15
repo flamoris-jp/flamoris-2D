@@ -18,6 +18,7 @@ public partial class MainWindow : Window, IAsyncDisposable
     private ProductHostClient? _client;
     private EditingContext _editingContext = EditingContext.Source;
     private bool _closingAfterShutdown;
+    private bool _disposed;
     private readonly TargetWorkspace _targets = new();
     private bool _updatingTargets;
     private bool _targetMutationPending;
@@ -35,6 +36,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         _autoConnect = autoConnect;
         foreach (var definition in EditingContextCatalog.All)
             _activeTools[definition.Context] = definition.Tools[0];
+        InitializeMeshUi();
         Loaded += MainWindow_Loaded;
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         SwitchContext(EditingContext.Source, returnFocus: false);
@@ -63,8 +65,12 @@ public partial class MainWindow : Window, IAsyncDisposable
             HostStatusIndicator.Fill = Brushes.SeaGreen;
             HostStatusText.Text =
                 $"接続済み · protocol {handshake.ProtocolVersion} · schema {handshake.ProductSchemaVersion}";
-            if (createDocument) await _client.CreateSessionAsync("名称未設定", 1920, 1080);
-            if (_client.DocumentToken is { } token) _targets.Attach(token);
+            if (createDocument)
+            {
+                await _client.CreateSessionAsync("名称未設定", 1920, 1080);
+                _hasHandsOn = false;
+            }
+            if (_client.DocumentToken is { } token) AttachDocumentWorkspace(token);
             await RefreshProjectionAsync();
             StatusText.Text = "Product HostのEditorSessionに接続しました。";
         }
@@ -77,10 +83,11 @@ public partial class MainWindow : Window, IAsyncDisposable
     private async Task RefreshProjectionAsync()
     {
         var client = _client;
-        if (client?.DocumentToken is null) return;
+        if (_disposed || client?.DocumentToken is null) return;
         await _refreshGate.WaitAsync();
         try
         {
+            if (_disposed || !ReferenceEquals(client, _client)) return;
             var snapshot = await client.GetWorkspaceAsync();
             if (!ReferenceEquals(client, _client) || !client.HasAuthoritativeProjection ||
                 snapshot.DocumentToken != client.DocumentToken || snapshot.Revision != client.Revision)
@@ -102,10 +109,11 @@ public partial class MainWindow : Window, IAsyncDisposable
             var projectName = snapshot.Payload.GetProperty("summary").GetProperty("displayName").GetString() ?? "名称未設定";
             Title = $"FLAMORIS 2D — {projectName}";
             RevisionText.Text = $"revision {client.Revision}";
-            TargetList.IsEnabled = !_targetMutationPending;
+            TargetList.IsEnabled = !_targetMutationPending && !_meshBusy;
             // A draft outlives keyboard focus and retains its starting revision.
             if (_propertySnapshot?.Id != _targets.SelectedId || !HasPropertyDraft)
                 UpdateSelectionEditor();
+            await RefreshMeshAsync(client);
         }
         catch (StaleProjectionException)
         {
@@ -123,23 +131,32 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async void NewDocument_Click(object sender, RoutedEventArgs e)
     {
+        if (_loadingArtwork || _meshBusy || !ConfirmDiscardHandsOn()) return;
         if (_client?.IsRunning != true)
         {
             await ConnectHostAsync(createDocument: true);
             return;
         }
-        await _client.CreateSessionAsync("名称未設定", 1920, 1080);
-        _targets.Attach(_client.DocumentToken!);
-        await RefreshProjectionAsync();
-        StatusText.Text = "新しいProduct Host documentを作成しました。";
+        try
+        {
+            await _client.CreateSessionAsync("名称未設定", 1920, 1080);
+            _hasHandsOn = false;
+            AttachDocumentWorkspace(_client.DocumentToken!);
+            await RefreshProjectionAsync();
+            StatusText.Text = "新しいProduct Host documentを作成しました。";
+        }
+        catch (Exception error) { StatusText.Text = $"新規セッションを作成できませんでした: {error.Message}"; }
     }
 
-    private async void Refresh_Click(object sender, RoutedEventArgs e) =>
-        await RefreshProjectionAsync();
+    private async void Refresh_Click(object sender, RoutedEventArgs e)
+    {
+        try { await RefreshProjectionAsync(); }
+        catch (Exception error) { StatusText.Text = $"状態を更新できませんでした: {error.Message}"; }
+    }
 
     private async void ApplyName_Click(object sender, RoutedEventArgs e)
     {
-        if (_client is null || _targets.Selected is not TargetProjection target || _targetMutationPending) return;
+        if (_client is null || _targets.Selected is not TargetProjection target || _targetMutationPending || _meshBusy) return;
         var name = DisplayNameEditor.Text.Trim();
         if (name.Length == 0) return;
         var visible = TargetVisibleEditor.IsChecked == true;
@@ -151,12 +168,13 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async void Undo_Click(object sender, RoutedEventArgs e)
     {
-        if (_client is null) return;
+        if (_client is null || _meshBusy || _loadingArtwork) return;
+        MeshCanvas.Cancel(); CancelGenerated();
         try
         {
             await _client.UndoAsync();
             await RefreshProjectionAsync();
-            ViewportHost.Focus();
+            MeshCanvas.Focus();
         }
         catch (Exception error)
         {
@@ -166,12 +184,13 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async void Redo_Click(object sender, RoutedEventArgs e)
     {
-        if (_client is null) return;
+        if (_client is null || _meshBusy || _loadingArtwork) return;
+        MeshCanvas.Cancel(); CancelGenerated();
         try
         {
             await _client.RedoAsync();
             await RefreshProjectionAsync();
-            ViewportHost.Focus();
+            MeshCanvas.Focus();
         }
         catch (Exception error)
         {
@@ -180,7 +199,7 @@ public partial class MainWindow : Window, IAsyncDisposable
     }
 
     private void Client_DocumentChanged(object? sender, DocumentChangedEventArgs e) =>
-        Dispatcher.InvokeAsync(() => _ = RefreshAfterChangeAsync(e));
+        Dispatcher.InvokeAsync(() => { if (!_disposed && ReferenceEquals(sender, _client)) _ = RefreshAfterChangeAsync(e); });
 
     private async Task RefreshAfterChangeAsync(DocumentChangedEventArgs e)
     {
@@ -196,8 +215,10 @@ public partial class MainWindow : Window, IAsyncDisposable
     }
 
     private void Client_AuthorityLost(object? sender, AuthorityLostEventArgs e) =>
-        Dispatcher.InvokeAsync(() => ShowAuthorityLost(
-            "Product Hostとの接続を失いました。staleな表示を破棄し、保存と編集を停止しました。"));
+        Dispatcher.InvokeAsync(() => {
+            if (!_disposed && ReferenceEquals(sender, _client)) ShowAuthorityLost(
+                "Product Hostとの接続を失いました。staleな表示を破棄し、保存と編集を停止しました。");
+        });
 
     private void ShowAuthorityLost(string message)
     {
@@ -212,6 +233,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private void ClearProjection()
     {
+        ClearMeshProjection();
         _propertySnapshot = null;
         _propertyRevision = -1;
         _targets.Invalidate();
@@ -234,6 +256,11 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private void WorkflowContext_Click(object sender, RoutedEventArgs e)
     {
+        if (_loadingArtwork || _meshBusy)
+        {
+            foreach (var button in WorkflowButtons()) button.IsChecked = button.Tag?.ToString() == _editingContext.ToString();
+            return;
+        }
         if (sender is ToggleButton { Tag: string value } &&
             Enum.TryParse<EditingContext>(value, out var context))
             SwitchContext(context, returnFocus: true);
@@ -256,7 +283,8 @@ public partial class MainWindow : Window, IAsyncDisposable
         TimeSurfaceRow.Height = definition.ShowTimeSurface
             ? new GridLength(190) : new GridLength(0);
         UpdateToolSettings();
-        if (returnFocus) ViewportHost.Focus();
+        ConfigureMeshContext();
+        if (returnFocus) MeshCanvas.Focus();
     }
 
     private IEnumerable<ToggleButton> WorkflowButtons()
@@ -276,7 +304,8 @@ public partial class MainWindow : Window, IAsyncDisposable
         {
             _activeTools[_editingContext] = tool;
             UpdateToolSettings();
-            ViewportHost.Focus();
+            SetMeshTool();
+            MeshCanvas.Focus();
         }
     }
 
@@ -287,11 +316,14 @@ public partial class MainWindow : Window, IAsyncDisposable
         ActiveToolSettingsText.Text = $"{tool} — {definition.ClickMeaning}";
     }
 
-    private void TargetList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void TargetList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_updatingTargets) return;
         _targets.Select((TargetList.SelectedItem as TargetProjection)?.Id);
         UpdateSelectionEditor();
+        MeshCanvas.Cancel(); CancelGenerated();
+        try { await RefreshProjectionAsync(); }
+        catch (Exception error) { StatusText.Text = error.Message; }
     }
 
     private void UpdateSelectionEditor()
@@ -333,7 +365,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async Task MutateTargetAsync(Func<Task<ProductHostResponse>> mutate)
     {
-        if (_targetMutationPending || _client?.HasAuthoritativeProjection != true) return;
+        if (_targetMutationPending || _meshBusy || _client?.HasAuthoritativeProjection != true) return;
         _targetMutationPending = true;
         TargetList.IsEnabled = ApplyNameButton.IsEnabled = false;
         DisplayNameEditor.IsEnabled = TargetVisibleEditor.IsEnabled = TargetLockedEditor.IsEnabled = false;
@@ -341,12 +373,12 @@ public partial class MainWindow : Window, IAsyncDisposable
         {
             await mutate();
             await RefreshProjectionAsync();
-            ViewportHost.Focus();
+            MeshCanvas.Focus();
             StatusText.Text = "対象の変更を確定しました。選択対象は維持しています。";
         }
         catch (ProductHostException error) when (error.Code == "revision.conflict")
         {
-            ViewportHost.Focus();
+            MeshCanvas.Focus();
             await RefreshProjectionAsync();
             StatusText.Text = "編集開始後に状態が変わりました。未確定の入力を破棄して最新状態を表示しました。";
         }
@@ -363,6 +395,12 @@ public partial class MainWindow : Window, IAsyncDisposable
     {
         // Text editing owns its Undo/Redo and navigation. Never undo the Project from a textbox.
         if (e.OriginalSource is TextBoxBase && e.Key != Key.Escape) return;
+        if (e.Key == Key.Escape)
+        {
+            _meshWork?.Cancel(); MeshCanvas.Cancel(); CancelGenerated(); MeshCanvas.Focus();
+            e.Handled = true; return;
+        }
+        if (_meshBusy || _loadingArtwork) return;
         if (Keyboard.Modifiers == ModifierKeys.Control &&
             e.Key >= Key.D1 && e.Key <= Key.D7)
         {
@@ -382,12 +420,12 @@ public partial class MainWindow : Window, IAsyncDisposable
         }
         else if (e.Key == Key.Escape)
         {
-            ViewportHost.Focus();
+            MeshCanvas.Focus();
             e.Handled = true;
         }
     }
 
-    private void FocusViewport_Click(object sender, RoutedEventArgs e) => ViewportHost.Focus();
+    private void FocusViewport_Click(object sender, RoutedEventArgs e) => MeshCanvas.Focus();
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void About_Click(object sender, RoutedEventArgs e) =>
@@ -406,6 +444,9 @@ public partial class MainWindow : Window, IAsyncDisposable
     private async void MainWindow_Closing(object? sender, CancelEventArgs e)
     {
         if (_closingAfterShutdown) return;
+        if (!ConfirmDiscardHandsOn()) { e.Cancel = true; return; }
+        _meshWork?.Cancel();
+        MeshCanvas.Cancel();
         e.Cancel = true;
         _closingAfterShutdown = true;
         await DisposeAsync();
@@ -432,7 +473,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         var draftRevision = _propertyRevision;
         DisplayNameEditor.Text = "Uncommitted draft";
         TargetVisibleEditor.IsChecked = false;
-        ViewportHost.Focus();
+        MeshCanvas.Focus();
         await _client.RenameNodeAsync(rootId, "External update");
         await RefreshProjectionAsync();
         if (DisplayNameEditor.Text != "Uncommitted draft" || TargetVisibleEditor.IsChecked != false ||
@@ -460,17 +501,18 @@ public partial class MainWindow : Window, IAsyncDisposable
             if (_targets.SelectedId != selectedBefore)
                 throw new InvalidOperationException("Context switching changed object selection.");
         }
+        await RunMeshSmokeAsync();
         await _client.ShutdownAsync();
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_client is not null)
-        {
-            await _client.DisposeAsync();
-            _client = null;
-        }
-        _refreshGate.Dispose();
+        if (_disposed) return;
+        _disposed = true;
+        _meshWork?.Cancel();
+        var client = _client; _client = null;
+        if (client is not null) await client.DisposeAsync();
+        // Pending refresh continuations still release this managed semaphore; no WaitHandle is allocated.
     }
 
 }
