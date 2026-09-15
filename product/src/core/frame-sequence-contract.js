@@ -13,4 +13,3 @@ export function exportFrameFileName(frameIndex, minimumDigits = 6) {
   }
   return `frame_${String(frameIndex + 1).padStart(minimumDigits, "0")}.png`;
 }
-
