@@ -102,6 +102,15 @@ public partial class MainWindow
         await client.EditRigAsync(new(nodeId,secondId,_selectedBoneId),RigEdit.BonePose(0,0,.3),client.Revision);
         var transition=await client.EditKeyStateAsync(new(keyArtId),KeyStateEdit.CreateTransition("State transition",keyArtId,secondId,2),client.Revision);
         var transitionId=String(transition.Payload,"transitionId")!;
+        var states=await client.GetKeyStateAsync(new(keyArtId,transitionId));
+        var fromForm=ArrayOf(states.Payload,"keyforms").Single(k=>String(k,"keyArtId")==keyArtId&&String(k,"topologyId")==String(topology,"id"));
+        var toForm=ArrayOf(states.Payload,"keyforms").Single(k=>String(k,"keyArtId")==secondId&&String(k,"topologyId")==String(topology,"id"));
+        var slotId=String(fromForm,"semanticSlotId")!;
+        await client.EditKeyStateAsync(new(keyArtId,transitionId,slotId),KeyStateEdit.SharedTopology(String(topology,"id")!,String(fromForm,"id")!,String(toForm,"id")!),client.Revision);
+        var blend=await client.EditTimelineAsync(new(TransitionId:transitionId),TimelineEdit.AddTrack(AnimationTrackKind.GeometryBlendTrack,JsonSerializer.SerializeToElement(new {semanticSlotId=slotId})),client.Revision);
+        var blendId=String(blend.Payload,"trackId")!;
+        await client.EditTimelineAsync(new(TransitionId:transitionId),TimelineEdit.AddKey(blendId,"geometryWeight",0,AnimationValue.Scalar(0)),client.Revision);
+        await client.EditTimelineAsync(new(TransitionId:transitionId),TimelineEdit.AddKey(blendId,"geometryWeight",240000,AnimationValue.Scalar(1)),client.Revision);
         _renderChoice=new(transitionId,"transition","State transition");_timeTicks=120000;SwitchContext(EditingContext.Animation,false);await RefreshProjectionAsync();
         FramePixels(MeshCanvas.EvaluatedFrame);
         await using(var input=File.OpenRead(Path.Combine(fixtureDirectory,"native-production-source.flimg")))

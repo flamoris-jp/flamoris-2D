@@ -47,6 +47,11 @@ public sealed partial class MeshViewport
         if(RigSubcontext=="Bone")foreach(var pose in Items(_rig.GetProperty("fk"),"poses"))
         {
             var (head,tip)=BonePoints(pose);var selected=Id(pose,"boneId")==_boneId;
+            if(_poseMode)
+            {
+                var rest=Transform(pose.GetProperty("bindMatrix"));var bone=Items(_rig,"bones").First(b=>Id(b,"id")==Id(pose,"boneId"));
+                dc.DrawLine(new Pen(Brushes.LightSlateGray,2){DashStyle=DashStyles.Dash},RigScreen(rest.Apply(new(0,0))),RigScreen(rest.Apply(new(bone.GetProperty("length").GetDouble(),0))));
+            }
             if(selected&&_rigStart is { } start&&_rigCurrent is { } current&&RigTool=="移動")
             {head=new(head.X+current.X-start.X,head.Y+current.Y-start.Y);tip=new(tip.X+current.X-start.X,tip.Y+current.Y-start.Y);}
             dc.DrawLine(new Pen(Brushes.Black,7),RigScreen(head),RigScreen(tip));

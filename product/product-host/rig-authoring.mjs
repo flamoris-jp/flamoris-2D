@@ -84,6 +84,7 @@ export function executeRigTool(session, {context = {}, tool, input = {}}) {
       return binding?session.execute({type:'bone.remove_rigid_binding',payload:{bindingId:binding.id}}):null;
     }
     case 'bone.mirror':{
+      editableNode(session,input.targetBoneId);
       const mirror=new BoneMirrorAuthoringController(session);
       mirror.setPair({sourceBoneId:context.boneId,targetBoneId:input.targetBoneId,activeKeyArtId:context.keyArtId,axisX:input.axisX});
       return input.pose?mirror.mirrorPose():mirror.mirrorRest();
@@ -99,6 +100,8 @@ export function executeRigTool(session, {context = {}, tool, input = {}}) {
     case 'bone.removeLimit':return session.execute({type:'bone.remove_rotation_constraint',payload:{constraintId:input.constraintId}});
     case 'ik.create':return new TwoBoneIkAuthoringController(session,{idFactory}).createConstraint(input);
     case 'ik.remove':case 'ik.enabled':case 'ik.bend':case 'ik.target':{
+      const constraint=session.query('bone.get_two_bone_ik',{constraintId:input.constraintId});
+      for(const boneId of [constraint.rootBoneId,constraint.midBoneId,constraint.endBoneId])editableNode(session,boneId);
       const ik=new TwoBoneIkAuthoringController(session,{idFactory});ik.setContext({constraintId:input.constraintId,keyArtId:context.keyArtId});
       if(tool==='ik.remove')return ik.removeConstraint();
       if(tool==='ik.enabled')return ik.setEnabled(input.enabled);

@@ -465,7 +465,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private void About_Click(object sender, RoutedEventArgs e) =>
         MessageBox.Show(this,
-            "FLAMORIS 2D native shell foundation\nProduct authority: JavaScript Product Host / EditorSession",
+            "FLAMORIS 2D Native\n素材の読込からアニメーション・書き出しまで制作できます。\n制作候補 — 従来版との切替は最終確認後に行います。",
             "FLAMORIS 2D", MessageBoxButton.OK, MessageBoxImage.Information);
 
     private void SetBusy(string message)

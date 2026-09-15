@@ -68,6 +68,17 @@ public partial class MainWindow
     }
     private async Task RefreshRigSurfaceAsync()
     {try{await RefreshProjectionAsync();}catch(Exception error){StatusText.Text=error.Message;}}
+    private async Task PreviewRigHelperAsync(Func<RigEdit> make,RigContext context,long revision)
+    {
+        try
+        {
+            if(_client?.HasAuthoritativeProjection!=true)return;
+            _client.AssertCurrent(_client.DocumentToken!,revision);
+            await RefreshEvaluatedFrameAsync(_client,rigPreview:new(context,make()));
+            StatusText.Text="補助操作のプレビューです。適用するか、プレビューを取り消してください。";
+        }
+        catch(Exception error){StatusText.Text=$"プレビューできません: {error.Message}";}
+    }
     private void RigContext_Click(object sender,RoutedEventArgs e)
     {
         if(_meshBusy||_documentBusy)return;
@@ -135,6 +146,7 @@ public partial class MainWindow
             ActionButton(panel,"回転制限を確定",()=>RunRigEditAsync(()=>RigEdit.LimitBone(ReadNumber(minimum)*Math.PI/180,ReadNumber(maximum)*Math.PI/180,enabled.IsChecked==true),context,revision));
             if(String(limit,"id") is { } limitId)ActionButton(panel,"回転制限を削除",()=>RunRigEditAsync(()=>RigEdit.RemoveLimit(limitId),context,revision));
             var mirror=Choices(panel,"左右反転先のBone",BoneChoices().Where(b=>b.Id!=context.BoneId));var axis=Field(panel,"反転軸 X",0);
+            ActionButton(panel,"左右反転を試す",()=>PreviewRigHelperAsync(()=>RigEdit.MirrorBone(Chosen(mirror),ReadNumber(axis),_bonePoseMode),context,revision));
             ActionButton(panel,"選択先へ左右反転",()=>RunRigEditAsync(()=>RigEdit.MirrorBone(Chosen(mirror),ReadNumber(axis),_bonePoseMode),context,revision));
             ActionButton(panel,"Boneを削除",()=>RunRigEditAsync(RigEdit.RemoveBone,context,revision));
         }
@@ -145,12 +157,14 @@ public partial class MainWindow
         {
             var id=String(ik,"id")!;Note(panel,$"IK: {BoneChoices().FirstOrDefault(b=>b.Id==String(ik,"rootBoneId"))?.Label}");
             var tx=Field(panel,"到達先 X（文書座標）",0);var ty=Field(panel,"到達先 Y（文書座標）",0);
+            ActionButton(panel,"IKポーズを試す",()=>PreviewRigHelperAsync(()=>RigEdit.IkTarget(id,ReadNumber(tx),ReadNumber(ty)),context,revision));
             ActionButton(panel,"この原画へIKポーズを適用",()=>RunRigEditAsync(()=>RigEdit.IkTarget(id,ReadNumber(tx),ReadNumber(ty)),context,revision));
             var active=Check(panel,"IKを有効にする",Property(ik,"enabled").ValueKind==JsonValueKind.True);
             ActionButton(panel,"有効／曲げ方向を変更",async()=>{await RunRigEditAsync(()=>RigEdit.EnableIk(id,active.IsChecked==true),context,revision);});
             ActionButton(panel,"曲げ方向を変更",()=>RunRigEditAsync(()=>RigEdit.BendIk(id,clockwise.IsChecked==true),context,revision));
             ActionButton(panel,"IKを削除",()=>RunRigEditAsync(()=>RigEdit.RemoveIk(id),context,revision));
         }
+        ActionButton(panel,"補助操作のプレビューを取消",async()=>{_lastRenderKey=null;await RefreshRigSurfaceAsync();});
     }
     private void BuildWarpPanel(RigContext context,long revision)
     {

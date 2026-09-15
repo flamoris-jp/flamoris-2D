@@ -150,7 +150,7 @@ public partial class MainWindow
             var represented = artwork.Keys.ToHashSet();
             var currentIds=frame.Payload.GetProperty("artwork").EnumerateArray().Select(a=>a.GetProperty("id").GetString()!).ToHashSet();
             foreach(var id in _renderTextures.Keys.Where(id=>!currentIds.Contains(id)).ToArray())_renderTextures.Remove(id);
-            MeshCanvas.ApplyEvaluatedFrame(bitmap, represented, choice.Kind == "keyArt" && _editingContext is EditingContext.Source or EditingContext.Mesh,documentWidth,documentHeight,Property(frame.Payload,"authoringMeshes"));
+            MeshCanvas.ApplyEvaluatedFrame(bitmap, represented, choice.Kind == "keyArt" && _editingContext is EditingContext.Source or EditingContext.Mesh,documentWidth,documentHeight,Property(frame.Payload,"authoringMeshes"),Property(frame.Payload,"plan"));
             RenderStatusText.Text = $"{width} × {height} · {clock.Elapsed.TotalMilliseconds:0} ms · {_renderer!.Driver}";
             if (preview is null && rigPreview is null) _lastRenderKey = key;
             else _lastRenderKey = null;

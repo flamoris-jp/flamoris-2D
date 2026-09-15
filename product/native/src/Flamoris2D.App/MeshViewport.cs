@@ -31,7 +31,7 @@ public sealed partial class MeshViewport : FrameworkElement
     private Affine2? _evaluatedWorld;
     private double[]? _formStartPositions;
     private double _frameWidth,_frameHeight;
-    private JsonElement _authoringMeshes;
+    private JsonElement _authoringMeshes,_pickPlan;
     private void UpdateEvaluatedMesh()
     {
         var mesh=_authoringMeshes.ValueKind==JsonValueKind.Array?_authoringMeshes.EnumerateArray().FirstOrDefault(m=>m.GetProperty("keyformId").GetString()==KeyformId&&m.GetProperty("nodeId").GetString()==NodeId):default;
@@ -53,14 +53,14 @@ public sealed partial class MeshViewport : FrameworkElement
     private HashSet<string> _representedNodes = [];
     private bool _showUnpreparedArtwork;
     public event Action<double[]?>? LayoutPreviewChanged;
-    public void ApplyEvaluatedFrame(BitmapSource frame, HashSet<string> representedNodes, bool showUnpreparedArtwork,double documentWidth,double documentHeight,JsonElement meshes)
+    public void ApplyEvaluatedFrame(BitmapSource frame, HashSet<string> representedNodes, bool showUnpreparedArtwork,double documentWidth,double documentHeight,JsonElement meshes,JsonElement plan)
     {
         EvaluatedFrame = frame;_frameWidth=documentWidth;_frameHeight=documentHeight;_representedNodes = representedNodes;_showUnpreparedArtwork = showUnpreparedArtwork;
-        _authoringMeshes=meshes;UpdateEvaluatedMesh();
+        _authoringMeshes=meshes;_pickPlan=plan;UpdateEvaluatedMesh();
         InvalidateVisual();
     }
     public void ClearEvaluatedFrame()
-    { EvaluatedFrame = null;_authoringMeshes=default;_evaluatedPositions=null;_evaluatedWorld=null;_frameWidth=_frameHeight=0;_representedNodes.Clear(); InvalidateVisual(); }
+    { EvaluatedFrame = null;_authoringMeshes=_pickPlan=default;_evaluatedPositions=null;_evaluatedWorld=null;_frameWidth=_frameHeight=0;_representedNodes.Clear(); InvalidateVisual(); }
     private LayoutGesture? _drag;
     private Point2? _pan;
     private (Point2 Point, int Vertex)? _click;
@@ -215,8 +215,22 @@ public sealed partial class MeshViewport : FrameworkElement
         if (RigDown(point)) { e.Handled=true; return; }
         if (!MeshEnabled && !DeformEnabled)
         {
+            var documentPoint=Camera.ToDocument(point);var hits=new List<string>();
+            foreach(var instance in Items(_pickPlan,"batches").Reverse().SelectMany(b=>Items(b,"renderInstances").Reverse()))
+            {
+                var nodeId=Id(instance,"sourceNodeId")??Id(Items(instance,"appearanceSamples").FirstOrDefault(),"sourceNodeId");
+                if(nodeId is null||hits.Contains(nodeId)||!Artwork.Any(a=>a.NodeId==nodeId&&a.Visible&&!a.Locked)||instance.GetProperty("opacity").GetDouble()<=0)continue;
+                var mesh=instance.GetProperty("mesh");
+                if(VertexPicking.HitTriangles(Doubles(mesh.GetProperty("positions")),mesh.GetProperty("indices").EnumerateArray().Select(i=>i.GetInt32()).ToArray(),documentPoint,Transform(instance.GetProperty("transform"))))hits.Add(nodeId);
+            }
+            if(hits.Count>0)
+            {
+                var index=Keyboard.Modifiers.HasFlag(ModifierKeys.Alt)?(hits.IndexOf(NodeId??"")+1)%hits.Count:0;
+                TargetPicked?.Invoke(hits[index]);return;
+            }
             foreach (var art in Artwork.Reverse().Where(a => a.Visible && !a.Locked && a.World.IsInvertible))
             {
+                if(_representedNodes.Contains(art.NodeId))continue;
                 var p = art.World.Inverse(Camera.ToDocument(point));
                 if (p.X >= art.Left && p.Y >= art.Top && p.X < art.Left + art.Bitmap.PixelWidth && p.Y < art.Top + art.Bitmap.PixelHeight)
                 { TargetPicked?.Invoke(art.NodeId); break; }
