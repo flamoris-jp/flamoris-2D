@@ -6,16 +6,17 @@ This roadmap is dependency-driven rather than date-driven. A phase is complete w
 
 FLAMORIS 2D is optimized for producing short deterministic moving-picture shots from layered or flat artwork. It is not intended to reproduce every Live2D feature before real production use begins.
 
-The defining workflow is now:
+The defining production workflow is now:
 
 ```text
-PSD / PNG artwork
+PSD / Cutwork `.flimg` / existing `.fl2d`
   -> Scene / Mesh / Semantic Mapping
   -> Clipping / Warp / Bones / Skinning where needed
   -> Key Art A -> B -> C ...
   -> reusable AnimationClips such as Blink / Breath / HairSway
   -> deterministic Sequence preview
-  -> deterministic PNG / MP4 export
+  -> deterministic PNG / H.264 MP4 export
+  -> Save / close / reopen / continue editing
   -> MV shot
 ```
 
@@ -23,34 +24,57 @@ MCP/AI readiness remains an architectural constraint from the beginning, not a l
 
 ## Current checkpoint
 
-Implemented through the current production core:
+The Phase 1-8 production core is implemented. The native WPF migration has advanced beyond shell proof: Issue #96 / PR #101 is now a Source-through-Export production candidate built on the existing JavaScript Product/Core authority.
+
+Implemented production architecture includes:
 
 - Phase 0 repository/design baseline
-- Phase 1 Editor Core + Windows Desktop shell
+- Phase 1 Editor Core + deterministic Project / Command / Query / EditorSession authority
 - Phase 2 deterministic Key-Art Transition foundation and authoring
-- Phase 3 production mesh topology, Contour AutoMesh, and correspondence assistance
+- Phase 3 production mesh topology, Contour AutoMesh, layout, and correspondence assistance
 - Phase 4 deterministic PNG / Windows MP4 export
-- repository-wide architecture audit and targeted refactor after Phase 4
 - Phase 6 clipping + Warp/Lattice Deformer
 - Phase 7 Bones, FK, rigid/weighted skinning, form correction, constraints, IK, and mirror helpers
-- Phase 8 Multi-Key-Art Sequence / Clip animation architecture, authoring UI, deterministic mixer, and automated production proof
+- Phase 8 Multi-Key-Art Sequence / Clip animation architecture, deterministic mixer, timeline authoring, and automated production proof
+- Native WPF Product Host integration from Source through Export, including Recovery, PSD/`.flimg` import, textured mesh editing, Rig/Deform, Animation, Preview, Export, Save/Open, and a self-contained Windows candidate
 
-Phase 5 input-simplification work remains experimental/deferred and does not block the current production pipeline.
+Phase 5 input-simplification work remains experimental/deferred and does not block the current PSD/Cutwork production pipeline.
 
 ### Current production gate
 
-The remaining gate is real packaged-Windows production QA with actual artwork/projects and a real supported FFmpeg path:
+The immediate gate is **final real-art Windows acceptance of PR #101 / Issue #96**, not another architecture phase.
 
-- launch the packaged app
-- author or open a real multi-Key-Art shot
-- scrub/play Sequence animation
-- verify clipping / Warp / Bone / reusable Clip motion visually
-- Save, close, reopen, and continue editing
-- export PNG sequence
-- export actual H.264 MP4 through Windows Media Foundation
-- inspect output and repeatability
+Automated Windows evidence now goes beyond the older Phase 8 proof. The packaged native candidate has exercised a synthetic but real-format workflow through:
 
-Automated Phase 8 production proof already covers deterministic Sequence evaluation, reusable Blink/Breath/HairSway clips, Undo/Redo, Save/Open equivalence, clipping coexistence, rig/Warp coexistence, and Preview/PNG/MP4 source-frame parity.
+```text
+PSD import
+-> Grid/Layout with visible textured deformation + exact Undo/Redo
+-> Bone/Skin
+-> nested Warp
+-> form correction + reusable MeshDeformation sample
+-> 8-second Sequence / Clip animation
+-> scrub / Preview parity
+-> 240 PNG frames
+-> real H.264 MP4 + ffprobe verification
+-> atomic Save
+-> New / Open
+-> resumed edit + Undo
+-> reviewed PSD re-import + Undo/Redo
+-> duplicate Key Art / Transition
+-> Cutwork .flimg import
+```
+
+At the current PR #101 candidate, Product CI, Native Shell Boundary, and Windows Desktop Package are green. The remaining acceptance is deliberately human/physical where automation is weak:
+
+- use real FLAMORIS artwork/project data rather than synthetic fixtures
+- inspect actual deformation/compositing and exported motion
+- verify focus, shortcuts, dialogs, pointer capture/cancel and discoverability
+- verify 100/125/150/200% DPI behavior on the real Windows machine
+- inspect light/dark artwork overlay contrast and dense timeline navigation
+- Save, close, reopen and continue editing in normal use
+- review release cutover / installer / association / Electron-retirement conditions
+
+Issue #78 remains the broader post-Phase-8 packaged-Windows QA checklist. Issue #79 remains the Production Robustness / Internal Beta umbrella. Issues #97 and #98 have implementation and accepted decision records in PR #101, but stay open until review/final acceptance is complete.
 
 ---
 
@@ -76,14 +100,15 @@ Delivered includes:
 - versioned Project model
 - stable scene identity
 - Query / Command / Transaction / EditorSession
-- Undo/Redo
+- Undo/Redo and saved-history identity
 - validation and migration
-- deterministic Save/Open and recovery
+- deterministic Save/Open and recovery contracts
 - PSD import/re-import
-- Scene Tree, Inspector, selection, and transforms
-- Browser/Desktop adapters
-- Windows Desktop shell and native file workflows
+- Scene Tree / target projection / selection / transforms
 - typed MCP-ready command/query schemas
+- Windows desktop adapters
+
+Native WPF does not replace this authority. It routes edits through the same Product Host / EditorSession.
 
 ---
 
@@ -104,7 +129,6 @@ Delivered includes:
 - Morph / Hold / Replace / Appear / Disappear / Occlusion
 - deterministic renderer-ready evaluation
 - A/B authoring and endpoint workflow
-- Transition preview and typed timing controls
 - diagnostics and preview-authority reporting
 - persistence and Undo/Redo equivalence
 
@@ -116,24 +140,19 @@ Goal: make target-keyform authoring practical enough for real production.
 
 Delivered includes:
 
-- Deform Mode and Topology Edit Mode
+- strict Mesh Structure / Mesh Layout / Deform separation
 - Project-global stable vertex identity
 - visible vertex IDs and optional Semantic Labels
 - add/remove/connect/subdivide topology commands
 - deterministic topology mutation contract
-- reusable Key State Strip projection
 - deterministic Contour AutoMesh with Grid fallback
 - correspondence pins using stable vertex IDs
 - deterministic target-keyform initialization
 - ordinary editable MeshKeyform output after correspondence Apply
+- native textured Layout preview/commit and whole-mesh alignment in PR #101
+- explicit UV editing and reference-protected cleanup in the native candidate
 
-Deferred helpers remain optional future work rather than blockers:
-
-- brush/proportional editing
-- lasso selection
-- smooth/relax
-- advanced mirror tools
-- TPS / ARAP / Laplacian solvers
+Optional helpers such as proportional editing, smooth/relax, lasso and advanced solvers remain intentionally deferred unless real production proves they are needed.
 
 ---
 
@@ -143,44 +162,15 @@ Goal: turn authored animation into actual output using the same deterministic se
 
 Delivered includes:
 
-### 4-1 Deterministic frame render pipeline
-
-- rational FPS -> deterministic frame/tick plan
+- rational FPS -> deterministic frame/tick planning
 - half-open export tick-domain boundary
 - canonical evaluator reuse
-- shared preview/export composition semantics
-- viewport-independent offscreen rendering
-- RGBA frame readback
+- shared preview/export render-plan semantics
+- deterministic PNG frame sequence export
+- Windows H.264 `h264_mf` encoder contract
+- progress/cancel/diagnostics and explicit partial-output policy
 
-### 4-2 PNG sequence export
-
-- deterministic `frame_000001.png` ordering
-- PNG encoding boundary
-- Desktop-owned destination/filesystem operations
-- conflict handling
-- progress and cancellation
-- explicit partial-output policy
-
-### 4-3 Windows MP4/H.264 integration
-
-- external FFmpeg boundary
-- Windows Media Foundation `h264_mf` path
-- capability/license gate
-- deterministic encoder invocation
-- process diagnostics and cancellation
-- incomplete-output cleanup
-
-### 4-4 Export UX
-
-- compact Export dialog
-- resolution presets/custom size
-- rational FPS presets/custom FPS
-- PNG sequence and MP4
-- native destination selection
-- progress/cancel/diagnostics
-- one-step temporary-frame MP4 workflow
-
-The remaining export gate is packaged-Windows manual production QA with real artwork and real FFmpeg, now tracked as part of the current production gate rather than unfinished export architecture.
+The native WPF candidate now uses the same canonical evaluated plan and D3D11 compositor for Preview and Export. Packaged CI has produced and ffprobe-verified a real 8-second / 240-frame H.264 MP4 through the pinned LGPL FFmpeg package. Human visual inspection on real artwork remains part of the current production gate, not missing export architecture.
 
 ---
 
@@ -188,28 +178,11 @@ The remaining export gate is packaged-Windows manual production QA with real art
 
 Goal: reduce setup effort when no layered PSD exists.
 
-A classical cutout experiment explored human-in-the-loop flat-image decomposition with deterministic local tools. Useful findings include:
+The historical classical-cutout experiment was split into the separate Cutwork product. FLAMORIS 2D now imports Cutwork `.flimg` v1 as ordinary source art, while mask/repair authoring stays outside this editor.
 
-- Polygon Lasso as an exact final binary selection
-- FG/BG refinement where needed
-- multi-layer cutouts and masks
-- manual Patch-based hidden-region repair
-- blur/smudge cleanup
-- original-image visibility for recovering damaged or occluded details
-- lightweight `.flimg` style packaging concepts for cutout layers and order metadata
-
-The experiment confirmed that rough perceptual sufficiency and editing speed matter more than pixel-perfect segmentation for short moving-picture clips.
-
-This work is intentionally not a blocker for the current PSD/part-based production pipeline. Future input simplification should reuse the same principle used elsewhere in FLAMORIS:
+This phase is not a blocker for the main production loop. Future AI-assisted input should still follow the same principle:
 
 > helpers propose or prepare ordinary editable data; the deterministic Project model remains authoritative.
-
-Future candidates:
-
-- deterministic candidate-mask generation
-- review/merge/delete candidate workflow
-- rough stacking-order assistance
-- optional AI-assisted segmentation layered on top of the deterministic review/apply path
 
 ---
 
@@ -221,8 +194,7 @@ Delivered includes:
 
 - persistent clipping bindings with stable identity
 - clipping validation and cycle protection
-- clipping authoring UI and diagnostics
-- clipping-aware shared preview/export renderer
+- clipping-aware shared preview/export semantics
 - final-geometry clipping resolution
 - Warp/Lattice Deformer domain model
 - 2x2 / 3x3 / 4x4 deterministic lattices
@@ -230,14 +202,8 @@ Delivered includes:
 - Key-Art-specific Warp keyforms
 - nested parent-first Warp semantics
 - child-lattice projection through parent Warp
-- Deformer authoring and Transition integration
 - persistence, Undo/Redo, Commands/Queries, and MCP-ready schemas
-
-Acceptance achieved:
-
-- clipped facial parts remain constrained through deformation
-- one sparse deformer can affect grouped child content
-- clipping and Warp coexist with Transition preview/export semantics
+- native Warp creation/nesting/control-point authoring and clipping controls in PR #101
 
 ---
 
@@ -247,149 +213,111 @@ Goal: make limbs and large pose changes practical when mesh/deformer editing alo
 
 Delivered includes:
 
-### Bone / FK foundation
-
 - persistent Bone and BonePoseKeyform
 - Scene-owned Bone hierarchy
 - deterministic parent-first FK
 - post-Warp projected Bone frames
 - Bone Edit / Pose authoring
 - rigid Bone attachment
-
-### Weighted skinning and correction
-
 - persistent SkinBinding
 - stable-vertex-ID weights
 - one-to-four normalized influences
 - weight authoring and visualization
 - deterministic linear blend skinning
 - MeshFormCorrectionKeyform
-- direct correction after skeletal deformation
-
-### Constraints and helpers
-
 - rotation constraints
 - authoring-only analytic two-bone IK
 - mirror helpers
 - exact Undo/Redo and persistence
+- native Bone/Warp/Weight subcontexts, helper previews, and form correction in PR #101
 
 Canonical evaluation keeps Warp before projected Bone frames, constraints before FK, skin/rigid deformation before form correction, and clipping after final deformation.
 
 ---
 
-## Phase 8 — Multi-Key-Art Animation and Clip Sequencing — COMPLETE IMPLEMENTATION / AUTOMATED PROOF
+## Phase 8 — Multi-Key-Art Animation and Clip Sequencing — COMPLETE
 
 Goal: move from isolated A -> B Transitions to reusable short MV shots.
 
-The normative contracts are defined in [`phase8-animation-sequencing.md`](phase8-animation-sequencing.md), with the production proof recorded in [`phase8-production-proof.md`](phase8-production-proof.md).
+The normative contracts are defined in [`phase8-animation-sequencing.md`](phase8-animation-sequencing.md), with the original production proof recorded in [`phase8-production-proof.md`](phase8-production-proof.md).
 
 Delivered includes:
 
-### 8-1 Sequence / ViewLane foundation
-
-- persistent `Sequence`
-- one owned `TemporalProgram` per Sequence
-- strict contiguous ViewLane coverage
-- KeyArtHold / TransitionInstance
-- deterministic boundary ownership
-- exact rational Transition retiming
-
-### 8-2 AnimationClip / ClipInstance foundation
-
-- reusable `AnimationClip`
-- owned clip TemporalPrograms
-- persistent `ClipInstance`
-- once / loop semantics
-- exact local-time projection
-- source offset / rational playback rate / weight / layer
-
-### 8-3 General typed animation tracks
-
-- TransformTrack
-- BoneTrack
-- DeformerTrack
-- MeshDeformationTrack
-- CameraTrack
-- opacity and discrete intent tracks
-- stable target identity and owner-aware validation
-
-### 8-4 Deterministic mixer
-
-- canonical contribution ordering
+- persistent `Sequence` / ViewLane
+- reusable `AnimationClip` / `ClipInstance`
+- Once / Loop semantics and rational playback rate
+- Transform / Bone / Deformer / MeshDeformation / Camera and existing discrete typed channels
+- deterministic contribution ordering and canonical evaluator stages
 - Transition/KeyArt semantic base + Clip overlays
-- Deformer before Warp
-- Bone mix before constraints/FK/skin
-- form correction before MeshDeformationTrack
-- Transform stage after rig geometry
-- final clipping and Sequence camera
-- renderer remains Sequence/Clip unaware
+- Sequence/Clip timeline authoring
+- keyframe CRUD, explicit interpolation and ease presets
+- deterministic scrub/playback time projection
+- Save/Open and Preview/Export semantic parity
 
-### 8-5 Timeline authoring UX
+The native production candidate migrates these capabilities into WPF without creating a second C# timeline/timebase.
 
-- Sequence selection/lifecycle
-- Key Art strip / ViewLane editing
-- scrub/playback/time display
-- Clip library and ClipInstance placement/editing
-- owner-aware track/keyframe editing
-- transient Clip-local authoring tick
-- one gesture = one history unit
-- drag cancel/no-op history protection
-
-### 8-6 Motion polish and production proof
-
-- Ease In / Ease Out / Ease In Out convenience compiled to explicit Bezier control points
-- reusable Blink / Breath / HairSway authored as ordinary typed AnimationClips
-- at least three distinct Key Arts in one Sequence
-- Transition retiming across A -> B -> C
-- node Transform + Warp + Bone + rigid/skin/form-correction coexistence
-- final-geometry clipping coexistence
-- deterministic looping and Clip reuse
-- Undo/Redo production regression coverage
-- Save/Open semantic equivalence
-- Preview / PNG / MP4 source-frame parity
-- realistic 5-second proof at 24 fps using the canonical 120000 ticks/sec timebase
-- automated Product and Windows packaging validation
-
-Phase 8 implementation is considered complete. The remaining manual packaged-Windows validation belongs to the current production gate and Phase 9 robustness work, not to a missing animation architecture feature.
-
-Deferred beyond Phase 8:
-
-- full graph editor
-- nested AnimationClips
-- reusable Camera clips
-- runtime IK
-- physics/procedural secondary motion
-- audio/NLE workflow
+Deferred beyond Phase 8 remain existing roadmap items such as a full graph editor, nested AnimationClips, reusable Camera clips, runtime IK, physics/procedural secondary motion, and NLE/audio workflow.
 
 ---
 
-## Phase 9 — Production Robustness / Beta — NEXT
+## Native WPF migration — SOURCE THROUGH EXPORT CANDIDATE
 
-Goal: turn the feature-complete core into a dependable internal MV production tool.
+Design authority:
 
-Primary work:
+- [`csharp-wpf-ui-migration.md`](csharp-wpf-ui-migration.md)
+- ADR 0006 Product Host boundary
+- ADR 0007 native Recovery lifecycle
+- ADR 0008 measured D3D11 renderer selection
+- ADR 0009 mesh-animation identity bridge
+- [`native-capability-map.md`](native-capability-map.md)
+- [`native-production-workflow.md`](native-production-workflow.md)
 
-- end-to-end packaged Windows QA and regression closure
-- real FLAMORIS PSD / multi-Key-Art project validation
-- actual Windows Media Foundation MP4 encoding and playback
-- large-project and multi-Key-Art profiling
-- missing-source and decode diagnostics
-- migration/recovery stress testing
-- export stress/cancellation/temp-cleanup testing
-- render/performance profiling
-- production presets only where real workflow evidence justifies them
-- dependency lockfile/provenance maintenance
-- public repository readiness where desired
+Current PR #101 implements:
+
+- native New/Open/Save/Save As/Incremental/Copy and scoped Recovery
+- full `.fl2d` envelope/artwork retention
+- PSD and Cutwork `.flimg` import plus reviewed PSD update
+- authenticated bounded document/raster bulk transfer
+- D3D11 hardware renderer with WARP fallback consuming canonical Product render plans
+- textured Mesh Layout, topology, Grid/Contour, correspondence, UV and Key State authoring
+- Bone / Warp / Weight / Skin / clipping / IK / mirror / form correction
+- Sequence / clips / typed tracks / keys / scrub / playback / camera
+- Preview / PNG / H.264 MP4 export through the same evaluated semantics
+- self-contained Windows x64 candidate with pinned Node and LGPL FFmpeg
+
+The migration is **not yet a release cutover**. Electron remains the default installed/released shell until the final Windows acceptance and retirement stop conditions pass.
+
+---
+
+## Phase 9 — Production Robustness / Internal Beta — ACTIVE
+
+Goal: turn the feature-complete core and native production candidate into a dependable internal MV production tool through real usage, focused fixes, profiling, and operational cleanup.
+
+Primary work now:
+
+- final PR #101 review and real-art Windows acceptance
+- focused bug fixes found by that hands-on pass
+- production-scale PSD / multi-Key-Art profiling
+- missing-source/decode diagnostics and recovery stress
+- export stress/cancellation/partial-output checks
+- performance profiling before optimization
+- dependency lockfile/provenance work (#6)
+- focused production UX cleanup (#58)
+- release/installer/association/cutover policy before Electron retirement
+- public repository readiness only when desired (#43)
 
 Acceptance criteria:
 
-- create an approximately 8-second multi-Key-Art Akino shot using real artwork
-- use reusable animation clips in that shot
+- create an approximately 8-second real FLAMORIS/Akino shot using real artwork
+- use Mesh / Rig / Deform / multiple Key Arts / reusable animation as needed by the shot
 - save, close, reopen, edit, preview, and export successfully
-- produce real PNG and H.264 MP4 output on Windows
-- repeated export from identical project state is deterministic
+- produce and visually inspect PNG and real Windows H.264 MP4 output
+- repeated export from identical project state remains semantically deterministic
+- production blockers found through real usage are fixed or explicitly documented
+- major observed performance bottlenecks are measured and acceptably resolved
+- current dependency/runtime graph is reproducible and provenance is reviewed
 - failures are actionable rather than silent
-- no production blocker remains from the Phase 1-8 architecture
+- release cutover does not remove capability or create a second authority
 
 ### Production Beta checkpoint
 
@@ -456,15 +384,15 @@ Audio analysis/lip-sync may later integrate with FLAMORIS production workflows, 
 
 ## Near-term execution order
 
-1. Complete packaged Windows manual QA for the Phase 8 production pipeline.
-2. Fix any blocker/major defects found by QA as focused Issues and small single-purpose commits.
-3. Close Phase 8 once real launch, Save/Open, PNG, and actual MP4 output are verified.
-4. Begin Phase 9 using a real approximately 8-second FLAMORIS/Akino shot as the production acceptance project.
-5. Profile and harden only the bottlenecks exposed by real production.
-6. Revisit input simplification / part decomposition after the main production loop is dependable.
-7. Add AI assistance only where it can propose ordinary deterministic edits without becoming persistent authority.
+1. Keep PR #101 reviewable and green; fix documentation/implementation review findings as focused commits.
+2. Run the final native Windows hands-on with real PSD/`.flimg`/`.fl2d` material and an approximately 8-second shot.
+3. Turn any real defect found by hands-on into a focused Issue/fix rather than extending the migration umbrella blindly.
+4. When acceptance evidence is complete, decide merge/cutover status for #96 and whether #97/#98 can close.
+5. Continue Phase 9 profiling, recovery/export stress and UX hardening under #79.
+6. Retire or replace the Electron default only after every stop condition in the migration design passes, including installer/association/release policy.
+7. Revisit input simplification and AI assistance only after the main production loop is dependable.
 
-This order deliberately favors producing real MV shots and hardening the existing architecture over adding broad new feature families.
+This order deliberately favors producing real MV shots and hardening the current production candidate over adding broad new feature families.
 
 ---
 
