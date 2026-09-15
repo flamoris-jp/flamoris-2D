@@ -98,9 +98,15 @@ export function executeKeyStateTool(session,{context={},tool,input={}}) {
         positions.push(pivotX+x+dx*Math.cos(rotation)-dy*Math.sin(rotation),pivotY+y+dx*Math.sin(rotation)+dy*Math.cos(rotation));}
       return run('mesh_keyform.move_vertices',{keyformId:keyform.id,positions});
     }
-    case 'sample.create':return run('animation.deformation_sample.create',{sample:{id:id('sample'),meshId:input.meshId,topologyId:input.topologyId,offsets:input.offsets}});
+    case 'sample.create': {
+      const sampleId=id('sample'),meshId=input.meshId||id('mesh_target');
+      const commands=input.meshId?[]:[command('animation.mesh_target.create',{meshId})];
+      commands.push(command('animation.deformation_sample.create',{sample:{id:sampleId,meshId,topologyId:input.topologyId,offsets:input.offsets}}));
+      return {...session.executeTransaction(commands,{label:'Create reusable mesh deformation'}),sampleId,meshId};
+    }
     case 'sample.update':return run('animation.deformation_sample.update',{sampleId:input.sampleId,sample:{...session.query('animation.deformation_sample.get',{sampleId:input.sampleId}),offsets:input.offsets}});
     case 'sample.remove':return run('animation.deformation_sample.remove',{sampleId:input.sampleId});
+    case 'sample.removeTarget':return run('animation.mesh_target.remove',{meshId:input.meshId});
     default:throw new Error('Unknown native Key State tool.');
   }
 }

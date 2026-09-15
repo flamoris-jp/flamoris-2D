@@ -9,6 +9,8 @@ public partial class MainWindow
     private string? _keyTransitionId,_keySlotId,_keyPanelKey;
     private readonly Dictionary<string,CorrespondencePin> _correspondencePins=[];
     private long _pinRevision=-1;
+    private string? _selectedSampleId;
+    private readonly Dictionary<string,VertexOffset> _sampleOffsets=[];
     private static StackPanel Section(Panel parent,string label,bool open=false)
     {
         var content=new StackPanel {Margin=new Thickness(5)};
@@ -24,6 +26,7 @@ public partial class MainWindow
             var r=await _client.EditKeyStateAsync(context,make(),revision);
             if(String(r.Payload,"keyArtId") is { } art){_renderChoice=new(art,"keyArt","原画");_meshChoices.Clear();}
             if(String(r.Payload,"transitionId") is { } transition)_keyTransitionId=transition;
+            if(String(r.Payload,"sampleId") is { } sample)_selectedSampleId=sample;
             _contextDraft=false;_keyPanelKey=null;_correspondencePins.Clear();await RefreshProjectionAsync();StatusText.Text="原画・遷移の編集を確定しました。";
         }
         catch(Exception error){StatusText.Text=$"編集できませんでした: {error.Message}";}
@@ -66,6 +69,7 @@ public partial class MainWindow
             ActionButton(panel,"位置決めを適用",()=>RunKeyStateAsync(()=>KeyStateEdit.Alignment(keyformId,ReadNumber(x),ReadNumber(y),ReadNumber(r)*Math.PI/180,ReadNumber(sx),ReadNumber(sy),ReadNumber(px),ReadNumber(py)),context,revision));
         }
         BuildTransitionPanel(state,context,revision);
+        if(_editingContext==EditingContext.Deform)BuildSamplePanel(state,context,revision);
     }
     private void BuildTransitionPanel(JsonElement state,KeyStateContext context,long revision)
     {
@@ -133,5 +137,35 @@ public partial class MainWindow
         });
         ActionButton(panel,"対応補助を適用",()=>RunKeyStateAsync(()=>KeyStateEdit.ApplyCorrespondence(_correspondencePins.Values.ToArray(),Chosen(preset),reverse.IsChecked==true),context,revision));
         ActionButton(panel,"プレビューを取消",async()=>{_lastRenderKey=null;await RefreshRigSurfaceAsync();});
+    }
+    private void BuildSamplePanel(JsonElement state,KeyStateContext context,long revision)
+    {
+        var form=ArrayOf(state,"keyforms").FirstOrDefault(k=>String(k,"id")==MeshCanvas.KeyformId);if(form.ValueKind!=JsonValueKind.Object)return;
+        var topologyId=String(form,"topologyId")!;
+        var panel=Section(KeyStatePanel,"アニメーション用の形状・MeshDeformation",true);
+        Note(panel,"骨・Warp・原画補正の後へ加える変位を作ります。AnimationのClipでMeshDeformationTrackに配置できます。");
+        var samples=ArrayOf(state,"samples").Where(s=>String(s,"topologyId")==topologyId).ToArray();
+        var select=Choices(panel,"編集する変形",samples.Select((s,i)=>new EntityChoice(String(s,"id")!,$"変形 {i+1}")),_selectedSampleId);
+        var selected=samples.FirstOrDefault(s=>String(s,"id")==_selectedSampleId);_sampleOffsets.Clear();
+        foreach(var offset in ArrayOf(selected,"offsets")){var v=String(offset,"vertexId")!;_sampleOffsets[v]=new(v,Number(offset,"dx"),Number(offset,"dy"));}
+        select.SelectionChanged+=async(_,_)=>{_selectedSampleId=(select.SelectedItem as EntityChoice)?.Id;_contextDraft=false;await RefreshRigSurfaceAsync();};
+        var x=Field(panel,"頂点の変位 X",0);var y=Field(panel,"頂点の変位 Y",0);
+        var count=new TextBlock {Text=$"変位 {_sampleOffsets.Count}頂点",Foreground=Brushes.White};panel.Children.Add(count);
+        ActionButton(panel,"選択頂点の変位を設定",()=>
+        {
+            try{foreach(var v in MeshCanvas.Selected)_sampleOffsets[v]=new(v,ReadNumber(x),ReadNumber(y));_contextDraft=true;count.Text=$"変位 {_sampleOffsets.Count}頂点";}
+            catch(Exception error){StatusText.Text=error.Message;}return Task.CompletedTask;
+        });
+        ActionButton(panel,"選択頂点の変位を解除",()=>{foreach(var v in MeshCanvas.Selected)_sampleOffsets.Remove(v);_contextDraft=true;count.Text=$"変位 {_sampleOffsets.Count}頂点";return Task.CompletedTask;});
+        ActionButton(panel,"新しいアニメーション変形を作成",()=>RunKeyStateAsync(()=>KeyStateEdit.CreateSample(null,topologyId,_sampleOffsets.Values.ToArray()),context,revision));
+        if(selected.ValueKind==JsonValueKind.Object)
+        {
+            var sampleId=String(selected,"id")!,meshId=String(selected,"meshId")!;
+            ActionButton(panel,"選択した変形を更新",()=>RunKeyStateAsync(()=>KeyStateEdit.UpdateSample(sampleId,_sampleOffsets.Values.ToArray()),context,revision));
+            ActionButton(panel,"同じターゲットへ別の変形を作成",()=>RunKeyStateAsync(()=>KeyStateEdit.CreateSample(meshId,topologyId,_sampleOffsets.Values.ToArray()),context,revision));
+            ActionButton(panel,"選択した変形を削除",()=>RunKeyStateAsync(()=>KeyStateEdit.RemoveSample(sampleId),context,revision));
+        }
+        var target=Choices(panel,"使わなくなった変形ターゲット",ArrayOf(state,"meshes").Select((m,i)=>new EntityChoice(String(m,"id")!,$"ターゲット {i+1}")));
+        ActionButton(panel,"未使用のターゲットを削除",()=>RunKeyStateAsync(()=>KeyStateEdit.RemoveMeshTarget(Chosen(target)),context,revision));
     }
 }

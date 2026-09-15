@@ -287,6 +287,8 @@ these dispositions. Query entries include Product-only export queries as well as
 | Command | `animation.temporal.add_event` | `src/commands/temporal-command-handlers.js` | Animation > Sequence / Clip / Tracks | deferred |
 | Command | `animation.temporal.add_region` | `src/commands/temporal-command-handlers.js` | Animation > Sequence / Clip / Tracks | deferred |
 | Command | `source.apply_psd_reimport` | `src/commands/scene-command-handlers.js` | Source > Object / Document | deferred |
+| Command | `animation.mesh_target.create` | `src/commands/mesh-deformation-sample-command-handlers.js` | Deform > reusable sample | migrated |
+| Command | `animation.mesh_target.remove` | `src/commands/mesh-deformation-sample-command-handlers.js` | Deform > reusable sample | deferred |
 | Command | `scene.rename_node` | `src/commands/scene-command-handlers.js` | Source > Object / Document | migrated |
 | Command | `scene.set_transform` | `src/commands/scene-command-handlers.js` | Source > Object / Document | deferred |
 | Command | `scene.set_visibility` | `src/commands/scene-command-handlers.js` | Source > Object / Document | migrated |
