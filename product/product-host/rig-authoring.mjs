@@ -9,6 +9,8 @@ import { defaultWarpKeyformControlPoints, isWarpGridDimension } from '../src/mod
 import { evaluateEndpointProjectedBoneFk } from '../src/core/rigid-bone-evaluator.js';
 import { worldTransformMatrix, invertAffine, transformPoint } from '../src/core/transforms.js';
 import { meshContext } from './mesh-hands-on.mjs';
+import { projectDeformerLattice, unprojectDeformerDocumentPoint } from '../src/ui/deformer-viewport-overlay.js';
+import { createBoneAuthoringSpace } from '../src/ui/bone-viewport-overlay.js';
 const idFactory = kind => `${kind}_${randomUUID()}`;
 function boneController(session, context) {
   const controller = new BoneAuthoringController(session, {idFactory});
@@ -23,11 +25,13 @@ function editableNode(session,id) {
 export function rigProjection(session, context = {}) {
   const keyArtId=context.keyArtId || null;
   const bone=boneController(session,context);
-  const part=context.nodeId?meshContext(session,{nodeId:context.nodeId,keyformId:context.keyformId},false).preparation.getState():null;
+  const part=context.nodeId?meshContext(session,{nodeId:context.nodeId,keyformId:context.keyformId,keyArtId},false).preparation.getState():null;
   const warps=session.query('deformer.list').map(d=>{
     const full=session.query('deformer.get',{deformerId:d.id});
     const keyform=keyArtId?session.query('deformer.get_keyform',{deformerId:d.id,keyArtId}):null;
-    return {...full,positions:keyform?.controlPoints || defaultWarpKeyformControlPoints(full,full.controlPoints),
+    const positions=keyform?.controlPoints || defaultWarpKeyformControlPoints(full,full.controlPoints);
+    const lattice=projectDeformerLattice({project:session.project,deformer:full,keyArtId,controlPoints:positions,view:{scale:1,originX:0,originY:0}});
+    return {...full,positions,documentPositions:lattice.points.map(p=>({controlPointId:p.controlPointId,...p.document})),diagnostics:lattice.diagnostics,
       worldTransform:session.query('scene.get_node',{nodeId:d.id}).worldTransform};
   });
   return {bones:session.query('bone.list'),bone:bone.getState(),
@@ -53,8 +57,9 @@ export function executeRigTool(session, {context = {}, tool, input = {}}) {
     }
     case 'bone.moveDocument':{
       const selected=bone.selectedBone();if(!selected)throw new Error('Select a Bone.');
-      const inverse=invertAffine(worldTransformMatrix(session.project,selected.parentNodeId));
-      const a=transformPoint(inverse,input.start),b=transformPoint(inverse,input.end);
+      const space=createBoneAuthoringSpace({project:session.project,boneId:selected.id,authoring:{mode:input.pose?'pose':'edit',activeKeyArt:context.keyArtId?{id:context.keyArtId}:null}});
+      if(space.diagnostics.length)throw new Error(space.diagnostics.map(d=>d.message||d.code).join('\n'));
+      const a=space.toLocal(input.start),b=space.toLocal(input.end);
       const current=input.pose?bone.persistentPose()?.localDelta||{x:0,y:0,rotation:0}:selected.restLocalTransform;
       const next={...current,x:current.x+b.x-a.x,y:current.y+b.y-a.y};
       return input.pose?bone.setPose(next):bone.setRest({...next,length:selected.length});
@@ -102,6 +107,13 @@ export function executeRigTool(session, {context = {}, tool, input = {}}) {
       for(const nodeId of input.childNodeIds || []){editableNode(session,nodeId);commands.push({type:'deformer.reparent_node',payload:{nodeId,parentId:id}});}
       const result=session.executeTransaction(commands,{label:'Create Warp and attach targets'});return {...result,deformerId:id};
     }
+    case 'warp.moveDocument': {
+      const deformer=session.query('deformer.get',{deformerId:context.deformerId});
+      const projectPoint=documentPoint=>unprojectDeformerDocumentPoint({project:session.project,deformer,keyArtId:context.keyArtId,documentPoint});
+      const a=projectPoint(input.start),b=projectPoint(input.end);
+      if(!a.point||!b.point||a.diagnostics.length||b.diagnostics.length)throw new Error('親Warpの編集座標へ変換できません。');
+      return executeRigTool(session,{context,tool:'warp.move',input:{controlPointIds:input.controlPointIds,x:b.point.x-a.point.x,y:b.point.y-a.point.y}});
+    }
     case 'warp.remove':return session.execute({type:'deformer.remove',payload:{deformerId:context.deformerId}});
     case 'warp.rename':return session.execute({type:'deformer.rename',payload:{deformerId:context.deformerId,displayName:input.displayName}});
     case 'warp.attach':return session.execute({type:'deformer.reparent_node',payload:{nodeId:context.nodeId,parentId:input.parentNodeId}});
@@ -129,12 +141,12 @@ export function executeRigTool(session, {context = {}, tool, input = {}}) {
       return controller.replaceInfluences(input.vertexId,input.influences);
     }
     case 'weight.remove':return session.execute({type:'skin.remove_binding',payload:{bindingId:context.bindingId}});
-    case 'weight.enabled':return session.execute({type:'skin.set_binding_enabled',payload:{bindingId:context.bindingId,enabled:input.enabled}});
+    case 'weight.enabled':return session.execute({type:'skin.set_enabled',payload:{bindingId:context.bindingId,enabled:input.enabled}});
     case 'clipping.source':return new ClippingAuthoringController(session,{idFactory}).setSource(context.nodeId,input.sourceNodeId);
     case 'clipping.enabled':return new ClippingAuthoringController(session,{idFactory}).setEnabled(context.nodeId,input.enabled);
     case 'clipping.remove':return new ClippingAuthoringController(session,{idFactory}).remove(context.nodeId);
     case 'form.move':case 'form.reset':{
-      const state=meshContext(session,{nodeId:context.nodeId,keyformId:context.keyformId}).preparation.getState();
+      const state=meshContext(session,{nodeId:context.nodeId,keyformId:context.keyformId,keyArtId:context.keyArtId}).preparation.getState();
       if(!state.topology||!state.semanticSlot)throw new Error('Select a prepared Part mesh.');
       const form=new FormCorrectionAuthoringController(session,{idFactory});
       form.setContext({topologyId:state.topology.id,semanticSlotId:state.semanticSlot.id,keyArtId:context.keyArtId,targetNodeId:context.nodeId});

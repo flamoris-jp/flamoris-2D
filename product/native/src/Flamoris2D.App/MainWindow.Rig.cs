@@ -28,12 +28,7 @@ public partial class MainWindow
         MeshCanvas.BoneCreateRequested+=async(a,b)=>await RunRigEditAsync(()=>RigEdit.BoneAt(a.X,a.Y,b.X,b.Y));
         MeshCanvas.BoneDeleteRequested+=async()=>await RunRigEditAsync(RigEdit.RemoveBone);
         MeshCanvas.WeightPaintRequested+=async(vertices,strength,subtract)=>await RunRigEditAsync(()=>RigEdit.Paint(vertices,strength,subtract));
-        MeshCanvas.WarpMoveRequested+=async(a,b)=>await RunRigEditAsync(()=>
-        {
-            var warp=ArrayOf(_rigSnapshot,"warps").First(w=>String(w,"id")==_selectedWarpId);
-            var world=MeshViewport.Transform(warp.GetProperty("worldTransform"));var from=world.Inverse(a);var to=world.Inverse(b);
-            return RigEdit.MoveWarp(_selectedControlPoints.ToArray(),to.X-from.X,to.Y-from.Y);
-        });
+        MeshCanvas.WarpMoveRequested+=async(a,b)=>await RunRigEditAsync(()=>RigEdit.MoveWarpDocument(_selectedControlPoints.ToArray(),a.X,a.Y,b.X,b.Y));
     }
     private RigContext CurrentRigContext()
     {
@@ -64,7 +59,7 @@ public partial class MainWindow
         MeshCanvas.RigSubcontext=_rigContext;MeshCanvas.RigTool=_rigTool;
         if(_editingContext==EditingContext.Rig)
         {
-            ToolList.ItemsSource=_rigContext=="Weight"?new[]{"選択","塗る","消す"}:new[]{"選択","移動","追加","削除"};
+            ToolList.ItemsSource=_rigContext=="Weight"?new[]{"選択","塗る","消す"}:_rigContext=="Warp"?new[]{"選択","移動"}:new[]{"選択","移動","追加","削除"};
             ToolList.SelectedItem=_rigTool;
             ActiveContextBadge.Text=$"リグ / {_rigContext}";
             ActiveToolSettingsText.Text=$"{_rigTool} — {_rigContext}の編集";

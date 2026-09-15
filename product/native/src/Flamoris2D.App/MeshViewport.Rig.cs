@@ -25,6 +25,7 @@ public sealed partial class MeshViewport
     public event Action<Point2,Point2>? BoneCreateRequested;
     public event Action? BoneDeleteRequested;
     public event Action<Point2,Point2>? WarpMoveRequested;
+    public event Action<RigEdit?>? RigPreviewChanged;
     public event Action<string[],double,bool>? WeightPaintRequested;
     public void ApplyRig(JsonElement rig,string? boneId,string? warpId,bool poseMode,HashSet<string> controlPoints)
     { _rig=rig;_boneId=boneId;_warpId=warpId;_poseMode=poseMode;_controlPoints=new(controlPoints);InvalidateVisual(); }
@@ -54,8 +55,8 @@ public sealed partial class MeshViewport
         }
         else if(RigSubcontext=="Warp"&&SelectedWarp is {ValueKind:JsonValueKind.Object} warp)
         {
-            var points=Items(warp,"positions");var columns=warp.GetProperty("columns").GetInt32();var world=Transform(warp.GetProperty("worldTransform"));
-            Point At(int i){var p=world.Apply(new(points[i].GetProperty("x").GetDouble(),points[i].GetProperty("y").GetDouble()));
+            var points=Items(warp,"documentPositions");var columns=warp.GetProperty("columns").GetInt32();
+            Point At(int i){var p=new Point2(points[i].GetProperty("x").GetDouble(),points[i].GetProperty("y").GetDouble());
                 if(_controlPoints.Contains(Id(points[i],"controlPointId")!)&&_rigStart is { } a&&_rigCurrent is { } b)p=new(p.X+b.X-a.X,p.Y+b.Y-a.Y);return RigScreen(p);}
             for(var i=0;i<points.Length;i++)
             {
@@ -97,8 +98,7 @@ public sealed partial class MeshViewport
         }
         else if(RigSubcontext=="Warp"&&SelectedWarp is {ValueKind:JsonValueKind.Object} warp)
         {
-            var world=Transform(warp.GetProperty("worldTransform"));
-            var hit=Items(warp,"positions").Select(p=>(Item:p,Point:Camera.ToView(world.Apply(new(p.GetProperty("x").GetDouble(),p.GetProperty("y").GetDouble())))))
+            var hit=Items(warp,"documentPositions").Select(p=>(Item:p,Point:Camera.ToView(new(p.GetProperty("x").GetDouble(),p.GetProperty("y").GetDouble()))))
                 .OrderBy(p=>Math.Pow(p.Point.X-pointer.X,2)+Math.Pow(p.Point.Y-pointer.Y,2)).FirstOrDefault();
             if(hit.Item.ValueKind==JsonValueKind.Object&&Math.Pow(hit.Point.X-pointer.X,2)+Math.Pow(hit.Point.Y-pointer.Y,2)<=100)
             {
@@ -123,12 +123,14 @@ public sealed partial class MeshViewport
         if(_rigStart is null)return false;_rigCurrent=Camera.ToDocument(pointer);
         if(RigSubcontext=="Weight")
             for(var i=0;i<VertexIds.Length;i++){var p=Screen(DisplayedPositions[i*2],DisplayedPositions[i*2+1]);if(Math.Pow(p.X-pointer.X,2)+Math.Pow(p.Y-pointer.Y,2)<=144)_paintVertices.Add(VertexIds[i]);}
+        else if(RigTool=="移動"&&_rigStart is { } a&&_rigCurrent is { } b)
+            RigPreviewChanged?.Invoke(RigSubcontext=="Bone"?RigEdit.MoveBoneDocument(a.X,a.Y,b.X,b.Y,_poseMode):RigEdit.MoveWarpDocument(_controlPoints.ToArray(),a.X,a.Y,b.X,b.Y));
         InvalidateVisual();return true;
     }
     private bool RigUp(Point2 pointer)
     {
         if(_rigStart is not { } start)return false;
-        var end=Camera.ToDocument(pointer);var vertices=_paintVertices.ToArray();_rigStart=_rigCurrent=null;_paintVertices.Clear();ReleaseMouseCapture();
+        var end=Camera.ToDocument(pointer);var vertices=_paintVertices.ToArray();_rigStart=_rigCurrent=null;_paintVertices.Clear();RigPreviewChanged?.Invoke(null);ReleaseMouseCapture();
         if(RigSubcontext=="Bone")
         {
             if(RigTool=="追加")BoneCreateRequested?.Invoke(start,end);
@@ -138,5 +140,5 @@ public sealed partial class MeshViewport
         else if(RigSubcontext=="Weight"&&vertices.Length>0)WeightPaintRequested?.Invoke(vertices,WeightStrength,RigTool=="消す");
         InvalidateVisual();return true;
     }
-    private void CancelRig(){_rigStart=_rigCurrent=null;_paintVertices.Clear();}
+    private void CancelRig(){var active=_rigStart is not null;_rigStart=_rigCurrent=null;_paintVertices.Clear();if(active)RigPreviewChanged?.Invoke(null);}
 }

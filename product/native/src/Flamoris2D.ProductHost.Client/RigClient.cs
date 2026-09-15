@@ -37,6 +37,7 @@ public sealed class RigEdit
     public static RigEdit AttachWarp(string parentNodeId) => new("warp.attach",new {parentNodeId});
     public static RigEdit WarpGrid(int size) => new("warp.grid",new {size});
     public static RigEdit MoveWarp(string[] controlPointIds,double x,double y) => new("warp.move",new {controlPointIds,x,y});
+    public static RigEdit MoveWarpDocument(string[] controlPointIds,double sx,double sy,double ex,double ey) => new("warp.moveDocument",new {controlPointIds,start=new {x=sx,y=sy},end=new {x=ex,y=ey}});
     public static RigEdit ResetWarp(string[] controlPointIds) => new("warp.reset",new {controlPointIds});
     public static RigEdit CreateSkin(string topologyId) => new("weight.create",new {topologyId});
     public static RigEdit Paint(string[] vertexIds,double strength,bool subtract) => new("weight.paint",new {vertexIds,strength,operation=subtract?"subtract":"add"});

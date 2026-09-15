@@ -27,6 +27,12 @@ public partial class MainWindow
 
     private void InitializeRenderUi()
     {
+        MeshCanvas.RigPreviewChanged += edit =>
+        {
+            _pendingRigPreview = edit is null ? null : new(CurrentRigContext(),edit);
+            Interlocked.Increment(ref _layoutInputGeneration);Interlocked.Increment(ref _renderGeneration);_renderWork?.Cancel();
+            if(!_layoutRenderRunning)_=DrainLayoutPreviewAsync();
+        };
         MeshCanvas.FormPreviewChanged += delta =>
         {
             _pendingRigPreview = delta is { } d ? new(CurrentRigContext(),RigEdit.FormMove(MeshCanvas.Selected.ToArray(),d.X,d.Y)) : null;
