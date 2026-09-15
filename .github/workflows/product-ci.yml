@@ -24,5 +24,8 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Install pinned Product source decoder
+        run: npm install --prefix product --workspaces=false --omit=dev --ignore-scripts --package-lock=false
+
       - name: Deterministic Product unit tests
         run: npm test

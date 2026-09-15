@@ -91,7 +91,7 @@ export class EditorSession {
     return this.executeTransaction([command], options);
   }
 
-  executeTransaction(commands, { label = "Edit" } = {}) {
+  prepareTransaction(commands) {
     if (!Array.isArray(commands) || commands.length === 0) {
       throw new CommandError(
         "A transaction needs at least one command.",
@@ -111,6 +111,17 @@ export class EditorSession {
     if (issues.some((entry) => entry.severity === "error")) {
       throw new TransactionError(issues);
     }
+    return { draft, inverses, affected, issues };
+  }
+
+  // A disposable Product-validated command draft: no second EditorSession, revision or history.
+  previewTransaction(commands, projectResult) {
+    if (typeof projectResult !== "function") throw new TypeError("Preview requires a result projector.");
+    return projectResult(this.prepareTransaction(commands).draft);
+  }
+
+  executeTransaction(commands, { label = "Edit" } = {}) {
+    const { draft, inverses, affected, issues } = this.prepareTransaction(commands);
     const entry = {
       label,
       commands: cloneProject(commands),

@@ -37,6 +37,10 @@ public partial class MainWindow : Window, IAsyncDisposable
         foreach (var definition in EditingContextCatalog.All)
             _activeTools[definition.Context] = definition.Tools[0];
         InitializeMeshUi();
+        InitializeDocumentUi();
+        InitializeRenderUi();
+        InitializeRigUi();
+        InitializeAnimationUi();
         Loaded += MainWindow_Loaded;
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         SwitchContext(EditingContext.Source, returnFocus: false);
@@ -44,7 +48,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        if (_autoConnect) await ConnectHostAsync(createDocument: true);
+        if (_autoConnect) { await ConnectHostAsync(createDocument: true);await LoadNativeSettingsAsync();await ShowRecoveryCardAsync(); }
     }
 
     private async Task ConnectHostAsync(bool createDocument)
@@ -61,6 +65,8 @@ public partial class MainWindow : Window, IAsyncDisposable
         {
             var hostPath = Path.Combine(AppContext.BaseDirectory, "ProductHost", "main.mjs");
             var nodePath = Environment.GetEnvironmentVariable("FLAMORIS_NODE_PATH");
+            var bundledNode = Path.Combine(AppContext.BaseDirectory,"runtime","node.exe");
+            if(string.IsNullOrWhiteSpace(nodePath)&&File.Exists(bundledNode))nodePath=bundledNode;
             var handshake = await _client.StartAsync(hostPath, nodePath);
             HostStatusIndicator.Fill = Brushes.SeaGreen;
             HostStatusText.Text =
@@ -98,6 +104,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             try
             {
                 TargetList.ItemsSource = _targets.Targets;
+                FilterTargets();
                 TargetList.SelectedItem = _targets.Selected;
             }
             finally { _updatingTargets = false; }
@@ -107,13 +114,20 @@ public partial class MainWindow : Window, IAsyncDisposable
             RedoMenuItem.IsEnabled = RedoButton.IsEnabled = canRedo;
             RefreshButton.IsEnabled = true;
             var projectName = snapshot.Payload.GetProperty("summary").GetProperty("displayName").GetString() ?? "名称未設定";
-            Title = $"FLAMORIS 2D — {projectName}";
+            Title = $"FLAMORIS 2D — {projectName}{(snapshot.Payload.GetProperty("isDirty").GetBoolean() ? " *" : "")}";
+            SaveMenuItem.IsEnabled = !_hasHandsOn && !_documentBusy;
             RevisionText.Text = $"revision {client.Revision}";
             TargetList.IsEnabled = !_targetMutationPending && !_meshBusy;
             // A draft outlives keyboard focus and retains its starting revision.
             if (_propertySnapshot?.Id != _targets.SelectedId || !HasPropertyDraft)
                 UpdateSelectionEditor();
+            UpdateRenderChoices(snapshot.Payload);
             await RefreshMeshAsync(client);
+            await RefreshEvaluatedFrameAsync(client);
+            await RefreshRigAsync(client);
+            await RefreshTimelineAsync(client);
+            await RefreshExportAsync(client);
+            await RefreshKeyStateAsync(client);
         }
         catch (StaleProjectionException)
         {
@@ -131,25 +145,23 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async void NewDocument_Click(object sender, RoutedEventArgs e)
     {
-        if (_loadingArtwork || _meshBusy || !ConfirmDiscardHandsOn()) return;
-        if (_client?.IsRunning != true)
-        {
-            await ConnectHostAsync(createDocument: true);
-            return;
-        }
         try
         {
+            if (!await ConfirmReplaceDocumentAsync()) return;
+            if (_client?.IsRunning != true) { await ConnectHostAsync(createDocument: true); return; }
+            AssertReplacementApproval();
             await _client.CreateSessionAsync("名称未設定", 1920, 1080);
-            _hasHandsOn = false;
+            _hasHandsOn = false; _currentPath = null; _lastRecovery = null;
             AttachDocumentWorkspace(_client.DocumentToken!);
             await RefreshProjectionAsync();
-            StatusText.Text = "新しいProduct Host documentを作成しました。";
+            StatusText.Text = "新しいプロジェクトを作成しました。";
         }
-        catch (Exception error) { StatusText.Text = $"新規セッションを作成できませんでした: {error.Message}"; }
+        catch (Exception error) { StatusText.Text = $"新規プロジェクトを作成できませんでした: {error.Message}"; }
     }
 
     private async void Refresh_Click(object sender, RoutedEventArgs e)
     {
+        _contextDraft=false;
         try { await RefreshProjectionAsync(); }
         catch (Exception error) { StatusText.Text = $"状態を更新できませんでした: {error.Message}"; }
     }
@@ -233,6 +245,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private void ClearProjection()
     {
+        ClearRenderProjection();
         ClearMeshProjection();
         _propertySnapshot = null;
         _propertyRevision = -1;
@@ -284,6 +297,10 @@ public partial class MainWindow : Window, IAsyncDisposable
             ? new GridLength(190) : new GridLength(0);
         UpdateToolSettings();
         ConfigureMeshContext();
+        ConfigureRigContext();
+        ConfigureAnimationContext();
+        ConfigureExportContext();
+        if (_client?.HasAuthoritativeProjection == true) _ = RefreshRigSurfaceAsync();
         if (returnFocus) MeshCanvas.Focus();
     }
 
@@ -305,6 +322,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             _activeTools[_editingContext] = tool;
             UpdateToolSettings();
             SetMeshTool();
+            if(_editingContext==EditingContext.Rig){_rigTool=tool;MeshCanvas.RigTool=tool;}
             MeshCanvas.Focus();
         }
     }
@@ -316,6 +334,17 @@ public partial class MainWindow : Window, IAsyncDisposable
         ActiveToolSettingsText.Text = $"{tool} — {definition.ClickMeaning}";
     }
 
+    private void FilterTargets()
+    {
+        if(TargetList?.ItemsSource is null)return;
+        var text=TargetSearch.Text.Trim();
+        System.Windows.Data.CollectionViewSource.GetDefaultView(TargetList.ItemsSource).Filter=item=>item is TargetProjection target&&(text.Length==0||target.DisplayName.Contains(text,StringComparison.OrdinalIgnoreCase)||target.Id.Contains(text,StringComparison.OrdinalIgnoreCase));
+    }
+    private void TargetSearch_Changed(object sender,TextChangedEventArgs e)
+    {
+        if(TargetList is null)return;
+        _updatingTargets=true;try{FilterTargets();TargetList.SelectedItem=_targets.Selected;}finally{_updatingTargets=false;}
+    }
     private async void TargetList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_updatingTargets) return;
@@ -400,7 +429,14 @@ public partial class MainWindow : Window, IAsyncDisposable
             _meshWork?.Cancel(); MeshCanvas.Cancel(); CancelGenerated(); MeshCanvas.Focus();
             e.Handled = true; return;
         }
-        if (_meshBusy || _loadingArtwork) return;
+        if (_meshBusy || _loadingArtwork || _documentBusy) return;
+        if (Keyboard.Modifiers == ModifierKeys.Control && e.Key is Key.S or Key.O or Key.N)
+        {
+            if (e.Key == Key.S) SaveDocument_Click(sender, e);
+            else if (e.Key == Key.O) OpenDocument_Click(sender, e);
+            else NewDocument_Click(sender, e);
+            e.Handled = true; return;
+        }
         if (Keyboard.Modifiers == ModifierKeys.Control &&
             e.Key >= Key.D1 && e.Key <= Key.D7)
         {
@@ -430,7 +466,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private void About_Click(object sender, RoutedEventArgs e) =>
         MessageBox.Show(this,
-            "FLAMORIS 2D native shell foundation\nProduct authority: JavaScript Product Host / EditorSession",
+            "FLAMORIS 2D Native\n素材の読込からアニメーション・書き出しまで制作できます。\n制作候補 — 従来版との切替は最終確認後に行います。",
             "FLAMORIS 2D", MessageBoxButton.OK, MessageBoxImage.Information);
 
     private void SetBusy(string message)
@@ -444,7 +480,12 @@ public partial class MainWindow : Window, IAsyncDisposable
     private async void MainWindow_Closing(object? sender, CancelEventArgs e)
     {
         if (_closingAfterShutdown) return;
-        if (!ConfirmDiscardHandsOn()) { e.Cancel = true; return; }
+        e.Cancel = true;
+        if (_closePromptActive) return;
+        _closePromptActive = true;
+        try { if (!await ConfirmReplaceDocumentAsync()) return; AssertReplacementApproval(); }
+        catch (Exception error) { StatusText.Text = error.Message; return; }
+        finally { _closePromptActive = false; }
         _meshWork?.Cancel();
         MeshCanvas.Cancel();
         e.Cancel = true;
@@ -502,16 +543,22 @@ public partial class MainWindow : Window, IAsyncDisposable
                 throw new InvalidOperationException("Context switching changed object selection.");
         }
         await RunMeshSmokeAsync();
+        await RunProductionSmokeAsync();
         await _client.ShutdownAsync();
     }
 
     public async ValueTask DisposeAsync()
     {
         if (_disposed) return;
+        _recoveryTimer.Stop();
+        StopPlayback();
+        _exportWork?.Cancel();
         _disposed = true;
         _meshWork?.Cancel();
         var client = _client; _client = null;
+        _renderWork?.Cancel();
         if (client is not null) await client.DisposeAsync();
+        await Task.Run(() => _renderer?.Dispose());
         // Pending refresh continuations still release this managed semaphore; no WaitHandle is allocated.
     }
 

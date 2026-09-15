@@ -1,20 +1,26 @@
-# FLAMORIS 2D native shell foundation
+# FLAMORIS 2D Native production candidate
 
-This directory contains the Phase 1 .NET 10 / WPF shell and its typed Product Host client.
-The existing JavaScript Product remains the only persistent editing authority.
+The .NET 10/WPF editor now connects the production Source → Mesh → Rig → Deform →
+Animation → Preview → Export workflow to the existing authoritative JavaScript Product.
+Start with the [Japanese production guide](../../docs/native-production-workflow.md).
+The [completion ledger](../../docs/native-capability-map.md) records every production
+capability and public Command/Query disposition. PR #101 is the review surface.
 
-The Issue #96 Mesh-first checkpoint adds **PNGでMesh体験…**, a disposable native
-reference-art/Structure/Layout workflow. Start with the
-[Windows Mesh hands-on guide](../../docs/native-mesh-hands-on.md#windows-hands-on--japanese-quick-path).
-PNG loading is not production Open, and the session cannot be saved.
+## Run the portable candidate
 
-## Build and smoke proof
+Download the `flamoris2d-native-production-candidate-win-x64` artifact from the latest
+successful Native Shell Boundary run on PR #101. Extract the entire directory and run
+`Flamoris2D.exe` on Windows x64. The package includes a self-contained .NET 10 runtime,
+Node 24.21.0, the exact Product Host/worker dependency graph, pinned PSD decoder and
+pinned LGPL shared FFmpeg distribution. Keep these files beside the executable.
+No developer runtime installation or command prompt is required. The candidate does
+not register `.fl2d` or replace the installed Electron version.
 
-Prerequisites:
+## Build and tests
 
-- Windows 10/11;
-- .NET 10 SDK; and
-- Node.js 24 (or set `FLAMORIS_NODE_PATH` to the reviewed Node executable).
+Development prerequisites: Windows 10/11 x64, .NET 10 SDK and Node 24. Install the
+Product dependency with `npm install --prefix product --workspaces=false --omit=dev
+--ignore-scripts --package-lock=false` from the repository root (one command).
 
 ```powershell
 dotnet build product/native/Flamoris2D.Native.sln -c Release
@@ -23,52 +29,32 @@ dotnet run --project product/native/src/Flamoris2D.App -c Release --no-build -- 
 dotnet run --project product/native/src/Flamoris2D.App -c Release
 ```
 
-The app project copies the reviewed Product Host entry and its JavaScript Product graph under
-`ProductHost/` in the output directory. Phase 1 does not yet bundle `node.exe`, claim the
-`.fl2d` file association, replace the Electron release, or implement native Save/Open.
+`ProductHost.files.props` is the explicit native source allowlist: main Host and both
+workers, closed over their relative import graph. Build dependencies include no tests,
+private artwork, Electron, index.html or DOM view modules. Existing pure JavaScript
+controllers/evaluators remain authoritative. The package graph is protected by
+`product/tests/production-manifest.test.js`. CI assembles the exact runtimes/notices,
+records packaged SHA256 values and launches the published executable with developer
+Node/.NET absent from PATH. `THIRD-PARTY-NOTICES.md` records upstream provenance.
 
-## Authority boundary
+With `FLAMORIS_RENDER_FIXTURE_DIR` set, native Host tests produce synthetic PSD/flimg and
+canonical renderer fixtures. The WPF smoke then authors an eight-second shot, exports
+240 PNGs plus real H.264 (`FLAMORIS_TEST_FFMPEG`), saves/reopens/resumes, exercises reimport
+and Key State/Transition editing, and checks source-frame parity. Fixtures are never
+copied into the runtime package. Without that variable the ordinary boundary/input
+smoke still runs, and does not claim the extended production fixture passed.
 
-```text
-WPF gesture
-  -> typed Product Command / Transaction
-  -> framed Product Host request
-  -> one JavaScript EditorSession
-  -> Project / history
-```
+## Authority and acceptance
 
-WPF retains only editing-context workspace state and revision-tagged projections. A host exit
-clears the document token and projected Parts/Objects, disables mutation, and shows the restart
-surface. It never serializes the projection as a substitute Project.
+WPF gestures send typed commands/transactions to one EditorSession. Immutable
+revision-tagged projections and local drafts are not a C# Project or second history.
+Canonical render plans drive D3D11 hardware/WARP; coalesced command-draft previews do
+not mutate history. Save uses immutable Host bytes and a revision-qualified receipt
+acknowledged only after durable atomic write. Recovery cleanup is lineage/snapshot
+scoped. See ADRs 0007–0009 for the implementation decisions and measured limits.
 
-## Manual Windows pass
-
-Run the app normally and verify:
-
-1. menu/window keyboard focus follows Windows conventions;
-2. Ctrl+1 through Ctrl+7 switches Source, Mesh, Rig, Deform, Animation, Preview, Export;
-3. only Animation allocates the bottom Timeline surface;
-4. left active tool, top tool meaning, right target selection, and Properties remain distinct;
-5. applying name/visibility/lock in Properties runs one Product transaction and one Undo restores all three;
-6. ending the Product Host process clears projected state and disables editing;
-7. restart creates a new authoritative Phase 1 session and does not claim recovery of the lost one.
-
-Issue #96 additionally requires checking that a row visibility/lock action addresses
-that row without changing the selected target, hidden/locked targets remain selected,
-and context switching preserves selection. Uncommitted Properties inputs retain their
-starting revision even after losing focus. If Product changes in the meantime, Apply
-rejects the old draft and reloads the current state. Ctrl+Z inside a textbox is text
-editing, not Project Undo. These routed-input checks still need a human Windows pass.
-
-The automated smoke checks transaction/history, retained unfocused drafts, stale Apply,
-visibility/lock projection and seven-context selection/time-surface behavior. It does
-not simulate a full mouse/keyboard session or open production artwork. The foundation
-New/restart commands create empty sessions and are not a finished dirty-close lifecycle.
-
-See [`../../docs/native-capability-map.md`](../../docs/native-capability-map.md) for the
-exact migrated subset and the Recovery, bulk-asset and renderer gates. `session.workspace`
-is an additive bundled Host/client read returning tree, summary and history availability
-at one tagged revision; it introduces no Project or MCP schema change.
-
-Full document recovery, final evaluated native rendering, PSD/.flimg import, Save/Open, packaging of the Node runtime, and
-Electron retirement are intentionally later phases.
+Final physical Windows checks cover real user artwork, 100/125/150/200% DPI, focus,
+pointer feel, overlay contrast, discoverability and file-dialog/save behavior. The
+portable smoke does not prove a signed installer, association, update/uninstall, live
+external MCP attachment, or Electron retirement. Those accepted release gates remain
+open; Electron stays until the migration design's stop conditions pass.

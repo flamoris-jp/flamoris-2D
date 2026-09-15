@@ -152,7 +152,12 @@ export function createProjectFromPsd(
 }
 
 export function reconcilePsdProject(project, psd, options = {}) {
-  const imported = createProjectFromPsd(psd, options);
+  return reconcileImportedPsdProject(project, createProjectFromPsd(psd, options));
+}
+
+// A native decode worker can supply the same validated import without retaining
+// a second PSD/canvas graph in the editor process.
+export function reconcileImportedPsdProject(project, imported) {
   const indexBySource = (sourceProject) => {
     const index = new Map();
     for (const node of Object.values(sourceProject.scene.nodes)) {

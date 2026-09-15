@@ -1,5 +1,7 @@
 # Native Mesh hands-on checkpoint
 
+> Historical PR #100 proof. Production work supersedes its checkpoint limits; use [native-production-workflow.md](native-production-workflow.md) and [native-capability-map.md](native-capability-map.md).
+
 Baseline: main `63372daa44ddf6c862cac7c47a34ca388437a104`, merged #99.
 Scope: user-authorized #96 Mesh-first proof, not production Open/Save/Recovery.
 
@@ -68,7 +70,8 @@ raster copy and runtime overhead are additional bounded allocations, not include
 the JS heap limit. Cancel signals only the matching preview ID/document token; the
 Worker terminates before another preview is admitted. Failed previews write no history.
 
-The binary endpoint permits at most two simultaneous connections. All attached assets
+The binary endpoint permits at most sixteen connections, with a one-second idle
+keep-alive timeout so pooled clients do not exhaust the socket cap. All attached assets
 and upload reservations share the 64 MiB Host raster budget. Native presentation caches
 only these immutable bitmaps; one input decode/upload runs at a time. Replacing a large
 session may exceed the shared budget: explicitly choose New (discard confirmation)

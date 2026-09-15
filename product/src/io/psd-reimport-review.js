@@ -1,5 +1,5 @@
 import { cloneProject } from "../model/project.js";
-import { reconcilePsdProject } from "./psd-project.js";
+import { reconcilePsdProject, reconcileImportedPsdProject } from "./psd-project.js";
 
 function comparableSourceState(node) {
   return {
@@ -58,7 +58,9 @@ export class PsdReimportReview {
     this.currentProject = cloneProject(project);
     this.baseProjectId = project.id;
     this.baseRevision = options.baseRevision ?? null;
-    const reconciliation = reconcilePsdProject(project, psd, options);
+    const reconciliation = options.importedProject
+      ? reconcileImportedPsdProject(project, options.importedProject)
+      : reconcilePsdProject(project, psd, options);
     this.importedProject = reconciliation.importedProject;
     this.rows = [];
     this.nextRow = 0;

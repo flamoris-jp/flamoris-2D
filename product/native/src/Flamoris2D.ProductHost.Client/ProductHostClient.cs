@@ -96,7 +96,10 @@ public sealed partial class ProductHostClient : IAsyncDisposable
         int height = 1080,
         CancellationToken cancellationToken = default)
     {
-        var response = await SendAsync("session.create", new { name, width, height }, false, false, cancellationToken);
+        var replacing = HasAuthoritativeProjection;
+        cancellationToken.ThrowIfCancellationRequested();
+        var response = await SendAsync(replacing ? "document.new" : "session.create", new { name, width, height },
+            replacing, replacing, CancellationToken.None, replacingDocument: replacing);
         AttachOpenedDocument(response);
         return response;
     }

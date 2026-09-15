@@ -95,7 +95,7 @@ public sealed partial class ProductHostClient
     public async Task<byte[]> DownloadRasterAsync(string id, int byteLength, string token, long revision,
         CancellationToken cancellationToken = default)
     {
-        if (byteLength <= 0 || byteLength > 4194304 * 4) throw new ArgumentOutOfRangeException(nameof(byteLength));
+        if (byteLength <= 0 || byteLength > 512 * 1024 * 1024) throw new ArgumentOutOfRangeException(nameof(byteLength));
         AssertCurrent(token, revision);
         using var request = RasterRequest(HttpMethod.Get, id, token, revision);
         using var result = await RasterHttp.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
@@ -118,11 +118,11 @@ public sealed partial class ProductHostClient
         return response;
     }
     public Task<ProductHostResponse> GetMeshAsync(string? nodeId, string? keyformId = null,
-        CancellationToken cancellationToken = default) =>
-        SendAsync("mesh.projection", new { nodeId, keyformId }, false, true, cancellationToken);
+        CancellationToken cancellationToken = default, string? keyArtId = null) =>
+        SendAsync("mesh.projection", new { nodeId, keyformId, keyArtId }, false, true, cancellationToken);
     public Task<ProductHostResponse> EditMeshAsync(string nodeId, string? keyformId, MeshEdit edit,
-        long revision, CancellationToken cancellationToken = default) =>
-        SendAsync("mesh.tool", new { nodeId, keyformId, context = edit.Context, tool = edit.Tool, input = edit.Input },
+        long revision, CancellationToken cancellationToken = default, string? keyArtId = null) =>
+        SendAsync("mesh.tool", new { nodeId, keyformId, keyArtId, context = edit.Context, tool = edit.Tool, input = edit.Input },
             true, true, cancellationToken, revision);
     public async Task<ProductHostResponse> GenerateMeshAsync(string nodeId, bool contour, int columns, int rows,
         double alphaThreshold, double density, double cornerSensitivity, double interiorDensity,

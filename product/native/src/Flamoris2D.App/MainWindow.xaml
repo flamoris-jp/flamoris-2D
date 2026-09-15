@@ -63,20 +63,29 @@
     </Window.Resources>
 
     <DockPanel>
+        <ContentControl x:Name="RecoveryCard" DockPanel.Dock="Bottom" Visibility="Collapsed" Background="#FFF3D8" />
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="{DynamicResource Menu.File}">
                 <MenuItem Header="{DynamicResource Menu.New}" InputGestureText="Ctrl+N"
                           Click="NewDocument_Click" />
                 <Separator />
-                <MenuItem Header="PNGでMesh体験（保存不可）…" Click="LoadArtwork_Click" />
+                <MenuItem Header="素材を読み込む（PSD / Cutwork）…" Click="ImportSource_Click" />
+                <MenuItem Header="PSDを再取込・照合…" Click="ReimportSource_Click" />
+                <MenuItem Header="開く…" InputGestureText="Ctrl+O" Click="OpenDocument_Click" />
+                <MenuItem x:Name="RecentFilesMenu" Header="最近使ったファイル" />
                 <Separator />
                 <MenuItem x:Name="SaveMenuItem" Header="{DynamicResource Menu.Save}"
-                          InputGestureText="Ctrl+S" IsEnabled="False"
-                          ToolTip="Phase 1では保存dialogを接続しません。" />
+                          InputGestureText="Ctrl+S" IsEnabled="False" Click="SaveDocument_Click" />
+                <MenuItem Header="名前を付けて保存…" Click="SaveAsDocument_Click" />
+                <MenuItem Header="コピーを保存…" Click="SaveCopyDocument_Click" />
+                <MenuItem Header="別バージョンを保存…" Click="SaveIncrementalDocument_Click" />
+                <MenuItem Header="復元…" Click="Recovery_Click" />
+                <MenuItem Header="開発用"><MenuItem Header="PNG Mesh proof（保存不可）…" Click="LoadArtwork_Click" /></MenuItem>
                 <Separator />
                 <MenuItem Header="{DynamicResource Menu.Exit}" Click="Exit_Click" />
             </MenuItem>
             <MenuItem Header="{DynamicResource Menu.Edit}">
+                <MenuItem Header="保存・復元の設定…" Click="Preferences_Click" />
                 <MenuItem x:Name="UndoMenuItem" Header="{DynamicResource Menu.Undo}"
                           InputGestureText="Ctrl+Z" Click="Undo_Click" IsEnabled="False" />
                 <MenuItem x:Name="RedoMenuItem" Header="{DynamicResource Menu.Redo}"
@@ -98,8 +107,8 @@
                     <ToolBar Background="{StaticResource ChromeBrush}">
                         <Button Style="{StaticResource CommandButton}" Content="新規"
                                 Click="NewDocument_Click" />
-                        <Button Style="{StaticResource CommandButton}" Content="PNGでMesh体験…"
-                                Click="LoadArtwork_Click" ToolTip="透明PNGを複数選択できます。この体験セッションは保存されません。" />
+                        <Button Style="{StaticResource CommandButton}" Content="素材を読み込む…"
+                                Click="ImportSource_Click" ToolTip="PSDまたはCutwork素材を読み込みます。" />
                         <Button x:Name="CancelArtworkButton" Content="中止" Click="CancelMeshWork_Click" Visibility="Collapsed" />
                         <Button x:Name="RefreshButton" Style="{StaticResource CommandButton}"
                                 Content="状態を更新" Click="Refresh_Click" IsEnabled="False" />
@@ -191,6 +200,23 @@
                                    Text="選択 — 素材または配置対象を選択" />
                     </DockPanel>
                 </Border>
+                <WrapPanel Margin="8,4">
+                    <TextBlock Text="表示する状態" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <ComboBox x:Name="RenderOwnerList" MinWidth="220" MaxWidth="420" DisplayMemberPath="Label" SelectionChanged="RenderOwner_Changed" />
+                    <TextBlock x:Name="RenderStatusText" Margin="12,0" VerticalAlignment="Center" />
+                </WrapPanel>
+                <WrapPanel x:Name="PlaybackControls" Margin="8,4" Visibility="Collapsed">
+                    <Button Content="|◀" Click="StartTime_Click" Padding="7,4" />
+                    <Button x:Name="PlayButton" Content="▶ 再生" Click="Play_Click" Padding="10,4" Margin="5,0" />
+                    <CheckBox x:Name="LoopPlayback" Content="ループ" Margin="6,4" />
+                    <Slider x:Name="TimeSlider" Minimum="0" Maximum="1" Width="350" ValueChanged="TimeSlider_Changed" />
+                    <TextBlock x:Name="PlayheadText" VerticalAlignment="Center" Margin="8,0" />
+                </WrapPanel>
+                <WrapPanel x:Name="RigContextOptions" Margin="8,4" Visibility="Collapsed">
+                    <Button Content="Bone / 骨" Tag="Bone" Click="RigContext_Click" Padding="10,5" Margin="3" />
+                    <Button Content="Warp / 格子" Tag="Warp" Click="RigContext_Click" Padding="10,5" Margin="3" />
+                    <Button Content="Weight / ウェイト" Tag="Weight" Click="RigContext_Click" Padding="10,5" Margin="3" />
+                </WrapPanel>
                 <StackPanel x:Name="MeshOptions" Visibility="Collapsed" Background="#EEEAE7">
                     <WrapPanel Margin="8,4">
                         <ToggleButton x:Name="StructureButton" Content="構造 / Structure" IsChecked="True"
@@ -294,6 +320,7 @@
                     <DockPanel>
                         <TextBlock DockPanel.Dock="Top" Style="{StaticResource PanelHeader}"
                                    Text="{DynamicResource Panel.Targets}" />
+                        <TextBox x:Name="TargetSearch" DockPanel.Dock="Top" Margin="6,0,6,6" ToolTip="名前またはIDで対象を絞り込む" TextChanged="TargetSearch_Changed" />
                         <ListBox x:Name="TargetList" Margin="6,0,6,6"
                                  Background="#202124" Foreground="{StaticResource PanelTextBrush}"
                                  BorderBrush="#41444A" SelectionChanged="TargetList_SelectionChanged">
@@ -344,6 +371,8 @@
                             <TextBlock Margin="0,16,0,0" Foreground="#8F9298"
                                        TextWrapping="Wrap"
                                        Text="表示とロックは選択とは別です。確定した変更は、まとめて1回で元に戻せます。" />
+                            <StackPanel x:Name="AuthoringPanel" Visibility="Collapsed" Margin="0,12,0,0" />
+                            <StackPanel x:Name="KeyStatePanel" Visibility="Collapsed" Margin="0,12,0,0" />
                             <StackPanel x:Name="MeshPropertiesPanel" Visibility="Collapsed" Margin="0,12,0,0">
                                 <TextBlock x:Name="MeshPropertiesText" Foreground="White" TextWrapping="Wrap" />
                                 <TextBlock Text="選択した頂点の意味ラベル" Foreground="#AEB0B5" Margin="0,8,0,3" />
@@ -360,29 +389,17 @@
             </Grid>
 
             <Border x:Name="TimeSurface" Grid.Row="1" Grid.ColumnSpan="3"
-                    Background="#25272B" BorderBrush="#41444A" BorderThickness="0,1,0,0"
-                    Visibility="Collapsed">
+                    Background="#25272B" BorderBrush="#41444A" BorderThickness="0,1,0,0" Visibility="Collapsed">
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Left" Style="{StaticResource PanelHeader}"
-                               Text="{DynamicResource Panel.Timeline}" Width="112" />
-                    <Grid Margin="8">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-                        <StackPanel Orientation="Horizontal">
-                            <Button Content="◀" Width="32" Margin="2" IsEnabled="False" />
-                            <Button Content="▶" Width="32" Margin="2" IsEnabled="False" />
-                            <TextBlock Text="00:00:00:00" Foreground="#ECECEC"
-                                       VerticalAlignment="Center" Margin="10,0" />
-                        </StackPanel>
-                        <Border Grid.Row="1" Margin="0,8,0,0" Background="#1D1F22"
-                                BorderBrush="#4B4E54" BorderThickness="1">
-                            <TextBlock Text="Animation surface foundation — authoringは次Phase"
-                                       Foreground="#AEB0B5" Margin="12"
-                                       VerticalAlignment="Center" />
-                        </Border>
-                    </Grid>
+                    <WrapPanel DockPanel.Dock="Top" Margin="8,4">
+                        <TextBlock Text="タイムライン" Foreground="White" VerticalAlignment="Center" />
+                        <TextBlock Text="拡大" Foreground="LightGray" Margin="16,0,4,0" VerticalAlignment="Center" />
+                        <Slider x:Name="TimelineZoom" Minimum="1" Maximum="12" Value="1" Width="140" ValueChanged="TimelineZoom_Changed" />
+                        <TextBlock Text="キーやクリップをドラッグして移動 · クリックでプロパティを編集" Foreground="LightGray" Margin="16,0" VerticalAlignment="Center" />
+                    </WrapPanel>
+                    <ScrollViewer x:Name="TimelineScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                        <local:TimelineViewport x:Name="TimelineCanvas" Width="900" Height="110" />
+                    </ScrollViewer>
                 </DockPanel>
             </Border>
         </Grid>

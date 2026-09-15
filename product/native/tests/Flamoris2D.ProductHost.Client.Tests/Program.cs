@@ -13,6 +13,9 @@ await TestRoundTripAsync(hostPath);
 await TestTargetPropertiesAsync(hostPath);
 await TestMeshArtworkAsync(hostPath);
 await TestCrashInvalidationAsync(hostPath);
+await DocumentTests.RunAsync(hostPath);
+RasterizerTests.Run();
+await ExportTests.RunAsync();
 Console.WriteLine("Product Host C# client tests passed.");
 
 static void TestViewportGeometry()
@@ -38,6 +41,9 @@ static void TestViewportGeometry()
     var world = new Affine2(0, 2, -3, 0, 10, 20);
     Near(world.Inverse(world.Apply(point)), point);
     var collapsed = new Affine2(0, 0, 0, 1, 0, 0);
+    Assert(VertexPicking.HitTriangles([0,0,10,0,0,10],[0,1,2],world.Apply(new(2,2)),world),"Evaluated transformed triangle was not picked.");
+    Assert(!VertexPicking.HitTriangles([0,0,10,0,0,10],[0,1,2],world.Apply(new(9,9)),world),"Outside mesh area selected its bounding box.");
+    Assert(!VertexPicking.HitTriangles([0,0,0,0,0,0],[0,1,2],new(0,0),Affine2.Identity),"Degenerate mesh was picked.");
     Assert(!collapsed.IsInvertible, "Collapsed targets must not be pickable.");
     AssertThrows<InvalidOperationException>(() => collapsed.Inverse(point));
     double[] positions = [10, 20, 30, 40];

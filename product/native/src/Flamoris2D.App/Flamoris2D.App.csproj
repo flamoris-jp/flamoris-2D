@@ -10,21 +10,22 @@
     <AssemblyName>Flamoris2D</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Product>FLAMORIS 2D</Product>
-    <Description>Native FLAMORIS 2D editor shell foundation.</Description>
+    <Description>Native FLAMORIS 2D production editor candidate.</Description>
     <VersionPrefix>0.4.0</VersionPrefix>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Flamoris2D.Rendering\Flamoris2D.Rendering.csproj" />
     <ProjectReference Include="..\Flamoris2D.ProductHost.Client\Flamoris2D.ProductHost.Client.csproj" />
   </ItemGroup>
+  <Import Project="..\..\ProductHost.files.props" />
   <ItemGroup>
-    <None Include="..\..\..\product-host\**\*"
-          Link="ProductHost\%(RecursiveDir)%(Filename)%(Extension)"
-          CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\..\..\src\**\*.js"
-          Link="src\%(RecursiveDir)%(Filename)%(Extension)"
-          CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\..\package.json"
           Link="package.json"
           CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\node_modules\ag-psd\dist\**\*.js"
+          Link="node_modules\ag-psd\dist\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\node_modules\ag-psd\package.json;..\..\..\node_modules\ag-psd\LICENSE" Link="node_modules\ag-psd\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\node_modules\base64-js\**\*" Link="node_modules\base64-js\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\node_modules\pako\**\*" Link="node_modules\pako\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

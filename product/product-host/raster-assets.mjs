@@ -60,14 +60,18 @@ export class RasterAssets {
   clear() { for (const id of [...this.entries.keys()]) this.release(id); }
   async start() {
     this.server = createServer((req, res) => this.serve(req, res));
-    this.server.maxConnections = 2;
+    // HttpClient/undici retain idle pooled sockets between requests. A two-socket
+    // cap drops otherwise valid sequential requests before authentication runs.
+    // Bytes and upload reservations remain independently bounded.
+    this.server.maxConnections = 16;
+    this.server.keepAliveTimeout = 1000;
     this.server.requestTimeout = 30000;
     this.server.headersTimeout = 10000;
     await new Promise((resolve, reject) => {
       this.server.once("error", reject);
       this.server.listen(0, "127.0.0.1", resolve);
     });
-    this.timer = setInterval(() => this.sweep(), 1000);
+    this.timer = setInterval(() => { this.sweep(); this.documentTransfers?.sweep(); }, 1000);
     this.timer.unref();
     return { url: `http://127.0.0.1:${this.server.address().port}`, secret: this.secret,
       format: "bgra8-straight", limits: this.limits };
@@ -79,6 +83,7 @@ export class RasterAssets {
       const expected = Buffer.from(`Bearer ${this.secret}`);
       if (req.headers.origin || authorization.length !== expected.length ||
           !timingSafeEqual(authorization, expected)) { res.writeHead(403).end(); req.resume(); return; }
+      if (await this.documentTransfers?.serve(req, res)) return;
       const match = /^\/raster\/([a-f0-9-]{36})$/.exec(req.url);
       if (!match || !["GET", "PUT", "DELETE"].includes(req.method)) {
         res.writeHead(404).end(); req.resume(); return;
@@ -121,6 +126,7 @@ export class RasterAssets {
   async close() {
     clearInterval(this.timer);
     this.clear();
+    this.documentTransfers?.clear();
     if (this.server) {
       this.server.closeAllConnections();
       await new Promise(resolve => this.server.close(resolve));
