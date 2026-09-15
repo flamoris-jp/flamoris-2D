@@ -14,6 +14,7 @@
     <VersionPrefix>0.4.0</VersionPrefix>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Flamoris2D.Rendering\Flamoris2D.Rendering.csproj" />
     <ProjectReference Include="..\Flamoris2D.ProductHost.Client\Flamoris2D.ProductHost.Client.csproj" />
   </ItemGroup>
   <ItemGroup>

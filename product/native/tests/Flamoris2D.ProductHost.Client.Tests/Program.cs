@@ -14,6 +14,7 @@ await TestTargetPropertiesAsync(hostPath);
 await TestMeshArtworkAsync(hostPath);
 await TestCrashInvalidationAsync(hostPath);
 await DocumentTests.RunAsync(hostPath);
+RasterizerTests.Run();
 Console.WriteLine("Product Host C# client tests passed.");
 
 static void TestViewportGeometry()

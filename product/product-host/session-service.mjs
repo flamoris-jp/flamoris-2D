@@ -5,6 +5,7 @@ import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
 import { MCP_SCHEMA_VERSION } from "../src/mcp/schemas.js";
 import { createProject, PROJECT_SCHEMA_VERSION } from "../src/model/project.js";
 import { parseProjectDocument, serializeProject } from "../src/io/project-json.js";
+import { evaluatedProjection } from "./evaluated-projection.mjs";
 import { prepareDocumentArtwork, attachDocumentArtwork, NATIVE_ARTWORK_LIMITS } from "./document-artwork.mjs";
 import { DocumentTransfers } from "./document-transfer.mjs";
 import { initializeDocumentLifecycle, serializeDocument, prepareDocumentSave, acknowledgeDocumentSave } from "./document-lifecycle.mjs";
@@ -43,6 +44,7 @@ const METHODS = new Set([
   "headless.query",
   "headless.execute",
   "headless.executeTransaction",
+  "render.project",
   "document.reserve",
   "document.open",
   "source.import",
@@ -269,6 +271,8 @@ export class ProductHostService {
     }
 
     switch (request.method) {
+      case "render.project":
+        return evaluatedProjection(document, this.assets, payload);
       case "source.cancel":
         this.cancelImport(request); return { cancelled: true };
       case "source.import": {
