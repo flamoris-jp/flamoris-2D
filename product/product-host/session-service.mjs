@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { keyStateProjection, executeKeyStateTool, correspondence, registerSourceParts } from './key-state-authoring.mjs';
 import { initializeSourceHistory, collectSourceAssets, beginSourceReview, changeSourceReview, applySourceReview } from './source-reimport.mjs';
 import { Worker } from "node:worker_threads";
 import { EditorSession } from "../src/commands/editor.js";
@@ -21,6 +22,7 @@ import {
 } from "./protocol.mjs";
 
 const MUTATING_METHODS = new Set([
+  "keyState.tool",
   "source.applyReview",
   "session.execute",
   "session.executeTransaction",
@@ -34,6 +36,7 @@ const MUTATING_METHODS = new Set([
 ]);
 
 const METHODS = new Set([
+  "keyState.projection", "keyState.tool", "keyState.correspondence",
   "source.analyzeReimport", "source.changeReview", "source.applyReview", "source.discardReview",
   "protocol.handshake",
   "host.health",
@@ -290,6 +293,9 @@ export class ProductHostService {
     }
 
     switch (request.method) {
+      case 'keyState.projection':return keyStateProjection(document.session,payload);
+      case 'keyState.tool':return executeKeyStateTool(document.session,payload);
+      case 'keyState.correspondence':this.#assertExpectedRevision(request,document);return correspondence(document.session,payload.context,payload.input);
       case "source.analyzeReimport": {
         this.#assertExpectedRevision(request, document);
         document.sourceReview = null; collectSourceAssets(document, this.assets);
@@ -327,7 +333,9 @@ export class ProductHostService {
         const parsed = await this.importSource(payload, bytes);
         this.#assertExpectedRevision(request, document);
         const prepared = await prepareDocumentArtwork(parsed, this.assets);
-        return this.#openProject(parsed.project, { ...parsed, dirty: true }, prepared);
+        const opened = this.#openProject(parsed.project, { ...parsed, dirty: true }, prepared);
+        registerSourceParts(this.document.session);
+        return opened;
       }
       case "document.reserve":
         this.#assertExpectedRevision(request, document);

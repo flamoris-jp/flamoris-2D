@@ -1,0 +1,137 @@
+using System.Text.Json;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using Flamoris.Flamoris2D.ProductHost;
+namespace Flamoris.Flamoris2D.App;
+public partial class MainWindow
+{
+    private string? _keyTransitionId,_keySlotId,_keyPanelKey;
+    private readonly Dictionary<string,CorrespondencePin> _correspondencePins=[];
+    private long _pinRevision=-1;
+    private static StackPanel Section(Panel parent,string label,bool open=false)
+    {
+        var content=new StackPanel {Margin=new Thickness(5)};
+        parent.Children.Add(new Expander {Header=label,Content=content,IsExpanded=open,Foreground=Brushes.White,Margin=new Thickness(0,6,0,0)});return content;
+    }
+    private KeyStateContext CurrentKeyState()=>new(_renderChoice?.Kind=="keyArt"?_renderChoice.Id:null,_keyTransitionId,_keySlotId);
+    private async Task RunKeyStateAsync(Func<KeyStateEdit> make,KeyStateContext context,long revision)
+    {
+        if(_client?.HasAuthoritativeProjection!=true||_meshBusy||_documentBusy)return;
+        SetMeshBusy(true);MeshCanvas.Cancel();
+        try
+        {
+            var r=await _client.EditKeyStateAsync(context,make(),revision);
+            if(String(r.Payload,"keyArtId") is { } art){_renderChoice=new(art,"keyArt","原画");_meshChoices.Clear();}
+            if(String(r.Payload,"transitionId") is { } transition)_keyTransitionId=transition;
+            _contextDraft=false;_keyPanelKey=null;_correspondencePins.Clear();await RefreshProjectionAsync();StatusText.Text="原画・遷移の編集を確定しました。";
+        }
+        catch(Exception error){StatusText.Text=$"編集できませんでした: {error.Message}";}
+        finally{SetMeshBusy(false);}
+    }
+    private async Task RefreshKeyStateAsync(ProductHostClient client)
+    {
+        var active=_editingContext is EditingContext.Source or EditingContext.Mesh or EditingContext.Deform;
+        KeyStatePanel.Visibility=active?Visibility.Visible:Visibility.Collapsed;if(!active)return;
+        // Deleted selections are cleared before requesting the authoritative projection.
+        var empty=await client.GetKeyStateAsync(new());
+        if(!ArrayOf(empty.Payload,"transitions").Any(t=>String(t,"id")==_keyTransitionId))_keyTransitionId=null;
+        if(!ArrayOf(empty.Payload,"slots").Any(t=>String(t,"id")==_keySlotId))_keySlotId=null;
+        var context=CurrentKeyState();var response=await client.GetKeyStateAsync(context);var state=response.Payload;var revision=response.Revision!.Value;
+        client.AssertCurrent(response.DocumentToken!,revision);
+        if(_pinRevision!=revision){_correspondencePins.Clear();_pinRevision=revision;}
+        var key=$"{response.DocumentToken}/{context}/{_editingContext}/{_targets.SelectedId}/{MeshCanvas.KeyformId}";
+        if(_contextDraft&&_keyPanelKey==key)return;_keyPanelKey=key;KeyStatePanel.Children.Clear();
+        var artPanel=Section(KeyStatePanel,"原画・Key State",context.KeyArtId is null);
+        var selected=Property(state,"selectedKeyArt");var name=Field(artPanel,"原画名",String(selected,"displayName")??"新しい原画");
+        ActionButton(artPanel,"全パーツを表示対象へ含める",()=>RunKeyStateAsync(KeyStateEdit.IncludeSource,context,revision));
+        if(context.KeyArtId is not null)
+        {
+            ActionButton(artPanel,"この状態を複製して次の原画を作る",()=>RunKeyStateAsync(()=>KeyStateEdit.DuplicateArt(name.Text),context,revision));
+            ActionButton(artPanel,"原画名を更新",()=>RunKeyStateAsync(()=>KeyStateEdit.RenameArt(name.Text),context,revision));
+            ActionButton(artPanel,"原画を削除",()=>RunKeyStateAsync(KeyStateEdit.RemoveArt,context,revision));
+            var member=ArrayOf(selected,"members").FirstOrDefault(m=>String(m,"nodeId")==_targets.SelectedId);
+            if(member.ValueKind==JsonValueKind.Object)
+            {
+                var opacity=Field(artPanel,"選択パーツの不透明度 0〜1",Number(member,"opacity",1));var order=Field(artPanel,"原画内の重ね順",Number(member,"drawOrder"));
+                var presence=Choices(artPanel,"表示状態",new[]{new EntityChoice("present","表示"),new("absent","非表示"),new("occluded","遮蔽")},String(member,"presence"));
+                var node=String(member,"nodeId")!;ActionButton(artPanel,"パーツの表示状態を更新",()=>RunKeyStateAsync(()=>KeyStateEdit.Member(node,ReadNumber(opacity),Chosen(presence),checked((int)ReadNumber(order))),context,revision));
+            }
+        }
+        if(_editingContext==EditingContext.Mesh&&context.KeyArtId is not null&&MeshCanvas.KeyformId is { } keyformId&&!MeshCanvas.Structure)
+        {
+            var panel=Section(KeyStatePanel,"メッシュ全体の位置決め",true);Note(panel,"原画上の配置を変更します。ポーズ補正は「変形」で編集します。");
+            var x=Field(panel,"移動 X",0);var y=Field(panel,"移動 Y",0);var r=Field(panel,"回転（度）",0);var sx=Field(panel,"拡大率 X",1);var sy=Field(panel,"拡大率 Y",1);
+            var px=Field(panel,"基準点 X",0);var py=Field(panel,"基準点 Y",0);
+            ActionButton(panel,"位置決めを適用",()=>RunKeyStateAsync(()=>KeyStateEdit.Alignment(keyformId,ReadNumber(x),ReadNumber(y),ReadNumber(r)*Math.PI/180,ReadNumber(sx),ReadNumber(sy),ReadNumber(px),ReadNumber(py)),context,revision));
+        }
+        BuildTransitionPanel(state,context,revision);
+    }
+    private void BuildTransitionPanel(JsonElement state,KeyStateContext context,long revision)
+    {
+        var panel=Section(KeyStatePanel,"遷移・パーツ対応",_editingContext==EditingContext.Deform);
+        var transitions=Choices(panel,"編集する遷移",ArrayOf(state,"transitions").Select(t=>new EntityChoice(String(t,"id")!,String(t,"displayName")!)),_keyTransitionId);
+        transitions.SelectionChanged+=async(_,_)=>{_keyTransitionId=(transitions.SelectedItem as EntityChoice)?.Id;_contextDraft=false;_keyPanelKey=null;_correspondencePins.Clear();await RefreshRigSurfaceAsync();};
+        var transition=Property(state,"activeTransition");var name=Field(panel,"遷移名",String(transition,"displayName")??"新しい遷移");var seconds=Field(panel,"長さ（秒）",Number(state,"durationSeconds",1));
+        var arts=ArrayOf(state,"keyArts").Select(k=>new EntityChoice(String(k,"id")!,String(k,"displayName")!)).ToArray();
+        var from=Choices(panel,"開始原画 A",arts,String(transition,"fromKeyArtId")??context.KeyArtId);var to=Choices(panel,"終了原画 B",arts,String(transition,"toKeyArtId"));
+        ActionButton(panel,"遷移を作成",()=>RunKeyStateAsync(()=>KeyStateEdit.CreateTransition(name.Text,Chosen(from),Chosen(to),ReadNumber(seconds)),context,revision));
+        if(context.TransitionId is not null)
+        {
+            ActionButton(panel,"遷移名・長さを更新",()=>RunKeyStateAsync(()=>KeyStateEdit.UpdateTransition(name.Text,ReadNumber(seconds)),context,revision));
+            ActionButton(panel,"開始原画を変更",()=>RunKeyStateAsync(()=>KeyStateEdit.Endpoint(true,Chosen(from)),context,revision));
+            ActionButton(panel,"終了原画を変更",()=>RunKeyStateAsync(()=>KeyStateEdit.Endpoint(false,Chosen(to)),context,revision));
+            ActionButton(panel,"遷移を削除",()=>RunKeyStateAsync(KeyStateEdit.RemoveTransition,context,revision));
+            async Task SelectEndpoint(bool start){var art=start?Chosen(from):Chosen(to);_renderChoice=new(art,"keyArt","原画");_meshChoices.Clear();_contextDraft=false;await RefreshRigSurfaceAsync();}
+            ActionButton(panel,"AのKey Stateを編集",()=>SelectEndpoint(true));ActionButton(panel,"BのKey Stateを編集",()=>SelectEndpoint(false));
+            ActionButton(panel,"遷移をプレビュー",async()=>{_renderChoice=new(context.TransitionId,"transition","遷移");_timeTicks=0;SwitchContext(EditingContext.Preview,false);await RefreshRigSurfaceAsync();});
+        }
+        var slot=Choices(panel,"対応するパーツ（SemanticSlot）",ArrayOf(state,"slots").Select(s=>new EntityChoice(String(s,"id")!,String(s,"displayName")!)),context.SemanticSlotId);
+        slot.SelectionChanged+=async(_,_)=>{_keySlotId=(slot.SelectedItem as EntityChoice)?.Id;_contextDraft=false;_correspondencePins.Clear();await RefreshRigSurfaceAsync();};
+        var slotName=Field(panel,"パーツ対応名",ArrayOf(state,"slots").Where(s=>String(s,"id")==context.SemanticSlotId).Select(s=>String(s,"displayName")).FirstOrDefault()??"新しい対応");
+        ActionButton(panel,"パーツ対応を作成",()=>RunKeyStateAsync(()=>KeyStateEdit.CreateSlot(slotName.Text),context,revision));
+        if(context.SemanticSlotId is null)return;
+        var mapArt=Choices(panel,"対応付ける原画",arts,context.KeyArtId);var node=Choices(panel,"対応付けるパーツ",ArrayOf(state,"nodes").Select(n=>new EntityChoice(String(n,"id")!,String(n,"displayName")!)),_targets.SelectedId);
+        ActionButton(panel,"対応付けを適用",()=>RunKeyStateAsync(()=>KeyStateEdit.Map(Chosen(mapArt),Chosen(node)),context,revision));
+        ActionButton(panel,"この原画の対応を解除",()=>RunKeyStateAsync(()=>KeyStateEdit.Unmap(Chosen(mapArt)),context,revision));
+        ActionButton(panel,"パーツ対応名を更新",()=>RunKeyStateAsync(()=>KeyStateEdit.RenameSlot(slotName.Text),context,revision));
+        ActionButton(panel,"パーツ対応を削除",()=>RunKeyStateAsync(KeyStateEdit.RemoveSlot,context,revision));
+        if(context.TransitionId is null)return;
+        var part=Property(Property(state,"selectedSemanticSlot"),"partTransition");
+        var mode=Choices(panel,"遷移方法",new[]{new EntityChoice("morph","形状を補間"),new("hold","片側を保持"),new("replace","画像を切替"),new("appear","出現"),new("disappear","消失"),new("occlusion","遮蔽")},String(part,"mode")??"morph");
+        var hold=Check(panel,"保持する原画はA",true);var group=Field(panel,"切替の合成グループ（任意）","");
+        ActionButton(panel,"遷移方法を設定",()=>RunKeyStateAsync(()=>KeyStateEdit.Mode(Chosen(mode),hold.IsChecked==true,string.IsNullOrWhiteSpace(group.Text)?null:group.Text),context,revision));
+        var forms=ArrayOf(state,"keyforms").Where(k=>String(k,"semanticSlotId")==context.SemanticSlotId).ToArray();
+        var aForms=Choices(panel,"Aのメッシュ",forms.Where(k=>String(k,"keyArtId")==String(transition,"fromKeyArtId")).Select((k,i)=>new EntityChoice(String(k,"id")!,$"メッシュ {i+1}")),String(part,"fromKeyformId"));
+        var bForms=Choices(panel,"Bのメッシュ",forms.Where(k=>String(k,"keyArtId")==String(transition,"toKeyArtId")).Select((k,i)=>new EntityChoice(String(k,"id")!,$"メッシュ {i+1}")),String(part,"toKeyformId"));
+        ActionButton(panel,"共有Topologyと両端を接続",()=>RunKeyStateAsync(()=>KeyStateEdit.SharedTopology(String(forms.First(k=>String(k,"id")==Chosen(aForms)),"topologyId")!,Chosen(aForms),Chosen(bForms)),context,revision));
+        foreach(var diagnostic in ArrayOf(state,"diagnostics"))Note(panel,String(diagnostic,"message")??diagnostic.ToString());
+        BuildCorrespondencePanel(state,context,revision,part);
+    }
+    private void BuildCorrespondencePanel(JsonElement state,KeyStateContext context,long revision,JsonElement part)
+    {
+        var topology=ArrayOf(state,"topologies").FirstOrDefault(t=>String(t,"id")==String(part,"topologyId"));if(topology.ValueKind!=JsonValueKind.Object)return;
+        var panel=Section(KeyStatePanel,"対応付けピン・位置の補助");
+        var vertices=Property(topology,"vertexIds").EnumerateArray().Select((v,i)=>new EntityChoice(v.GetString()!,$"頂点 {i+1} · {v.GetString()}"));
+        var vertex=Choices(panel,"固定する頂点",vertices,MeshCanvas.Selected.FirstOrDefault());var x=Field(panel,"対応先 X",0);var y=Field(panel,"対応先 Y",0);
+        var preset=Choices(panel,"補助の強さ",new[]{new EntityChoice("soft","柔らかく"),new("normal","標準"),new("firm","強く")},"normal");var reverse=Check(panel,"B → Aへ対応付け",false);
+        var count=new TextBlock {Text=$"ピン {_correspondencePins.Count}点",Foreground=Brushes.White};panel.Children.Add(count);
+        ActionButton(panel,"ピンを追加・更新",()=>{try{var v=Chosen(vertex);_correspondencePins[v]=new(v,ReadNumber(x),ReadNumber(y));count.Text=$"ピン {_correspondencePins.Count}点";}catch(Exception error){StatusText.Text=error.Message;}return Task.CompletedTask;});
+        ActionButton(panel,"選択ピンを削除",()=>{if(vertex.SelectedItem is EntityChoice v)_correspondencePins.Remove(v.Id);count.Text=$"ピン {_correspondencePins.Count}点";return Task.CompletedTask;});
+        ActionButton(panel,"全ピンを解除",()=>{_correspondencePins.Clear();count.Text="ピン 0点";return Task.CompletedTask;});
+        ActionButton(panel,"対応位置を試す",async()=>
+        {
+            try
+            {
+                var result=await _client!.SolveCorrespondenceAsync(context,_correspondencePins.Values.ToArray(),Chosen(preset),reverse.IsChecked==true,revision);
+                var positions=Property(result.Payload,"candidatePositions");if(positions.ValueKind!=JsonValueKind.Array)throw new InvalidOperationException(Property(result.Payload,"diagnostics").ToString());
+                var targetId=String(result.Payload,"targetKeyformId")!;var target=ArrayOf(state,"keyforms").First(k=>String(k,"id")==targetId);
+                _renderChoice=new(String(target,"keyArtId")!,"keyArt","原画");await RefreshEvaluatedFrameAsync(_client,new(targetId,MeshViewport.Doubles(positions)));
+                StatusText.Text="対応補助のプレビューです。「適用」で確定します。";
+            }
+            catch(Exception error){StatusText.Text=error.Message;}
+        });
+        ActionButton(panel,"対応補助を適用",()=>RunKeyStateAsync(()=>KeyStateEdit.ApplyCorrespondence(_correspondencePins.Values.ToArray(),Chosen(preset),reverse.IsChecked==true),context,revision));
+        ActionButton(panel,"プレビューを取消",async()=>{_lastRenderKey=null;await RefreshRigSurfaceAsync();});
+    }
+}

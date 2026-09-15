@@ -105,7 +105,7 @@ public partial class MainWindow
         var token = client.DocumentToken!;
         var nodeId = _targets.SelectedId;
         _meshChoices.TryGetValue(nodeId ?? "", out var keyformId);
-        var response = await client.GetMeshAsync(nodeId, keyformId);
+        var response = await client.GetMeshAsync(nodeId, keyformId, keyArtId:_renderChoice?.Kind=="keyArt"?_renderChoice.Id:null);
         client.AssertCurrent(token, response.Revision!.Value);
         if (!ReferenceEquals(client, _client) || _targets.SelectedId != nodeId || _targets.Revision != response.Revision) return;
         if (_textureToken != token) { _textures.Clear(); _meshChoices.Clear(); _textureToken = token; }
@@ -257,7 +257,7 @@ public partial class MainWindow
         try
         {
             client.AssertCurrent(token, revision);
-            await client.EditMeshAsync(nodeId, keyformId, edit, revision);
+            await client.EditMeshAsync(nodeId, keyformId, edit, revision, keyArtId:_renderChoice?.Kind=="keyArt"?_renderChoice.Id:null);
             await RefreshProjectionAsync();
             var added = MeshCanvas.VertexIds.Where(id => !previousIds.Contains(id)).ToArray();
             if (MeshCanvas.NodeId == nodeId && added.Length == 1 && MeshCanvas.VertexIds.Length == previousIds.Count + 1)

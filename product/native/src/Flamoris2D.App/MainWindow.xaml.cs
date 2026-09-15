@@ -124,6 +124,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             await RefreshRigAsync(client);
             await RefreshTimelineAsync(client);
             await RefreshExportAsync(client);
+            await RefreshKeyStateAsync(client);
         }
         catch (StaleProjectionException)
         {
@@ -295,6 +296,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         ConfigureRigContext();
         ConfigureAnimationContext();
         ConfigureExportContext();
+        if (_client?.HasAuthoritativeProjection == true) _ = RefreshRigSurfaceAsync();
         if (returnFocus) MeshCanvas.Focus();
     }
 

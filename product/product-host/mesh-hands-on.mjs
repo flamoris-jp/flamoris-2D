@@ -30,6 +30,8 @@ export function createHandsOnProject(assets) {
 export function meshContext(session, input, strict = true) {
   const preparation = new MeshPreparationController(session);
   preparation.selectPart(input.nodeId);
+  const keyArtId = input.keyArtId || (input.keyformId && session.project.meshKeyforms.find(k => k.id === input.keyformId)?.keyArtId);
+  if (keyArtId) preparation.selectKeyArt(keyArtId);
   if (input.keyformId && (strict || preparation.getState().keyforms.some(k => k.id === input.keyformId)))
     preparation.selectKeyform(input.keyformId);
   const tools = new MeshToolController(session, preparation);

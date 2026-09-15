@@ -369,6 +369,7 @@
                                        TextWrapping="Wrap"
                                        Text="表示とロックは選択とは別です。確定した変更は、まとめて1回で元に戻せます。" />
                             <StackPanel x:Name="AuthoringPanel" Visibility="Collapsed" Margin="0,12,0,0" />
+                            <StackPanel x:Name="KeyStatePanel" Visibility="Collapsed" Margin="0,12,0,0" />
                             <StackPanel x:Name="MeshPropertiesPanel" Visibility="Collapsed" Margin="0,12,0,0">
                                 <TextBlock x:Name="MeshPropertiesText" Foreground="White" TextWrapping="Wrap" />
                                 <TextBlock Text="選択した頂点の意味ラベル" Foreground="#AEB0B5" Margin="0,8,0,3" />

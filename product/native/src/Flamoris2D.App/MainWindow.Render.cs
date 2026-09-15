@@ -69,6 +69,7 @@ public partial class MainWindow
         StopPlayback();
         _renderChoice = RenderOwnerList.SelectedItem as RenderChoice; _timeTicks = 0;
         _timelineContext = new(); _contextDraft = false;
+        _meshChoices.Clear();
         MeshCanvas.Cancel(); _lastRenderKey = null;
         try { await RefreshProjectionAsync(); } catch (Exception error) { StatusText.Text = error.Message; }
     }

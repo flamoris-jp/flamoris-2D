@@ -118,11 +118,11 @@ public sealed partial class ProductHostClient
         return response;
     }
     public Task<ProductHostResponse> GetMeshAsync(string? nodeId, string? keyformId = null,
-        CancellationToken cancellationToken = default) =>
-        SendAsync("mesh.projection", new { nodeId, keyformId }, false, true, cancellationToken);
+        CancellationToken cancellationToken = default, string? keyArtId = null) =>
+        SendAsync("mesh.projection", new { nodeId, keyformId, keyArtId }, false, true, cancellationToken);
     public Task<ProductHostResponse> EditMeshAsync(string nodeId, string? keyformId, MeshEdit edit,
-        long revision, CancellationToken cancellationToken = default) =>
-        SendAsync("mesh.tool", new { nodeId, keyformId, context = edit.Context, tool = edit.Tool, input = edit.Input },
+        long revision, CancellationToken cancellationToken = default, string? keyArtId = null) =>
+        SendAsync("mesh.tool", new { nodeId, keyformId, keyArtId, context = edit.Context, tool = edit.Tool, input = edit.Input },
             true, true, cancellationToken, revision);
     public async Task<ProductHostResponse> GenerateMeshAsync(string nodeId, bool contour, int columns, int rows,
         double alphaThreshold, double density, double cornerSensitivity, double interiorDensity,

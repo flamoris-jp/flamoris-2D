@@ -1,0 +1,37 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { ProductHostService } from '../product-host/session-service.mjs';
+import { createProjectFromPsd } from '../src/io/psd-project.js';
+import { serializeProject } from '../src/io/project-json.js';
+import { encodeRgbaPng } from '../product-host/document-artwork.mjs';
+let seq=0;
+test('native Key Art states, endpoint topology and correspondence retain exact shared history',async()=>{
+ const h=new ProductHostService();
+ async function send(method,payload={}){const r=(await h.handle({protocolVersion:1,requestId:String(++seq),documentToken:h.documentToken,expectedRevision:h.revision,method,payload})).response;assert.equal(r.ok,true,JSON.stringify(r.error));return r.payload;}
+ const p=createProjectFromPsd({width:32,height:32,children:[{id:1,name:'part',left:0,top:0,right:32,bottom:32}]});
+ const nodeId=Object.values(p.scene.nodes).find(n=>n.kind==='part').id,keyArtId=p.keyArts[0].id;
+ const dataUrl='data:image/png;base64,'+encodeRgbaPng(32,32,new Uint8Array(32*32*4).fill(255)).toString('base64');
+ await send('session.open',{document:serializeProject(p,0,{renderAssets:[{nodeId,width:32,height:32,dataUrl}]})});
+ const key=(tool,input={},context={keyArtId})=>send('keyState.tool',{context,tool,input});
+ await key('source.include');const base=await send('render.project',{keyArtId});assert.equal(base.artwork.length,1,'unmeshed source renders through the canonical evaluator');
+ const g=await send('mesh.generatePreview',{nodeId,previewId:'grid',kind:'grid',columns:2,rows:2});
+ await send('mesh.tool',{nodeId,keyArtId,context:'structure',tool:'topology.automesh',input:{candidate:g.candidate}});
+ const original=structuredClone(h.document.session.project);
+ const duplicate=await key('keyart.duplicate',{displayName:'State B'});const b=duplicate.keyArtId;
+ const state=await send('mesh.projection',{nodeId,keyArtId:b});assert.equal(state.state.available,true);assert.equal(state.state.keyArt.id,b);
+ const bform=state.state.activeKeyform,slotId=state.state.semanticSlot.id;
+ await key('mesh.align',{keyformId:bform.id,x:4,y:2,rotation:0,scaleX:1,scaleY:1,pivotX:0,pivotY:0},{keyArtId:b});
+ assert.deepEqual(h.document.session.project.meshKeyforms.find(k=>k.keyArtId===keyArtId).positions,original.meshKeyforms[0].positions);
+ const transition=await key('transition.create',{displayName:'A to B',fromKeyArtId:keyArtId,toKeyArtId:b,durationSeconds:2});
+ const context={keyArtId,transitionId:transition.transitionId,semanticSlotId:slotId};
+ await key('transition.topology',{topologyId:bform.topologyId,fromKeyformId:original.meshKeyforms[0].id,toKeyformId:bform.id},context);
+ const before=structuredClone(h.document.session.project),revision=h.revision;
+ const pins=[{vertexId:original.meshTopologies[0].vertexIds[0],target:{x:2,y:3}},{vertexId:original.meshTopologies[0].vertexIds.at(-1),target:{x:31,y:30}}];
+ const solved=await send('keyState.correspondence',{context,input:{pins,preset:'normal'}});
+ assert.ok(solved.candidatePositions);assert.deepEqual(h.document.session.project,before);assert.equal(h.revision,revision);
+ await key('correspondence.apply',{pins,preset:'normal'},context);const after=structuredClone(h.document.session.project);
+ await send('session.undo');assert.deepEqual(h.document.session.project,before);await send('session.redo');assert.deepEqual(h.document.session.project,after);
+ const frame=await send('render.project',{transitionId:transition.transitionId,timeTicks:120000});assert.equal(frame.artwork.length,1);
+ const saved=await send('session.serialize');await send('session.open',{document:saved.document});
+ assert.deepEqual((await send('render.project',{transitionId:transition.transitionId,timeTicks:120000})).plan,frame.plan);
+});

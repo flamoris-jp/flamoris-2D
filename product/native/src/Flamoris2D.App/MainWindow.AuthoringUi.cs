@@ -31,14 +31,15 @@ public partial class MainWindow
         return value;
     }
     private static string Chosen(ComboBox box) => (box.SelectedItem as EntityChoice)?.Id ?? throw new ArgumentException("対象を選択してください。");
-    private static ComboBox Choices(Panel panel,string label,IEnumerable<EntityChoice> items,string? selected = null)
+    private ComboBox Choices(Panel panel,string label,IEnumerable<EntityChoice> items,string? selected = null)
     {
         Note(panel,label);var box=new ComboBox {ItemsSource=items.ToArray(),DisplayMemberPath="Label",Margin=new Thickness(0,0,0,5)};
         box.SelectedItem=((EntityChoice[])box.ItemsSource).FirstOrDefault(i=>i.Id==selected);
+        box.SelectionChanged+=(_,_)=>_contextDraft=true;
         panel.Children.Add(box);return box;
     }
-    private static CheckBox Check(Panel panel,string label,bool value)
-    {var box=new CheckBox {Content=label,IsChecked=value,Foreground=Brushes.White,Margin=new Thickness(0,5,0,3)};panel.Children.Add(box);return box;}
+    private CheckBox Check(Panel panel,string label,bool value)
+    {var box=new CheckBox {Content=label,IsChecked=value,Foreground=Brushes.White,Margin=new Thickness(0,5,0,3)};box.Click+=(_,_)=>_contextDraft=true;panel.Children.Add(box);return box;}
     private static void ActionButton(Panel panel,string label,Func<Task> action)
     {
         var button=new Button {Content=label,Padding=new Thickness(6,4,6,4),Margin=new Thickness(0,3,0,3),HorizontalAlignment=HorizontalAlignment.Stretch};
