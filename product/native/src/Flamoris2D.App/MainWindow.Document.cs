@@ -37,6 +37,33 @@ public partial class MainWindow
         if (!await SaveDocumentAsync("save")) return false;
         return !(await _client.GetWorkspaceAsync()).Payload.GetProperty("isDirty").GetBoolean();
     }
+    private async void ImportSource_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (!await ConfirmReplaceDocumentAsync()) return;
+            var dialog = new OpenFileDialog { Filter = "制作素材 (*.psd;*.flimg)|*.psd;*.flimg", Title = "制作素材を読み込む" };
+            if (dialog.ShowDialog(this) != true) return;
+            if (_client?.HasAuthoritativeProjection != true) await ConnectHostAsync(true);
+            if (_client?.HasAuthoritativeProjection != true) return;
+            _documentBusy = true; SetMeshBusy(true); _meshWork = new CancellationTokenSource();
+            CancelArtworkButton.Visibility = Visibility.Visible; CancelArtworkButton.IsEnabled = true;
+            StatusText.Text = "素材を検証・読み込み中…";
+            await using var input = new FileStream(dialog.FileName, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, FileOptions.Asynchronous);
+            var kind = Path.GetExtension(dialog.FileName).Equals(".psd", StringComparison.OrdinalIgnoreCase) ? NativeSourceKind.Psd : NativeSourceKind.Cutwork;
+            await _client.ImportSourceAsync(input, input.Length, kind, Path.GetFileName(dialog.FileName), _meshWork.Token);
+            _currentPath = null; _hasHandsOn = false; _lastRecovery = null;
+            AttachDocumentWorkspace(_client.DocumentToken!); await RefreshProjectionAsync();
+            TargetList.SelectedItem = _targets.Targets.FirstOrDefault(t => t.Kind == "part");
+            await RefreshProjectionAsync(); MeshCanvas.Fit(); StatusText.Text = "素材を読み込みました。パーツを選んでメッシュを生成できます。";
+        }
+        catch (Exception error) { StatusText.Text = $"素材を読み込めませんでした: {error.Message}"; }
+        finally
+        {
+            _meshWork?.Dispose(); _meshWork = null; _documentBusy = false;
+            CancelArtworkButton.Visibility = Visibility.Collapsed; SetMeshBusy(false);
+        }
+    }
     private async void OpenDocument_Click(object sender, RoutedEventArgs e)
     {
         try

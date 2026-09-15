@@ -5,6 +5,8 @@ using System.Text.Json;
 
 namespace Flamoris.Flamoris2D.ProductHost;
 
+public enum NativeSourceKind { Psd, Cutwork }
+
 public sealed record DocumentIdentity(string LineageId, string DocumentToken, long Revision,
     long EditorRevision, string SnapshotId, string Timestamp, string Name);
 public sealed record PreparedDocument(string Id, long ByteLength, string? ReceiptId,
@@ -52,8 +54,14 @@ public sealed partial class ProductHostClient
         }
         if (DocumentToken != document.Identity.DocumentToken) throw new InvalidOperationException("The document was replaced while saving.");
     }
-    public async Task<ProductHostResponse> OpenDocumentAsync(Stream source, long byteLength,
-        RecoveryOrigin? recovery = null, CancellationToken cancellationToken = default)
+    public Task<ProductHostResponse> OpenDocumentAsync(Stream source, long byteLength,
+        RecoveryOrigin? recovery = null, CancellationToken cancellationToken = default) =>
+        ReplaceFromStreamAsync(source, byteLength, recovery, null, null, cancellationToken);
+    public Task<ProductHostResponse> ImportSourceAsync(Stream source, long byteLength, NativeSourceKind kind,
+        string fileName, CancellationToken cancellationToken = default) =>
+        ReplaceFromStreamAsync(source, byteLength, null, kind == NativeSourceKind.Psd ? "psd" : "flimg", fileName, cancellationToken);
+    private async Task<ProductHostResponse> ReplaceFromStreamAsync(Stream source, long byteLength,
+        RecoveryOrigin? recovery, string? kind, string? fileName, CancellationToken cancellationToken)
     {
         if (byteLength <= 0 || byteLength > MaximumDocumentBytes) throw new InvalidDataException("ファイルは128 MiB以下にしてください。");
         var token = DocumentToken ?? throw new InvalidOperationException("No document."); var revision = Revision;
@@ -67,12 +75,19 @@ public sealed partial class ProductHostClient
             using var result = await RasterHttp.SendAsync(request, cancellationToken); result.EnsureSuccessStatusCode();
             AssertCurrent(token, revision); cancellationToken.ThrowIfCancellationRequested();
             // Replacement cannot be abandoned after dispatch: wait for its authoritative acknowledgement.
-            var response = await SendAsync("document.open", new { id,
+            var jobId = Guid.NewGuid().ToString();
+            using var cancellation = cancellationToken.Register(() => { if (kind is not null) _ = CancelImportAsync(jobId); });
+            var response = await SendAsync(kind is null ? "document.open" : "source.import", new { id, kind, fileName, jobId,
                 recovery = recovery is null ? null : new { lineageId = recovery.LineageId, snapshotId = recovery.SnapshotId } },
                 true, true, CancellationToken.None, revision, replacingDocument: true);
             AttachOpenedDocument(response); return response;
         }
         finally { await ReleaseDocumentAsync(id, token, revision); }
+    }
+    private async Task CancelImportAsync(string jobId)
+    {
+        try { await SendAsync("source.cancel", new { jobId }, false, true, CancellationToken.None); }
+        catch { /* Cancellation also has a bounded worker lifetime. */ }
     }
     public Task<ProductHostResponse> AcknowledgeDocumentAsync(PreparedDocument document) =>
         SendAsync("document.acknowledgeSave", new { receiptId = document.ReceiptId }, false, true, CancellationToken.None);

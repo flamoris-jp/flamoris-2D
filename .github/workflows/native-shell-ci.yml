@@ -35,8 +35,11 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Install pinned Product source decoder
+        run: npm install --prefix product --workspaces=false --omit=dev --ignore-scripts --package-lock=false
+
       - name: Product Host protocol tests
-        run: node --test product/tests/product-host.test.js product/tests/native-mesh-host.test.js product/tests/native-document-host.test.js
+        run: node --test product/tests/product-host.test.js product/tests/native-mesh-host.test.js product/tests/native-document-host.test.js product/tests/native-source-host.test.js
 
       - name: Build native solution
         run: dotnet build product/native/Flamoris2D.Native.sln -c Release

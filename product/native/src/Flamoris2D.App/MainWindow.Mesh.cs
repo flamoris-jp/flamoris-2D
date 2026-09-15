@@ -264,7 +264,7 @@ public partial class MainWindow
                 MeshCanvas.Selected.Clear(); MeshCanvas.Selected.Add(added[0]);
                 UpdateMeshProperties(); MeshCanvas.InvalidateVisual();
             }
-            StatusText.Text = "メッシュ操作を確定しました。Ctrl+Zでこの操作を戻せます（保存不可）。";
+            StatusText.Text = "メッシュ操作を確定しました。Ctrl+Zでこの操作を戻せます。";
         }
         catch (Exception error)
         {

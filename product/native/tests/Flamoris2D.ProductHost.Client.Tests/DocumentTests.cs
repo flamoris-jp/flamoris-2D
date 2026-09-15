@@ -31,7 +31,7 @@ internal static class DocumentTests
                 throw new InvalidOperationException("Failure should propagate.");
             }
             catch (IOException) { }
-            Check(original.SequenceEqual(await File.ReadAllBytesAsync(path)), "Failed write changed the destination.");
+            Check(Enumerable.SequenceEqual(original, await File.ReadAllBytesAsync(path)), "Failed write changed the destination.");
             try
             {
                 await AtomicDocumentFile.WriteAsync(path, (s, ct) => s.WriteAsync(original, ct).AsTask(), overwrite: false);
@@ -43,7 +43,7 @@ internal static class DocumentTests
                 try { await AtomicDocumentFile.WriteAsync(path, async (s, ct) => { await s.WriteAsync(original, ct); cancel.Cancel(); }, cancellationToken: cancel.Token); }
                 catch (OperationCanceledException) { }
             }
-            Check(original.SequenceEqual(await File.ReadAllBytesAsync(path)), "Cancelled write changed the destination.");
+            Check(Enumerable.SequenceEqual(original, await File.ReadAllBytesAsync(path)), "Cancelled write changed the destination.");
             await using (var input = File.OpenRead(path)) await client.OpenDocumentAsync(input, input.Length);
             Check((await client.GetSceneTreeAsync()).Payload.GetProperty("displayName").GetString() == "saved state", "Reopen did not use saved bytes.");
             await client.RenameNodeAsync(root, "recover me");

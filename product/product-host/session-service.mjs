@@ -45,6 +45,8 @@ const METHODS = new Set([
   "headless.executeTransaction",
   "document.reserve",
   "document.open",
+  "source.import",
+  "source.cancel",
   "document.prepareSave",
   "document.acknowledgeSave",
   "document.release",
@@ -98,6 +100,30 @@ export class ProductHostService {
     this.assets.documentTransfers = this.transfers;
     this.bulkEndpoint = null;
     this.generation = null;
+    this.importJob = null;
+  }
+
+  cancelImport(request) {
+    if (request?.protocolVersion === PRODUCT_HOST_PROTOCOL_VERSION && request.method === "source.cancel" &&
+        request.documentToken === this.documentToken && request.payload?.jobId === this.importJob?.id)
+      this.importJob.cancel();
+  }
+  async importSource(payload, bytes) {
+    if (this.importJob || typeof payload.jobId !== "string" || payload.jobId.length > 80) throw new Error("Invalid import job.");
+    const worker = new Worker(new URL("./source-import-worker.mjs", import.meta.url), {
+      workerData: { bytes, kind: payload.kind, fileName: payload.fileName },
+      resourceLimits: { maxOldGenerationSizeMb: 512, maxYoungGenerationSizeMb: 32, stackSizeMb: 4 },
+    });
+    let timeout;
+    try {
+      return await new Promise((resolve, reject) => {
+        this.importJob = { id: payload.jobId, cancel: () => reject(new Error("素材の読み込みを中止しました。")) };
+        timeout = setTimeout(() => reject(new Error("素材の読み込みが60秒の上限を超えました。")), 60000);
+        worker.once("message", m => m.error ? reject(Object.assign(new Error(m.error.message), m.error)) : resolve(m.result));
+        worker.once("error", reject);
+        worker.once("exit", code => { if (code) reject(new Error("素材の読み込みWorkerが終了しました。")); });
+      });
+    } finally { clearTimeout(timeout); this.importJob = null; await worker.terminate(); }
   }
 
   cancelMeshPreview(request) {
@@ -243,6 +269,16 @@ export class ProductHostService {
     }
 
     switch (request.method) {
+      case "source.cancel":
+        this.cancelImport(request); return { cancelled: true };
+      case "source.import": {
+        this.#assertExpectedRevision(request, document);
+        const bytes = this.transfers.uploaded(payload.id, document.token, document.revision);
+        const parsed = await this.importSource(payload, bytes);
+        this.#assertExpectedRevision(request, document);
+        const prepared = await prepareDocumentArtwork(parsed, this.assets);
+        return this.#openProject(parsed.project, { ...parsed, dirty: true }, prepared);
+      }
       case "document.reserve":
         this.#assertExpectedRevision(request, document);
         return this.transfers.reserve(payload.byteLength, "upload", document.token, document.revision);
