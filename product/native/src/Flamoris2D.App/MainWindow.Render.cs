@@ -66,7 +66,9 @@ public partial class MainWindow
     private async void RenderOwner_Changed(object sender, SelectionChangedEventArgs e)
     {
         if (_updatingRenderChoices) return;
+        StopPlayback();
         _renderChoice = RenderOwnerList.SelectedItem as RenderChoice; _timeTicks = 0;
+        _timelineContext = new(); _contextDraft = false;
         MeshCanvas.Cancel(); _lastRenderKey = null;
         try { await RefreshProjectionAsync(); } catch (Exception error) { StatusText.Text = error.Message; }
     }
@@ -89,7 +91,7 @@ public partial class MainWindow
         {
             var frame = await client.ProjectRenderAsync(choice.Kind == "keyArt" ? choice.Id : null,
                 choice.Kind == "transition" ? choice.Id : null, choice.Kind == "sequence" ? choice.Id : null,
-                _timeTicks, work.Token, preview, revision);
+                _timeTicks, work.Token, preview, revision, preview is null ? _playbackSample : null);
             var artwork = new Dictionary<string, RenderTexture>();
             foreach (var a in frame.Payload.GetProperty("artwork").EnumerateArray())
             {
@@ -120,6 +122,13 @@ public partial class MainWindow
             }, work.Token);
             client.AssertCurrent(token, revision);
             if (generation != _renderGeneration || !ReferenceEquals(client, _client) || choice != _renderChoice) return;
+            _timeTicks = frame.Payload.GetProperty("timeTicks").GetInt64();
+            _updatingTime=true;
+            try { TimeSlider.Maximum=Math.Max(1,Number(frame.Payload,"durationTicks",1)); }
+            finally { _updatingTime=false; }
+            UpdateTimeDisplay();
+            PlayheadText.Text=String(frame.Payload,"timeLabel")??$"{_timeTicks} ticks";
+            if(frame.Payload.TryGetProperty("playing",out var playing)&&!playing.GetBoolean())StopPlayback();
             var bitmap = BitmapSource.Create(width, height, 96, 96, PixelFormats.Pbgra32, null, pixels, width * 4); bitmap.Freeze();
             var represented = artwork.Keys.ToHashSet();
             MeshCanvas.ApplyEvaluatedFrame(bitmap, represented, choice.Kind == "keyArt" && _editingContext is EditingContext.Source or EditingContext.Mesh);
@@ -131,7 +140,7 @@ public partial class MainWindow
         catch (StaleProjectionException) { }
         catch (Exception error)
         {
-            if (generation == _renderGeneration) { MeshCanvas.ClearEvaluatedFrame(); RenderStatusText.Text = $"描画停止: {error.Message}"; }
+            if (generation == _renderGeneration) { StopPlayback(); MeshCanvas.ClearEvaluatedFrame(); RenderStatusText.Text = $"描画停止: {error.Message}"; }
         }
         finally { if (ReferenceEquals(_renderWork, work)) _renderWork = null; work.Dispose(); }
     }

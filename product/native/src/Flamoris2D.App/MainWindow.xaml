@@ -202,6 +202,13 @@
                     <ComboBox x:Name="RenderOwnerList" MinWidth="220" MaxWidth="420" DisplayMemberPath="Label" SelectionChanged="RenderOwner_Changed" />
                     <TextBlock x:Name="RenderStatusText" Margin="12,0" VerticalAlignment="Center" />
                 </WrapPanel>
+                <WrapPanel x:Name="PlaybackControls" Margin="8,4" Visibility="Collapsed">
+                    <Button Content="|◀" Click="StartTime_Click" Padding="7,4" />
+                    <Button x:Name="PlayButton" Content="▶ 再生" Click="Play_Click" Padding="10,4" Margin="5,0" />
+                    <CheckBox x:Name="LoopPlayback" Content="ループ" Margin="6,4" />
+                    <Slider x:Name="TimeSlider" Minimum="0" Maximum="1" Width="350" ValueChanged="TimeSlider_Changed" />
+                    <TextBlock x:Name="PlayheadText" VerticalAlignment="Center" Margin="8,0" />
+                </WrapPanel>
                 <WrapPanel x:Name="RigContextOptions" Margin="8,4" Visibility="Collapsed">
                     <Button Content="Bone / 骨" Tag="Bone" Click="RigContext_Click" Padding="10,5" Margin="3" />
                     <Button Content="Warp / 格子" Tag="Warp" Click="RigContext_Click" Padding="10,5" Margin="3" />
@@ -377,29 +384,17 @@
             </Grid>
 
             <Border x:Name="TimeSurface" Grid.Row="1" Grid.ColumnSpan="3"
-                    Background="#25272B" BorderBrush="#41444A" BorderThickness="0,1,0,0"
-                    Visibility="Collapsed">
+                    Background="#25272B" BorderBrush="#41444A" BorderThickness="0,1,0,0" Visibility="Collapsed">
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Left" Style="{StaticResource PanelHeader}"
-                               Text="{DynamicResource Panel.Timeline}" Width="112" />
-                    <Grid Margin="8">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-                        <StackPanel Orientation="Horizontal">
-                            <Button Content="◀" Width="32" Margin="2" IsEnabled="False" />
-                            <Button Content="▶" Width="32" Margin="2" IsEnabled="False" />
-                            <TextBlock Text="00:00:00:00" Foreground="#ECECEC"
-                                       VerticalAlignment="Center" Margin="10,0" />
-                        </StackPanel>
-                        <Border Grid.Row="1" Margin="0,8,0,0" Background="#1D1F22"
-                                BorderBrush="#4B4E54" BorderThickness="1">
-                            <TextBlock Text="Animation surface foundation — authoringは次Phase"
-                                       Foreground="#AEB0B5" Margin="12"
-                                       VerticalAlignment="Center" />
-                        </Border>
-                    </Grid>
+                    <WrapPanel DockPanel.Dock="Top" Margin="8,4">
+                        <TextBlock Text="タイムライン" Foreground="White" VerticalAlignment="Center" />
+                        <TextBlock Text="拡大" Foreground="LightGray" Margin="16,0,4,0" VerticalAlignment="Center" />
+                        <Slider x:Name="TimelineZoom" Minimum="1" Maximum="12" Value="1" Width="140" ValueChanged="TimelineZoom_Changed" />
+                        <TextBlock Text="キーやクリップをドラッグして移動 · クリックでプロパティを編集" Foreground="LightGray" Margin="16,0" VerticalAlignment="Center" />
+                    </WrapPanel>
+                    <ScrollViewer x:Name="TimelineScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                        <local:TimelineViewport x:Name="TimelineCanvas" Width="900" Height="110" />
+                    </ScrollViewer>
                 </DockPanel>
             </Border>
         </Grid>

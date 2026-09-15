@@ -5,6 +5,7 @@ import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
 import { MCP_SCHEMA_VERSION } from "../src/mcp/schemas.js";
 import { createProject, PROJECT_SCHEMA_VERSION } from "../src/model/project.js";
 import { parseProjectDocument, serializeProject } from "../src/io/project-json.js";
+import { timelineProjection, executeTimelineTool, playbackTick } from "./timeline-authoring.mjs";
 import { rigProjection, executeRigTool } from "./rig-authoring.mjs";
 import { evaluatedProjection } from "./evaluated-projection.mjs";
 import { prepareDocumentArtwork, attachDocumentArtwork, NATIVE_ARTWORK_LIMITS } from "./document-artwork.mjs";
@@ -26,6 +27,7 @@ const MUTATING_METHODS = new Set([
   "headless.executeTransaction",
   "mesh.tool",
   "rig.tool",
+  "timeline.tool",
 ]);
 
 const METHODS = new Set([
@@ -59,6 +61,8 @@ const METHODS = new Set([
   "handsOn.open",
   "mesh.projection",
   "rig.projection",
+  "timeline.projection",
+  "timeline.tool",
   "rig.tool",
   "mesh.tool",
   "mesh.generatePreview",
@@ -277,10 +281,16 @@ export class ProductHostService {
     }
 
     switch (request.method) {
+      case "timeline.projection":return timelineProjection(document.session,payload);
+      case "timeline.tool":return executeTimelineTool(document.session,payload);
       case "rig.projection":return rigProjection(document.session,payload);
       case "rig.tool":return executeRigTool(document.session,payload);
       case "render.project":
         if (payload.layoutPreview) this.#assertExpectedRevision(request, document);
+        if(payload.playback) {
+          const clock=playbackTick(document.session,payload);
+          return {...evaluatedProjection(document,this.assets,{...payload,timeTicks:clock.timeTicks}),playing:clock.playing};
+        }
         return evaluatedProjection(document, this.assets, payload);
       case "source.cancel":
         this.cancelImport(request); return { cancelled: true };
