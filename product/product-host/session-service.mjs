@@ -5,6 +5,8 @@ import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
 import { MCP_SCHEMA_VERSION } from "../src/mcp/schemas.js";
 import { createProject, PROJECT_SCHEMA_VERSION } from "../src/model/project.js";
 import { parseProjectDocument, serializeProject } from "../src/io/project-json.js";
+import { DocumentTransfers } from "./document-transfer.mjs";
+import { initializeDocumentLifecycle, serializeDocument, prepareDocumentSave, acknowledgeDocumentSave } from "./document-lifecycle.mjs";
 import { RasterAssets } from "./raster-assets.mjs";
 import { createHandsOnProject, meshContext, executeMeshTool, generateMeshPreview } from "./mesh-hands-on.mjs";
 import {
@@ -40,6 +42,11 @@ const METHODS = new Set([
   "headless.query",
   "headless.execute",
   "headless.executeTransaction",
+  "document.reserve",
+  "document.open",
+  "document.prepareSave",
+  "document.acknowledgeSave",
+  "document.release",
   "assets.reserve",
   "handsOn.open",
   "mesh.projection",
@@ -86,6 +93,8 @@ export class ProductHostService {
     this.document = null;
     this.shutdownRequested = false;
     this.assets = new RasterAssets(() => ({ token: this.documentToken, revision: this.revision }));
+    this.transfers = new DocumentTransfers(() => ({ token: this.documentToken, revision: this.revision }));
+    this.assets.documentTransfers = this.transfers;
     this.bulkEndpoint = null;
     this.generation = null;
   }
@@ -128,15 +137,17 @@ export class ProductHostService {
     return this.document?.token ?? null;
   }
 
-  #openProject(project) {
+  #openProject(project, envelope = {}) {
     const session = new EditorSession(project);
     this.assets.clear();
+    this.transfers.clear();
     this.document = {
       token: this.createToken(),
       revision: 0,
       session,
       headless: new HeadlessProductAdapter(session),
     };
+    initializeDocumentLifecycle(this.document, envelope);
     return {
       documentToken: this.document.token,
       revision: this.document.revision,
@@ -220,7 +231,8 @@ export class ProductHostService {
           "document.content_required",
         );
       }
-      return this.#openProject(parseProjectDocument(payload.document).project);
+      const parsed = parseProjectDocument(payload.document);
+      return this.#openProject(parsed.project, parsed);
     }
 
     const document = this.#requireDocument(request);
@@ -229,6 +241,31 @@ export class ProductHostService {
     }
 
     switch (request.method) {
+      case "document.reserve":
+        this.#assertExpectedRevision(request, document);
+        return this.transfers.reserve(payload.byteLength, "upload", document.token, document.revision);
+      case "document.release":
+        this.transfers.get(payload.id, document.token, payload.revision);
+        this.transfers.release(payload.id);
+        return { released: true };
+      case "document.open": {
+        this.#assertExpectedRevision(request, document);
+        const bytes = this.transfers.uploaded(payload.id, document.token, document.revision);
+        const parsed = parseProjectDocument(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+        const recovery = payload.recovery;
+        if (recovery && (![recovery.lineageId, recovery.snapshotId].every(id =>
+          typeof id === "string" && /^[a-f0-9-]{36}$/.test(id)))) throw new Error("Invalid Recovery identity.");
+        return this.#openProject(parsed.project, { ...parsed, lineageId: recovery?.lineageId,
+          restoredSnapshotId: recovery?.snapshotId, dirty: Boolean(recovery) });
+      }
+      case "document.prepareSave":
+        this.#assertExpectedRevision(request, document);
+        if (document.bindings && !document.renderAssets) throw new Error("PNG proof sessions cannot be saved.");
+        return prepareDocumentSave(document, this.transfers, payload.operation);
+      case "document.acknowledgeSave":
+        // Edits while bytes were being written are allowed. The opaque receipt captures history identity.
+        return acknowledgeDocumentSave(document, this.transfers, payload.receiptId);
+
       case "assets.reserve":
         this.#assertExpectedRevision(request, document);
         return this.assets.reserve(payload, document.token, document.revision);
@@ -286,6 +323,7 @@ export class ProductHostService {
           isDirty: document.session.isDirty,
           editorRevision: document.session.currentRevision,
           savedRevision: document.session.savedRevision,
+          lineageId: document.lineageId,
         };
       case "session.execute":
         return document.session.execute(payload.command, { label: payload.label });
@@ -297,7 +335,7 @@ export class ProductHostService {
         return document.session.redo();
       case "session.serialize":
         if (document.bindings) throw new Error("Hands-on artwork sessions cannot be saved. Production persistence is not implemented.");
-        return { document: serializeProject(document.session.project, payload.spacing ?? 2) };
+        return { document: serializeDocument(document, payload.spacing ?? 2) };
       case "session.history":
         return {
           entries: document.session.history,
