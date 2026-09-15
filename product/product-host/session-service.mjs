@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { initializeSourceHistory, collectSourceAssets, beginSourceReview, changeSourceReview, applySourceReview } from './source-reimport.mjs';
 import { Worker } from "node:worker_threads";
 import { EditorSession } from "../src/commands/editor.js";
 import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
@@ -20,6 +21,7 @@ import {
 } from "./protocol.mjs";
 
 const MUTATING_METHODS = new Set([
+  "source.applyReview",
   "session.execute",
   "session.executeTransaction",
   "session.undo",
@@ -32,6 +34,7 @@ const MUTATING_METHODS = new Set([
 ]);
 
 const METHODS = new Set([
+  "source.analyzeReimport", "source.changeReview", "source.applyReview", "source.discardReview",
   "protocol.handshake",
   "host.health",
   "host.shutdown",
@@ -192,6 +195,7 @@ export class ProductHostService {
     };
     initializeDocumentLifecycle(this.document, envelope);
     if (prepared) attachDocumentArtwork(this.document, this.assets, prepared);
+    initializeSourceHistory(this.document, this.assets);
     return {
       documentToken: this.document.token,
       revision: this.document.revision,
@@ -286,6 +290,20 @@ export class ProductHostService {
     }
 
     switch (request.method) {
+      case "source.analyzeReimport": {
+        this.#assertExpectedRevision(request, document);
+        document.sourceReview = null; collectSourceAssets(document, this.assets);
+        if (payload.kind !== 'psd') throw new Error('既存Productの再取込はPSDに対応しています。');
+        const parsed = await this.importSource(payload, this.transfers.uploaded(payload.id, document.token, document.revision));
+        this.#assertExpectedRevision(request, document);
+        return beginSourceReview(document, this.assets, parsed, await prepareDocumentArtwork(parsed, this.assets));
+      }
+      case "source.changeReview":
+        this.#assertExpectedRevision(request, document); return changeSourceReview(document, payload);
+      case "source.applyReview": return applySourceReview(document, this.assets, payload.id);
+      case "source.discardReview":
+        if (document.sourceReview?.id === payload.id) document.sourceReview = null;
+        collectSourceAssets(document, this.assets); return { discarded: true };
       case "export.settings":return nativeExportSettings(document.session);
       case "export.plan":this.#assertExpectedRevision(request,document);return nativeExportPlan(document.session,payload);
       case "export.frame":this.#assertExpectedRevision(request,document);return nativeExportFrame(document,this.assets,payload);
@@ -403,9 +421,9 @@ export class ProductHostService {
       case "session.executeTransaction":
         return document.session.executeTransaction(payload.commands, { label: payload.label });
       case "session.undo":
-        return document.session.undo();
+        return document.sourceHistory ? document.sourceHistory.undo() : document.session.undo();
       case "session.redo":
-        return document.session.redo();
+        return document.sourceHistory ? document.sourceHistory.redo() : document.session.redo();
       case "session.serialize":
         if (document.bindings && !document.renderAssets) throw new Error("Hands-on artwork sessions cannot be saved. Production persistence is not implemented.");
         return { document: serializeDocument(document, payload.spacing ?? 2) };
@@ -437,6 +455,7 @@ export class ProductHostService {
       const payload = await this.#dispatch(request);
       const mutated = MUTATING_METHODS.has(request.method) && payload !== null;
       if (mutated) this.document.revision += 1;
+      if (this.document) collectSourceAssets(this.document, this.assets);
       const response = {
         protocolVersion: PRODUCT_HOST_PROTOCOL_VERSION,
         type: "response",

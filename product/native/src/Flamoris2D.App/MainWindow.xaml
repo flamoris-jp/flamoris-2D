@@ -70,6 +70,7 @@
                           Click="NewDocument_Click" />
                 <Separator />
                 <MenuItem Header="素材を読み込む（PSD / Cutwork）…" Click="ImportSource_Click" />
+                <MenuItem Header="PSDを再取込・照合…" Click="ReimportSource_Click" />
                 <MenuItem Header="開く…" InputGestureText="Ctrl+O" Click="OpenDocument_Click" />
                 <Separator />
                 <MenuItem x:Name="SaveMenuItem" Header="{DynamicResource Menu.Save}"

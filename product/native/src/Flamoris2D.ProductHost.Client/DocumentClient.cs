@@ -60,8 +60,16 @@ public sealed partial class ProductHostClient
     public Task<ProductHostResponse> ImportSourceAsync(Stream source, long byteLength, NativeSourceKind kind,
         string fileName, CancellationToken cancellationToken = default) =>
         ReplaceFromStreamAsync(source, byteLength, null, kind == NativeSourceKind.Psd ? "psd" : "flimg", fileName, cancellationToken);
+    public Task<ProductHostResponse> AnalyzeReimportAsync(Stream source, long byteLength, string fileName, CancellationToken cancellationToken = default) =>
+        ReplaceFromStreamAsync(source, byteLength, null, "psd", fileName, cancellationToken, reimport: true);
+    public Task<ProductHostResponse> ChangeSourceReviewAsync(string id,string rowId,string action,string? importedNodeId,long revision) =>
+        SendAsync("source.changeReview",new {id,rowId,action,importedNodeId},true,true,CancellationToken.None,revision);
+    public Task<ProductHostResponse> ApplySourceReviewAsync(string id,long revision) =>
+        SendAsync("source.applyReview",new {id},true,true,CancellationToken.None,revision);
+    public Task<ProductHostResponse> DiscardSourceReviewAsync(string id) =>
+        SendAsync("source.discardReview",new {id},false,true,CancellationToken.None);
     private async Task<ProductHostResponse> ReplaceFromStreamAsync(Stream source, long byteLength,
-        RecoveryOrigin? recovery, string? kind, string? fileName, CancellationToken cancellationToken)
+        RecoveryOrigin? recovery, string? kind, string? fileName, CancellationToken cancellationToken, bool reimport = false)
     {
         if (byteLength <= 0 || byteLength > MaximumDocumentBytes) throw new InvalidDataException("ファイルは128 MiB以下にしてください。");
         var token = DocumentToken ?? throw new InvalidOperationException("No document."); var revision = Revision;
@@ -77,10 +85,10 @@ public sealed partial class ProductHostClient
             // Replacement cannot be abandoned after dispatch: wait for its authoritative acknowledgement.
             var jobId = Guid.NewGuid().ToString();
             using var cancellation = cancellationToken.Register(() => { if (kind is not null) _ = CancelImportAsync(jobId); });
-            var response = await SendAsync(kind is null ? "document.open" : "source.import", new { id, kind, fileName, jobId,
+            var response = await SendAsync(reimport ? "source.analyzeReimport" : kind is null ? "document.open" : "source.import", new { id, kind, fileName, jobId,
                 recovery = recovery is null ? null : new { lineageId = recovery.LineageId, snapshotId = recovery.SnapshotId } },
-                true, true, CancellationToken.None, revision, replacingDocument: true);
-            AttachOpenedDocument(response); return response;
+                true, true, CancellationToken.None, revision, replacingDocument: !reimport);
+            if (!reimport) AttachOpenedDocument(response); return response;
         }
         finally { await ReleaseDocumentAsync(id, token, revision); }
     }

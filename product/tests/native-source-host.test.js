@@ -35,11 +35,35 @@ function cutwork() {
     layers: [{ id: '30000000-0000-0000-0000-000000000001', kind: 'base', name: 'Base', visible: true, semanticName: null, bounds: { x:0, y:0, width:2, height:2 } }] };
   return storedZip([['manifest.json',JSON.stringify(manifest)],['assets/original.png',png]]);
 }
-function psd() {
+function psd(red = 255) {
   initializeCanvas(() => { throw new Error('Unexpected canvas'); }, (width,height) => ({ width,height,data:new Uint8ClampedArray(width*height*4) }));
   return new Uint8Array(writePsd({ width:32,height:32,children:[{name:'eye',id:12,left:7,top:11,
-    imageData:{width:2,height:2,data:new Uint8ClampedArray([255,0,0,255,0,255,0,128,0,0,255,255,255,255,255,0])}}] }));
+    imageData:{width:2,height:2,data:new Uint8ClampedArray([red,0,0,255,0,255,0,128,0,0,255,255,255,255,255,0])}}] }));
 }
+
+test('reviewed native PSD update retains authored topology and restores exact artwork through shared Undo/Redo',async()=>{
+ const h=new ProductHostService();await send(h,'session.create');
+ async function upload(bytes){const r=await send(h,'document.reserve',{byteLength:bytes.length});h.transfers.entries.get(r.id).bytes=Buffer.from(bytes);return r.id;}
+ const id=await upload(psd());await send(h,'source.import',{id,kind:'psd',fileName:'art.psd',jobId:'initial'});
+ const nodeId=[...h.document.bindings.keys()][0];
+ const candidate=await send(h,'mesh.generatePreview',{nodeId,previewId:'mesh',kind:'grid',columns:2,rows:2});
+ await send(h,'mesh.tool',{nodeId,context:'structure',tool:'topology.automesh',input:{candidate:candidate.candidate}});
+ const beforeProject=structuredClone(h.document.session.project),beforeAssets=structuredClone(h.document.renderAssets),beforeHandle=h.document.bindings.get(nodeId);
+ const r=await send(h,'source.analyzeReimport',{id:await upload(psd(10)),kind:'psd',fileName:'art.psd',jobId:'update'});
+ assert.equal(r.canApply,true);assert.deepEqual(h.document.session.project,beforeProject);assert.equal(h.assets.entries.size,2);
+ await send(h,'source.applyReview',{id:r.id});const afterProject=structuredClone(h.document.session.project),afterAssets=structuredClone(h.document.renderAssets),afterHandle=h.document.bindings.get(nodeId);
+ assert.notEqual(afterHandle,beforeHandle);assert.notDeepEqual(afterAssets,beforeAssets);
+ assert.deepEqual(afterProject.meshes,beforeProject.meshes);assert.deepEqual(Object.keys(afterProject.scene.nodes),Object.keys(beforeProject.scene.nodes));
+ await send(h,'session.undo');assert.deepEqual(h.document.session.project,beforeProject);assert.deepEqual(h.document.renderAssets,beforeAssets);assert.equal(h.document.bindings.get(nodeId),beforeHandle);
+ await send(h,'session.redo');assert.deepEqual(h.document.session.project,afterProject);assert.deepEqual(h.document.renderAssets,afterAssets);
+ await send(h,'session.undo');
+ await send(h,'headless.execute',{command:{type:'scene.rename_node',payload:{nodeId:h.document.session.project.scene.rootId,displayName:'forked'}}});
+ assert.equal(h.assets.entries.size,1);assert.equal(h.assets.entries.has(afterHandle),false);
+ const stale=await send(h,'source.analyzeReimport',{id:await upload(psd(20)),kind:'psd',fileName:'art.psd',jobId:'stale'});
+ await send(h,'headless.execute',{command:{type:'scene.rename_node',payload:{nodeId:h.document.session.project.scene.rootId,displayName:'changed'}}});
+ const result=(await h.handle({protocolVersion:1,requestId:'stale-apply',documentToken:h.documentToken,expectedRevision:h.revision,method:'source.applyReview',payload:{id:stale.id}})).response;
+ assert.equal(result.ok,false);await send(h,'source.discardReview',{id:stale.id});assert.equal(h.assets.entries.size,1);
+});
 for (const [kind, fixture] of [['psd',psd],['flimg',cutwork]]) {
   test(`native ${kind} worker imports ordinary Product Key Art, retains raster, saves/reopens and preserves exact mesh Undo`, async () => {
     const h = new ProductHostService(); await send(h,'session.create'); const bytes = fixture();

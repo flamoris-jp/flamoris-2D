@@ -72,6 +72,15 @@ export class ReimportRenderHistory {
     }
   }
 
+  referencedParts() {
+    const parts = new Set(this.getParts());
+    for (const entry of [...this.editor.session.undoStack, ...this.editor.session.redoStack]) {
+      const transition = this.transitions.get(entry);
+      for (const part of [...(transition?.beforeParts || []), ...(transition?.afterParts || [])]) parts.add(part);
+    }
+    return [...parts];
+  }
+
   apply(review, importedParts) {
     const session = this.editor.session;
     review.assertSessionCurrent(session);
