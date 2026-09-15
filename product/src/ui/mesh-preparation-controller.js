@@ -189,7 +189,7 @@ export class MeshPreparationController {
       ? this.session.project.keyArts.filter((keyArt) =>
         keyArt.members.some((member) => member.nodeId === node.id))
       : [];
-    const keyArt = this.selectedKeyArtId ? keyArtMatches.find(k => k.id === this.selectedKeyArtId)
+    const keyArt = this.selectedKeyArtId ? keyArtMatches.find(k => k.id === this.selectedKeyArtId) || null
       : matchingKeyArt(this.session.project, this.selectedNodeId);
     const slotMatches = keyArt && node
       ? this.session.project.semanticSlots.filter((slot) =>

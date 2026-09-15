@@ -60,14 +60,36 @@ public partial class MainWindow
         SwitchContext(EditingContext.Preview,false);await RefreshProjectionAsync();if(!evaluated.SequenceEqual(FramePixels(MeshCanvas.EvaluatedFrame)))throw new Exception("Animation/Preview frame mismatch.");
         var directory=Path.Combine(fixtureDirectory,"native-eight-second-frames");if(Directory.Exists(directory))Directory.Delete(directory,true);
         SwitchContext(EditingContext.Export,false);await RefreshProjectionAsync();
-        await ExportAsync(new(sequenceId,null,64,64,30,1,false),directory,"ffmpeg");
+        var encoder=Environment.GetEnvironmentVariable("FLAMORIS_TEST_FFMPEG");
+        await ExportAsync(new(sequenceId,null,64,64,30,1,encoder is not null),directory,encoder??"ffmpeg");
         if(!Directory.Exists(directory)||Directory.GetFiles(directory,"frame_*.png").Length!=240)throw new Exception("Eight-second native PNG export incomplete.");
+        if(encoder is not null)
+        {
+            var output=Path.Combine(directory,"shot.mp4");if(!File.Exists(output))throw new Exception($"Native MP4 export incomplete: {_exportProgressText?.Text}");
+            var probe=await NativeVideoEncoder.RunAsync(Path.Combine(Path.GetDirectoryName(encoder)!,"ffprobe.exe"),
+                ["-v","error","-select_streams","v:0","-count_frames","-show_entries","stream=codec_name,nb_read_frames,width,height,duration","-of","json",output],CancellationToken.None);
+            using var metadata=JsonDocument.Parse(probe.StandardOutput);var stream=metadata.RootElement.GetProperty("streams")[0];
+            if(probe.ExitCode!=0||String(stream,"codec_name")!="h264"||String(stream,"nb_read_frames")!="240"||Math.Abs(double.Parse(String(stream,"duration")!,System.Globalization.CultureInfo.InvariantCulture)-8)>.001)
+                throw new Exception("Encoded MP4 does not match the eight-second/240-frame contract.");
+            Console.WriteLine("Native MP4 verified with ffprobe: H.264, 240 decoded frames, 8 seconds.");
+        }
         var projectPath=Path.Combine(fixtureDirectory,"native-eight-second.fl2d");var saved=await client.PrepareDocumentAsync("saveAs");
         await AtomicDocumentFile.WriteAsync(projectPath,(stream,ct)=>client.DownloadDocumentAsync(saved,stream,ct));await client.AcknowledgeDocumentAsync(saved);
         if((await client.GetWorkspaceAsync()).Payload.GetProperty("isDirty").GetBoolean())throw new Exception("Durable save remained dirty.");
         await client.CreateSessionAsync();await using(var input=File.OpenRead(projectPath))await client.OpenDocumentAsync(input,input.Length);
         AttachDocumentWorkspace(client.DocumentToken!);_renderChoice=new(sequenceId,"sequence","Native shot");_timeTicks=480000;
         SwitchContext(EditingContext.Preview,false);await RefreshProjectionAsync();if(!evaluated.SequenceEqual(FramePixels(MeshCanvas.EvaluatedFrame)))throw new Exception("Saved production frame changed after reopen.");
+        await client.EditTimelineAsync(new(sequenceId),TimelineEdit.RenameSequence("Resumed native shot"),client.Revision);await client.UndoAsync();await RefreshProjectionAsync();
+        if(!evaluated.SequenceEqual(FramePixels(MeshCanvas.EvaluatedFrame)))throw new Exception("Editing/Undo after reopen changed the evaluated frame.");
+        await using(var input=File.OpenRead(Path.Combine(fixtureDirectory,"native-production-source.psd")))
+        {
+            var review=await client.AnalyzeReimportAsync(input,input.Length,"native-production-source.psd");
+            await client.ApplySourceReviewAsync(String(review.Payload,"id")!,client.Revision);await client.UndoAsync();await client.RedoAsync();
+        }
+        await RefreshProjectionAsync();if(!evaluated.SequenceEqual(FramePixels(MeshCanvas.EvaluatedFrame)))throw new Exception("Reviewed source update changed authored animation.");
+        await using(var input=File.OpenRead(Path.Combine(fixtureDirectory,"native-production-source.flimg")))
+            await client.ImportSourceAsync(input,input.Length,NativeSourceKind.Cutwork,"native-production-source.flimg");
+        AttachDocumentWorkspace(client.DocumentToken!);SwitchContext(EditingContext.Source,false);await RefreshProjectionAsync();FramePixels(MeshCanvas.EvaluatedFrame);
         Console.WriteLine("Native WPF production path passed: PSD > Mesh/image deformation > Bone/Skin > Warp > form correction > eight-second Sequence > Preview > 240 PNGs > atomic Save > New > Open; evaluated frame retained.");
     }
 }

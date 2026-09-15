@@ -46,6 +46,17 @@ jobs:
       - name: Build native solution
         run: dotnet build product/native/Flamoris2D.Native.sln -c Release
 
+      - name: Prepare pinned LGPL encoder for native integration
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'native-ffmpeg.zip'
+          Invoke-WebRequest 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-14-13-17/ffmpeg-N-126556-g639ee84952-win64-lgpl-shared.zip' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne '526562B18482314EA17110B7E5A0CFBB701815DCBA66156817B7EEF4662A57F8') { throw 'Encoder archive checksum mismatch' }
+          $destination = Join-Path $env:RUNNER_TEMP 'native-ffmpeg'
+          Expand-Archive $archive $destination
+          $encoder = (Get-ChildItem $destination -Filter ffmpeg.exe -Recurse | Select-Object -First 1).FullName
+          "FLAMORIS_TEST_FFMPEG=$encoder" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: C# client and crash-invalidation tests
         run: dotnet run --project product/native/tests/Flamoris2D.ProductHost.Client.Tests -c Release --no-build -- product/product-host/main.mjs
 
