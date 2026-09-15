@@ -123,3 +123,32 @@ test('immutable save download tolerates edits but expires and never crosses docu
   assert.throws(() => small.reserve(5, 'upload', token, 0), /limit/);
   small.reserve(4, 'upload', token, 0); assert.throws(() => small.reserve(1, 'upload', token, 0), /budget/);
 });
+
+test('real embedded RGBA artwork decodes, preserves cropped bounds, generates in document coordinates and survives save/reopen', async () => {
+  const { createProjectFromPsd } = await import('../src/io/psd-project.js');
+  const { encodeRgbaPng } = await import('../product-host/document-artwork.mjs');
+  const host = await setup();
+  const project = createProjectFromPsd({ width: 64, height: 64, children: [
+    { id: 1, name: 'eye', left: 11, top: 19, right: 13, bottom: 21 } ] });
+  const node = Object.values(project.scene.nodes).find(n => n.kind === 'part');
+  const png = encodeRgbaPng(2, 2, new Uint8Array([255,0,0,255, 0,255,0,128, 0,0,255,255, 255,255,255,0]));
+  const record = { nodeId: node.id, sourceKey: node.sourceRef.sourceKey, name: 'eye',
+    width: 2, height: 2, left: 11, top: 19, right: 13, bottom: 21, dataUrl: 'data:image/png;base64,' + png.toString('base64') };
+  const text = serializeProject(project, 0, { renderAssets: [record] });
+  const opened = await send(host, 'session.open', { document: text });
+  assert.equal(opened.ok, true, JSON.stringify(opened.error));
+  const p = await send(host, 'mesh.projection', { nodeId: node.id });
+  assert.equal(p.payload.proofOnly, false); assert.equal(p.payload.artwork[0].left, 11);
+  assert.deepEqual([...host.assets.entries.values()][0].bytes.subarray(0, 4), Buffer.from([0,0,255,255]));
+  const preview = await send(host, 'mesh.generatePreview', { nodeId: node.id, previewId: 'cropped-grid', kind: 'grid', columns: 2, rows: 2 });
+  assert.equal(preview.ok, true, JSON.stringify(preview.error));
+  assert.ok(preview.payload.candidate.positions.every((n, i) => n >= (i % 2 ? 19 : 11)));
+  const original = structuredClone(host.document.session.project);
+  const malformed = JSON.parse(text); malformed.renderAssets[0].width = 4096;
+  const token = host.documentToken;
+  assert.equal((await send(host, 'session.open', { document: JSON.stringify(malformed) })).ok, false);
+  assert.equal(host.documentToken, token); assert.deepEqual(host.document.session.project, original);
+  const serialized = await send(host, 'session.serialize');
+  assert.equal((await send(host, 'session.open', { document: serialized.payload.document })).ok, true);
+  assert.deepEqual(host.document.renderAssets, [record]);
+});

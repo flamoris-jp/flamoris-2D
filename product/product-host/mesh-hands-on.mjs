@@ -56,10 +56,10 @@ export function executeMeshTool(session, input) {
 export function generateMeshPreview(asset, input) {
   // BGRA and RGBA share the same alpha lane; the existing helpers read alpha only.
   const image = { width: asset.width, height: asset.height, data: asset.bytes };
-  if (input.kind === "contour") return generateContourAutoMesh(image, input.settings);
+  if (input.kind === "contour") return generateContourAutoMesh(image, input.settings, { left: asset.left ?? 0, top: asset.top ?? 0, width: asset.width, height: asset.height });
   if (input.kind !== "grid") throw new Error("Unknown mesh generator.");
   const mesh = generateGridMesh(findAlphaBounds(image), image.width, image.height,
     input.columns, input.rows);
-  return { candidate: { positions: [...mesh.baseVertices], uvs: [...mesh.uvs], indices: [...mesh.indices] },
+  return { candidate: { positions: [...mesh.baseVertices].map((n, i) => n + (i % 2 ? asset.top ?? 0 : asset.left ?? 0)), uvs: [...mesh.uvs], indices: [...mesh.indices] },
     diagnostics: [] };
 }

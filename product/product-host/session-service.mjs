@@ -5,6 +5,7 @@ import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
 import { MCP_SCHEMA_VERSION } from "../src/mcp/schemas.js";
 import { createProject, PROJECT_SCHEMA_VERSION } from "../src/model/project.js";
 import { parseProjectDocument, serializeProject } from "../src/io/project-json.js";
+import { prepareDocumentArtwork, attachDocumentArtwork, NATIVE_ARTWORK_LIMITS } from "./document-artwork.mjs";
 import { DocumentTransfers } from "./document-transfer.mjs";
 import { initializeDocumentLifecycle, serializeDocument, prepareDocumentSave, acknowledgeDocumentSave } from "./document-lifecycle.mjs";
 import { RasterAssets } from "./raster-assets.mjs";
@@ -92,7 +93,7 @@ export class ProductHostService {
     this.createToken = createToken;
     this.document = null;
     this.shutdownRequested = false;
-    this.assets = new RasterAssets(() => ({ token: this.documentToken, revision: this.revision }));
+    this.assets = new RasterAssets(() => ({ token: this.documentToken, revision: this.revision }), NATIVE_ARTWORK_LIMITS);
     this.transfers = new DocumentTransfers(() => ({ token: this.documentToken, revision: this.revision }));
     this.assets.documentTransfers = this.transfers;
     this.bulkEndpoint = null;
@@ -110,7 +111,7 @@ export class ProductHostService {
       throw new Error("Generation already running or missing preview ID.");
     const token = this.documentToken, revision = this.revision;
     const worker = new Worker(new URL("./mesh-generation-worker.mjs", import.meta.url), {
-      workerData: { asset: { width: asset.width, height: asset.height, bytes: asset.bytes }, input },
+      workerData: { asset: { width: asset.width, height: asset.height, left: asset.left, top: asset.top, bytes: asset.bytes }, input },
       resourceLimits: { maxOldGenerationSizeMb: 128, maxYoungGenerationSizeMb: 16, stackSizeMb: 2 },
     });
     let timeout;
@@ -137,7 +138,7 @@ export class ProductHostService {
     return this.document?.token ?? null;
   }
 
-  #openProject(project, envelope = {}) {
+  #openProject(project, envelope = {}, prepared = null) {
     const session = new EditorSession(project);
     this.assets.clear();
     this.transfers.clear();
@@ -148,6 +149,7 @@ export class ProductHostService {
       headless: new HeadlessProductAdapter(session),
     };
     initializeDocumentLifecycle(this.document, envelope);
+    if (prepared) attachDocumentArtwork(this.document, this.assets, prepared);
     return {
       documentToken: this.document.token,
       revision: this.document.revision,
@@ -232,7 +234,7 @@ export class ProductHostService {
         );
       }
       const parsed = parseProjectDocument(payload.document);
-      return this.#openProject(parsed.project, parsed);
+      return this.#openProject(parsed.project, parsed, await prepareDocumentArtwork(parsed, this.assets));
     }
 
     const document = this.#requireDocument(request);
@@ -256,7 +258,7 @@ export class ProductHostService {
         if (recovery && (![recovery.lineageId, recovery.snapshotId].every(id =>
           typeof id === "string" && /^[a-f0-9-]{36}$/.test(id)))) throw new Error("Invalid Recovery identity.");
         return this.#openProject(parsed.project, { ...parsed, lineageId: recovery?.lineageId,
-          restoredSnapshotId: recovery?.snapshotId, dirty: Boolean(recovery) });
+          restoredSnapshotId: recovery?.snapshotId, dirty: Boolean(recovery) }, await prepareDocumentArtwork(parsed, this.assets));
       }
       case "document.prepareSave":
         this.#assertExpectedRevision(request, document);
@@ -292,14 +294,14 @@ export class ProductHostService {
       }
       case "mesh.projection": {
         const state = payload.nodeId ? meshContext(document.session, payload, false).preparation.getState() : null;
-        const artwork = [...(document.bindings || [])].map(([nodeId, id]) => {
+        const artwork = [...(document.bindings || [])].filter(([nodeId]) => document.session.project.scene.nodes[nodeId]).map(([nodeId, id]) => {
           const asset = this.assets.get(id, document.token, document.revision);
           const node = document.session.query("scene.get_node", { nodeId });
           return { id, nodeId, width: asset.width, height: asset.height, byteLength: asset.byteLength,
             visible: node.effectiveVisible, locked: node.locked, bounds: node.bounds,
-            worldTransform: node.worldTransform };
+            worldTransform: node.worldTransform, left: asset.left ?? 0, top: asset.top ?? 0 };
         });
-        return { state, artwork, proofOnly: Boolean(document.bindings) };
+        return { state, artwork, proofOnly: Boolean(document.bindings && !document.renderAssets), diagnostics: document.artworkDiagnostics || [] };
       }
       case "mesh.tool":
         return executeMeshTool(document.session, payload);
@@ -334,7 +336,7 @@ export class ProductHostService {
       case "session.redo":
         return document.session.redo();
       case "session.serialize":
-        if (document.bindings) throw new Error("Hands-on artwork sessions cannot be saved. Production persistence is not implemented.");
+        if (document.bindings && !document.renderAssets) throw new Error("Hands-on artwork sessions cannot be saved. Production persistence is not implemented.");
         return { document: serializeDocument(document, payload.spacing ?? 2) };
       case "session.history":
         return {
