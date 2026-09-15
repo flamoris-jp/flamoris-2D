@@ -18,6 +18,8 @@ public sealed class RigEdit
     public static RigEdit ResetBone() => new("bone.reset",new {});
     public static RigEdit RemoveBone() => new("bone.remove",new {});
     public static RigEdit RenameBone(string displayName) => new("bone.rename",new {displayName});
+    public static RigEdit EnableBone(bool enabled) => new("bone.enabled",new {enabled});
+    public static RigEdit EnableRigidBinding(bool enabled) => new("bone.bindingEnabled",new {enabled});
     public static RigEdit ReparentBone(string parentNodeId) => new("bone.reparent",new {parentNodeId});
     public static RigEdit BindBone() => new("bone.bind",new {});
     public static RigEdit UnbindBone() => new("bone.unbind",new {});
@@ -43,6 +45,8 @@ public sealed class RigEdit
     public static RigEdit Paint(string[] vertexIds,double strength,bool subtract) => new("weight.paint",new {vertexIds,strength,operation=subtract?"subtract":"add"});
     public static RigEdit SetWeight(string vertexId,double weight) => new("weight.numeric",new {vertexId,weight});
     public static RigEdit NormalizeWeight(string vertexId) => new("weight.normalize",new {vertexId});
+    public static RigEdit ReplaceWeights(string vertexId,(string BoneId,double Weight)[] values) => new("weight.replace",new {vertexId,influences=values.Select(v=>new {boneId=v.BoneId,weight=v.Weight})});
+    public static RigEdit ClearWeights(string vertexId) => new("weight.clear",new {vertexId});
     public static RigEdit RemoveSkin() => new("weight.remove",new {});
     public static RigEdit EnableSkin(bool enabled) => new("weight.enabled",new {enabled});
     public static RigEdit ClipSource(string sourceNodeId) => new("clipping.source",new {sourceNodeId});

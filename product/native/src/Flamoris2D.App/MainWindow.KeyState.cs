@@ -124,7 +124,15 @@ public partial class MainWindow
         var aForms=Choices(panel,"Aのメッシュ",forms.Where(k=>String(k,"keyArtId")==String(transition,"fromKeyArtId")).Select((k,i)=>new EntityChoice(String(k,"id")!,$"メッシュ {i+1}")),String(part,"fromKeyformId"));
         var bForms=Choices(panel,"Bのメッシュ",forms.Where(k=>String(k,"keyArtId")==String(transition,"toKeyArtId")).Select((k,i)=>new EntityChoice(String(k,"id")!,$"メッシュ {i+1}")),String(part,"toKeyformId"));
         ActionButton(panel,"共有Topologyと両端を接続",()=>RunKeyStateAsync(()=>KeyStateEdit.SharedTopology(String(forms.First(k=>String(k,"id")==Chosen(aForms)),"topologyId")!,Chosen(aForms),Chosen(bForms)),context,revision));
-        foreach(var diagnostic in ArrayOf(state,"diagnostics"))Note(panel,String(diagnostic,"message")??diagnostic.ToString());
+        foreach(var diagnostic in ArrayOf(state,"diagnostics"))
+        {
+            Note(panel,String(diagnostic,"message")??String(diagnostic,"code")??diagnostic.ToString());
+            if(String(diagnostic,"key") is { } diagnosticKey)
+            {
+                var acknowledged=Property(diagnostic,"acknowledged").ValueKind==JsonValueKind.True;
+                ActionButton(panel,acknowledged?"確認済みを取り消す":"この診断を確認済みにする",()=>RunKeyStateAsync(()=>acknowledged?KeyStateEdit.ClearDiagnosticAcknowledgement(diagnosticKey):KeyStateEdit.AcknowledgeDiagnostic(diagnosticKey),context,revision));
+            }
+        }
         BuildCorrespondencePanel(state,context,revision,part);
     }
     private void BuildCorrespondencePanel(JsonElement state,KeyStateContext context,long revision,JsonElement part)

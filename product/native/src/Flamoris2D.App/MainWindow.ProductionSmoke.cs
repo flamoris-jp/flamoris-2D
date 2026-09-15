@@ -45,6 +45,8 @@ public partial class MainWindow
         await client.EditRigAsync(context,RigEdit.MoveWarp([control],3,2),client.Revision);await RefreshProjectionAsync();
         SwitchContext(EditingContext.Deform,false);await RefreshProjectionAsync();MeshCanvas.Selected.Add(MeshCanvas.VertexIds[0]);
         await client.EditRigAsync(CurrentRigContext(),RigEdit.FormMove([MeshCanvas.VertexIds[0]],1,-1),client.Revision);await RefreshProjectionAsync();
+        var sample=await client.EditKeyStateAsync(new(keyArtId,NodeId:nodeId),KeyStateEdit.CreateSample(null,String(topology,"id")!,[new(MeshCanvas.VertexIds[0],4,-2)]),client.Revision);
+        var sampleId=String(sample.Payload,"sampleId")!;var meshTargetId=String(sample.Payload,"meshId")!;
         SwitchContext(EditingContext.Animation,false);await RefreshProjectionAsync();
         var sequence=await client.EditTimelineAsync(new(),TimelineEdit.CreateSequence("Native eight-second shot",8,keyArtId),client.Revision);
         var sequenceId=String(sequence.Payload,"sequenceId")!;_renderChoice=new(sequenceId,"sequence","Native shot");await RefreshProjectionAsync();
@@ -55,6 +57,10 @@ public partial class MainWindow
         var trackId=String(track.Payload,"trackId")!;
         await client.EditTimelineAsync(new(sequenceId,clipId),TimelineEdit.AddKey(trackId,"rotation",0,AnimationValue.Scalar(0)),client.Revision);
         await client.EditTimelineAsync(new(sequenceId,clipId),TimelineEdit.AddKey(trackId,"rotation",960000,AnimationValue.Scalar(.5)),client.Revision);
+        var meshTrack=await client.EditTimelineAsync(new(sequenceId,clipId),TimelineEdit.AddTrack(AnimationTrackKind.MeshDeformationTrack,JsonSerializer.SerializeToElement(new {meshId=meshTargetId})),client.Revision);
+        var meshTrackId=String(meshTrack.Payload,"trackId")!;
+        await client.EditTimelineAsync(new(sequenceId,clipId),TimelineEdit.AddKey(meshTrackId,"deformation",0,AnimationValue.Deformation(sampleId,0)),client.Revision);
+        await client.EditTimelineAsync(new(sequenceId,clipId),TimelineEdit.AddKey(meshTrackId,"deformation",960000,AnimationValue.Deformation(sampleId,1)),client.Revision);
         await client.EditTimelineAsync(new(sequenceId),TimelineEdit.PlaceClip(clipId,new(0,960000,0,1,1,false,1,0,true)),client.Revision);
         await RefreshProjectionAsync();await ScrubAsync(480000);var evaluated=FramePixels(MeshCanvas.EvaluatedFrame);
         SwitchContext(EditingContext.Preview,false);await RefreshProjectionAsync();if(!evaluated.SequenceEqual(FramePixels(MeshCanvas.EvaluatedFrame)))throw new Exception("Animation/Preview frame mismatch.");
@@ -87,9 +93,16 @@ public partial class MainWindow
             await client.ApplySourceReviewAsync(String(review.Payload,"id")!,client.Revision);await client.UndoAsync();await client.RedoAsync();
         }
         await RefreshProjectionAsync();if(!evaluated.SequenceEqual(FramePixels(MeshCanvas.EvaluatedFrame)))throw new Exception("Reviewed source update changed authored animation.");
+        var second=await client.EditKeyStateAsync(new(keyArtId,NodeId:nodeId),KeyStateEdit.DuplicateArt("Second Key State"),client.Revision);
+        var secondId=String(second.Payload,"keyArtId")!;
+        await client.EditRigAsync(new(nodeId,secondId,_selectedBoneId),RigEdit.BonePose(0,0,.3),client.Revision);
+        var transition=await client.EditKeyStateAsync(new(keyArtId),KeyStateEdit.CreateTransition("State transition",keyArtId,secondId,2),client.Revision);
+        var transitionId=String(transition.Payload,"transitionId")!;
+        _renderChoice=new(transitionId,"transition","State transition");_timeTicks=120000;SwitchContext(EditingContext.Animation,false);await RefreshProjectionAsync();
+        FramePixels(MeshCanvas.EvaluatedFrame);
         await using(var input=File.OpenRead(Path.Combine(fixtureDirectory,"native-production-source.flimg")))
             await client.ImportSourceAsync(input,input.Length,NativeSourceKind.Cutwork,"native-production-source.flimg");
         AttachDocumentWorkspace(client.DocumentToken!);SwitchContext(EditingContext.Source,false);await RefreshProjectionAsync();FramePixels(MeshCanvas.EvaluatedFrame);
-        Console.WriteLine("Native WPF production path passed: PSD > Mesh/image deformation > Bone/Skin > Warp > form correction > eight-second Sequence > Preview > 240 PNGs > atomic Save > New > Open; evaluated frame retained.");
+        Console.WriteLine("Native WPF production path passed: PSD > Mesh/image deformation > Bone/Skin > Warp > form correction + reusable MeshDeformation > eight-second Sequence > Preview > 240 PNGs > atomic Save > New > Open > reimport/Undo/Redo > duplicate Key State/Transition > Cutwork; evaluated frame retained.");
     }
 }

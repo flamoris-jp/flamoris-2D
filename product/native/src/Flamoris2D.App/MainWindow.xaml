@@ -320,6 +320,7 @@
                     <DockPanel>
                         <TextBlock DockPanel.Dock="Top" Style="{StaticResource PanelHeader}"
                                    Text="{DynamicResource Panel.Targets}" />
+                        <TextBox x:Name="TargetSearch" DockPanel.Dock="Top" Margin="6,0,6,6" ToolTip="名前またはIDで対象を絞り込む" TextChanged="TargetSearch_Changed" />
                         <ListBox x:Name="TargetList" Margin="6,0,6,6"
                                  Background="#202124" Foreground="{StaticResource PanelTextBrush}"
                                  BorderBrush="#41444A" SelectionChanged="TargetList_SelectionChanged">

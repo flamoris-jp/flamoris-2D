@@ -102,6 +102,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             try
             {
                 TargetList.ItemsSource = _targets.Targets;
+                FilterTargets();
                 TargetList.SelectedItem = _targets.Selected;
             }
             finally { _updatingTargets = false; }
@@ -330,6 +331,17 @@ public partial class MainWindow : Window, IAsyncDisposable
         ActiveToolSettingsText.Text = $"{tool} — {definition.ClickMeaning}";
     }
 
+    private void FilterTargets()
+    {
+        if(TargetList?.ItemsSource is null)return;
+        var text=TargetSearch.Text.Trim();
+        System.Windows.Data.CollectionViewSource.GetDefaultView(TargetList.ItemsSource).Filter=item=>item is TargetProjection target&&(text.Length==0||target.DisplayName.Contains(text,StringComparison.OrdinalIgnoreCase)||target.Id.Contains(text,StringComparison.OrdinalIgnoreCase));
+    }
+    private void TargetSearch_Changed(object sender,TextChangedEventArgs e)
+    {
+        if(TargetList is null)return;
+        _updatingTargets=true;try{FilterTargets();TargetList.SelectedItem=_targets.Selected;}finally{_updatingTargets=false;}
+    }
     private async void TargetList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_updatingTargets) return;

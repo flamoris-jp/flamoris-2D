@@ -114,9 +114,17 @@ public partial class MainWindow
             ActionButton(panel,_bonePoseMode?"この原画のポーズを確定":"初期形状を確定",()=>RunRigEditAsync(()=>_bonePoseMode?
                 RigEdit.BonePose(ReadNumber(x),ReadNumber(y),ReadNumber(rotation)*Math.PI/180):RigEdit.BoneRest(ReadNumber(x),ReadNumber(y),ReadNumber(rotation)*Math.PI/180,ReadNumber(length)),context,revision));
             ActionButton(panel,"名前を変更",()=>RunRigEditAsync(()=>RigEdit.RenameBone(name.Text),context,revision));
+            var boneEnabled=Check(panel,"Boneを有効にする",Property(bone,"enabled").ValueKind!=JsonValueKind.False);
+            ActionButton(panel,"Boneの有効状態を確定",()=>RunRigEditAsync(()=>RigEdit.EnableBone(boneEnabled.IsChecked==true),context,revision));
             ActionButton(panel,"ポーズをリセット",()=>RunRigEditAsync(RigEdit.ResetBone,context,revision));
             ActionButton(panel,"選択パーツをこのBoneに固定",()=>RunRigEditAsync(RigEdit.BindBone,context,revision));
             ActionButton(panel,"選択パーツの固定を解除",()=>RunRigEditAsync(RigEdit.UnbindBone,context,revision));
+            var rigid=ArrayOf(_rigSnapshot,"rigidBindings").FirstOrDefault(b=>String(b,"targetNodeId")==context.NodeId);
+            if(rigid.ValueKind==JsonValueKind.Object)
+            {
+                var rigidEnabled=Check(panel,"Boneへの固定を有効にする",Property(rigid,"enabled").ValueKind==JsonValueKind.True);
+                ActionButton(panel,"固定の有効状態を確定",()=>RunRigEditAsync(()=>RigEdit.EnableRigidBinding(rigidEnabled.IsChecked==true),context,revision));
+            }
             var parents=BoneChoices().Where(b=>b.Id!=context.BoneId).Prepend(new EntityChoice(String(_rigSnapshot,"rootId")!,"ルート"));
             var parent=Choices(panel,"親Bone／ルート",parents,String(bone,"parentNodeId"));
             ActionButton(panel,"親を変更",()=>RunRigEditAsync(()=>RigEdit.ReparentBone(Chosen(parent)),context,revision));
@@ -182,6 +190,12 @@ public partial class MainWindow
             ActionButton(panel,"選択頂点のウェイトを設定",()=>RunRigEditAsync(()=>RigEdit.SetWeight(MeshCanvas.Selected.Single(),ReadNumber(weight)),context,revision));
             ActionButton(panel,"選択頂点を正規化",()=>RunRigEditAsync(()=>RigEdit.NormalizeWeight(MeshCanvas.Selected.Single()),context,revision));
             var binding=ArrayOf(_rigSnapshot,"skinBindings").First(b=>String(b,"id")==context.BindingId);
+            var replace=Section(panel,"影響するBoneを明示して置換");
+            Note(replace,"頂点を1つ選択し、最大4本のBoneとウェイトを指定します。合計は1にしてください。空欄は使いません。");
+            var influences=new List<(ComboBox Bone,TextBox Weight)>();
+            for(var i=0;i<4;i++)influences.Add((Choices(replace,$"Bone {i+1}",BoneChoices().Prepend(new EntityChoice("","—")),i==0?context.BoneId:""),Field(replace,$"ウェイト {i+1}",i==0?1:0)));
+            ActionButton(replace,"選択頂点の影響を置換",()=>RunRigEditAsync(()=>RigEdit.ReplaceWeights(MeshCanvas.Selected.Single(),influences.Where(v=>(v.Bone.SelectedItem as EntityChoice)?.Id is {Length:>0}).Select(v=>(Chosen(v.Bone),ReadNumber(v.Weight))).ToArray()),context,revision));
+            ActionButton(replace,"選択頂点の全ウェイトを解除（Skin無効時）",()=>RunRigEditAsync(()=>RigEdit.ClearWeights(MeshCanvas.Selected.Single()),context,revision));
             var enabled=Check(panel,"スキニングを有効にする",Property(binding,"enabled").ValueKind==JsonValueKind.True);
             ActionButton(panel,"有効状態を確定",()=>RunRigEditAsync(()=>RigEdit.EnableSkin(enabled.IsChecked==true),context,revision));
             ActionButton(panel,"SkinBindingを削除",()=>RunRigEditAsync(RigEdit.RemoveSkin,context,revision));
@@ -189,6 +203,11 @@ public partial class MainWindow
         var clip=Property(_rigSnapshot,"clipping");
         var sources=Choices(panel,"クリッピング元",ArrayOf(clip,"sourceCandidates").Select(c=>new EntityChoice(String(c,"id")!,String(c,"displayName")??"Part")),String(Property(clip,"binding"),"sourceNodeId"));
         ActionButton(panel,"クリッピング元を設定",()=>RunRigEditAsync(()=>RigEdit.ClipSource(Chosen(sources)),context,revision));
+        if(Property(clip,"binding").ValueKind==JsonValueKind.Object)
+        {
+            var enabled=Check(panel,"クリッピングを有効にする",Property(Property(clip,"binding"),"enabled").ValueKind==JsonValueKind.True);
+            ActionButton(panel,"クリッピングの有効状態を確定",()=>RunRigEditAsync(()=>RigEdit.EnableClipping(enabled.IsChecked==true),context,revision));
+        }
         ActionButton(panel,"クリッピングを解除",()=>RunRigEditAsync(RigEdit.RemoveClipping,context,revision));
     }
     private void BuildFormPanel(RigContext context,long revision)

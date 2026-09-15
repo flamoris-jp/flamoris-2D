@@ -24,13 +24,17 @@ test('native Bone/Warp/Skin/form tools commit through one history and preserve e
  await tool('bone.create',{displayName:'root',length:12});context.boneId=host.document.session.project.rig.bones[0].id;
  await tool('bone.rest',{x:5,y:5,rotation:0,length:12});
  await tool('bone.pose',{x:0,y:0,rotation:.2});
+ await tool('bone.enabled',{enabled:false});await tool('bone.enabled',{enabled:true});
  await tool('bone.limit',{minRotation:-.5,maxRotation:.5,enabled:true});
- await tool('bone.bind');await tool('bone.unbind');
+ await tool('bone.bind');await tool('bone.bindingEnabled',{enabled:false});await tool('bone.bindingEnabled',{enabled:true});await tool('bone.unbind');
  const snapshot=await send(host,'rig.projection',context);assert.equal(snapshot.fk.poses.length,1);
  context.keyformId=snapshot.part.activeKeyform.id;
  await tool('weight.create',{topologyId:snapshot.part.topology.id});context.bindingId=host.document.session.project.rig.skinBindings[0].id;
  await tool('weight.paint',{vertexIds:[snapshot.part.topology.vertexIds[0]],strength:.2,operation:'add'});
  await tool('weight.enabled',{enabled:false});await tool('weight.enabled',{enabled:true});
+ await tool('weight.enabled',{enabled:false});await tool('weight.clear',{vertexId:snapshot.part.topology.vertexIds[0]});
+ await tool('weight.replace',{vertexId:snapshot.part.topology.vertexIds[0],influences:[{boneId:context.boneId,weight:1}]});
+ await tool('weight.enabled',{enabled:true});
  await tool('form.move',{vertexIds:[snapshot.part.topology.vertexIds[0]],x:2,y:-1});
  const warp=await tool('warp.create',{displayName:'warp',parentNodeId:snapshot.rootId,size:3,bounds:{left:0,top:0,right:32,bottom:32},childNodeIds:[nodeId]});
  context.deformerId=warp.deformerId;

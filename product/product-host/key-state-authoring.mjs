@@ -32,6 +32,14 @@ export function keyStateProjection(session,context={}) {
     diagnostics:context.transitionId?session.query('transition.get_diagnostics',{transitionId:context.transitionId}):[],
     samples:session.query('animation.deformation_sample.list'),meshes:session.query('mesh.list')};
 }
+function editableKeyform(session,keyformId) {
+  const keyform=session.query('mesh.get_keyform',{keyformId});
+  const mapping=session.query('semantic_slot.get_mapping',{semanticSlotId:keyform.semanticSlotId,keyArtId:keyform.keyArtId});
+  if(!mapping)throw new Error('Mesh Key Art mapping is missing.');
+  const node=session.query('scene.get_node',{nodeId:mapping.nodeId});
+  if(node.locked||!node.effectiveVisible)throw new Error('非表示・ロック中のメッシュは編集できません。');
+  return keyform;
+}
 export function correspondence(session,context,input,apply=false) {
   const a=authoring(session,context),e=new EndpointMeshController(session,a);
   // Selection uses the persisted shared references. Selecting keyforms with the
@@ -40,7 +48,7 @@ export function correspondence(session,context,input,apply=false) {
   c.setDirection(input.reverse?'to':'from',input.reverse?'from':'to');c.setPreset(input.preset||'normal');
   if(!Array.isArray(input.pins)||input.pins.length>10000)throw new Error('Invalid correspondence pins.');
   for(const pin of input.pins)c.addPin(pin.vertexId,pin.target);
-  const state=c.solve();return apply?c.apply():state;
+  const state=c.solve();if(apply){editableKeyform(session,state.targetKeyformId);return c.apply();}return state;
 }
 export function executeKeyStateTool(session,{context={},tool,input={}}) {
   const a=authoring(session,context),p=session.project;
@@ -95,11 +103,16 @@ export function executeKeyStateTool(session,{context={},tool,input={}}) {
         command('transition.set_part_mode',{transitionId:context.transitionId,semanticSlotId:context.semanticSlotId,partTransitionId:part?.id||id('part_transition'),mode:'morph',configuration:{}}),
         command('transition.set_part_topology',{transitionId:context.transitionId,semanticSlotId:context.semanticSlotId,...input})],{label:'Connect shared Morph endpoints'});
     }
-    case 'transition.override':return run('transition.set_diagnostic_override',{transitionId:context.transitionId,...input});
+    case 'transition.override': {
+      const diagnostic=session.query('transition.get_diagnostics',{transitionId:context.transitionId}).find(d=>d.key===input.key);
+      if(!diagnostic)throw new Error('Diagnostic changed; refresh before acknowledging.');
+      const {key,code,semanticSlotId,timeTicks,evidenceFingerprint}=diagnostic;
+      return run('transition.set_diagnostic_override',{transitionId:context.transitionId,override:{key,code,semanticSlotId,timeTicks,evidenceFingerprint}});
+    }
     case 'transition.clearOverride':return run('transition.clear_diagnostic_override',{transitionId:context.transitionId,...input});
     case 'correspondence.apply':return correspondence(session,context,input,true);
     case 'mesh.align': {
-      const keyform=session.query('mesh.get_keyform',{keyformId:input.keyformId});
+      const keyform=editableKeyform(session,input.keyformId);
       if(keyform.keyArtId!==context.keyArtId)throw new Error('Select the mesh Key Art before alignment.');
       const {x,y,rotation,scaleX,scaleY,pivotX,pivotY}=input;
       if(![x,y,rotation,scaleX,scaleY,pivotX,pivotY].every(Number.isFinite))throw new Error('Alignment requires finite values.');

@@ -27,6 +27,8 @@ public sealed class KeyStateEdit
     public static KeyStateEdit UpdateTransition(string displayName,double durationSeconds)=>new("transition.update",new {displayName,durationSeconds});
     public static KeyStateEdit Endpoint(bool from,string keyArtId)=>new("transition.endpoint",new {endpoint=from?"from":"to",keyArtId});
     public static KeyStateEdit RemoveTransition()=>new("transition.remove",new {});
+    public static KeyStateEdit AcknowledgeDiagnostic(string key)=>new("transition.override",new {key});
+    public static KeyStateEdit ClearDiagnosticAcknowledgement(string key)=>new("transition.clearOverride",new {key});
     public static KeyStateEdit Mode(string mode,bool holdFrom=true,string? compositeGroupId=null)=>new("transition.mode",new {mode,configuration=new {holdEndpoint=holdFrom?"from":"to",compositeGroupId}});
     public static KeyStateEdit SharedTopology(string topologyId,string fromKeyformId,string toKeyformId)=>new("transition.topology",new {topologyId,fromKeyformId,toKeyformId});
     public static KeyStateEdit Alignment(string keyformId,double x,double y,double rotation,double scaleX,double scaleY,double pivotX,double pivotY)=>new("mesh.align",new {keyformId,x,y,rotation,scaleX,scaleY,pivotX,pivotY});

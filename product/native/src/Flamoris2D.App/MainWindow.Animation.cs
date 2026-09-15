@@ -154,7 +154,7 @@ public partial class MainWindow
         else if(valueKind=="clipping")
         {var clipping=Choices(panel,"クリッピング元",_targets.Targets.Where(t=>t.Kind=="part").Select(t=>new EntityChoice(t.Id,t.DisplayName)).Prepend(new EntityChoice("","なし")),String(value,"sourceNodeId")??"");read=()=>AnimationValue.Clipping(Chosen(clipping) is {Length:>0} id?id:null);}
         else if(valueKind=="deformation")
-        {var sample=Choices(panel,"変形サンプル",ArrayOf(_timelineSnapshot,"deformationSamples").Select(s=>new EntityChoice(String(s,"id")!,String(s,"displayName")??"変形")),String(value,"deformationSampleId"));var weight=Field(panel,"変形の強さ",Number(value,"weight",1));read=()=>AnimationValue.Deformation(Chosen(sample),ReadNumber(weight));}
+        {var sample=Choices(panel,"変形サンプル",ArrayOf(_timelineSnapshot,"deformationSamples").Select((s,i)=>new EntityChoice(String(s,"id")!,$"変形 {i+1} · {String(s,"id")}")),String(value,"deformationSampleId"));var weight=Field(panel,"変形の強さ",Number(value,"weight",1));read=()=>AnimationValue.Deformation(Chosen(sample),ReadNumber(weight));}
         else if(valueKind=="weights")
         {var fields=ArrayOf(_timelineSnapshot,"appearanceOptions").ToDictionary(o=>String(o,"id")!,o=>Field(panel,String(o,"label")!,Number(value,String(o,"id")!)));read=()=>AnimationValue.Appearance(fields.ToDictionary(p=>p.Key,p=>ReadNumber(p.Value)));}
         else{var scalar=Field(panel,selectedChannel=="rotation"?"値（ラジアン）":"値",value.ValueKind==JsonValueKind.Number?value.GetDouble():valueKind is "unit-number" or "positive-number"?1:0);read=()=>AnimationValue.Scalar(ReadNumber(scalar));}

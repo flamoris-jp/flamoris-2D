@@ -6,7 +6,8 @@ import { WeightAuthoringController } from '../src/ui/weight-authoring-controller
 import { ClippingAuthoringController } from '../src/ui/clipping-authoring-controller.js';
 import { FormCorrectionAuthoringController } from '../src/ui/form-correction-authoring-controller.js';
 import { defaultWarpKeyformControlPoints, isWarpGridDimension } from '../src/model/warp-deformer.js';
-import { evaluateEndpointProjectedBoneFk } from '../src/core/rigid-bone-evaluator.js';
+import { evaluateEndpointProjectedBoneFk, createEndpointBoneWarpEvaluationStages } from '../src/core/rigid-bone-evaluator.js';
+import { invertWarpStages, resolveWarpEvaluationStages } from '../src/core/warp-deformer-evaluator.js';
 import { worldTransformMatrix, invertAffine, transformPoint } from '../src/core/transforms.js';
 import { meshContext } from './mesh-hands-on.mjs';
 import { projectDeformerLattice, unprojectDeformerDocumentPoint } from '../src/ui/deformer-viewport-overlay.js';
@@ -49,7 +50,8 @@ export function executeRigTool(session, {context = {}, tool, input = {}}) {
     case 'bone.createAt':{
       const parentNodeId=context.boneId||session.project.scene.rootId;
       const inverse=invertAffine(worldTransformMatrix(session.project,parentNodeId));
-      const a=transformPoint(inverse,input.start),b=transformPoint(inverse,input.end);
+      const stages=context.boneId?resolveWarpEvaluationStages(createEndpointBoneWarpEvaluationStages(session.project,context.boneId,context.keyArtId)):[];
+      const a=transformPoint(inverse,invertWarpStages(input.start,stages)),b=transformPoint(inverse,invertWarpStages(input.end,stages));
       const length=Math.hypot(b.x-a.x,b.y-a.y);
       if(length<.001)throw new Error('Boneの始点から終点へドラッグしてください。');
       return session.execute({type:'bone.create',payload:{id:idFactory('bone'),displayName:'Bone',parentNodeId,
@@ -69,10 +71,16 @@ export function executeRigTool(session, {context = {}, tool, input = {}}) {
     case 'bone.reset':return bone.resetPose();
     case 'bone.remove':return bone.remove();
     case 'bone.rename':return bone.rename(input.displayName);
+    case 'bone.enabled':return session.execute({type:'bone.set_enabled',payload:{boneId:context.boneId,enabled:input.enabled}});
     case 'bone.reparent':return bone.reparent(input.parentNodeId);
     case 'bone.bind':return bone.bindTarget(context.nodeId);
+    case 'bone.bindingEnabled': {
+      const binding=session.query('bone.list_rigid_bindings').find(b=>b.targetNodeId===context.nodeId);
+      if(!binding)throw new Error('Select a rigidly attached Part.');
+      return session.execute({type:'bone.set_rigid_binding_enabled',payload:{bindingId:binding.id,enabled:input.enabled}});
+    }
     case 'bone.unbind':{
-      const binding=session.query('bone.get_rigid_binding_for_target',{targetNodeId:context.nodeId});
+      const binding=session.query('bone.list_rigid_bindings').find(b=>b.targetNodeId===context.nodeId);
       return binding?session.execute({type:'bone.remove_rigid_binding',payload:{bindingId:binding.id}}):null;
     }
     case 'bone.mirror':{
@@ -141,6 +149,7 @@ export function executeRigTool(session, {context = {}, tool, input = {}}) {
       return controller.replaceInfluences(input.vertexId,input.influences);
     }
     case 'weight.remove':return session.execute({type:'skin.remove_binding',payload:{bindingId:context.bindingId}});
+    case 'weight.clear':return session.execute({type:'skin.clear_vertex_weights',payload:{bindingId:context.bindingId,vertexId:input.vertexId}});
     case 'weight.enabled':return session.execute({type:'skin.set_enabled',payload:{bindingId:context.bindingId,enabled:input.enabled}});
     case 'clipping.source':return new ClippingAuthoringController(session,{idFactory}).setSource(context.nodeId,input.sourceNodeId);
     case 'clipping.enabled':return new ClippingAuthoringController(session,{idFactory}).setEnabled(context.nodeId,input.enabled);
