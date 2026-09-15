@@ -123,6 +123,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             await RefreshEvaluatedFrameAsync(client);
             await RefreshRigAsync(client);
             await RefreshTimelineAsync(client);
+            await RefreshExportAsync(client);
         }
         catch (StaleProjectionException)
         {
@@ -293,6 +294,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         ConfigureMeshContext();
         ConfigureRigContext();
         ConfigureAnimationContext();
+        ConfigureExportContext();
         if (returnFocus) MeshCanvas.Focus();
     }
 
@@ -524,6 +526,7 @@ public partial class MainWindow : Window, IAsyncDisposable
                 throw new InvalidOperationException("Context switching changed object selection.");
         }
         await RunMeshSmokeAsync();
+        await RunProductionSmokeAsync();
         await _client.ShutdownAsync();
     }
 
@@ -532,6 +535,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         if (_disposed) return;
         _recoveryTimer.Stop();
         StopPlayback();
+        _exportWork?.Cancel();
         _disposed = true;
         _meshWork?.Cancel();
         var client = _client; _client = null;

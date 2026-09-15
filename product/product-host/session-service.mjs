@@ -5,6 +5,7 @@ import { HeadlessProductAdapter } from "../src/mcp/adapter.js";
 import { MCP_SCHEMA_VERSION } from "../src/mcp/schemas.js";
 import { createProject, PROJECT_SCHEMA_VERSION } from "../src/model/project.js";
 import { parseProjectDocument, serializeProject } from "../src/io/project-json.js";
+import { nativeExportSettings, nativeExportPlan, nativeExportFrame, nativeEncoderContract } from "./native-export.mjs";
 import { timelineProjection, executeTimelineTool, playbackTick } from "./timeline-authoring.mjs";
 import { rigProjection, executeRigTool } from "./rig-authoring.mjs";
 import { evaluatedProjection } from "./evaluated-projection.mjs";
@@ -50,6 +51,10 @@ const METHODS = new Set([
   "headless.execute",
   "headless.executeTransaction",
   "render.project",
+  "export.settings",
+  "export.plan",
+  "export.frame",
+  "export.encoder",
   "document.reserve",
   "document.open",
   "source.import",
@@ -281,6 +286,10 @@ export class ProductHostService {
     }
 
     switch (request.method) {
+      case "export.settings":return nativeExportSettings(document.session);
+      case "export.plan":this.#assertExpectedRevision(request,document);return nativeExportPlan(document.session,payload);
+      case "export.frame":this.#assertExpectedRevision(request,document);return nativeExportFrame(document,this.assets,payload);
+      case "export.encoder":return nativeEncoderContract(payload);
       case "timeline.projection":return timelineProjection(document.session,payload);
       case "timeline.tool":return executeTimelineTool(document.session,payload);
       case "rig.projection":return rigProjection(document.session,payload);

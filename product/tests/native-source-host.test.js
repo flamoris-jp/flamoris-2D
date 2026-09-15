@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { writePsd, initializeCanvas } from 'ag-psd';
 import { ProductHostService } from '../product-host/session-service.mjs';
@@ -53,4 +55,15 @@ for (const [kind, fixture] of [['psd',psd],['flimg',cutwork]]) {
     await send(h,'session.open',{document:saved.document}); assert.deepEqual(h.document.renderAssets,assets);
     assert.deepEqual(h.document.session.project,edited); assert.equal(h.assets.entries.size,1);
   });
+}
+
+
+if(process.env.FLAMORIS_RENDER_FIXTURE_DIR) {
+  const directory=process.env.FLAMORIS_RENDER_FIXTURE_DIR;mkdirSync(directory,{recursive:true});
+  initializeCanvas(()=>{throw new Error('Unexpected canvas');},(width,height)=>({width,height,data:new Uint8ClampedArray(width*height*4)}));
+  const data=new Uint8ClampedArray(48*48*4);
+  for(let y=0;y<48;y++)for(let x=0;x<48;x++){const i=(y*48+x)*4;data[i]=x*5;data[i+1]=y*5;data[i+2]=160;data[i+3]=Math.hypot(x-24,y-24)<22?255:0;}
+  const bytes=writePsd({width:64,height:64,children:[{name:'Production part',id:12,left:8,top:8,imageData:{width:48,height:48,data}}]});
+  writeFileSync(join(directory,'native-production-source.psd'),new Uint8Array(bytes));
+  writeFileSync(join(directory,'native-production-source.flimg'),cutwork());
 }
