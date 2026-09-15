@@ -40,7 +40,7 @@ public sealed class NativeRecoveryStore(string directory, long maximumBytes = 10
             if (!CryptographicOperations.FixedTimeEquals(digest, hash.GetHashAndReset())) throw new InvalidDataException("Checksum mismatch.");
             return new(path, metadata, null);
         }
-        catch (Exception error) when (error is IOException or JsonException or ArgumentException or OverflowException)
+        catch (Exception error) when (error is IOException or InvalidDataException or JsonException or ArgumentException or OverflowException)
         { return new(path, null, error.Message); }
     }
     private static RecoveryMetadata ReadMetadata(Stream stream)
@@ -126,10 +126,11 @@ public sealed class NativeRecoveryStore(string directory, long maximumBytes = 10
         {
             var path = Path.GetFullPath(selected.Path);
             if (Path.GetDirectoryName(path) != _directory) throw new InvalidDataException("Recovery selection is outside the store.");
-            var checkedEntry = ReadEntry(path);
-            if (checkedEntry.Metadata is null) throw new InvalidDataException(checkedEntry.Error);
             using var stream = File.OpenRead(path); var metadata = ReadMetadata(stream);
             var bytes = new byte[checked((int)metadata.ByteLength)]; await stream.ReadExactlyAsync(bytes);
+            var digest = new byte[32]; await stream.ReadExactlyAsync(digest);
+            if (!CryptographicOperations.FixedTimeEquals(digest, SHA256.HashData(bytes)))
+                throw new InvalidDataException("Recovery checksum mismatch.");
             return (new MemoryStream(bytes, writable: false), metadata);
         }
         finally { _gate.Release(); }
