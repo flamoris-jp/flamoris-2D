@@ -11,7 +11,7 @@ namespace Flamoris.Flamoris2D.App;
 public partial class MainWindow
 {
     private CancellationTokenSource? _exportWork;
-    private string _encoderPath="ffmpeg";
+    private string _encoderPath=File.Exists(Path.Combine(AppContext.BaseDirectory,"ffmpeg","bin","ffmpeg.exe"))?Path.Combine(AppContext.BaseDirectory,"ffmpeg","bin","ffmpeg.exe"):"ffmpeg";
     private string? _exportDirectory;
     private bool _exportBusy;
     private TextBlock? _exportProgressText;

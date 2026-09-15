@@ -10,20 +10,15 @@
     <AssemblyName>Flamoris2D</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Product>FLAMORIS 2D</Product>
-    <Description>Native FLAMORIS 2D editor shell foundation.</Description>
+    <Description>Native FLAMORIS 2D production editor candidate.</Description>
     <VersionPrefix>0.4.0</VersionPrefix>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Flamoris2D.Rendering\Flamoris2D.Rendering.csproj" />
     <ProjectReference Include="..\Flamoris2D.ProductHost.Client\Flamoris2D.ProductHost.Client.csproj" />
   </ItemGroup>
+  <Import Project="..\..\ProductHost.files.props" />
   <ItemGroup>
-    <None Include="..\..\..\product-host\**\*"
-          Link="ProductHost\%(RecursiveDir)%(Filename)%(Extension)"
-          CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\..\..\src\**\*.js"
-          Link="src\%(RecursiveDir)%(Filename)%(Extension)"
-          CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\..\package.json"
           Link="package.json"
           CopyToOutputDirectory="PreserveNewest" />

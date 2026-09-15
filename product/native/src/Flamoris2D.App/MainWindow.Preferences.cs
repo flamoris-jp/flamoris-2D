@@ -21,7 +21,7 @@ public partial class MainWindow
                 using var document=JsonDocument.Parse(await File.ReadAllTextAsync(SettingsPath));var root=document.RootElement;
                 if(Property(root,"preferences").ValueKind==JsonValueKind.Object)_nativePreferences=Property(root,"preferences").Clone();
                 foreach(var path in ArrayOf(root,"recentFiles").Where(v=>v.ValueKind==JsonValueKind.String).Select(v=>v.GetString()!).Where(File.Exists).Take(10))_recentFiles.Add(path);
-                if(String(root,"encoderPath") is {Length:>0} encoder)_encoderPath=encoder;
+                if(String(root,"encoderPath") is {Length:>0} encoder&&File.Exists(encoder))_encoderPath=encoder;
             }
             _nativePreferences=(await _client.NormalizePreferencesAsync(_nativePreferences)).Payload;ApplyNativePreferences();RefreshRecentMenu();
         }

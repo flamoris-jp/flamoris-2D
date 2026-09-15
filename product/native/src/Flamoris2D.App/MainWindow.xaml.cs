@@ -65,6 +65,8 @@ public partial class MainWindow : Window, IAsyncDisposable
         {
             var hostPath = Path.Combine(AppContext.BaseDirectory, "ProductHost", "main.mjs");
             var nodePath = Environment.GetEnvironmentVariable("FLAMORIS_NODE_PATH");
+            var bundledNode = Path.Combine(AppContext.BaseDirectory,"runtime","node.exe");
+            if(string.IsNullOrWhiteSpace(nodePath)&&File.Exists(bundledNode))nodePath=bundledNode;
             var handshake = await _client.StartAsync(hostPath, nodePath);
             HostStatusIndicator.Fill = Brushes.SeaGreen;
             HostStatusText.Text =

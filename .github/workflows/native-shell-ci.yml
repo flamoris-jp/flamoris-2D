@@ -9,7 +9,8 @@ on:
       - "product/product-host/**"
       - "product/src/**"
       - "product/tests/product-host.test.js"
-      - "product/tests/native-mesh-host.test.js"
+      - "product/tests/native-*.test.js"
+      - "product/tests/production-manifest.test.js"
       - "product/package.json"
       - ".github/workflows/native-shell-ci.yml"
   workflow_dispatch:
@@ -30,7 +31,7 @@ jobs:
       - name: Set up Node 24
         uses: actions/setup-node@v5
         with:
-          node-version: "24"
+          node-version: "24.21.0"
 
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v5
@@ -60,11 +61,33 @@ jobs:
       - name: C# client and crash-invalidation tests
         run: dotnet run --project product/native/tests/Flamoris2D.ProductHost.Client.Tests -c Release --no-build -- product/product-host/main.mjs
 
-      - name: WPF XAML and Product Host smoke launch
-        run: dotnet run --project product/native/src/Flamoris2D.App -c Release --no-build -- --smoke-test
-
       - name: Publish native candidate
-        run: dotnet publish product/native/src/Flamoris2D.App -c Release -r win-x64 --self-contained false -o out/native-win-x64
+        run: dotnet publish product/native/src/Flamoris2D.App -c Release -r win-x64 --self-contained true -o out/native-win-x64
+
+      - name: Include versioned runtimes and upstream notices
+        shell: pwsh
+        run: |
+          $package = Join-Path $env:GITHUB_WORKSPACE 'out/native-win-x64'
+          $runtime = New-Item -ItemType Directory -Path (Join-Path $package 'runtime') -Force
+          Copy-Item (Get-Command node).Source (Join-Path $runtime 'node.exe')
+          if ((& (Join-Path $runtime 'node.exe') --version) -ne 'v24.21.0') { throw 'Unexpected bundled Node version' }
+          Invoke-WebRequest 'https://raw.githubusercontent.com/nodejs/node/v24.21.0/LICENSE' -OutFile (Join-Path $runtime 'LICENSE.txt')
+          $ffmpegRoot = Split-Path (Split-Path $env:FLAMORIS_TEST_FFMPEG)
+          Copy-Item $ffmpegRoot (Join-Path $package 'ffmpeg') -Recurse
+          Copy-Item 'product/native/THIRD-PARTY-NOTICES.md' $package
+          Copy-Item 'docs/native-production-workflow.md' (Join-Path $package 'README.md')
+          Get-ChildItem $package -File -Recurse | ForEach-Object { '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash, $_.FullName.Substring($package.Length + 1) } | Set-Content (Join-Path $env:RUNNER_TEMP 'native-sha256.txt')
+          Copy-Item (Join-Path $env:RUNNER_TEMP 'native-sha256.txt') (Join-Path $package 'SHA256SUMS.txt')
+
+      - name: Packaged WPF production smoke without developer runtimes on PATH
+        shell: pwsh
+        run: |
+          $package = Join-Path $env:GITHUB_WORKSPACE 'out/native-win-x64'
+          $env:FLAMORIS_NODE_PATH = $null
+          $env:FLAMORIS_TEST_FFMPEG = Join-Path $package 'ffmpeg/bin/ffmpeg.exe'
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+          $process = Start-Process (Join-Path $package 'Flamoris2D.exe') -ArgumentList '--smoke-test' -PassThru -Wait -NoNewWindow
+          if ($process.ExitCode -ne 0) { throw "Packaged WPF smoke failed: $($process.ExitCode)" }
 
       - name: Upload native candidate
         uses: actions/upload-artifact@v4
