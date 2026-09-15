@@ -133,21 +133,18 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async void NewDocument_Click(object sender, RoutedEventArgs e)
     {
-        if (!await ConfirmReplaceDocumentAsync()) return;
-        if (_client?.IsRunning != true)
-        {
-            await ConnectHostAsync(createDocument: true);
-            return;
-        }
         try
         {
+            if (!await ConfirmReplaceDocumentAsync()) return;
+            if (_client?.IsRunning != true) { await ConnectHostAsync(createDocument: true); return; }
+            AssertReplacementApproval();
             await _client.CreateSessionAsync("名称未設定", 1920, 1080);
             _hasHandsOn = false; _currentPath = null; _lastRecovery = null;
             AttachDocumentWorkspace(_client.DocumentToken!);
             await RefreshProjectionAsync();
-            StatusText.Text = "新しいProduct Host documentを作成しました。";
+            StatusText.Text = "新しいプロジェクトを作成しました。";
         }
-        catch (Exception error) { StatusText.Text = $"新規セッションを作成できませんでした: {error.Message}"; }
+        catch (Exception error) { StatusText.Text = $"新規プロジェクトを作成できませんでした: {error.Message}"; }
     }
 
     private async void Refresh_Click(object sender, RoutedEventArgs e)
@@ -456,7 +453,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         e.Cancel = true;
         if (_closePromptActive) return;
         _closePromptActive = true;
-        try { if (!await ConfirmReplaceDocumentAsync()) return; }
+        try { if (!await ConfirmReplaceDocumentAsync()) return; AssertReplacementApproval(); }
         catch (Exception error) { StatusText.Text = error.Message; return; }
         finally { _closePromptActive = false; }
         _meshWork?.Cancel();

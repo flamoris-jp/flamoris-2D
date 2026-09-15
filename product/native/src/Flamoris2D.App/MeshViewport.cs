@@ -225,7 +225,7 @@ public sealed class MeshViewport : FrameworkElement
             {
                 var art = Artwork.First(a => a.NodeId == NodeId);
                 if (Tool == "頂点を追加") edit = MeshEdit.Add(click.Point.X, click.Point.Y,
-                    Math.Clamp(click.Point.X / art.Bitmap.PixelWidth, 0, 1), Math.Clamp(click.Point.Y / art.Bitmap.PixelHeight, 0, 1));
+                    Math.Clamp((click.Point.X - art.Left) / art.Bitmap.PixelWidth, 0, 1), Math.Clamp((click.Point.Y - art.Top) / art.Bitmap.PixelHeight, 0, 1));
                 else if (Tool == "頂点を削除" && click.Vertex >= 0) edit = MeshEdit.Remove(VertexIds[click.Vertex]);
             }
         }

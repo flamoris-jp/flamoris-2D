@@ -152,3 +152,16 @@ test('real embedded RGBA artwork decodes, preserves cropped bounds, generates in
   assert.equal((await send(host, 'session.open', { document: serialized.payload.document })).ok, true);
   assert.deepEqual(host.document.renderAssets, [record]);
 });
+
+
+test('native New requires the reviewed token/revision and preserves edits on a stale replacement', async () => {
+  const host = await setup(); const document = host.document;
+  const approved = { documentToken: host.documentToken, expectedRevision: host.revision };
+  await rename(host, 'edited while choosing a file');
+  const rejected = await send(host, 'document.new', {}, approved);
+  assert.equal(rejected.error.code, 'revision.conflict'); assert.equal(host.document, document);
+  assert.equal(host.document.session.isDirty, true);
+  const accepted = await send(host, 'document.new'); assert.equal(accepted.ok, true);
+  assert.notEqual(host.documentToken, approved.documentToken);
+  assert.equal((await send(host, 'document.new', {}, approved)).error.code, 'document.token_stale');
+});

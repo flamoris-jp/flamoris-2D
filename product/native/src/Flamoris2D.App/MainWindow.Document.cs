@@ -12,7 +12,11 @@ public partial class MainWindow
 {
     private string? _currentPath;
     private bool _documentBusy, _closePromptActive, _recoveryDismissed;
-    private (string Token, long Revision)? _lastRecovery;
+    private (string Token, long Revision)? _lastRecovery, _replacementApproval;
+    private void AssertReplacementApproval()
+    {
+        if (_replacementApproval is { } approval) _client!.AssertCurrent(approval.Token, approval.Revision);
+    }
     private readonly NativeRecoveryStore _recovery = new(Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FLAMORIS", "2D", "Recovery"));
     private readonly DispatcherTimer _recoveryTimer = new() { Interval = TimeSpan.FromSeconds(30) };
@@ -24,21 +28,27 @@ public partial class MainWindow
     }
     private async Task<bool> ConfirmReplaceDocumentAsync()
     {
+        _replacementApproval = null;
         if (_documentBusy || _loadingArtwork || _meshBusy) return false;
         if (!_autoConnect) return true;
-        if (_hasHandsOn) return ConfirmDiscardHandsOn();
         if (_client?.HasAuthoritativeProjection != true) return true;
         var state = await _client.GetWorkspaceAsync();
+        _replacementApproval = (state.DocumentToken!, state.Revision!.Value);
+        if (_hasHandsOn) return ConfirmDiscardHandsOn();
         if (!state.Payload.GetProperty("isDirty").GetBoolean()) return true;
         var choice = MessageBox.Show(this, "変更を保存してから続けますか？\n「いいえ」は現在の編集を破棄します。復元データは残ります。",
             "未保存の変更", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
         if (choice == MessageBoxResult.Cancel) return false;
         if (choice == MessageBoxResult.No) return true;
         if (!await SaveDocumentAsync("save")) return false;
-        return !(await _client.GetWorkspaceAsync()).Payload.GetProperty("isDirty").GetBoolean();
+        state = await _client.GetWorkspaceAsync();
+        _replacementApproval = (state.DocumentToken!, state.Revision!.Value);
+        return !state.Payload.GetProperty("isDirty").GetBoolean();
     }
     private async void ImportSource_Click(object sender, RoutedEventArgs e)
     {
+        if (_documentBusy || _meshBusy || _loadingArtwork) return;
+        var started = false;
         try
         {
             if (!await ConfirmReplaceDocumentAsync()) return;
@@ -46,7 +56,8 @@ public partial class MainWindow
             if (dialog.ShowDialog(this) != true) return;
             if (_client?.HasAuthoritativeProjection != true) await ConnectHostAsync(true);
             if (_client?.HasAuthoritativeProjection != true) return;
-            _documentBusy = true; SetMeshBusy(true); _meshWork = new CancellationTokenSource();
+            AssertReplacementApproval();
+            started = true; _documentBusy = true; SetMeshBusy(true); _meshWork = new CancellationTokenSource();
             CancelArtworkButton.Visibility = Visibility.Visible; CancelArtworkButton.IsEnabled = true;
             StatusText.Text = "素材を検証・読み込み中…";
             await using var input = new FileStream(dialog.FileName, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, FileOptions.Asynchronous);
@@ -60,8 +71,12 @@ public partial class MainWindow
         catch (Exception error) { StatusText.Text = $"素材を読み込めませんでした: {error.Message}"; }
         finally
         {
-            _meshWork?.Dispose(); _meshWork = null; _documentBusy = false;
-            CancelArtworkButton.Visibility = Visibility.Collapsed; SetMeshBusy(false);
+            if (started)
+            {
+                _meshWork?.Dispose(); _meshWork = null; _documentBusy = false;
+                CancelArtworkButton.Visibility = Visibility.Collapsed; SetMeshBusy(false);
+                SaveMenuItem.IsEnabled = !_hasHandsOn && _client?.HasAuthoritativeProjection == true;
+            }
         }
     }
     private async void OpenDocument_Click(object sender, RoutedEventArgs e)
@@ -83,12 +98,13 @@ public partial class MainWindow
         try
         {
             await using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, FileOptions.Asynchronous);
+            AssertReplacementApproval();
             await _client.OpenDocumentAsync(input, input.Length);
             _currentPath = Path.GetFullPath(path); _hasHandsOn = false; _lastRecovery = null;
             AttachDocumentWorkspace(_client.DocumentToken!); await RefreshProjectionAsync();
             MeshCanvas.Fit(); StatusText.Text = $"開きました: {Path.GetFileName(path)}";
         }
-        finally { _documentBusy = false; SetMeshBusy(false); }
+        finally { _documentBusy = false; SetMeshBusy(false); SaveMenuItem.IsEnabled = !_hasHandsOn && _client?.HasAuthoritativeProjection == true; }
     }
     private async void SaveDocument_Click(object sender, RoutedEventArgs e) => await SaveDocumentAsync("save");
     private async void SaveAsDocument_Click(object sender, RoutedEventArgs e) => await SaveDocumentAsync("saveAs");
@@ -108,6 +124,7 @@ public partial class MainWindow
         }
         _documentBusy = true; PreparedDocument? prepared = null;
         var client = _client;
+        string? cleanupWarning = null;
         try
         {
             MeshCanvas.Cancel(); CancelGenerated();
@@ -121,10 +138,10 @@ public partial class MainWindow
                 _currentPath = Path.GetFullPath(path);
                 var cleanup = ack.Payload.GetProperty("cleanup").Deserialize<RecoveryCleanup>(new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
                 try { await Task.Run(() => _recovery.CleanupAsync(cleanup)); }
-                catch (Exception error) { StatusText.Text = $"保存済み。復元データの整理は保留: {error.Message}"; }
+                catch (Exception error) { cleanupWarning = $"保存済み。復元データの整理は保留: {error.Message}"; }
             }
             await RefreshProjectionAsync();
-            StatusText.Text = $"保存しました: {Path.GetFileName(path)}";
+            StatusText.Text = cleanupWarning ?? $"保存しました: {Path.GetFileName(path)}";
             return true;
         }
         catch (Exception error) { StatusText.Text = $"保存できませんでした: {error.Message}"; return false; }
@@ -132,6 +149,7 @@ public partial class MainWindow
         {
             if (prepared is not null) await client.ReleaseDocumentAsync(prepared.Id, prepared.Identity.DocumentToken, prepared.Identity.Revision);
             _documentBusy = false;
+            SaveMenuItem.IsEnabled = !_hasHandsOn && client.HasAuthoritativeProjection;
         }
     }
     private async Task CaptureRecoveryAsync()
@@ -151,13 +169,16 @@ public partial class MainWindow
         {
             if (prepared is not null) await client.ReleaseDocumentAsync(prepared.Id, prepared.Identity.DocumentToken, prepared.Identity.Revision);
             _documentBusy = false;
+            SaveMenuItem.IsEnabled = !_hasHandsOn && client.HasAuthoritativeProjection;
         }
     }
     private async void Recovery_Click(object sender, RoutedEventArgs e) => await ShowRecoveryCardAsync(explicitOpen: true);
     private async Task ShowRecoveryCardAsync(bool explicitOpen = false)
     {
         if (!_autoConnect || (_recoveryDismissed && !explicitOpen)) return;
-        var entries = await Task.Run(_recovery.List);
+        IReadOnlyList<RecoveryEntry> entries;
+        try { entries = await Task.Run(_recovery.List); }
+        catch (Exception error) { StatusText.Text = $"復元候補を読み取れませんでした: {error.Message}"; return; }
         if (entries.Count == 0) { RecoveryCard.Visibility = Visibility.Collapsed; return; }
         var panel = new StackPanel { Margin = new Thickness(12) };
         panel.Children.Add(new TextBlock { Text = "復元できる編集データ", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0,0,0,6) });
@@ -172,6 +193,7 @@ public partial class MainWindow
                 if (_recoveryList.SelectedItem is not RecoveryEntry entry || entry.Metadata is null || !await ConfirmReplaceDocumentAsync()) return;
                 _documentBusy = true;
                 var (bytes, metadata) = await _recovery.ReadAsync(entry);
+                AssertReplacementApproval();
                 await using (bytes)
                     await _client!.OpenDocumentAsync(bytes, bytes.Length, new RecoveryOrigin(metadata.Identity.LineageId, metadata.Identity.SnapshotId));
                 _currentPath = null; _hasHandsOn = false; _lastRecovery = null; _recoveryDismissed = true;

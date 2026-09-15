@@ -104,8 +104,8 @@
                     <ToolBar Background="{StaticResource ChromeBrush}">
                         <Button Style="{StaticResource CommandButton}" Content="新規"
                                 Click="NewDocument_Click" />
-                        <Button Style="{StaticResource CommandButton}" Content="PNGでMesh体験…"
-                                Click="LoadArtwork_Click" ToolTip="透明PNGを複数選択できます。この体験セッションは保存されません。" />
+                        <Button Style="{StaticResource CommandButton}" Content="素材を読み込む…"
+                                Click="ImportSource_Click" ToolTip="PSDまたはCutwork素材を読み込みます。" />
                         <Button x:Name="CancelArtworkButton" Content="中止" Click="CancelMeshWork_Click" Visibility="Collapsed" />
                         <Button x:Name="RefreshButton" Style="{StaticResource CommandButton}"
                                 Content="状態を更新" Click="Refresh_Click" IsEnabled="False" />

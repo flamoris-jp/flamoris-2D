@@ -48,6 +48,7 @@ public partial class MainWindow
         if (_client?.HasAuthoritativeProjection != true) await ConnectHostAsync(true);
         if (_client?.HasAuthoritativeProjection != true) return;
         var client = _client;
+        AssertReplacementApproval();
         var token = client.DocumentToken!;
         var revision = client.Revision;
         var handles = new List<string>();

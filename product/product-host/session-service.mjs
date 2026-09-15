@@ -31,6 +31,7 @@ const METHODS = new Set([
   "host.health",
   "host.shutdown",
   "session.create",
+  "document.new",
   "session.open",
   "session.query",
   "session.execute",
@@ -237,7 +238,8 @@ export class ProductHostService {
       this.shutdownRequested = true;
       return { accepted: true };
     }
-    if (request.method === "session.create") {
+    if (request.method === "session.create" || request.method === "document.new") {
+      if (request.method === "document.new") this.#assertExpectedRevision(request, this.#requireDocument(request));
       const width = Number(payload.width ?? 1920);
       const height = Number(payload.height ?? 1080);
       if (!Number.isSafeInteger(width) || width <= 0 ||
