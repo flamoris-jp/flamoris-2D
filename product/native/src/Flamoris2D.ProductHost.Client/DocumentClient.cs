@@ -17,6 +17,8 @@ public sealed record RecoveryCleanup(string LineageId, string DocumentToken, lon
 public sealed partial class ProductHostClient
 {
     public const long MaximumDocumentBytes = 128L * 1024 * 1024;
+    public Task<ProductHostResponse> NormalizePreferencesAsync(JsonElement preferences)=>SendAsync("native.preferences",new {preferences},false,true,CancellationToken.None);
+    public Task<ProductHostResponse> IncrementalNameAsync(string fileName,string[] existingFileNames,JsonElement preferences)=>SendAsync("document.incrementalName",new {fileName,existingFileNames,preferences},false,true,CancellationToken.None);
     private static readonly JsonSerializerOptions DocumentJson = new() { PropertyNameCaseInsensitive = true };
     private HttpRequestMessage DocumentRequest(HttpMethod method, string id, string token, long revision)
     {

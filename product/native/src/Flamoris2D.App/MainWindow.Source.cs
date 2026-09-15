@@ -33,6 +33,7 @@ public partial class MainWindow
             if(candidateId is not null&&_client is not null)
                 try{await _client.DiscardSourceReviewAsync(candidateId);}catch(Exception error){StatusText.Text=error.Message;}
             _meshWork?.Dispose();_meshWork=null;_documentBusy=false;SetMeshBusy(false);CancelArtworkButton.Visibility=Visibility.Collapsed;
+            if(candidateId is not null&&PreferenceFlag("saveAfterMajorOperations",true))await CaptureRecoveryAsync();
         }
     }
     private void ShowSourceReview(JsonElement projection,long revision)

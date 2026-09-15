@@ -20,6 +20,14 @@ async function prepare(host, operation = 'save') {
   assert.equal(r.ok, true, JSON.stringify(r.error)); return r.payload;
 }
 
+test('native preferences and incremental naming reuse Product policy without editing the document',async()=>{
+ const host=await setup(),revision=host.revision;
+ const prefs=await send(host,'native.preferences',{preferences:{autosaveIntervalSeconds:60,recoveryVersions:5,incrementalSaveWidth:4}});
+ assert.equal(prefs.payload.recoveryVersions,5);
+ const next=await send(host,'document.incrementalName',{fileName:'shot_009.fl2d',existingFileNames:['shot_010.fl2d','other_099.fl2d'],preferences:prefs.payload});
+ assert.equal(next.payload.fileName,'shot_0011.fl2d');assert.equal(host.revision,revision);
+});
+
 test('open/serialize preserves complete embedded artwork records and timestamps', async () => {
   const host = await setup();
   const assets = [{ nodeId: 'external', sourceKey: 'layer:3', width: 1, height: 1,

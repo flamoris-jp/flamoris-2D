@@ -14,6 +14,7 @@ public sealed record RecoveryEntry(string Path, RecoveryMetadata? Metadata, stri
 public sealed class NativeRecoveryStore(string directory, long maximumBytes = 1024L * 1024 * 1024)
 {
     private readonly string _directory = Path.GetFullPath(directory);
+    public int RetainedVersions {get;set;} = 3;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true };
     public IReadOnlyList<RecoveryEntry> List()
@@ -87,7 +88,7 @@ public sealed class NativeRecoveryStore(string directory, long maximumBytes = 10
                 await stream.WriteAsync(sha.Hash!, ct);
             }, overwrite: false, cancellationToken);
             // Only validated snapshots in THIS lineage, only after durable replacement.
-            foreach (var old in List().Where(e => e.Metadata?.Identity.LineageId == prepared.Identity.LineageId).Skip(3))
+            foreach (var old in List().Where(e => e.Metadata?.Identity.LineageId == prepared.Identity.LineageId).Skip(Math.Clamp(RetainedVersions,1,10)))
                 File.Delete(old.Path);
         }
         finally { _gate.Release(); }

@@ -24,7 +24,9 @@ function authoring(session, context) {
 }
 export function keyStateProjection(session,context={}) {
   const state=authoring(session,context).getState();
-  return {...state,durationSeconds:state.activeTransition?ticksToSeconds(state.activeTransition.durationTicks):1,slots:session.query('semantic_slot.list'),keyforms:session.query('mesh.list_keyforms'),
+  return {...state,node:context.nodeId?session.query('scene.get_node',{nodeId:context.nodeId}):null,
+    groups:Object.values(session.project.scene.nodes).filter(n=>n.kind==='group').map(n=>({id:n.id,displayName:n.displayName})),
+    durationSeconds:state.activeTransition?ticksToSeconds(state.activeTransition.durationTicks):1,slots:session.query('semantic_slot.list'),keyforms:session.query('mesh.list_keyforms'),
     topologies:session.query('mesh.list_topologies'),modes:PART_TRANSITION_MODES,
     nodes:Object.values(session.project.scene.nodes).filter(n=>n.kind==='part').map(n=>({id:n.id,displayName:n.displayName})),
     diagnostics:context.transitionId?session.query('transition.get_diagnostics',{transitionId:context.transitionId}):[],
@@ -44,6 +46,13 @@ export function executeKeyStateTool(session,{context={},tool,input={}}) {
   const a=authoring(session,context),p=session.project;
   const run=(type,payload)=>session.execute(command(type,payload));
   switch(tool) {
+    case 'object.transform': {
+      const node=session.query('scene.get_node',{nodeId:context.nodeId});
+      if(node.locked||!node.effectiveVisible||!['part','group'].includes(node.kind))throw new Error('表示中・ロックされていないパーツかグループを選択してください。');
+      return run('scene.set_transform',{nodeId:context.nodeId,coordinateSpace:'node-local',transform:input.transform});
+    }
+    case 'object.group':return run('scene.create_group',{id:id('group'),parentId:input.parentId,displayName:input.displayName});
+    case 'object.reparent':return run('scene.reparent_node',{nodeId:context.nodeId,parentId:input.parentId,index:input.index});
     case 'source.include':return registerSourceParts(session);
     case 'keyart.duplicate': {
       const source=session.query('keyart.get',{keyArtId:context.keyArtId}),keyArtId=id('keyart');

@@ -14,6 +14,10 @@ test('native Key Art states, endpoint topology and correspondence retain exact s
  await send('session.open',{document:serializeProject(p,0,{renderAssets:[{nodeId,width:32,height:32,dataUrl}]})});
  const key=(tool,input={},context={keyArtId})=>send('keyState.tool',{context,tool,input});
  await key('source.include');const base=await send('render.project',{keyArtId});assert.equal(base.artwork.length,1,'unmeshed source renders through the canonical evaluator');
+ const nodeState=await send('keyState.projection',{keyArtId,nodeId});assert.equal(nodeState.node.id,nodeId);assert.ok(nodeState.node.transform);
+ const beforeObject=structuredClone(h.document.session.project);
+ await key('object.transform',{transform:{position:{x:2,y:3},rotation:0,scale:{x:1,y:1},pivot:{x:0,y:0}}},{keyArtId,nodeId});
+ await send('session.undo');assert.deepEqual(h.document.session.project,beforeObject);
  const g=await send('mesh.generatePreview',{nodeId,previewId:'grid',kind:'grid',columns:2,rows:2});
  await send('mesh.tool',{nodeId,keyArtId,context:'structure',tool:'topology.automesh',input:{candidate:g.candidate}});
  const original=structuredClone(h.document.session.project);

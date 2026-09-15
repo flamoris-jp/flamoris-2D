@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { normalizePreferences } from '../src/preferences.js';
+import { incrementalFilename } from '../src/io/project-files.js';
 import { keyStateProjection, executeKeyStateTool, correspondence, registerSourceParts } from './key-state-authoring.mjs';
 import { initializeSourceHistory, collectSourceAssets, beginSourceReview, changeSourceReview, applySourceReview } from './source-reimport.mjs';
 import { Worker } from "node:worker_threads";
@@ -36,6 +38,7 @@ const MUTATING_METHODS = new Set([
 ]);
 
 const METHODS = new Set([
+  "native.preferences", "document.incrementalName",
   "keyState.projection", "keyState.tool", "keyState.correspondence",
   "source.analyzeReimport", "source.changeReview", "source.applyReview", "source.discardReview",
   "protocol.handshake",
@@ -293,6 +296,10 @@ export class ProductHostService {
     }
 
     switch (request.method) {
+      case 'native.preferences':return normalizePreferences(payload.preferences);
+      case 'document.incrementalName':
+        if(!Array.isArray(payload.existingFileNames)||payload.existingFileNames.length>10000||!payload.existingFileNames.every(n=>typeof n==='string'&&n.length<=260))throw new Error('Invalid incremental filename list.');
+        return {fileName:incrementalFilename(payload.fileName,payload.existingFileNames,normalizePreferences(payload.preferences).incrementalSaveWidth)};
       case 'keyState.projection':return keyStateProjection(document.session,payload);
       case 'keyState.tool':return executeKeyStateTool(document.session,payload);
       case 'keyState.correspondence':this.#assertExpectedRevision(request,document);return correspondence(document.session,payload.context,payload.input);

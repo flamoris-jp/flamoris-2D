@@ -1,7 +1,7 @@
 using System.Text.Json;
 namespace Flamoris.Flamoris2D.ProductHost;
-public sealed record KeyStateContext(string? KeyArtId=null,string? TransitionId=null,string? SemanticSlotId=null)
-{internal object Wire=>new {keyArtId=KeyArtId,transitionId=TransitionId,semanticSlotId=SemanticSlotId};}
+public sealed record KeyStateContext(string? KeyArtId=null,string? TransitionId=null,string? SemanticSlotId=null,string? NodeId=null)
+{internal object Wire=>new {keyArtId=KeyArtId,transitionId=TransitionId,semanticSlotId=SemanticSlotId,nodeId=NodeId};}
 public sealed record CorrespondencePin(string VertexId,double X,double Y)
 {internal object Wire=>new {vertexId=VertexId,target=new {x=X,y=Y}};}
 public sealed record VertexOffset(string VertexId,double Dx,double Dy)
@@ -10,6 +10,9 @@ public sealed class KeyStateEdit
 {
     private KeyStateEdit(string tool,object input)=>(Tool,Input)=(tool,input);
     internal string Tool {get;} internal object Input {get;}
+    public static KeyStateEdit ObjectTransform(double x,double y,double rotation,double sx,double sy,double px,double py)=>new("object.transform",new {transform=new {position=new {x,y},rotation,scale=new {x=sx,y=sy},pivot=new {x=px,y=py}}});
+    public static KeyStateEdit CreateGroup(string parentId,string displayName)=>new("object.group",new {parentId,displayName});
+    public static KeyStateEdit Reparent(string parentId,int index)=>new("object.reparent",new {parentId,index});
     public static KeyStateEdit IncludeSource()=>new("source.include",new {});
     public static KeyStateEdit DuplicateArt(string displayName)=>new("keyart.duplicate",new {displayName});
     public static KeyStateEdit RenameArt(string displayName)=>new("keyart.rename",new {displayName});

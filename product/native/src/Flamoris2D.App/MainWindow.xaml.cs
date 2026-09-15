@@ -48,7 +48,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        if (_autoConnect) { await ConnectHostAsync(createDocument: true); await ShowRecoveryCardAsync(); }
+        if (_autoConnect) { await ConnectHostAsync(createDocument: true);await LoadNativeSettingsAsync();await ShowRecoveryCardAsync(); }
     }
 
     private async Task ConnectHostAsync(bool createDocument)

@@ -48,7 +48,7 @@ public partial class MainWindow
     private async void ImportSource_Click(object sender, RoutedEventArgs e)
     {
         if (_documentBusy || _meshBusy || _loadingArtwork) return;
-        var started = false;
+        var started = false;var imported=false;
         try
         {
             if (!await ConfirmReplaceDocumentAsync()) return;
@@ -67,6 +67,7 @@ public partial class MainWindow
             AttachDocumentWorkspace(_client.DocumentToken!); await RefreshProjectionAsync();
             TargetList.SelectedItem = _targets.Targets.FirstOrDefault(t => t.Kind == "part");
             await RefreshProjectionAsync(); MeshCanvas.Fit(); StatusText.Text = "素材を読み込みました。パーツを選んでメッシュを生成できます。";
+            imported=true;
         }
         catch (Exception error) { StatusText.Text = $"素材を読み込めませんでした: {error.Message}"; }
         finally
@@ -76,6 +77,7 @@ public partial class MainWindow
                 _meshWork?.Dispose(); _meshWork = null; _documentBusy = false;
                 CancelArtworkButton.Visibility = Visibility.Collapsed; SetMeshBusy(false);
                 SaveMenuItem.IsEnabled = !_hasHandsOn && _client?.HasAuthoritativeProjection == true;
+                if(imported&&PreferenceFlag("saveAfterMajorOperations",true))await CaptureRecoveryAsync();
             }
         }
     }
@@ -103,6 +105,7 @@ public partial class MainWindow
             _currentPath = Path.GetFullPath(path); _hasHandsOn = false; _lastRecovery = null;
             AttachDocumentWorkspace(_client.DocumentToken!); await RefreshProjectionAsync();
             MeshCanvas.Fit(); StatusText.Text = $"開きました: {Path.GetFileName(path)}";
+            await RememberRecentAsync(path);
         }
         finally { _documentBusy = false; SetMeshBusy(false); SaveMenuItem.IsEnabled = !_hasHandsOn && _client?.HasAuthoritativeProjection == true; }
     }
@@ -114,13 +117,23 @@ public partial class MainWindow
     {
         if (_documentBusy || _loadingArtwork || _meshBusy || _hasHandsOn || _client?.HasAuthoritativeProjection != true) return false;
         var path = _currentPath;
-        if (operation != "save" || path is null)
+        if (operation is "saveAs" or "copy" || path is null)
         {
             var dialog = new SaveFileDialog { Filter = "FLAMORIS 2D (*.fl2d)|*.fl2d", DefaultExt = ".fl2d",
                 AddExtension = true, FileName = path is null ? "名称未設定.fl2d" : Path.GetFileName(path),
                 Title = operation == "copy" ? "コピーを保存" : operation == "incremental" ? "別バージョンを保存（上書き不可）" : "名前を付けて保存" };
             if (dialog.ShowDialog(this) != true) return false;
             path = dialog.FileName;
+        }
+        if(operation=="incremental")
+        {
+            try
+            {
+                var directory=Path.GetDirectoryName(Path.GetFullPath(path))!;
+                var next=await _client.IncrementalNameAsync(Path.GetFileName(path),Directory.EnumerateFiles(directory,"*.fl2d").Select(p=>Path.GetFileName(p)!).Take(10001).ToArray(),_nativePreferences);
+                var fileName=String(next.Payload,"fileName")!;if(Path.GetFileName(fileName)!=fileName)throw new InvalidDataException("Invalid incremental name.");path=Path.Combine(directory,fileName);
+            }
+            catch(Exception error){StatusText.Text=error.Message;return false;}
         }
         _documentBusy = true; PreparedDocument? prepared = null;
         var client = _client;
@@ -141,6 +154,7 @@ public partial class MainWindow
                 catch (Exception error) { cleanupWarning = $"保存済み。復元データの整理は保留: {error.Message}"; }
             }
             await RefreshProjectionAsync();
+            await RememberRecentAsync(path);
             StatusText.Text = cleanupWarning ?? $"保存しました: {Path.GetFileName(path)}";
             return true;
         }
@@ -175,7 +189,7 @@ public partial class MainWindow
     private async void Recovery_Click(object sender, RoutedEventArgs e) => await ShowRecoveryCardAsync(explicitOpen: true);
     private async Task ShowRecoveryCardAsync(bool explicitOpen = false)
     {
-        if (!_autoConnect || (_recoveryDismissed && !explicitOpen)) return;
+        if (!_autoConnect || ((_recoveryDismissed || !PreferenceFlag("showRecoveryNotification",true)) && !explicitOpen)) return;
         IReadOnlyList<RecoveryEntry> entries;
         try { entries = await Task.Run(_recovery.List); }
         catch (Exception error) { StatusText.Text = $"復元候補を読み取れませんでした: {error.Message}"; return; }
@@ -188,10 +202,11 @@ public partial class MainWindow
         var restore = new Button { Content = "選択したデータを復元", Margin = new Thickness(3) };
         restore.Click += async (_, _) =>
         {
+            var started=false;
             try
             {
                 if (_recoveryList.SelectedItem is not RecoveryEntry entry || entry.Metadata is null || !await ConfirmReplaceDocumentAsync()) return;
-                _documentBusy = true;
+                _documentBusy = true;started=true;SetMeshBusy(true);
                 var (bytes, metadata) = await _recovery.ReadAsync(entry);
                 AssertReplacementApproval();
                 await using (bytes)
@@ -201,7 +216,7 @@ public partial class MainWindow
                 RecoveryCard.Visibility = Visibility.Collapsed; StatusText.Text = "復元しました。名前を付けて保存してください。";
             }
             catch (Exception error) { StatusText.Text = $"復元できませんでした: {error.Message}"; }
-            finally { _documentBusy = false; }
+            finally { if(started){_documentBusy = false;SetMeshBusy(false);} }
         };
         var dismiss = new Button { Content = "今回は復元しない", Margin = new Thickness(3) };
         dismiss.Click += (_, _) => { _recoveryDismissed = true; RecoveryCard.Visibility = Visibility.Collapsed; };

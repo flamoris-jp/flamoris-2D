@@ -72,6 +72,7 @@
                 <MenuItem Header="素材を読み込む（PSD / Cutwork）…" Click="ImportSource_Click" />
                 <MenuItem Header="PSDを再取込・照合…" Click="ReimportSource_Click" />
                 <MenuItem Header="開く…" InputGestureText="Ctrl+O" Click="OpenDocument_Click" />
+                <MenuItem x:Name="RecentFilesMenu" Header="最近使ったファイル" />
                 <Separator />
                 <MenuItem x:Name="SaveMenuItem" Header="{DynamicResource Menu.Save}"
                           InputGestureText="Ctrl+S" IsEnabled="False" Click="SaveDocument_Click" />
@@ -84,6 +85,7 @@
                 <MenuItem Header="{DynamicResource Menu.Exit}" Click="Exit_Click" />
             </MenuItem>
             <MenuItem Header="{DynamicResource Menu.Edit}">
+                <MenuItem Header="保存・復元の設定…" Click="Preferences_Click" />
                 <MenuItem x:Name="UndoMenuItem" Header="{DynamicResource Menu.Undo}"
                           InputGestureText="Ctrl+Z" Click="Undo_Click" IsEnabled="False" />
                 <MenuItem x:Name="RedoMenuItem" Header="{DynamicResource Menu.Redo}"

@@ -16,7 +16,7 @@ public partial class MainWindow
         var content=new StackPanel {Margin=new Thickness(5)};
         parent.Children.Add(new Expander {Header=label,Content=content,IsExpanded=open,Foreground=Brushes.White,Margin=new Thickness(0,6,0,0)});return content;
     }
-    private KeyStateContext CurrentKeyState()=>new(_renderChoice?.Kind=="keyArt"?_renderChoice.Id:null,_keyTransitionId,_keySlotId);
+    private KeyStateContext CurrentKeyState()=>new(_renderChoice?.Kind=="keyArt"?_renderChoice.Id:null,_keyTransitionId,_keySlotId,_targets.SelectedId);
     private async Task RunKeyStateAsync(Func<KeyStateEdit> make,KeyStateContext context,long revision)
     {
         if(_client?.HasAuthoritativeProjection!=true||_meshBusy||_documentBusy)return;
@@ -45,6 +45,7 @@ public partial class MainWindow
         if(_pinRevision!=revision){_correspondencePins.Clear();_pinRevision=revision;}
         var key=$"{response.DocumentToken}/{context}/{_editingContext}/{_targets.SelectedId}/{MeshCanvas.KeyformId}";
         if(_contextDraft&&_keyPanelKey==key)return;_keyPanelKey=key;KeyStatePanel.Children.Clear();
+        if(_editingContext==EditingContext.Source)BuildObjectPanel(state,context,revision);
         var artPanel=Section(KeyStatePanel,"原画・Key State",context.KeyArtId is null);
         var selected=Property(state,"selectedKeyArt");var name=Field(artPanel,"原画名",String(selected,"displayName")??"新しい原画");
         ActionButton(artPanel,"全パーツを表示対象へ含める",()=>RunKeyStateAsync(KeyStateEdit.IncludeSource,context,revision));
@@ -70,6 +71,20 @@ public partial class MainWindow
         }
         BuildTransitionPanel(state,context,revision);
         if(_editingContext==EditingContext.Deform)BuildSamplePanel(state,context,revision);
+    }
+    private void BuildObjectPanel(JsonElement state,KeyStateContext context,long revision)
+    {
+        var node=Property(state,"node");var panel=Section(KeyStatePanel,"配置・グループ",true);
+        var groups=Choices(panel,"親グループ",ArrayOf(state,"groups").Select(g=>new EntityChoice(String(g,"id")!,String(g,"displayName")!)),String(node,"parentId"));
+        var groupName=Field(panel,"新しいグループ名","グループ");
+        ActionButton(panel,"グループを作成",()=>RunKeyStateAsync(()=>KeyStateEdit.CreateGroup(Chosen(groups),groupName.Text),context,revision));
+        if(node.ValueKind!=JsonValueKind.Object||String(node,"kind") is not ("part" or "group"))return;
+        var transform=Property(node,"transform");var position=Property(transform,"position");var scale=Property(transform,"scale");var pivot=Property(transform,"pivot");
+        var x=Field(panel,"位置 X",Number(position,"x"));var y=Field(panel,"位置 Y",Number(position,"y"));var rotation=Field(panel,"回転（度）",Number(transform,"rotation")*180/Math.PI);
+        var sx=Field(panel,"拡大率 X",Number(scale,"x",1));var sy=Field(panel,"拡大率 Y",Number(scale,"y",1));var px=Field(panel,"中心 X",Number(pivot,"x"));var py=Field(panel,"中心 Y",Number(pivot,"y"));
+        ActionButton(panel,"配置を適用",()=>RunKeyStateAsync(()=>KeyStateEdit.ObjectTransform(ReadNumber(x),ReadNumber(y),ReadNumber(rotation)*Math.PI/180,ReadNumber(sx),ReadNumber(sy),ReadNumber(px),ReadNumber(py)),context,revision));
+        var index=Field(panel,"グループ内の位置（0から）",0);
+        ActionButton(panel,"親グループ・並び順を変更",()=>RunKeyStateAsync(()=>KeyStateEdit.Reparent(Chosen(groups),checked((int)ReadTicks(index))),context,revision));
     }
     private void BuildTransitionPanel(JsonElement state,KeyStateContext context,long revision)
     {
