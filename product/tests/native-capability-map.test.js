@@ -15,7 +15,7 @@ test("native migration ledger covers every public Product command and query", as
     const documented = rows.map((line) => line.split("|")[2].trim().replaceAll("`", ""));
     assert.deepEqual(documented.sort(), names.sort(), `${kind} coverage drift`);
     for (const row of rows) {
-      assert.match(row, /\| (migrated|superseded|deferred) \|$/);
+      assert.match(row, /\| (migrated|superseded|intentionally deferred) \|$/);
       assert.match(row, /src\/(commands|queries)\//);
     }
   }

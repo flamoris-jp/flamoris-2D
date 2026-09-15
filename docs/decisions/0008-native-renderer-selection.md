@@ -43,7 +43,7 @@ Windows runner measurements at commit `0c7824c8959d168cb5d682f2f6f939a70337c412`
 production fixture includes nested Warp, rigid Bone, rotation constraints, form correction,
 animation, two appearances, clipping and camera. Test-only subdivision increases geometry
 density after evaluation; it is not a new mesh topology in Product. Skin is separately
-covered by Product/Host conformance and must also appear in final integrated workflow QA.
+covered by Product/Host conformance and the integrated native eight-second workflow below.
 
 | Candidate | Time including composition and CPU readback | Notes |
 | --- | --- | --- |
@@ -61,9 +61,15 @@ Observed process working sets were 372.0 MiB after WARP and 429.3 MiB with both 
 alive. These are snapshots, not measured peak or admission guarantees. The 512 MiB
 composition admission limit remains separate from asset/document and runtime allocations.
 Warm timings exclude Host evaluation, initial decode/upload and WPF composition; the
-viewport reports its measured frame path separately. Final acceptance still needs the
-complete eight-second workflow, cancellation/large-asset limits, DPI and actual-device
-visual/interaction review. This decision does not close #98 or assert migration completion.
+viewport reports its measured frame path separately. The packaged Windows workflow now
+passes PSD -> Mesh -> Bone/Skin -> Warp -> form correction + MeshDeformation -> eight-second
+Sequence -> Preview -> 240 PNGs and H.264 -> atomic Save -> Open/resumed Undo -> reviewed PSD
+update -> Key State/Transition -> Cutwork. One recorded run is
+[34979394655](https://github.com/flamoris-jp/flamoris-2D/actions/runs/34979394655).
+It launches the self-contained candidate with developer Node/.NET absent from PATH and
+checks actual ffprobe output (H.264, 240 decoded frames, eight seconds).
+Final acceptance still needs physical DPI, representative user artwork, and actual-device
+visual/interaction review. This decision does not close #98 or approve Electron retirement.
 
 
 ## Authoring preview ownership
@@ -74,3 +80,14 @@ that draft with the ordinary Product evaluator. It does not install another sess
 change revision/dirty state, push history or keep a draft Project in C#. Mouse release
 submits the ordinary command once. Token/revision/context/gesture identity reject stale
 frames; cancel removes only transient presentation. Topology is never previewed as Deform.
+
+Bone/Warp/form-correction gesture previews use the same command-draft path. Existing
+Product authoring-space helpers project/unproject nested Warp and Bone handles; C# does
+not invert deformation fields or evaluate rig state. Source picking reads evaluated
+triangles/draw order, with geometric overlap cycling; it is not alpha-mask pixel picking.
+
+Preview raster presentation is bounded to a 2048-pixel long edge, preserving the original
+document extent for camera/picking. Export uses the canonical canvas-to-output mapping
+with at most 4096 pixels per edge / 8294400 pixels; H.264 requires even dimensions.
+Both use the same D3D11 compositor. Native runtime assembly uses the reviewed Host/worker
+allowlist and excludes tests, private artwork, Electron and DOM view modules.

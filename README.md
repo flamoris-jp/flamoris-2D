@@ -21,6 +21,8 @@ FLAMORIS 2D is intentionally focused. It is not intended to reproduce every Live
 
 The Phase 1-8 production core is implemented.
 
+The native WPF production candidate in [PR #101](https://github.com/flamoris-jp/flamoris-2D/pull/101) now supports Source through Export and save/reopen. See the [Japanese native workflow](docs/native-production-workflow.md) and [completion ledger](docs/native-capability-map.md). Electron remains the default release until final Windows acceptance and reviewed cutover.
+
 Current checkpoint:
 
 - Phase 1 Editor Core + Windows Desktop shell — complete

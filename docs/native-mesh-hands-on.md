@@ -1,5 +1,7 @@
 # Native Mesh hands-on checkpoint
 
+> Historical PR #100 proof. Production work supersedes its checkpoint limits; use [native-production-workflow.md](native-production-workflow.md) and [native-capability-map.md](native-capability-map.md).
+
 Baseline: main `63372daa44ddf6c862cac7c47a34ca388437a104`, merged #99.
 Scope: user-authorized #96 Mesh-first proof, not production Open/Save/Recovery.
 

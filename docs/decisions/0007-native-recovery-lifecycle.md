@@ -56,8 +56,10 @@ Native Recovery is immutable files in the application recovery directory, extern
 Project/.fl2d. Snapshot metadata includes version, stable snapshot/lineage IDs, source
 token/protocol/history revision, timestamps and optional source path. The full document
 and metadata commit together by atomic move. List corrupt/future entries diagnostically;
-never restore or silently delete them. Keep the last three readable snapshots per
+never restore or silently delete them. By default keep the last three readable snapshots per
 lineage, evicting older readable snapshots only AFTER the replacement is durable.
+Native preferences can select 1/3/5/10 retained versions, matching the existing Product
+preference contract; explicit discard remains separate from automatic retention.
 No automatic cross-lineage eviction: reaching the aggregate 1 GiB disk quota fails the
 new snapshot with a visible warning and preserves all existing bytes. Explicit discard
 is the way to reclaim unrelated/corrupt data.
@@ -67,8 +69,10 @@ reserved/transferring document bytes; at most two handles; two HTTP connections 
 with raster transport. These are admission limits, not measured peak-RSS claims.
 Raster materialization separately checks dimensions, count and current+candidate bytes
 before decode. Limit failures leave the current document intact; no hidden asset eviction.
-Documents beyond this admission policy remain usable in Electron pending measured
-production budget revision under #98. This is an explicitly remaining parity gap.
+Documents beyond this admission policy are rejected without replacing the live document.
+The native policy is explicit in the completion ledger; expanded limits require measured
+memory evidence. Electron remains available during release acceptance. These bounds do
+not leave the Recovery/save acknowledgement contract unimplemented.
 
 ## Validation
 

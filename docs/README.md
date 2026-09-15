@@ -17,8 +17,9 @@
 - [`mcp-design.md`](mcp-design.md) — MCP-ready command/transaction architecture
 - [`repository-boundaries.md`](repository-boundaries.md) — Product / Staging / Test / History separation, testing and CI boundary
 - [`csharp-wpf-ui-migration.md`](csharp-wpf-ui-migration.md) — accepted native WPF shell and JavaScript Product Host migration design
-- [`native-capability-map.md`](native-capability-map.md) — Issue #96 legacy/native capability ledger and explicit parity gates
-- [`native-mesh-hands-on.md`](native-mesh-hands-on.md) — PNG hands-on asset/viewport boundary, Mesh semantics and Windows操作手順
+- [`native-capability-map.md`](native-capability-map.md) — Issue #96 migration completion ledger and remaining release acceptance
+- [`native-production-workflow.md`](native-production-workflow.md) — Nativeの素材読込から書き出し・保存再開までの制作手順
+- [`native-mesh-hands-on.md`](native-mesh-hands-on.md) — historical PR #100 proof boundary; use the production guide below
 - [`research/rigging-tools.md`](research/rigging-tools.md) — reference research from Inochi2D/Inochi Creator, Live2D Cubism, Stretchy Studio, Iki, Godot, and Synfig
 - [`research/key-art-transition-research.md`](research/key-art-transition-research.md) — correspondence/morphing research notes
 - [`reviews/phase1c-implementation-20260831.md`](reviews/phase1c-implementation-20260831.md) — Phase 1C implementation coverage and remaining real-Akino manual acceptance
@@ -34,7 +35,9 @@ Repository-wide AI/automation rules live at [`../AGENTS.md`](../AGENTS.md).
 - [`decisions/0004-project-files-recovery-and-psd-reimport.md`](decisions/0004-project-files-recovery-and-psd-reimport.md) — `.fl2d`, save points, Preferences/Recovery, reviewed PSD re-import, and the minimal headless boundary
 - [`decisions/0005-windows-desktop-shell.md`](decisions/0005-windows-desktop-shell.md) — Electron Windows shell, native file semantics, Recovery storage, Recent Files, and security boundary
 - [`decisions/0006-csharp-wpf-shell-product-host.md`](decisions/0006-csharp-wpf-shell-product-host.md) — accepted WPF shell with a versioned out-of-process JavaScript Product Host
-- [`decisions/0007-native-recovery-lifecycle.md`](decisions/0007-native-recovery-lifecycle.md) — **proposed**, unaccepted native Recovery lineage/save acknowledgement decision
+- [`decisions/0007-native-recovery-lifecycle.md`](decisions/0007-native-recovery-lifecycle.md) — native Recovery lineage/save acknowledgement; settled for implementation under Issue #96, PR review open
+- [`decisions/0008-native-renderer-selection.md`](decisions/0008-native-renderer-selection.md) — measured D3D11 hardware/WARP choice and bounded artifact policy
+- [`decisions/0009-native-mesh-animation-identity.md`](decisions/0009-native-mesh-animation-identity.md) — expose the existing mesh animation identity through ordinary Commands
 - [`reviews/phase1-desktop-implementation-20260901.md`](reviews/phase1-desktop-implementation-20260901.md) — Desktop implementation coverage and Windows manual acceptance
 
 ## Earlier draft
