@@ -9,6 +9,7 @@ on:
       - "product/product-host/**"
       - "product/src/**"
       - "product/tests/product-host.test.js"
+      - "product/tests/native-mesh-host.test.js"
       - "product/package.json"
       - ".github/workflows/native-shell-ci.yml"
   workflow_dispatch:
@@ -35,7 +36,7 @@ jobs:
           dotnet-version: "10.0.x"
 
       - name: Product Host protocol tests
-        run: node --test product/tests/product-host.test.js
+        run: node --test product/tests/product-host.test.js product/tests/native-mesh-host.test.js
 
       - name: Build native solution
         run: dotnet build product/native/Flamoris2D.Native.sln -c Release
@@ -52,6 +53,6 @@ jobs:
       - name: Upload hands-on candidate
         uses: actions/upload-artifact@v4
         with:
-          name: flamoris2d-native-phase1-win-x64
+          name: flamoris2d-native-mesh-hands-on-win-x64
           path: out/native-win-x64
           if-no-files-found: error

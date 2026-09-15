@@ -3,6 +3,11 @@
 This directory contains the Phase 1 .NET 10 / WPF shell and its typed Product Host client.
 The existing JavaScript Product remains the only persistent editing authority.
 
+The Issue #96 Mesh-first checkpoint adds **PNGでMesh体験…**, a disposable native
+reference-art/Structure/Layout workflow. Start with the
+[Windows Mesh hands-on guide](../../docs/native-mesh-hands-on.md#windows-hands-on--japanese-quick-path).
+PNG loading is not production Open, and the session cannot be saved.
+
 ## Build and smoke proof
 
 Prerequisites:
@@ -65,5 +70,5 @@ exact migrated subset and the Recovery, bulk-asset and renderer gates. `session.
 is an additive bundled Host/client read returning tree, summary and history availability
 at one tagged revision; it introduces no Project or MCP schema change.
 
-Full document recovery, native rendering, import, Save/Open, packaging of the Node runtime, and
+Full document recovery, final evaluated native rendering, PSD/.flimg import, Save/Open, packaging of the Node runtime, and
 Electron retirement are intentionally later phases.
