@@ -37,6 +37,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         foreach (var definition in EditingContextCatalog.All)
             _activeTools[definition.Context] = definition.Tools[0];
         InitializeMeshUi();
+        InitializeDocumentUi();
         Loaded += MainWindow_Loaded;
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         SwitchContext(EditingContext.Source, returnFocus: false);
@@ -44,7 +45,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        if (_autoConnect) await ConnectHostAsync(createDocument: true);
+        if (_autoConnect) { await ConnectHostAsync(createDocument: true); await ShowRecoveryCardAsync(); }
     }
 
     private async Task ConnectHostAsync(bool createDocument)
@@ -107,7 +108,8 @@ public partial class MainWindow : Window, IAsyncDisposable
             RedoMenuItem.IsEnabled = RedoButton.IsEnabled = canRedo;
             RefreshButton.IsEnabled = true;
             var projectName = snapshot.Payload.GetProperty("summary").GetProperty("displayName").GetString() ?? "名称未設定";
-            Title = $"FLAMORIS 2D — {projectName}";
+            Title = $"FLAMORIS 2D — {projectName}{(snapshot.Payload.GetProperty("isDirty").GetBoolean() ? " *" : "")}";
+            SaveMenuItem.IsEnabled = !_hasHandsOn && !_documentBusy;
             RevisionText.Text = $"revision {client.Revision}";
             TargetList.IsEnabled = !_targetMutationPending && !_meshBusy;
             // A draft outlives keyboard focus and retains its starting revision.
@@ -131,7 +133,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async void NewDocument_Click(object sender, RoutedEventArgs e)
     {
-        if (_loadingArtwork || _meshBusy || !ConfirmDiscardHandsOn()) return;
+        if (!await ConfirmReplaceDocumentAsync()) return;
         if (_client?.IsRunning != true)
         {
             await ConnectHostAsync(createDocument: true);
@@ -140,7 +142,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         try
         {
             await _client.CreateSessionAsync("名称未設定", 1920, 1080);
-            _hasHandsOn = false;
+            _hasHandsOn = false; _currentPath = null; _lastRecovery = null;
             AttachDocumentWorkspace(_client.DocumentToken!);
             await RefreshProjectionAsync();
             StatusText.Text = "新しいProduct Host documentを作成しました。";
@@ -400,7 +402,14 @@ public partial class MainWindow : Window, IAsyncDisposable
             _meshWork?.Cancel(); MeshCanvas.Cancel(); CancelGenerated(); MeshCanvas.Focus();
             e.Handled = true; return;
         }
-        if (_meshBusy || _loadingArtwork) return;
+        if (_meshBusy || _loadingArtwork || _documentBusy) return;
+        if (Keyboard.Modifiers == ModifierKeys.Control && e.Key is Key.S or Key.O or Key.N)
+        {
+            if (e.Key == Key.S) SaveDocument_Click(sender, e);
+            else if (e.Key == Key.O) OpenDocument_Click(sender, e);
+            else NewDocument_Click(sender, e);
+            e.Handled = true; return;
+        }
         if (Keyboard.Modifiers == ModifierKeys.Control &&
             e.Key >= Key.D1 && e.Key <= Key.D7)
         {
@@ -444,7 +453,12 @@ public partial class MainWindow : Window, IAsyncDisposable
     private async void MainWindow_Closing(object? sender, CancelEventArgs e)
     {
         if (_closingAfterShutdown) return;
-        if (!ConfirmDiscardHandsOn()) { e.Cancel = true; return; }
+        e.Cancel = true;
+        if (_closePromptActive) return;
+        _closePromptActive = true;
+        try { if (!await ConfirmReplaceDocumentAsync()) return; }
+        catch (Exception error) { StatusText.Text = error.Message; return; }
+        finally { _closePromptActive = false; }
         _meshWork?.Cancel();
         MeshCanvas.Cancel();
         e.Cancel = true;
@@ -508,6 +522,7 @@ public partial class MainWindow : Window, IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         if (_disposed) return;
+        _recoveryTimer.Stop();
         _disposed = true;
         _meshWork?.Cancel();
         var client = _client; _client = null;

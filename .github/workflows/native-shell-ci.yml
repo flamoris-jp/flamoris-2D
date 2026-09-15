@@ -36,7 +36,7 @@ jobs:
           dotnet-version: "10.0.x"
 
       - name: Product Host protocol tests
-        run: node --test product/tests/product-host.test.js product/tests/native-mesh-host.test.js
+        run: node --test product/tests/product-host.test.js product/tests/native-mesh-host.test.js product/tests/native-document-host.test.js
 
       - name: Build native solution
         run: dotnet build product/native/Flamoris2D.Native.sln -c Release

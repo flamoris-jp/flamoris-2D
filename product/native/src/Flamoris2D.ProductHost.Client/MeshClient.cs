@@ -95,7 +95,7 @@ public sealed partial class ProductHostClient
     public async Task<byte[]> DownloadRasterAsync(string id, int byteLength, string token, long revision,
         CancellationToken cancellationToken = default)
     {
-        if (byteLength <= 0 || byteLength > 4194304 * 4) throw new ArgumentOutOfRangeException(nameof(byteLength));
+        if (byteLength <= 0 || byteLength > 512 * 1024 * 1024) throw new ArgumentOutOfRangeException(nameof(byteLength));
         AssertCurrent(token, revision);
         using var request = RasterRequest(HttpMethod.Get, id, token, revision);
         using var result = await RasterHttp.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);

@@ -9,7 +9,7 @@ using Flamoris.Flamoris2D.ProductHost;
 namespace Flamoris.Flamoris2D.App;
 
 public sealed record ArtworkProjection(string Id, string NodeId, BitmapSource Bitmap,
-    Affine2 World, bool Visible, bool Locked);
+    Affine2 World, bool Visible, bool Locked, double Left = 0, double Top = 0);
 
 // Replaceable reference-art presenter. It does not implement the Product evaluator/compositor.
 public sealed class MeshViewport : FrameworkElement
@@ -112,7 +112,7 @@ public sealed class MeshViewport : FrameworkElement
         {
             var w = art.World;
             dc.PushTransform(new MatrixTransform(w.A, w.B, w.C, w.D, w.X, w.Y));
-            dc.DrawImage(art.Bitmap, new Rect(0, 0, art.Bitmap.PixelWidth, art.Bitmap.PixelHeight));
+            dc.DrawImage(art.Bitmap, new Rect(art.Left, art.Top, art.Bitmap.PixelWidth, art.Bitmap.PixelHeight));
             dc.Pop();
         }
         dc.Pop();
@@ -126,7 +126,7 @@ public sealed class MeshViewport : FrameworkElement
         }
         if (Artwork.Count == 0)
         {
-            var text = new FormattedText("「PNGでMesh体験」から素材を選択\nこの体験セッションは保存されません。",
+            var text = new FormattedText("「ファイル > 開く」からプロジェクトを選択",
                 CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface("Yu Gothic UI"), 16,
                 Brushes.LightGray, VisualTreeHelper.GetDpi(this).PixelsPerDip);
             dc.DrawText(text, new Point(24, 32));
@@ -178,7 +178,7 @@ public sealed class MeshViewport : FrameworkElement
             foreach (var art in Artwork.Reverse().Where(a => a.Visible && !a.Locked && a.World.IsInvertible))
             {
                 var p = art.World.Inverse(Camera.ToDocument(point));
-                if (p.X >= 0 && p.Y >= 0 && p.X < art.Bitmap.PixelWidth && p.Y < art.Bitmap.PixelHeight)
+                if (p.X >= art.Left && p.Y >= art.Top && p.X < art.Left + art.Bitmap.PixelWidth && p.Y < art.Top + art.Bitmap.PixelHeight)
                 { TargetPicked?.Invoke(art.NodeId); break; }
             }
             return;

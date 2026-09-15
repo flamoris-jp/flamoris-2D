@@ -41,7 +41,7 @@ public partial class MainWindow
 
     private async void LoadArtwork_Click(object sender, RoutedEventArgs e)
     {
-        if (_loadingArtwork || _meshBusy || !ConfirmDiscardHandsOn()) return;
+        if (!await ConfirmReplaceDocumentAsync()) return;
         var dialog = new OpenFileDialog { Filter = "PNG artwork (*.png)|*.png", Multiselect = true,
             Title = "Mesh体験用PNGを選択 — 保存されません（複数可）" };
         if (dialog.ShowDialog(this) != true) return;
@@ -121,7 +121,8 @@ public partial class MainWindow
             }
             artwork.Add(new(id, a.GetProperty("nodeId").GetString()!, bitmap,
                 MeshViewport.Transform(a.GetProperty("worldTransform")), a.GetProperty("visible").GetBoolean(),
-                a.GetProperty("locked").GetBoolean()));
+                a.GetProperty("locked").GetBoolean(),
+                a.TryGetProperty("left", out var left) ? left.GetDouble() : 0, a.TryGetProperty("top", out var top) ? top.GetDouble() : 0));
         }
         client.AssertCurrent(token, response.Revision.Value);
         if (!ReferenceEquals(client, _client) || _targets.SelectedId != nodeId) return;
@@ -185,7 +186,7 @@ public partial class MainWindow
             if (MeshCanvas.Structure) _structureTool = tool; else _layoutTool = tool;
             var mode = MeshCanvas.Structure ? "構造" : "位置決め";
             ActiveContextBadge.Text = $"メッシュ / {mode}";
-            ViewportContextText.Text = $"メッシュ / {mode} — {tool}（参照Artwork・保存不可）";
+            ViewportContextText.Text = $"メッシュ / {mode} — {tool}（参照Artwork）";
             var hint = tool switch { "移動" => "頂点をドラッグ。Shiftで複数選択、Escで取消",
                 "頂点を追加" => "Artwork上をクリックして頂点を追加", "頂点を削除" => "頂点をクリックして削除",
                 "面を作成" => "3頂点を選択して上の作成ボタン", "辺を分割" => "辺の両端2頂点を選択して上の分割ボタン",

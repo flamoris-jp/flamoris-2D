@@ -63,16 +63,21 @@
     </Window.Resources>
 
     <DockPanel>
+        <ContentControl x:Name="RecoveryCard" DockPanel.Dock="Bottom" Visibility="Collapsed" Background="#FFF3D8" />
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="{DynamicResource Menu.File}">
                 <MenuItem Header="{DynamicResource Menu.New}" InputGestureText="Ctrl+N"
                           Click="NewDocument_Click" />
                 <Separator />
-                <MenuItem Header="PNGでMesh体験（保存不可）…" Click="LoadArtwork_Click" />
+                <MenuItem Header="開く…" InputGestureText="Ctrl+O" Click="OpenDocument_Click" />
                 <Separator />
                 <MenuItem x:Name="SaveMenuItem" Header="{DynamicResource Menu.Save}"
-                          InputGestureText="Ctrl+S" IsEnabled="False"
-                          ToolTip="Phase 1では保存dialogを接続しません。" />
+                          InputGestureText="Ctrl+S" IsEnabled="False" Click="SaveDocument_Click" />
+                <MenuItem Header="名前を付けて保存…" Click="SaveAsDocument_Click" />
+                <MenuItem Header="コピーを保存…" Click="SaveCopyDocument_Click" />
+                <MenuItem Header="別バージョンを保存…" Click="SaveIncrementalDocument_Click" />
+                <MenuItem Header="復元…" Click="Recovery_Click" />
+                <MenuItem Header="開発用"><MenuItem Header="PNG Mesh proof（保存不可）…" Click="LoadArtwork_Click" /></MenuItem>
                 <Separator />
                 <MenuItem Header="{DynamicResource Menu.Exit}" Click="Exit_Click" />
             </MenuItem>
