@@ -13,6 +13,7 @@ let queue = Promise.resolve();
 decoder.on("data", (request) => {
   // Cancellation only signals the matching bounded preview worker. Responses/mutations stay serialized.
   service.cancelMeshPreview(request);
+  service.cancelImport(request);
   queue = queue.then(async () => {
     const { response, events } = await service.handle(request);
     await writeControlFrame(stdout, response);
@@ -32,6 +33,6 @@ decoder.on("error", (error) => {
 });
 
 stdin.pipe(decoder);
-await new Promise((resolve) => stdin.on("close", () => { service.generation?.cancel(); resolve(); }));
+await new Promise((resolve) => stdin.on("close", () => { service.generation?.cancel(); service.importJob?.cancel(); resolve(); }));
 await queue;
 await service.assets.close();

@@ -41,6 +41,20 @@ public readonly record struct Affine2(double A, double B, double C, double D, do
 
 public static class VertexPicking
 {
+    public static bool HitTriangles(double[] positions,int[] indices,Point2 documentPoint,Affine2 world)
+    {
+        if(!world.IsInvertible)return false;var p=world.Inverse(documentPoint);
+        static double Cross(Point2 a,Point2 b,Point2 c)=>(b.X-a.X)*(c.Y-a.Y)-(b.Y-a.Y)*(c.X-a.X);
+        Point2 At(int i)=>new(positions[i*2],positions[i*2+1]);
+        for(var i=0;i+2<indices.Length;i+=3)
+        {
+            var a=At(indices[i]);var b=At(indices[i+1]);var c=At(indices[i+2]);
+            if(Math.Abs(Cross(a,b,c))<1e-12)continue;
+            var u=Cross(a,b,p);var v=Cross(b,c,p);var w=Cross(c,a,p);
+            if(u>=-1e-9&&v>=-1e-9&&w>=-1e-9||u<=1e-9&&v<=1e-9&&w<=1e-9)return true;
+        }
+        return false;
+    }
     public static int Hit(double[] positions, Point2 pointer, ViewportCamera camera, Affine2 world, double radius = 8)
     {
         var best = -1;

@@ -167,6 +167,16 @@ const transform = {
 };
 
 export const commandSchemas = {
+  "animation.mesh_target.create": {
+    type: "object", required: ["meshId"], properties: { meshId: nonEmptyString }, additionalProperties: false,
+  },
+  "animation.mesh_target.remove": {
+    type: "object", required: ["meshId"], properties: { meshId: nonEmptyString }, additionalProperties: false,
+  },
+  "animation.mesh_target.restore_internal": {
+    internal: true, type: "object", required: ["meshId", "index"],
+    properties: { meshId: nonEmptyString, index: nonNegativeInteger }, additionalProperties: false,
+  },
   "animation.deformation_sample.create": {
     type: "object", required: ["sample"], properties: { sample: meshDeformationSample },
     additionalProperties: false,

@@ -30,6 +30,8 @@ export function createHandsOnProject(assets) {
 export function meshContext(session, input, strict = true) {
   const preparation = new MeshPreparationController(session);
   preparation.selectPart(input.nodeId);
+  const keyArtId = input.keyArtId || (input.keyformId && session.project.meshKeyforms.find(k => k.id === input.keyformId)?.keyArtId);
+  if (keyArtId) preparation.selectKeyArt(keyArtId);
   if (input.keyformId && (strict || preparation.getState().keyforms.some(k => k.id === input.keyformId)))
     preparation.selectKeyform(input.keyformId);
   const tools = new MeshToolController(session, preparation);
@@ -56,10 +58,10 @@ export function executeMeshTool(session, input) {
 export function generateMeshPreview(asset, input) {
   // BGRA and RGBA share the same alpha lane; the existing helpers read alpha only.
   const image = { width: asset.width, height: asset.height, data: asset.bytes };
-  if (input.kind === "contour") return generateContourAutoMesh(image, input.settings);
+  if (input.kind === "contour") return generateContourAutoMesh(image, input.settings, { left: asset.left ?? 0, top: asset.top ?? 0, width: asset.width, height: asset.height });
   if (input.kind !== "grid") throw new Error("Unknown mesh generator.");
   const mesh = generateGridMesh(findAlphaBounds(image), image.width, image.height,
     input.columns, input.rows);
-  return { candidate: { positions: [...mesh.baseVertices], uvs: [...mesh.uvs], indices: [...mesh.indices] },
+  return { candidate: { positions: [...mesh.baseVertices].map((n, i) => n + (i % 2 ? asset.top ?? 0 : asset.left ?? 0)), uvs: [...mesh.uvs], indices: [...mesh.indices] },
     diagnostics: [] };
 }

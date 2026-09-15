@@ -41,13 +41,14 @@ public partial class MainWindow
 
     private async void LoadArtwork_Click(object sender, RoutedEventArgs e)
     {
-        if (_loadingArtwork || _meshBusy || !ConfirmDiscardHandsOn()) return;
+        if (!await ConfirmReplaceDocumentAsync()) return;
         var dialog = new OpenFileDialog { Filter = "PNG artwork (*.png)|*.png", Multiselect = true,
             Title = "Mesh体験用PNGを選択 — 保存されません（複数可）" };
         if (dialog.ShowDialog(this) != true) return;
         if (_client?.HasAuthoritativeProjection != true) await ConnectHostAsync(true);
         if (_client?.HasAuthoritativeProjection != true) return;
         var client = _client;
+        AssertReplacementApproval();
         var token = client.DocumentToken!;
         var revision = client.Revision;
         var handles = new List<string>();
@@ -104,7 +105,7 @@ public partial class MainWindow
         var token = client.DocumentToken!;
         var nodeId = _targets.SelectedId;
         _meshChoices.TryGetValue(nodeId ?? "", out var keyformId);
-        var response = await client.GetMeshAsync(nodeId, keyformId);
+        var response = await client.GetMeshAsync(nodeId, keyformId, keyArtId:_renderChoice?.Kind=="keyArt"?_renderChoice.Id:null);
         client.AssertCurrent(token, response.Revision!.Value);
         if (!ReferenceEquals(client, _client) || _targets.SelectedId != nodeId || _targets.Revision != response.Revision) return;
         if (_textureToken != token) { _textures.Clear(); _meshChoices.Clear(); _textureToken = token; }
@@ -121,11 +122,14 @@ public partial class MainWindow
             }
             artwork.Add(new(id, a.GetProperty("nodeId").GetString()!, bitmap,
                 MeshViewport.Transform(a.GetProperty("worldTransform")), a.GetProperty("visible").GetBoolean(),
-                a.GetProperty("locked").GetBoolean()));
+                a.GetProperty("locked").GetBoolean(),
+                a.TryGetProperty("left", out var left) ? left.GetDouble() : 0, a.TryGetProperty("top", out var top) ? top.GetDouble() : 0));
         }
         client.AssertCurrent(token, response.Revision.Value);
         if (!ReferenceEquals(client, _client) || _targets.SelectedId != nodeId) return;
         MeshCanvas.Apply(response, artwork, nodeId);
+        var currentArtworkIds=artwork.Select(a=>a.Id).ToHashSet();
+        foreach(var id in _textures.Keys.Where(id=>!currentArtworkIds.Contains(id)).ToArray())_textures.Remove(id);
         if (MeshCanvas.GeneratedPreview is null) ApplyGeneratedButton.IsEnabled = false;
         _updatingMeshChoices = true;
         try
@@ -163,6 +167,8 @@ public partial class MainWindow
         MeshCanvas.Cancel(); CancelGenerated();
         var mesh = _editingContext == EditingContext.Mesh;
         MeshCanvas.MeshEnabled = mesh;
+        MeshCanvas.DeformEnabled=_editingContext==EditingContext.Deform;
+        if(MeshCanvas.DeformEnabled){MeshCanvas.Tool="移動";ToolList.ItemsSource=new[]{"選択","移動"};ToolList.SelectedItem="移動";}
         MeshOptions.Visibility = MeshPropertiesPanel.Visibility = mesh ? Visibility.Visible : Visibility.Collapsed;
         if (mesh)
         {
@@ -177,6 +183,7 @@ public partial class MainWindow
     {
         if (!_meshReady) return;
         MeshCanvas.Cancel();
+        if(_editingContext==EditingContext.Deform&&ToolList.SelectedItem is string deformTool)MeshCanvas.Tool=deformTool;
         var mesh = _editingContext == EditingContext.Mesh;
         if (mesh && ToolList.SelectedItem is string tool)
         {
@@ -185,9 +192,9 @@ public partial class MainWindow
             if (MeshCanvas.Structure) _structureTool = tool; else _layoutTool = tool;
             var mode = MeshCanvas.Structure ? "構造" : "位置決め";
             ActiveContextBadge.Text = $"メッシュ / {mode}";
-            ViewportContextText.Text = $"メッシュ / {mode} — {tool}（参照Artwork・保存不可）";
+            ViewportContextText.Text = $"メッシュ / {mode} — {tool}";
             var hint = tool switch { "移動" => "頂点をドラッグ。Shiftで複数選択、Escで取消",
-                "頂点を追加" => "Artwork上をクリックして頂点を追加", "頂点を削除" => "頂点をクリックして削除",
+                "頂点を追加" => "点を追加した後、3頂点を選び「面を作成」で画像を貼る面に接続", "頂点を削除" => "頂点をクリックして削除",
                 "面を作成" => "3頂点を選択して上の作成ボタン", "辺を分割" => "辺の両端2頂点を選択して上の分割ボタン",
                 "生成" => "上でGrid／輪郭を試して、プレビューを明示的に適用", _ => "頂点を選択。Shiftで追加／解除" };
             ActiveToolSettingsText.Text = $"{tool} — {hint}";
@@ -255,7 +262,7 @@ public partial class MainWindow
         try
         {
             client.AssertCurrent(token, revision);
-            await client.EditMeshAsync(nodeId, keyformId, edit, revision);
+            await client.EditMeshAsync(nodeId, keyformId, edit, revision, keyArtId:_renderChoice?.Kind=="keyArt"?_renderChoice.Id:null);
             await RefreshProjectionAsync();
             var added = MeshCanvas.VertexIds.Where(id => !previousIds.Contains(id)).ToArray();
             if (MeshCanvas.NodeId == nodeId && added.Length == 1 && MeshCanvas.VertexIds.Length == previousIds.Count + 1)
@@ -263,7 +270,7 @@ public partial class MainWindow
                 MeshCanvas.Selected.Clear(); MeshCanvas.Selected.Add(added[0]);
                 UpdateMeshProperties(); MeshCanvas.InvalidateVisual();
             }
-            StatusText.Text = "メッシュ操作を確定しました。Ctrl+Zでこの操作を戻せます（保存不可）。";
+            StatusText.Text = "メッシュ操作を確定しました。Ctrl+Zでこの操作を戻せます。";
         }
         catch (Exception error)
         {

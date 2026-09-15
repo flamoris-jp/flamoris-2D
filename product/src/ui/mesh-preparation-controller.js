@@ -31,11 +31,22 @@ export class MeshPreparationController {
     this.onChange = onChange;
     this.idFactory = idFactory || defaultIdFactory();
     this.selectedNodeId = null;
+    this.selectedKeyArtId = null;
     this.selectedTopologyId = null;
     this.selectedKeyformId = null;
   }
 
   notify(reason) { this.onChange?.(reason, this); }
+
+  selectKeyArt(keyArtId) {
+    if (keyArtId !== null) this.session.query("keyart.get", { keyArtId });
+    if (this.selectedKeyArtId === keyArtId) return;
+    this.selectedKeyArtId = keyArtId; this.selectedTopologyId = null; this.selectedKeyformId = null;
+    const state = this.getState();
+    if (state.keyforms.length === 1) {
+      this.selectedKeyformId = state.keyforms[0].id; this.selectedTopologyId = state.keyforms[0].topologyId;
+    }
+  }
 
   selectPart(nodeId) {
     if (this.selectedNodeId === nodeId) return this.getState();
@@ -178,7 +189,8 @@ export class MeshPreparationController {
       ? this.session.project.keyArts.filter((keyArt) =>
         keyArt.members.some((member) => member.nodeId === node.id))
       : [];
-    const keyArt = matchingKeyArt(this.session.project, this.selectedNodeId);
+    const keyArt = this.selectedKeyArtId ? keyArtMatches.find(k => k.id === this.selectedKeyArtId) || null
+      : matchingKeyArt(this.session.project, this.selectedNodeId);
     const slotMatches = keyArt && node
       ? this.session.project.semanticSlots.filter((slot) =>
         (slot.mappings || []).some((mapping) =>
@@ -203,7 +215,7 @@ export class MeshPreparationController {
     let reason = "";
     if (!node) reason = "パーツを選択してください";
     else if (node.kind !== "part") reason = "メッシュを作成する描画パーツを選択してください";
-    else if (keyArtMatches.length !== 1) reason = keyArtMatches.length
+    else if (!keyArt) reason = keyArtMatches.length
       ? "パーツが複数のKey Artに所属しています。編集対象を明示してください"
       : "選択パーツを含むKey Artがありません";
     else if (slotMatches.length > 1) reason = "パーツのSemanticSlot対応が曖昧です";

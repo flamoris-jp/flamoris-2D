@@ -4,33 +4,61 @@
   "entries": [
     {
       "dependency": "EditorSession, Project, Query, Command, Transaction and validation graph",
-      "sources": ["src/commands", "src/queries", "src/model", "src/core (non-render surface)"],
+      "sources": [
+        "src/commands",
+        "src/queries",
+        "src/model",
+        "src/core (non-render surface)"
+      ],
       "classification": "plain Node-compatible Product code",
       "disposition": "Loaded directly by Product Host and guarded by module-graph tests."
     },
     {
       "dependency": "Blob, DecompressionStream and TextDecoder for Cutwork PNG materialization",
-      "sources": ["src/io/png-raster.js", "src/io/cutwork-flimg-reader.js"],
+      "sources": [
+        "src/io/png-raster.js",
+        "src/io/cutwork-flimg-reader.js"
+      ],
       "classification": "plain Node-compatible Product code",
       "disposition": "Node 24 provides the exercised APIs; startup checks fail closed if missing."
     },
     {
       "dependency": "window.agPsd and browser file-picker/storage lifecycle",
-      "sources": ["src/app.js", "src/ui/browser-project-files.js"],
+      "sources": [
+        "src/app.js",
+        "src/ui/browser-project-files.js"
+      ],
       "classification": "environment adapter required",
       "disposition": "Not loaded by Product Host. PSD decode and recovery transport need typed host adapters in later phases."
     },
     {
       "dependency": "Electron dialogs, atomic file save and export IPC",
-      "sources": ["desktop/main.mjs", "src/ui/desktop-project-files.js", "src/ui/desktop-video-export.js"],
+      "sources": [
+        "desktop/main.mjs",
+        "src/ui/desktop-project-files.js",
+        "src/ui/desktop-video-export.js"
+      ],
       "classification": "native adapter candidate",
       "disposition": "WPF owns user intent and OS lifecycle; typed Product parse/serialize remains authoritative."
     },
     {
       "dependency": "OffscreenCanvas and Canvas/WebGL composition assumptions",
-      "sources": ["src/core/export-offscreen-renderer.js", "src/renderer.js", "src/ui/viewport-renderer.js"],
+      "sources": [
+        "src/core/export-offscreen-renderer.js",
+        "src/renderer.js",
+        "src/ui/viewport-renderer.js"
+      ],
       "classification": "deferred renderer concern",
       "disposition": "Excluded from Phase 1 host graph; native renderer selection requires a later ADR and parity proof."
+    },
+    {
+      "dependency": "TransientPlaybackClock browser scheduling defaults",
+      "sources": [
+        "src/ui/timeline-primitives.js",
+        "src/ui/sequence-timeline-controller.js"
+      ],
+      "classification": "environment adapter required",
+      "disposition": "Native Host always supplies explicit no-schedule adapters and advances the existing Product clock with WPF elapsed milliseconds. Browser defaults are never invoked by Native."
     }
   ]
 }

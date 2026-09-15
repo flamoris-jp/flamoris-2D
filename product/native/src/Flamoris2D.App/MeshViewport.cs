@@ -9,10 +9,10 @@ using Flamoris.Flamoris2D.ProductHost;
 namespace Flamoris.Flamoris2D.App;
 
 public sealed record ArtworkProjection(string Id, string NodeId, BitmapSource Bitmap,
-    Affine2 World, bool Visible, bool Locked);
+    Affine2 World, bool Visible, bool Locked, double Left = 0, double Top = 0);
 
-// Replaceable reference-art presenter. It does not implement the Product evaluator/compositor.
-public sealed class MeshViewport : FrameworkElement
+// WPF camera/input/overlay presentation. Evaluated pixels arrive from the shared native renderer.
+public sealed partial class MeshViewport : FrameworkElement
 {
     public ViewportCamera Camera { get; } = new();
     public IReadOnlyList<ArtworkProjection> Artwork { get; private set; } = Array.Empty<ArtworkProjection>();
@@ -26,6 +26,21 @@ public sealed class MeshViewport : FrameworkElement
     public IReadOnlyDictionary<string, string> VertexLabels { get; private set; } = new Dictionary<string, string>();
     public HashSet<string> Selected { get; } = [];
     public bool MeshEnabled { get; set; }
+    public bool DeformEnabled { get; set; }
+    private double[]? _evaluatedPositions;
+    private Affine2? _evaluatedWorld;
+    private double[]? _formStartPositions;
+    private double _frameWidth,_frameHeight;
+    private JsonElement _authoringMeshes,_pickPlan;
+    private void UpdateEvaluatedMesh()
+    {
+        var mesh=_authoringMeshes.ValueKind==JsonValueKind.Array?_authoringMeshes.EnumerateArray().FirstOrDefault(m=>m.GetProperty("keyformId").GetString()==KeyformId&&m.GetProperty("nodeId").GetString()==NodeId):default;
+        _evaluatedPositions=mesh.ValueKind==JsonValueKind.Object?Doubles(mesh.GetProperty("positions")):null;
+        _evaluatedWorld=mesh.ValueKind==JsonValueKind.Object?Transform(mesh.GetProperty("worldTransform")):null;
+    }
+    public double[] DisplayedPositions => (DeformEnabled || RigEnabled && RigSubcontext=="Weight") && _evaluatedPositions is not null ? _evaluatedPositions : Positions;
+    public event Action<Point2?>? FormPreviewChanged;
+    public event Action<Point2,long>? FormMoveRequested;
     public bool Structure { get; set; } = true;
     public bool OverlayVisible { get; set; } = true;
     public bool ShowIds { get; set; }
@@ -34,10 +49,22 @@ public sealed class MeshViewport : FrameworkElement
     public bool Busy { get; set; }
     public string Tool { get; set; } = "選択";
     public JsonElement? GeneratedPreview { get; set; }
+    public BitmapSource? EvaluatedFrame { get; private set; }
+    private HashSet<string> _representedNodes = [];
+    private bool _showUnpreparedArtwork;
+    public event Action<double[]?>? LayoutPreviewChanged;
+    public void ApplyEvaluatedFrame(BitmapSource frame, HashSet<string> representedNodes, bool showUnpreparedArtwork,double documentWidth,double documentHeight,JsonElement meshes,JsonElement plan)
+    {
+        EvaluatedFrame = frame;_frameWidth=documentWidth;_frameHeight=documentHeight;_representedNodes = representedNodes;_showUnpreparedArtwork = showUnpreparedArtwork;
+        _authoringMeshes=meshes;_pickPlan=plan;UpdateEvaluatedMesh();
+        InvalidateVisual();
+    }
+    public void ClearEvaluatedFrame()
+    { EvaluatedFrame = null;_authoringMeshes=_pickPlan=default;_evaluatedPositions=null;_evaluatedWorld=null;_frameWidth=_frameHeight=0;_representedNodes.Clear(); InvalidateVisual(); }
     private LayoutGesture? _drag;
     private Point2? _pan;
     private (Point2 Point, int Vertex)? _click;
-    private Affine2 World => Artwork.FirstOrDefault(a => a.NodeId == NodeId)?.World ?? Affine2.Identity;
+    private Affine2 World => (DeformEnabled || RigEnabled && RigSubcontext=="Weight") && _evaluatedWorld is { } evaluated ? evaluated : Artwork.FirstOrDefault(a => a.NodeId == NodeId)?.World ?? Affine2.Identity;
     private bool Pickable => World.IsInvertible && Artwork.Any(a => a.NodeId == NodeId && a.Visible && !a.Locked);
     public event Action<MeshEdit, long>? CommitRequested;
     public event Action<string>? TargetPicked;
@@ -72,6 +99,7 @@ public sealed class MeshViewport : FrameworkElement
                 v => v.Value.TryGetProperty("semanticLabel", out var label) ? label.GetString() ?? "" : "")
             : new Dictionary<string, string>();
         Selected.IntersectWith(VertexIds);
+        UpdateEvaluatedMesh();
         SelectionChanged?.Invoke();
         InvalidateVisual();
     }
@@ -86,15 +114,24 @@ public sealed class MeshViewport : FrameworkElement
     }
     public void Fit()
     {
-        var width = Artwork.Count > 0 ? Artwork.Max(a => a.Bitmap.PixelWidth) : 1920;
-        var height = Artwork.Count > 0 ? Artwork.Max(a => a.Bitmap.PixelHeight) : 1080;
-        Camera.Fit(ActualWidth, ActualHeight, width, height); InvalidateVisual();
+        var corners = Artwork.SelectMany(a => new[] { a.World.Apply(new(a.Left, a.Top)),
+            a.World.Apply(new(a.Left+a.Bitmap.PixelWidth,a.Top)), a.World.Apply(new(a.Left,a.Top+a.Bitmap.PixelHeight)),
+            a.World.Apply(new(a.Left+a.Bitmap.PixelWidth,a.Top+a.Bitmap.PixelHeight)) }).ToArray();
+        var left = corners.Length > 0 ? Math.Min(0,corners.Min(p=>p.X)) : 0;
+        var top = corners.Length > 0 ? Math.Min(0,corners.Min(p=>p.Y)) : 0;
+        var width = Math.Max(_frameWidth, corners.Length > 0 ? corners.Max(p=>p.X) : 1920) - left;
+        var height = Math.Max(_frameHeight, corners.Length > 0 ? corners.Max(p=>p.Y) : 1080) - top;
+        Camera.Fit(ActualWidth, ActualHeight, width, height); Camera.Pan(-left*Camera.Scale,-top*Camera.Scale); InvalidateVisual();
     }
     public void Cancel()
     {
+        CancelRig();
+        var hadDrag = _drag is not null;
         _drag?.Cancel();
         _drag = null; _click = null; _pan = null;
         if (IsMouseCaptured) ReleaseMouseCapture();
+        if (hadDrag) { LayoutPreviewChanged?.Invoke(null);FormPreviewChanged?.Invoke(null); }
+        _formStartPositions=null;
         InvalidateVisual();
     }
     public void SelectAll()
@@ -108,25 +145,27 @@ public sealed class MeshViewport : FrameworkElement
     {
         dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(39, 42, 48)), null, new Rect(RenderSize));
         dc.PushTransform(new MatrixTransform(Camera.Scale, 0, 0, Camera.Scale, Camera.Origin.X, Camera.Origin.Y));
-        foreach (var art in Artwork.Where(a => a.Visible))
+        foreach (var art in Artwork.Where(a => a.Visible && (EvaluatedFrame is null || _showUnpreparedArtwork && !_representedNodes.Contains(a.NodeId))))
         {
             var w = art.World;
             dc.PushTransform(new MatrixTransform(w.A, w.B, w.C, w.D, w.X, w.Y));
-            dc.DrawImage(art.Bitmap, new Rect(0, 0, art.Bitmap.PixelWidth, art.Bitmap.PixelHeight));
+            dc.DrawImage(art.Bitmap, new Rect(art.Left, art.Top, art.Bitmap.PixelWidth, art.Bitmap.PixelHeight));
             dc.Pop();
         }
+        if (EvaluatedFrame is { } frame) dc.DrawImage(frame, new Rect(0,0,_frameWidth,_frameHeight));
         dc.Pop();
-        if (MeshEnabled && OverlayVisible && Pickable)
+        if ((MeshEnabled || DeformEnabled) && OverlayVisible && Pickable)
         {
-            var positions = _drag?.Preview ?? Positions;
+            var positions = _drag?.Preview ?? DisplayedPositions;
             DrawMesh(dc, positions, Triangles, Brushes.Cyan, VertexIds);
             if (GeneratedPreview is { } preview)
                 DrawMesh(dc, Doubles(preview.GetProperty("positions")),
                     preview.GetProperty("indices").EnumerateArray().Select(v => v.GetInt32()).ToArray(), Brushes.Orange, []);
         }
+        DrawRig(dc);
         if (Artwork.Count == 0)
         {
-            var text = new FormattedText("「PNGでMesh体験」から素材を選択\nこの体験セッションは保存されません。",
+            var text = new FormattedText("「ファイル > 開く」からプロジェクトを選択",
                 CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface("Yu Gothic UI"), 16,
                 Brushes.LightGray, VisualTreeHelper.GetDpi(this).PixelsPerDip);
             dc.DrawText(text, new Point(24, 32));
@@ -173,18 +212,33 @@ public sealed class MeshViewport : FrameworkElement
             (e.ChangedButton == MouseButton.Left && Keyboard.IsKeyDown(Key.Space)))
         { Cancel(); _pan = point; CaptureMouse(); e.Handled = true; return; }
         if (e.ChangedButton != MouseButton.Left || Busy) return;
-        if (!MeshEnabled)
+        if (RigDown(point)) { e.Handled=true; return; }
+        if (!MeshEnabled && !DeformEnabled)
         {
+            var documentPoint=Camera.ToDocument(point);var hits=new List<string>();
+            foreach(var instance in Items(_pickPlan,"batches").Reverse().SelectMany(b=>Items(b,"renderInstances").Reverse()))
+            {
+                var nodeId=Id(instance,"sourceNodeId")??Id(Items(instance,"appearanceSamples").FirstOrDefault(),"sourceNodeId");
+                if(nodeId is null||hits.Contains(nodeId)||!Artwork.Any(a=>a.NodeId==nodeId&&a.Visible&&!a.Locked)||instance.GetProperty("opacity").GetDouble()<=0)continue;
+                var mesh=instance.GetProperty("mesh");
+                if(VertexPicking.HitTriangles(Doubles(mesh.GetProperty("positions")),mesh.GetProperty("indices").EnumerateArray().Select(i=>i.GetInt32()).ToArray(),documentPoint,Transform(instance.GetProperty("transform"))))hits.Add(nodeId);
+            }
+            if(hits.Count>0)
+            {
+                var index=Keyboard.Modifiers.HasFlag(ModifierKeys.Alt)?(hits.IndexOf(NodeId??"")+1)%hits.Count:0;
+                TargetPicked?.Invoke(hits[index]);return;
+            }
             foreach (var art in Artwork.Reverse().Where(a => a.Visible && !a.Locked && a.World.IsInvertible))
             {
+                if(_representedNodes.Contains(art.NodeId))continue;
                 var p = art.World.Inverse(Camera.ToDocument(point));
-                if (p.X >= 0 && p.Y >= 0 && p.X < art.Bitmap.PixelWidth && p.Y < art.Bitmap.PixelHeight)
+                if (p.X >= art.Left && p.Y >= art.Top && p.X < art.Left + art.Bitmap.PixelWidth && p.Y < art.Top + art.Bitmap.PixelHeight)
                 { TargetPicked?.Invoke(art.NodeId); break; }
             }
             return;
         }
         if (!Pickable || !OverlayVisible || DocumentToken is null) return;
-        var hit = VertexPicking.Hit(Positions, point, Camera, World);
+        var hit = VertexPicking.Hit(DisplayedPositions, point, Camera, World);
         var additive = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) || Tool is "面を作成" or "辺を分割";
         if (hit >= 0)
         {
@@ -194,10 +248,13 @@ public sealed class MeshViewport : FrameworkElement
         }
         else if (!additive && Tool != "頂点を追加") Selected.Clear();
         SelectionChanged?.Invoke();
-        if (!Structure && Tool == "移動" && hit >= 0)
-            _drag = new LayoutGesture(DocumentToken, Revision, Positions,
+        if ((!Structure || DeformEnabled) && Tool == "移動" && hit >= 0)
+        {
+            _formStartPositions=DeformEnabled?(double[])DisplayedPositions.Clone():null;
+            _drag = new LayoutGesture(DocumentToken, Revision, DisplayedPositions,
                 VertexIds.Select((id, index) => (id, index)).Where(p => Selected.Contains(p.id)).Select(p => p.index).ToArray(), Local(point));
-        else if (Structure && (Tool == "頂点を追加" || Tool == "頂点を削除" && hit >= 0))
+        }
+        else if (!DeformEnabled && Structure && (Tool == "頂点を追加" || Tool == "頂点を削除" && hit >= 0))
             _click = (Local(point), hit);
         if (_drag is not null || _click is not null) CaptureMouse();
         InvalidateVisual(); e.Handled = true;
@@ -206,37 +263,46 @@ public sealed class MeshViewport : FrameworkElement
     {
         var point = PointOf(e.GetPosition(this));
         if (_pan is { } start) { Camera.Pan(point.X - start.X, point.Y - start.Y); _pan = point; }
-        else if (_drag is not null) _drag.Move(Local(point), Snap);
+        else if (RigMove(point)) { e.Handled=true; return; }
+        else if (_drag is not null) { _drag.Move(Local(point), Snap);if(DeformEnabled)FormPreviewChanged?.Invoke(FormDelta(_drag.Preview!));else LayoutPreviewChanged?.Invoke(_drag.Preview); }
         else return;
         InvalidateVisual();
     }
     protected override void OnMouseUp(MouseButtonEventArgs e)
     {
+        if (e.ChangedButton==MouseButton.Left && RigUp(PointOf(e.GetPosition(this)))) { e.Handled=true;return; }
         MeshEdit? edit = null;
+        Point2? formDelta=null;
         var revision = Revision;
         if (_pan is null && e.ChangedButton == MouseButton.Left)
         {
             if (_drag is { } drag)
             {
                 drag.Move(Local(PointOf(e.GetPosition(this))), Snap);
-                if (drag.Finish(DocumentToken!, Revision) is { } positions) edit = MeshEdit.Move(positions);
+                if (drag.Finish(DocumentToken!, Revision) is { } positions) { if(DeformEnabled)formDelta=FormDelta(positions);else edit = MeshEdit.Move(positions); }
             }
             else if (_click is { } click)
             {
                 var art = Artwork.First(a => a.NodeId == NodeId);
                 if (Tool == "頂点を追加") edit = MeshEdit.Add(click.Point.X, click.Point.Y,
-                    Math.Clamp(click.Point.X / art.Bitmap.PixelWidth, 0, 1), Math.Clamp(click.Point.Y / art.Bitmap.PixelHeight, 0, 1));
+                    Math.Clamp((click.Point.X - art.Left) / art.Bitmap.PixelWidth, 0, 1), Math.Clamp((click.Point.Y - art.Top) / art.Bitmap.PixelHeight, 0, 1));
                 else if (Tool == "頂点を削除" && click.Vertex >= 0) edit = MeshEdit.Remove(VertexIds[click.Vertex]);
             }
         }
         Cancel();
         if (edit is not null && Pickable && !Busy) CommitRequested?.Invoke(edit, revision);
+        if (formDelta is { } delta && Pickable && !Busy) FormMoveRequested?.Invoke(delta,revision);
         e.Handled = true;
     }
     protected override void OnKeyDown(KeyEventArgs e)
     {
         if (e.Key == Key.Escape) { Cancel(); GeneratedPreview = null; InvalidateVisual(); e.Handled = true; }
-        else if (e.Key == Key.A && Keyboard.Modifiers == ModifierKeys.Control && MeshEnabled)
+        else if (e.Key == Key.A && Keyboard.Modifiers == ModifierKeys.Control && (MeshEnabled || DeformEnabled))
         { SelectAll(); e.Handled = true; }
+    }
+    private Point2? FormDelta(double[] positions)
+    {
+        var index=Array.FindIndex(VertexIds,id=>Selected.Contains(id));
+        return index>=0&&_formStartPositions is { } start ? new(positions[index*2]-start[index*2],positions[index*2+1]-start[index*2+1]):null;
     }
 }

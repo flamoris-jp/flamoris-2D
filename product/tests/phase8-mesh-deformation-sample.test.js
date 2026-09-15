@@ -29,6 +29,18 @@ function sample(id = "sample") {
   ] };
 }
 
+test('identity-only mesh targets enable fresh sample authoring through the shared Command layer',()=>{
+ const project=fixture();project.meshes=[];const session=new EditorSession(project),adapter=new HeadlessProductAdapter(session);
+ const before=structuredClone(session.project);
+ adapter.executeTransaction([{type:'animation.mesh_target.create',payload:{meshId:'mesh'}},{type:'animation.deformation_sample.create',payload:{sample:sample()}}]);
+ const after=structuredClone(session.project);assert.deepEqual(after.meshes,[{id:'mesh'}]);assert.equal(after.animation.deformationSamples.length,1);
+ assert.throws(()=>adapter.execute({type:'animation.mesh_target.remove',payload:{meshId:'mesh'}}));assert.deepEqual(session.project,after);
+ session.undo();assert.deepEqual(session.project,before);session.redo();assert.deepEqual(session.project,after);
+ adapter.execute({type:'animation.deformation_sample.remove',payload:{sampleId:'sample'}});
+ adapter.execute({type:'animation.mesh_target.remove',payload:{meshId:'mesh'}});assert.deepEqual(session.project.meshes,[]);
+ assert.throws(()=>adapter.execute({type:'animation.mesh_target.create',payload:{meshId:'legacy',baseVertices:[0,0]}}));
+});
+
 test("MeshDeformationSample has stable identity and canonical sparse offsets", () => {
   const value = normalizeMeshDeformationSample(sample());
   assert.equal(value.id, "sample");

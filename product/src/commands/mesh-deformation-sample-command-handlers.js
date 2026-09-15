@@ -38,6 +38,22 @@ function remove(project, sampleId) {
 }
 
 export const meshDeformationSampleCommandHandlers = {
+  "animation.mesh_target.create": (project, { meshId }) => {
+    if (project.meshes.some(m => m.id === meshId)) throw new CommandError('Mesh target already exists.', 'identity.duplicate');
+    project.meshes.push({ id: meshId });
+    return { inverse: { type: 'animation.mesh_target.remove', payload: { meshId } }, affectedIds: [meshId] };
+  },
+  "animation.mesh_target.remove": (project, { meshId }) => {
+    const index = project.meshes.findIndex(m => m.id === meshId), mesh = project.meshes[index];
+    if (!mesh) throw new CommandError('Unknown mesh target.', 'animation.mesh_target_not_found');
+    if (Object.keys(mesh).some(k => k !== 'id')) throw new CommandError('This command only removes identity-only mesh targets.', 'animation.legacy_mesh_preserved');
+    project.meshes.splice(index, 1);
+    return { inverse: { type: 'animation.mesh_target.restore_internal', payload: { meshId, index } }, affectedIds: [meshId] };
+  },
+  "animation.mesh_target.restore_internal": (project, { meshId, index }) => {
+    project.meshes.splice(index, 0, { id: meshId });
+    return { inverse: { type: 'animation.mesh_target.remove', payload: { meshId } }, affectedIds: [meshId] };
+  },
   "animation.deformation_sample.create": (project, payload) => {
     const sample = normalizeMeshDeformationSample(payload.sample);
     if (collection(project).some((entry) => entry.id === sample.id)) {
