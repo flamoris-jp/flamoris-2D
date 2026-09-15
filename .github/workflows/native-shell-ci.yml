@@ -41,7 +41,7 @@ jobs:
         run: npm install --prefix product --workspaces=false --omit=dev --ignore-scripts --package-lock=false
 
       - name: Product Host protocol tests
-        run: node --test product/tests/product-host.test.js product/tests/native-mesh-host.test.js product/tests/native-document-host.test.js product/tests/native-source-host.test.js product/tests/native-render-projection.test.js
+        run: node --test product/tests/product-host.test.js product/tests/native-mesh-host.test.js product/tests/native-document-host.test.js product/tests/native-source-host.test.js product/tests/native-render-projection.test.js product/tests/native-rig-host.test.js
 
       - name: Build native solution
         run: dotnet build product/native/Flamoris2D.Native.sln -c Release

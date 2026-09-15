@@ -39,6 +39,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         InitializeMeshUi();
         InitializeDocumentUi();
         InitializeRenderUi();
+        InitializeRigUi();
         Loaded += MainWindow_Loaded;
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         SwitchContext(EditingContext.Source, returnFocus: false);
@@ -119,6 +120,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             UpdateRenderChoices(snapshot.Payload);
             await RefreshMeshAsync(client);
             await RefreshEvaluatedFrameAsync(client);
+            await RefreshRigAsync(client);
         }
         catch (StaleProjectionException)
         {
@@ -287,6 +289,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             ? new GridLength(190) : new GridLength(0);
         UpdateToolSettings();
         ConfigureMeshContext();
+        ConfigureRigContext();
         if (returnFocus) MeshCanvas.Focus();
     }
 
@@ -308,6 +311,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             _activeTools[_editingContext] = tool;
             UpdateToolSettings();
             SetMeshTool();
+            if(_editingContext==EditingContext.Rig){_rigTool=tool;MeshCanvas.RigTool=tool;}
             MeshCanvas.Focus();
         }
     }

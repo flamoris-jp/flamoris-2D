@@ -1,6 +1,6 @@
 # ADR 0008: Native evaluated renderer selection
 
-Status: proposed; candidate implementation and measurement only. Not final renderer authority.
+Status: accepted for implementation under the Issue #96 instruction; PR review and final native workflow acceptance remain open.
 
 Parent #96; decision/proof #98. Existing evaluator order/time/mesh semantics are preserved.
 
@@ -29,9 +29,41 @@ budgets separately from human visual acceptance. Use synthetic shareable artwork
 existing Product production-shot evaluation fixtures. Never package benchmark fixtures
 as editor bootstrap. Disqualify an incomplete candidate explicitly; do not call it parity.
 
-No renderer has been accepted yet. Electron remains the release backend. Candidate code
-may support measurement and semantic conformance, but cannot be represented as a final
-native compositor until #98's comparison/evidence requirement is met.
+## Decision and measured evidence
+
+Select Direct3D 11 with a hardware device and explicit WARP fallback if hardware device
+creation fails. Use one shared evaluated renderer for native preview and export. Keep
+the software implementation as a conformance reference, not an interactive fallback.
+On device loss, stop rendering with a diagnostic; do not silently save altered content.
+Electron remains available until the full migration retirement conditions are satisfied.
+
+Windows runner measurements at commit `0c7824c8959d168cb5d682f2f6f939a70337c412`:
+[Windows boundary run](https://github.com/flamoris-jp/flamoris-2D/actions/runs/34968321565).
+1920×1080 output, 720 evaluated triangles, 13 synthetic 512×512 textures. The canonical
+production fixture includes nested Warp, rigid Bone, rotation constraints, form correction,
+animation, two appearances, clipping and camera. Test-only subdivision increases geometry
+density after evaluation; it is not a new mesh topology in Product. Skin is separately
+covered by Product/Host conformance and must also appear in final integrated workflow QA.
+
+| Candidate | Time including composition and CPU readback | Notes |
+| --- | --- | --- |
+| Software C# | 816.89 ms, one representative frame | Too slow for interaction; reference only |
+| D3D11 WARP | median 25.34 ms, max 27.63 ms, five warm samples | Hardware-independent fallback |
+| D3D11 hardware device | median 27.08 ms, max 28.40 ms, five warm samples | Runner device; not a claim about a user's physical GPU |
+
+WARP and hardware matched the software reference to mean absolute channel error 0.0006
+on a 0–255 scale. Maximum isolated edge error was 255; the fraction above 2 was below
+0.00005% (rounded to 0.0000% in logs). Rasterizer subpixel edge rules differ, so do not
+claim bit-exact parity. Five original 64×64 frames had maximum channel errors 1–2 and
+mean errors 0.0020–0.0037. Reference edge and weighted-alpha tests also passed.
+
+Observed process working sets were 372.0 MiB after WARP and 429.3 MiB with both D3D devices
+alive. These are snapshots, not measured peak or admission guarantees. The 512 MiB
+composition admission limit remains separate from asset/document and runtime allocations.
+Warm timings exclude Host evaluation, initial decode/upload and WPF composition; the
+viewport reports its measured frame path separately. Final acceptance still needs the
+complete eight-second workflow, cancellation/large-asset limits, DPI and actual-device
+visual/interaction review. This decision does not close #98 or assert migration completion.
 
 
 ## Authoring preview ownership

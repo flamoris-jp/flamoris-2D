@@ -28,7 +28,7 @@ public static class EditingContextCatalog
         new(EditingContext.Mesh, "メッシュ", "Mesh", "構造／位置決めと操作ツールを選択",
             ["選択", "頂点を追加", "頂点を削除", "面を作成", "辺を分割", "生成"], false),
         new(EditingContext.Rig, "リグ", "Rig", "Bone / Warp / Weight対象を選択",
-            ["選択", "Bone", "Warp", "Weight"], false),
+            ["選択", "移動", "追加", "削除"], false),
         new(EditingContext.Deform, "変形", "Deform", "既存topologyの変形対象を選択",
             ["選択", "変形", "補正"], false),
         new(EditingContext.Animation, "動き", "Animation", "keyまたは時間位置を選択",

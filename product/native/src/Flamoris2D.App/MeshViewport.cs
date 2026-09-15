@@ -12,7 +12,7 @@ public sealed record ArtworkProjection(string Id, string NodeId, BitmapSource Bi
     Affine2 World, bool Visible, bool Locked, double Left = 0, double Top = 0);
 
 // WPF camera/input/overlay presentation. Evaluated pixels arrive from the shared native renderer.
-public sealed class MeshViewport : FrameworkElement
+public sealed partial class MeshViewport : FrameworkElement
 {
     public ViewportCamera Camera { get; } = new();
     public IReadOnlyList<ArtworkProjection> Artwork { get; private set; } = Array.Empty<ArtworkProjection>();
@@ -105,6 +105,7 @@ public sealed class MeshViewport : FrameworkElement
     }
     public void Cancel()
     {
+        CancelRig();
         var hadDrag = _drag is not null;
         _drag?.Cancel();
         _drag = null; _click = null; _pan = null;
@@ -140,6 +141,7 @@ public sealed class MeshViewport : FrameworkElement
                 DrawMesh(dc, Doubles(preview.GetProperty("positions")),
                     preview.GetProperty("indices").EnumerateArray().Select(v => v.GetInt32()).ToArray(), Brushes.Orange, []);
         }
+        DrawRig(dc);
         if (Artwork.Count == 0)
         {
             var text = new FormattedText("「ファイル > 開く」からプロジェクトを選択",
@@ -189,6 +191,7 @@ public sealed class MeshViewport : FrameworkElement
             (e.ChangedButton == MouseButton.Left && Keyboard.IsKeyDown(Key.Space)))
         { Cancel(); _pan = point; CaptureMouse(); e.Handled = true; return; }
         if (e.ChangedButton != MouseButton.Left || Busy) return;
+        if (RigDown(point)) { e.Handled=true; return; }
         if (!MeshEnabled)
         {
             foreach (var art in Artwork.Reverse().Where(a => a.Visible && !a.Locked && a.World.IsInvertible))
@@ -222,12 +225,14 @@ public sealed class MeshViewport : FrameworkElement
     {
         var point = PointOf(e.GetPosition(this));
         if (_pan is { } start) { Camera.Pan(point.X - start.X, point.Y - start.Y); _pan = point; }
+        else if (RigMove(point)) { e.Handled=true; return; }
         else if (_drag is not null) { _drag.Move(Local(point), Snap); LayoutPreviewChanged?.Invoke(_drag.Preview); }
         else return;
         InvalidateVisual();
     }
     protected override void OnMouseUp(MouseButtonEventArgs e)
     {
+        if (e.ChangedButton==MouseButton.Left && RigUp(PointOf(e.GetPosition(this)))) { e.Handled=true;return; }
         MeshEdit? edit = null;
         var revision = Revision;
         if (_pan is null && e.ChangedButton == MouseButton.Left)
