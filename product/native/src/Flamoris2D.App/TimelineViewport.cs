@@ -73,7 +73,7 @@ public sealed class TimelineViewport : FrameworkElement
             var trackId=Text(track,"trackId");
             foreach(var channel in track.GetProperty("channels").EnumerateObject())
             {
-                Label(dc,Text(track,"kind").Replace("Track","")+" · "+channel.Name,6,y+5);
+                Label(dc,AuthoringLabels.Track(Text(track,"kind"))+" · "+AuthoringLabels.Channel(channel.Name),6,y+5);
                 _hits.Add(new("track",trackId,trackId,channel.Name,new Rect(0,y,LabelWidth,Row),0,0));
                 dc.DrawLine(new Pen(Brushes.DimGray,.6),new Point(LabelWidth,y+Row/2),new Point(ActualWidth,y+Row/2));
                 foreach(var frame in Items(channel.Value,"keyframes"))

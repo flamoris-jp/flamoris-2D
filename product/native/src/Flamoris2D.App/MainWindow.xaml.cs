@@ -161,6 +161,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async void Refresh_Click(object sender, RoutedEventArgs e)
     {
+        _contextDraft=false;
         try { await RefreshProjectionAsync(); }
         catch (Exception error) { StatusText.Text = $"状態を更新できませんでした: {error.Message}"; }
     }

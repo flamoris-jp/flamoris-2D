@@ -80,10 +80,10 @@ public partial class MainWindow
         {
             var form=ArrayOf(state,"keyforms").First(k=>String(k,"id")==keyformId);var uvs=Property(form,"uvs").EnumerateArray().Select(v=>v.GetDouble()).ToArray();
             var vertex=Choices(panel,"画像の割当を編集する頂点",MeshCanvas.VertexIds.Select((v,i)=>new EntityChoice(v,$"頂点 {i+1} · {v}")),MeshCanvas.Selected.FirstOrDefault());
-            var u=Field(panel,"U（画像の左0 → 右1）",0);var v=Field(panel,"V（画像の上0 → 下1）",0);
-            void SetUv(){var i=Array.IndexOf(MeshCanvas.VertexIds,(vertex.SelectedItem as EntityChoice)?.Id);if(i>=0){u.Text=uvs[i*2].ToString(System.Globalization.CultureInfo.InvariantCulture);v.Text=uvs[i*2+1].ToString(System.Globalization.CultureInfo.InvariantCulture);}}
-            SetUv();vertex.SelectionChanged+=(_,_)=>SetUv();
-            ActionButton(panel,"選択頂点の画像割当を更新",()=>RunKeyStateAsync(()=>KeyStateEdit.VertexUv(keyformId,Chosen(vertex),ReadNumber(u),ReadNumber(v)),context,revision));
+            var uvU=Field(panel,"U（画像の左0 → 右1）",0);var uvV=Field(panel,"V（画像の上0 → 下1）",0);
+            void SetUv(){var i=Array.IndexOf(MeshCanvas.VertexIds,(vertex.SelectedItem as EntityChoice)?.Id);if(i>=0){uvU.Text=uvs[i*2].ToString(System.Globalization.CultureInfo.InvariantCulture);uvV.Text=uvs[i*2+1].ToString(System.Globalization.CultureInfo.InvariantCulture);}}
+            var draft=_contextDraft;SetUv();_contextDraft=draft;vertex.SelectionChanged+=(_,_)=>SetUv();
+            ActionButton(panel,"選択頂点の画像割当を更新",()=>RunKeyStateAsync(()=>KeyStateEdit.VertexUv(keyformId,Chosen(vertex),ReadNumber(uvU),ReadNumber(uvV)),context,revision));
             ActionButton(panel,"この原画のメッシュ配置を削除",()=>RunKeyStateAsync(()=>KeyStateEdit.RemoveKeyform(keyformId),context,revision));
         }
         Note(panel,"他の原画・遷移・リグ・変形が参照するデータは削除できません。参照先を自動で消す操作ではありません。");
@@ -123,7 +123,7 @@ public partial class MainWindow
             ActionButton(panel,"AのKey Stateを編集",()=>SelectEndpoint(true));ActionButton(panel,"BのKey Stateを編集",()=>SelectEndpoint(false));
             ActionButton(panel,"遷移をプレビュー",async()=>{_renderChoice=new(context.TransitionId,"transition","遷移");_timeTicks=0;SwitchContext(EditingContext.Preview,false);await RefreshRigSurfaceAsync();});
         }
-        var slot=Choices(panel,"対応するパーツ（SemanticSlot）",ArrayOf(state,"slots").Select(s=>new EntityChoice(String(s,"id")!,String(s,"displayName")!)),context.SemanticSlotId);
+        var slot=Choices(panel,"対応するパーツ",ArrayOf(state,"slots").Select(s=>new EntityChoice(String(s,"id")!,String(s,"displayName")!)),context.SemanticSlotId);
         slot.SelectionChanged+=async(_,_)=>{_keySlotId=(slot.SelectedItem as EntityChoice)?.Id;_contextDraft=false;_correspondencePins.Clear();await RefreshRigSurfaceAsync();};
         var slotName=Field(panel,"パーツ対応名",ArrayOf(state,"slots").Where(s=>String(s,"id")==context.SemanticSlotId).Select(s=>String(s,"displayName")).FirstOrDefault()??"新しい対応");
         ActionButton(panel,"パーツ対応を作成",()=>RunKeyStateAsync(()=>KeyStateEdit.CreateSlot(slotName.Text),context,revision));
@@ -141,7 +141,7 @@ public partial class MainWindow
         var forms=ArrayOf(state,"keyforms").Where(k=>String(k,"semanticSlotId")==context.SemanticSlotId).ToArray();
         var aForms=Choices(panel,"Aのメッシュ",forms.Where(k=>String(k,"keyArtId")==String(transition,"fromKeyArtId")).Select((k,i)=>new EntityChoice(String(k,"id")!,$"メッシュ {i+1}")),String(part,"fromKeyformId"));
         var bForms=Choices(panel,"Bのメッシュ",forms.Where(k=>String(k,"keyArtId")==String(transition,"toKeyArtId")).Select((k,i)=>new EntityChoice(String(k,"id")!,$"メッシュ {i+1}")),String(part,"toKeyformId"));
-        ActionButton(panel,"共有Topologyと両端を接続",()=>RunKeyStateAsync(()=>KeyStateEdit.SharedTopology(String(forms.First(k=>String(k,"id")==Chosen(aForms)),"topologyId")!,Chosen(aForms),Chosen(bForms)),context,revision));
+        ActionButton(panel,"共通メッシュで両端を接続",()=>RunKeyStateAsync(()=>KeyStateEdit.SharedTopology(String(forms.First(k=>String(k,"id")==Chosen(aForms)),"topologyId")!,Chosen(aForms),Chosen(bForms)),context,revision));
         foreach(var diagnostic in ArrayOf(state,"diagnostics"))
         {
             Note(panel,String(diagnostic,"message")??String(diagnostic,"code")??diagnostic.ToString());

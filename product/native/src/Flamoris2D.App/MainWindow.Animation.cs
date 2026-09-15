@@ -132,15 +132,15 @@ public partial class MainWindow
     private void BuildTrackPanel(Panel panel,TimelineContext context,long revision)
     {
         var tracks=ArrayOf(_timelineSnapshot,"tracks");var select=Choices(panel,"トラック",tracks.Select(t=>new EntityChoice(String(t,"trackId")!,
-            $"{String(t,"kind")?.Replace("Track","")} · {String(t,"targetLabel")}")),context.TrackId);
+            $"{AuthoringLabels.Track(String(t,"kind"))} · {String(t,"targetLabel")}")),context.TrackId);
         select.SelectionChanged+=(_,_)=>{_timelineContext=_timelineContext with {TrackId=(select.SelectedItem as EntityChoice)?.Id,KeyframeId=null,Channel=null};_contextDraft=false;_=RefreshRigSurfaceAsync();};
-        var kinds=ArrayOf(_timelineSnapshot,"allowedTrackKinds").Select(k=>new EntityChoice(k.GetString()!,k.GetString()!.Replace("Track","")));
+        var kinds=ArrayOf(_timelineSnapshot,"allowedTrackKinds").Select(k=>new EntityChoice(k.GetString()!,AuthoringLabels.Track(k.GetString())));
         var kind=Choices(panel,"追加するトラックの種類",kinds,context.TrackKind);
         kind.SelectionChanged+=(_,_)=>{_timelineContext=_timelineContext with {TrackKind=(kind.SelectedItem as EntityChoice)?.Id};_contextDraft=false;_=RefreshRigSurfaceAsync();};
         var options=ArrayOf(_timelineSnapshot,"targetOptions");var target=Choices(panel,"トラックの対象",options.Select((o,i)=>new EntityChoice(i.ToString(),String(o,"label")??"対象")));
         ActionButton(panel,"トラックを追加",()=>RunTimelineEditAsync(()=>TimelineEdit.AddTrack(Enum.Parse<AnimationTrackKind>(Chosen(kind)),options[int.Parse(Chosen(target))].GetProperty("target")),context,revision));
         var track=tracks.FirstOrDefault(t=>String(t,"trackId")==context.TrackId);if(track.ValueKind!=JsonValueKind.Object)return;
-        var channels=track.GetProperty("channels").EnumerateObject().Select(c=>new EntityChoice(c.Name,c.Name));
+        var channels=track.GetProperty("channels").EnumerateObject().Select(c=>new EntityChoice(c.Name,AuthoringLabels.Channel(c.Name)));
         var channel=Choices(panel,"編集するチャンネル",channels,context.Channel??channels.First().Id);
         channel.SelectionChanged+=(_,_)=>{_timelineContext=_timelineContext with {Channel=(channel.SelectedItem as EntityChoice)?.Id,KeyframeId=null};_contextDraft=false;_=RefreshRigSurfaceAsync();};
         var selectedChannel=Chosen(channel);var frames=track.GetProperty("channels").GetProperty(selectedChannel).GetProperty("keyframes").EnumerateArray().ToArray();
@@ -150,7 +150,7 @@ public partial class MainWindow
         var value=Property(frame,"value");var definition=Property(Property(_timelineSnapshot,"channels"),selectedChannel);var valueKind=String(definition,"value");
         Func<AnimationValue> read;
         if(valueKind=="presence")
-        {var presence=Choices(panel,"出現状態",new[]{"present","absent","occluded"}.Select(p=>new EntityChoice(p,p)),value.ValueKind==JsonValueKind.String?value.GetString():"present");read=()=>AnimationValue.Presence(Chosen(presence));}
+        {var presence=Choices(panel,"出現状態",new[]{new EntityChoice("present","表示"),new("absent","非表示"),new("occluded","遮蔽")},value.ValueKind==JsonValueKind.String?value.GetString():"present");read=()=>AnimationValue.Presence(Chosen(presence));}
         else if(valueKind=="clipping")
         {var clipping=Choices(panel,"クリッピング元",_targets.Targets.Where(t=>t.Kind=="part").Select(t=>new EntityChoice(t.Id,t.DisplayName)).Prepend(new EntityChoice("","なし")),String(value,"sourceNodeId")??"");read=()=>AnimationValue.Clipping(Chosen(clipping) is {Length:>0} id?id:null);}
         else if(valueKind=="deformation")

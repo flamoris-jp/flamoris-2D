@@ -11,6 +11,22 @@ public enum EditingContext
     Export,
 }
 
+public static class AuthoringLabels
+{
+    public static string Track(string? kind)=>kind switch
+    {
+        "TransformTrack"=>"配置","BoneTrack"=>"Boneのポーズ","DeformerTrack"=>"Warp制御点","MeshDeformationTrack"=>"メッシュ変形",
+        "OpacityTrack"=>"不透明度","PresenceTrack"=>"表示状態","DrawOrderTrack"=>"重ね順","ClippingTrack"=>"クリッピング",
+        "CameraTrack"=>"カメラ","GeometryBlendTrack"=>"形状の補間","AppearanceTrack"=>"画像の混合",_=>kind??"トラック",
+    };
+    public static string Channel(string kind)=>kind switch
+    {
+        "x" or "positionX"=>"位置 X","y" or "positionY"=>"位置 Y","rotation"=>"回転","scaleX"=>"拡大率 X","scaleY"=>"拡大率 Y","scale"=>"拡大率",
+        "deltaX"=>"変位 X","deltaY"=>"変位 Y","deformation"=>"変形","geometryWeight"=>"形状の混ざり方","appearance"=>"画像の混ざり方",
+        "opacity"=>"不透明度","presence"=>"表示状態","drawOrder"=>"重ね順","clipping"=>"クリッピング元",_=>kind,
+    };
+}
+
 public sealed record EditingContextDefinition(
     EditingContext Context,
     string JapaneseName,
