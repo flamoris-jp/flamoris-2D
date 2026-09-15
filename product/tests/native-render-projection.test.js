@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { ProductHostService } from '../product-host/session-service.mjs';
 import { buildPhase8ProductionProof, PROOF_TICKS } from './helpers/phase8-production-proof.js';
 import { encodeRgbaPng } from '../product-host/document-artwork.mjs';
@@ -28,6 +28,21 @@ test('native render projection reuses canonical production-shot evaluation for c
     assert.deepEqual(native.plan,canonical);assert.deepEqual(host.document.session.project,before);
     fixtures.push(native);
   }
+  const keyform=host.document.session.project.meshKeyforms[0];
+  const positions=keyform.positions.map((v,i)=>i===0?v+3:v);
+  const identity={revision:host.revision,current:host.document.session.currentRevision,saved:host.document.session.savedRevision,
+    history:structuredClone(host.document.session.history)};
+  const preview=await send(host,'render.project',{keyArtId:keyform.keyArtId,layoutPreview:{keyformId:keyform.id,positions}});
+  assert.deepEqual(host.document.session.project,before);
+  assert.deepEqual({revision:host.revision,current:host.document.session.currentRevision,saved:host.document.session.savedRevision,
+    history:host.document.session.history},identity);
+  await send(host,'session.execute',{command:{type:'mesh_keyform.move_vertices',payload:{keyformId:keyform.id,positions}}});
+  const committed=await send(host,'render.project',{keyArtId:keyform.keyArtId});
+  assert.deepEqual(preview.plan,committed.plan,'drag preview must equal the same committed Product command');
+  await send(host,'session.undo');assert.deepEqual(host.document.session.project,before);
+  const invalid=(await host.handle({protocolVersion:1,requestId:'invalid-preview',method:'render.project',documentToken:host.documentToken,
+    expectedRevision:host.revision,payload:{keyArtId:keyform.keyArtId,layoutPreview:{keyformId:keyform.id,positions:[1,2]}}})).response;
+  assert.equal(invalid.ok,false);assert.deepEqual(host.document.session.project,before);
   // Optional explicit test output for Windows renderer conformance/measurement. Never Product bootstrap.
   if(process.env.FLAMORIS_RENDER_FIXTURE_DIR) {
     const directory=process.env.FLAMORIS_RENDER_FIXTURE_DIR;mkdirSync(directory,{recursive:true});

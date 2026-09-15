@@ -274,6 +274,7 @@ export class ProductHostService {
 
     switch (request.method) {
       case "render.project":
+        if (payload.layoutPreview) this.#assertExpectedRevision(request, document);
         return evaluatedProjection(document, this.assets, payload);
       case "source.cancel":
         this.cancelImport(request); return { cancelled: true };
@@ -368,6 +369,9 @@ export class ProductHostService {
           editorRevision: document.session.currentRevision,
           savedRevision: document.session.savedRevision,
           lineageId: document.lineageId,
+          keyArts: document.session.query("keyart.list", {}),
+          transitions: document.session.query("transition.list", {}),
+          sequences: document.session.query("sequence.list", {}),
         };
       case "session.execute":
         return document.session.execute(payload.command, { label: payload.label });

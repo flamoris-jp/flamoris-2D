@@ -3,11 +3,20 @@ import { evaluateSequence } from '../src/core/sequence-evaluator.js';
 import { createEvaluatedRenderPlan } from '../src/core/evaluated-render.js';
 import { createClippingRasterPlan } from '../src/core/clipping-raster-plan.js';
 
-export function evaluatedProjection(document, assets, { keyArtId, transitionId, sequenceId, timeTicks = 0 } = {}) {
+export function evaluatedProjection(document, assets, { keyArtId, transitionId, sequenceId, timeTicks = 0, layoutPreview = null } = {}) {
   if (!Number.isSafeInteger(timeTicks) || timeTicks < 0) throw new Error('Expected non-negative integer Product ticks.');
   const selected = [keyArtId, transitionId, sequenceId].filter(Boolean);
   if (selected.length !== 1) throw new Error('Select exactly one Key Art, Transition or Sequence.');
-  const project = document.session.project;
+  if (layoutPreview) {
+    if (!keyArtId) throw new Error('Layout preview requires a Key Art.');
+    const keyform = document.session.project.meshKeyforms.find(k => k.id === layoutPreview.keyformId);
+    if (!keyform || keyform.keyArtId !== keyArtId) throw new Error('Layout preview Key Art mismatch.');
+    return document.session.previewTransaction([{type:'mesh_keyform.move_vertices', payload:layoutPreview}], project =>
+      projectFrame(document, assets, project, {keyArtId, transitionId, sequenceId, timeTicks}));
+  }
+  return projectFrame(document, assets, document.session.project, {keyArtId, transitionId, sequenceId, timeTicks});
+}
+function projectFrame(document, assets, project, {keyArtId, transitionId, sequenceId, timeTicks}) {
   const evaluation = sequenceId ? evaluateSequence(project, sequenceId, timeTicks)
     : transitionId ? evaluateTransition(project, transitionId, timeTicks) : evaluateKeyArtBaseState(project, keyArtId);
   const plan = createEvaluatedRenderPlan(evaluation, {

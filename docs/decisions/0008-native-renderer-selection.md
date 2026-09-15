@@ -32,3 +32,13 @@ as editor bootstrap. Disqualify an incomplete candidate explicitly; do not call 
 No renderer has been accepted yet. Electron remains the release backend. Candidate code
 may support measurement and semantic conformance, but cannot be represented as a final
 native compositor until #98's comparison/evidence requirement is met.
+
+
+## Authoring preview ownership
+
+A Layout drag submits a disposable `mesh_keyform.move_vertices` preview through the
+existing EditorSession command validation and draft preparation. Its callback evaluates
+that draft with the ordinary Product evaluator. It does not install another session,
+change revision/dirty state, push history or keep a draft Project in C#. Mouse release
+submits the ordinary command once. Token/revision/context/gesture identity reject stale
+frames; cancel removes only transient presentation. Topology is never previewed as Deform.

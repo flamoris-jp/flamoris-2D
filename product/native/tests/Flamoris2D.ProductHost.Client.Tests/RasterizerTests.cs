@@ -67,6 +67,7 @@ internal static class RasterizerTests
             using var assets=JsonDocument.Parse(File.ReadAllText(Path.Combine(fixtureDirectory,"production-render-textures.json")));
             var realTextures=assets.RootElement.EnumerateArray().ToDictionary(a=>a.GetProperty("nodeId").GetString()!,a=>new RenderTexture(
                 a.GetProperty("width").GetInt32(),a.GetProperty("height").GetInt32(),a.GetProperty("bgra").EnumerateArray().Select(b=>b.GetByte()).ToArray()));
+            RendererMeasurement.Run(fixture.RootElement,realTextures,direct);
             foreach(var projection in fixture.RootElement.EnumerateArray())
             {
                 var reference=EvaluatedRasterizer.Render(projection,realTextures,64,64);var gpu=direct.Render(projection,realTextures,64,64);

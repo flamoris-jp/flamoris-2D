@@ -187,9 +187,9 @@ public partial class MainWindow
             if (MeshCanvas.Structure) _structureTool = tool; else _layoutTool = tool;
             var mode = MeshCanvas.Structure ? "構造" : "位置決め";
             ActiveContextBadge.Text = $"メッシュ / {mode}";
-            ViewportContextText.Text = $"メッシュ / {mode} — {tool}（参照Artwork）";
+            ViewportContextText.Text = $"メッシュ / {mode} — {tool}";
             var hint = tool switch { "移動" => "頂点をドラッグ。Shiftで複数選択、Escで取消",
-                "頂点を追加" => "Artwork上をクリックして頂点を追加", "頂点を削除" => "頂点をクリックして削除",
+                "頂点を追加" => "点を追加した後、3頂点を選び「面を作成」で画像を貼る面に接続", "頂点を削除" => "頂点をクリックして削除",
                 "面を作成" => "3頂点を選択して上の作成ボタン", "辺を分割" => "辺の両端2頂点を選択して上の分割ボタン",
                 "生成" => "上でGrid／輪郭を試して、プレビューを明示的に適用", _ => "頂点を選択。Shiftで追加／解除" };
             ActiveToolSettingsText.Text = $"{tool} — {hint}";

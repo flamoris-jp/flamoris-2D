@@ -197,6 +197,11 @@
                                    Text="選択 — 素材または配置対象を選択" />
                     </DockPanel>
                 </Border>
+                <WrapPanel Margin="8,4">
+                    <TextBlock Text="表示する状態" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <ComboBox x:Name="RenderOwnerList" MinWidth="220" MaxWidth="420" DisplayMemberPath="Label" SelectionChanged="RenderOwner_Changed" />
+                    <TextBlock x:Name="RenderStatusText" Margin="12,0" VerticalAlignment="Center" />
+                </WrapPanel>
                 <StackPanel x:Name="MeshOptions" Visibility="Collapsed" Background="#EEEAE7">
                     <WrapPanel Margin="8,4">
                         <ToggleButton x:Name="StructureButton" Content="構造 / Structure" IsChecked="True"

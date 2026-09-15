@@ -38,6 +38,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             _activeTools[definition.Context] = definition.Tools[0];
         InitializeMeshUi();
         InitializeDocumentUi();
+        InitializeRenderUi();
         Loaded += MainWindow_Loaded;
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         SwitchContext(EditingContext.Source, returnFocus: false);
@@ -115,7 +116,9 @@ public partial class MainWindow : Window, IAsyncDisposable
             // A draft outlives keyboard focus and retains its starting revision.
             if (_propertySnapshot?.Id != _targets.SelectedId || !HasPropertyDraft)
                 UpdateSelectionEditor();
+            UpdateRenderChoices(snapshot.Payload);
             await RefreshMeshAsync(client);
+            await RefreshEvaluatedFrameAsync(client);
         }
         catch (StaleProjectionException)
         {
@@ -232,6 +235,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private void ClearProjection()
     {
+        ClearRenderProjection();
         ClearMeshProjection();
         _propertySnapshot = null;
         _propertyRevision = -1;
@@ -523,7 +527,9 @@ public partial class MainWindow : Window, IAsyncDisposable
         _disposed = true;
         _meshWork?.Cancel();
         var client = _client; _client = null;
+        _renderWork?.Cancel();
         if (client is not null) await client.DisposeAsync();
+        await Task.Run(() => _renderer?.Dispose());
         // Pending refresh continuations still release this managed semaphore; no WaitHandle is allocated.
     }
 

@@ -11,7 +11,7 @@ namespace Flamoris.Flamoris2D.App;
 public sealed record ArtworkProjection(string Id, string NodeId, BitmapSource Bitmap,
     Affine2 World, bool Visible, bool Locked, double Left = 0, double Top = 0);
 
-// Replaceable reference-art presenter. It does not implement the Product evaluator/compositor.
+// WPF camera/input/overlay presentation. Evaluated pixels arrive from the shared native renderer.
 public sealed class MeshViewport : FrameworkElement
 {
     public ViewportCamera Camera { get; } = new();
@@ -34,6 +34,14 @@ public sealed class MeshViewport : FrameworkElement
     public bool Busy { get; set; }
     public string Tool { get; set; } = "選択";
     public JsonElement? GeneratedPreview { get; set; }
+    public BitmapSource? EvaluatedFrame { get; private set; }
+    private HashSet<string> _representedNodes = [];
+    private bool _showUnpreparedArtwork;
+    public event Action<double[]?>? LayoutPreviewChanged;
+    public void ApplyEvaluatedFrame(BitmapSource frame, HashSet<string> representedNodes, bool showUnpreparedArtwork)
+    { EvaluatedFrame = frame; _representedNodes = representedNodes; _showUnpreparedArtwork = showUnpreparedArtwork; InvalidateVisual(); }
+    public void ClearEvaluatedFrame()
+    { EvaluatedFrame = null; _representedNodes.Clear(); InvalidateVisual(); }
     private LayoutGesture? _drag;
     private Point2? _pan;
     private (Point2 Point, int Vertex)? _click;
@@ -86,15 +94,22 @@ public sealed class MeshViewport : FrameworkElement
     }
     public void Fit()
     {
-        var width = Artwork.Count > 0 ? Artwork.Max(a => a.Bitmap.PixelWidth) : 1920;
-        var height = Artwork.Count > 0 ? Artwork.Max(a => a.Bitmap.PixelHeight) : 1080;
-        Camera.Fit(ActualWidth, ActualHeight, width, height); InvalidateVisual();
+        var corners = Artwork.SelectMany(a => new[] { a.World.Apply(new(a.Left, a.Top)),
+            a.World.Apply(new(a.Left+a.Bitmap.PixelWidth,a.Top)), a.World.Apply(new(a.Left,a.Top+a.Bitmap.PixelHeight)),
+            a.World.Apply(new(a.Left+a.Bitmap.PixelWidth,a.Top+a.Bitmap.PixelHeight)) }).ToArray();
+        var left = corners.Length > 0 ? Math.Min(0,corners.Min(p=>p.X)) : 0;
+        var top = corners.Length > 0 ? Math.Min(0,corners.Min(p=>p.Y)) : 0;
+        var width = Math.Max(EvaluatedFrame?.PixelWidth ?? 0, corners.Length > 0 ? corners.Max(p=>p.X) : 1920) - left;
+        var height = Math.Max(EvaluatedFrame?.PixelHeight ?? 0, corners.Length > 0 ? corners.Max(p=>p.Y) : 1080) - top;
+        Camera.Fit(ActualWidth, ActualHeight, width, height); Camera.Pan(-left*Camera.Scale,-top*Camera.Scale); InvalidateVisual();
     }
     public void Cancel()
     {
+        var hadDrag = _drag is not null;
         _drag?.Cancel();
         _drag = null; _click = null; _pan = null;
         if (IsMouseCaptured) ReleaseMouseCapture();
+        if (hadDrag) LayoutPreviewChanged?.Invoke(null);
         InvalidateVisual();
     }
     public void SelectAll()
@@ -108,13 +123,14 @@ public sealed class MeshViewport : FrameworkElement
     {
         dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(39, 42, 48)), null, new Rect(RenderSize));
         dc.PushTransform(new MatrixTransform(Camera.Scale, 0, 0, Camera.Scale, Camera.Origin.X, Camera.Origin.Y));
-        foreach (var art in Artwork.Where(a => a.Visible))
+        foreach (var art in Artwork.Where(a => a.Visible && (EvaluatedFrame is null || _showUnpreparedArtwork && !_representedNodes.Contains(a.NodeId))))
         {
             var w = art.World;
             dc.PushTransform(new MatrixTransform(w.A, w.B, w.C, w.D, w.X, w.Y));
             dc.DrawImage(art.Bitmap, new Rect(art.Left, art.Top, art.Bitmap.PixelWidth, art.Bitmap.PixelHeight));
             dc.Pop();
         }
+        if (EvaluatedFrame is { } frame) dc.DrawImage(frame, new Rect(0,0,frame.PixelWidth,frame.PixelHeight));
         dc.Pop();
         if (MeshEnabled && OverlayVisible && Pickable)
         {
@@ -206,7 +222,7 @@ public sealed class MeshViewport : FrameworkElement
     {
         var point = PointOf(e.GetPosition(this));
         if (_pan is { } start) { Camera.Pan(point.X - start.X, point.Y - start.Y); _pan = point; }
-        else if (_drag is not null) _drag.Move(Local(point), Snap);
+        else if (_drag is not null) { _drag.Move(Local(point), Snap); LayoutPreviewChanged?.Invoke(_drag.Preview); }
         else return;
         InvalidateVisual();
     }
