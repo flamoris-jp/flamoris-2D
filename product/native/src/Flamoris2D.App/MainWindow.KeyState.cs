@@ -160,7 +160,7 @@ public partial class MainWindow
         ActionButton(panel,"新しいアニメーション変形を作成",()=>RunKeyStateAsync(()=>KeyStateEdit.CreateSample(null,topologyId,_sampleOffsets.Values.ToArray()),context,revision));
         if(selected.ValueKind==JsonValueKind.Object)
         {
-            var sampleId=String(selected,"id")!,meshId=String(selected,"meshId")!;
+            var sampleId=String(selected,"id")!;var meshId=String(selected,"meshId")!;
             ActionButton(panel,"選択した変形を更新",()=>RunKeyStateAsync(()=>KeyStateEdit.UpdateSample(sampleId,_sampleOffsets.Values.ToArray()),context,revision));
             ActionButton(panel,"同じターゲットへ別の変形を作成",()=>RunKeyStateAsync(()=>KeyStateEdit.CreateSample(meshId,topologyId,_sampleOffsets.Values.ToArray()),context,revision));
             ActionButton(panel,"選択した変形を削除",()=>RunKeyStateAsync(()=>KeyStateEdit.RemoveSample(sampleId),context,revision));

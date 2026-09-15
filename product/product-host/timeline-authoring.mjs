@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { transitionTimelineProjection, executeTransitionTimeline } from './transition-timeline.mjs';
 import { SequenceTimelineController } from '../src/ui/sequence-timeline-controller.js';
 import { TransientPlaybackClock, projectTimelineTime } from '../src/ui/timeline-primitives.js';
 import { TEMPORAL_TRACK_DEFINITIONS, temporalChannelDefinition, secondsToTicks, ticksToSeconds } from '../src/core/temporal.js';
@@ -14,6 +15,7 @@ export function timelineContext(session,context={}) {
  return controller;
 }
 export function timelineProjection(session,context={}) {
+ if(context.transitionId)return transitionTimelineProjection(session,context);
  const controller=timelineContext(session,context);const state=controller.getState();
  const {evaluation,...projection}=state;
  return {...projection,durationSeconds:state.sequence?ticksToSeconds(state.sequence.durationTicks):8,clipDurationSeconds:state.selectedClip?ticksToSeconds(state.selectedClip.durationTicks):1,trackDefinitions:TEMPORAL_TRACK_DEFINITIONS,
@@ -25,6 +27,7 @@ export function timelineProjection(session,context={}) {
   secondsLabel:projectTimelineTime(context.timeTicks||0,'seconds',session.query('project.get_render_settings').frameRate).label};
 }
 export function executeTimelineTool(session,{context={},tool,input={}}) {
+ if(context.transitionId&&!tool.startsWith('sequence.'))return executeTransitionTimeline(session,{context,tool,input});
  const controller=timelineContext(session,context);
  const duration=()=>input.durationSeconds===undefined?input.durationTicks:secondsToTicks(input.durationSeconds);
  switch(tool) {

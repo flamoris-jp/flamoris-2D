@@ -19,7 +19,7 @@ public partial class MainWindow
     private bool _playing,_playBusy,_updatingTime;
     private PlaybackSample? _playbackSample;
     private static long ReadTicks(TextBox box)=>long.TryParse(box.Text,out var value)&&value>=0&&value<=9_007_199_254_740_991?value:throw new ArgumentException("0以上の整数ticksを入力してください。");
-    private TimelineContext CurrentTimelineContext()=>_timelineContext with {SequenceId=_renderChoice?.Kind=="sequence"?_renderChoice.Id:null,TimeTicks=_timeTicks};
+    private TimelineContext CurrentTimelineContext()=>_timelineContext with {SequenceId=_renderChoice?.Kind=="sequence"?_renderChoice.Id:null,TransitionId=_renderChoice?.Kind=="transition"?_renderChoice.Id:null,TimeTicks=_timeTicks};
     private void InitializeAnimationUi()
     {
         _playTimer.Tick+=async(_,_)=>await PlaybackFrameAsync();
@@ -91,7 +91,7 @@ public partial class MainWindow
         var program=Property(_timelineSnapshot,"program");_updatingTime=true;
         try{TimeSlider.Maximum=Math.Max(1,Number(program,"durationTicks",1));}finally{_updatingTime=false;}
         UpdateTimeDisplay();
-        var key=$"{response.DocumentToken}/{context.SequenceId}/{context.ClipId}/{context.TrackId}/{context.Channel}/{context.KeyframeId}/{context.TrackKind}/{_selectedViewId}/{_selectedClipInstanceId}";
+        var key=$"{response.DocumentToken}/{context.SequenceId}/{context.TransitionId}/{context.ClipId}/{context.TrackId}/{context.Channel}/{context.KeyframeId}/{context.TrackKind}/{_selectedViewId}/{_selectedClipInstanceId}";
         if(_contextDraft&&_timelinePanelKey==key)return;
         _timelinePanelKey=key;AuthoringPanel.Children.Clear();BuildTimelinePanel(context,_timelineRevision);
     }
@@ -113,6 +113,7 @@ public partial class MainWindow
     }
     private void BuildTimelinePanel(TimelineContext context,long revision)
     {
+        if(context.TransitionId is not null){Note(AuthoringPanel,"遷移の時間編集：形状・画像・表示状態を補間します。");BuildTrackPanel(AuthoringPanel,context,revision);return;}
         var panel=AuthoringPanel;var sequence=Property(_timelineSnapshot,"sequence");
         var name=Field(panel,"シーケンス名",String(sequence,"displayName")??"新しいシーケンス");var seconds=Field(panel,"長さ（秒）",Number(_timelineSnapshot,"durationSeconds",8));
         var arts=Choices(panel,"最初の原画",ArrayOf(_timelineSnapshot,"keyArts").Select(k=>new EntityChoice(String(k,"id")!,String(k,"displayName")??"原画")));
@@ -154,6 +155,8 @@ public partial class MainWindow
         {var clipping=Choices(panel,"クリッピング元",_targets.Targets.Where(t=>t.Kind=="part").Select(t=>new EntityChoice(t.Id,t.DisplayName)).Prepend(new EntityChoice("","なし")),String(value,"sourceNodeId")??"");read=()=>AnimationValue.Clipping(Chosen(clipping) is {Length:>0} id?id:null);}
         else if(valueKind=="deformation")
         {var sample=Choices(panel,"変形サンプル",ArrayOf(_timelineSnapshot,"deformationSamples").Select(s=>new EntityChoice(String(s,"id")!,String(s,"displayName")??"変形")),String(value,"deformationSampleId"));var weight=Field(panel,"変形の強さ",Number(value,"weight",1));read=()=>AnimationValue.Deformation(Chosen(sample),ReadNumber(weight));}
+        else if(valueKind=="weights")
+        {var fields=ArrayOf(_timelineSnapshot,"appearanceOptions").ToDictionary(o=>String(o,"id")!,o=>Field(panel,String(o,"label")!,Number(value,String(o,"id")!)));read=()=>AnimationValue.Appearance(fields.ToDictionary(p=>p.Key,p=>ReadNumber(p.Value)));}
         else{var scalar=Field(panel,selectedChannel=="rotation"?"値（ラジアン）":"値",value.ValueKind==JsonValueKind.Number?value.GetDouble():valueKind is "unit-number" or "positive-number"?1:0);read=()=>AnimationValue.Scalar(ReadNumber(scalar));}
         ActionButton(panel,"キーフレームを追加",()=>RunTimelineEditAsync(()=>TimelineEdit.AddKey(context.TrackId!,selectedChannel,ReadTicks(tick),read()),context,revision));
         if(context.KeyframeId is { } keyId)

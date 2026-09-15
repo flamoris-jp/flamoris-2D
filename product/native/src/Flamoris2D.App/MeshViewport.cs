@@ -250,7 +250,7 @@ public sealed partial class MeshViewport : FrameworkElement
         var point = PointOf(e.GetPosition(this));
         if (_pan is { } start) { Camera.Pan(point.X - start.X, point.Y - start.Y); _pan = point; }
         else if (RigMove(point)) { e.Handled=true; return; }
-        else if (_drag is not null) { _drag.Move(Local(point), Snap);if(DeformEnabled)FormPreviewChanged?.Invoke(FormDelta(_drag.Preview));else LayoutPreviewChanged?.Invoke(_drag.Preview); }
+        else if (_drag is not null) { _drag.Move(Local(point), Snap);if(DeformEnabled)FormPreviewChanged?.Invoke(FormDelta(_drag.Preview!));else LayoutPreviewChanged?.Invoke(_drag.Preview); }
         else return;
         InvalidateVisual();
     }

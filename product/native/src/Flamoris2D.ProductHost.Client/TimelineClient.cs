@@ -3,11 +3,11 @@ using System.Text.Json;
 namespace Flamoris.Flamoris2D.ProductHost;
 
 public sealed record TimelineContext(string? SequenceId = null,string? ClipId = null,string? TrackId = null,
-    string? Channel = null,string? KeyframeId = null,string? TrackKind = null,long TimeTicks = 0)
+    string? Channel = null,string? KeyframeId = null,string? TrackKind = null,long TimeTicks = 0,string? TransitionId = null)
 {
-    internal object Wire => new {sequenceId=SequenceId,clipId=ClipId,trackId=TrackId,channel=Channel,keyframeId=KeyframeId,trackKind=TrackKind,timeTicks=TimeTicks};
+    internal object Wire => new {sequenceId=SequenceId,clipId=ClipId,trackId=TrackId,channel=Channel,keyframeId=KeyframeId,trackKind=TrackKind,timeTicks=TimeTicks,transitionId=TransitionId};
 }
-public enum AnimationTrackKind {TransformTrack,BoneTrack,DeformerTrack,MeshDeformationTrack,OpacityTrack,PresenceTrack,DrawOrderTrack,ClippingTrack,CameraTrack}
+public enum AnimationTrackKind {TransformTrack,BoneTrack,DeformerTrack,MeshDeformationTrack,OpacityTrack,PresenceTrack,DrawOrderTrack,ClippingTrack,CameraTrack,GeometryBlendTrack,AppearanceTrack}
 public sealed class AnimationValue
 {
     private AnimationValue(object value)=>Wire=value;
@@ -16,6 +16,7 @@ public sealed class AnimationValue
     public static AnimationValue Presence(string presence)=>presence is "present" or "absent" or "occluded"?new(presence):throw new ArgumentException("Invalid presence.");
     public static AnimationValue Clipping(string? sourceNodeId)=>new(new {sourceNodeId});
     public static AnimationValue Deformation(string deformationSampleId,double weight)=>new(new {deformationSampleId,weight});
+    public static AnimationValue Appearance(IReadOnlyDictionary<string,double> weights)=>new(weights);
 }
 public sealed record ClipPlacement(long StartTicks,long EndTicks,long SourceOffsetTicks,int RateNumerator,int RateDenominator,bool Loop,double Weight,int Layer,bool Enabled)
 {

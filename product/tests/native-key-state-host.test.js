@@ -31,6 +31,16 @@ test('native Key Art states, endpoint topology and correspondence retain exact s
  assert.ok(solved.candidatePositions);assert.deepEqual(h.document.session.project,before);assert.equal(h.revision,revision);
  await key('correspondence.apply',{pins,preset:'normal'},context);const after=structuredClone(h.document.session.project);
  await send('session.undo');assert.deepEqual(h.document.session.project,before);await send('session.redo');assert.deepEqual(h.document.session.project,after);
+ const timeContext={transitionId:transition.transitionId,trackKind:'GeometryBlendTrack'};
+ const timeline=await send('timeline.projection',timeContext);assert.equal(timeline.program.durationTicks,240000);
+ const timeTool=(tool,input)=>send('timeline.tool',{context:timeContext,tool,input});
+ const track=await timeTool('track.add',{kind:'GeometryBlendTrack',target:{semanticSlotId:slotId}});
+ const first=await timeTool('key.add',{trackId:track.trackId,channel:'geometryWeight',timeTicks:0,value:0});
+ await timeTool('key.add',{trackId:track.trackId,channel:'geometryWeight',timeTicks:240000,value:1});
+ await timeTool('key.ease',{trackId:track.trackId,channel:'geometryWeight',keyframeId:first.keyframeId,presetId:'ease-in-out'});
+ const history=structuredClone(h.document.session.project);await send('session.undo');await send('session.redo');assert.deepEqual(h.document.session.project,history);
+ const sample=await key('sample.create',{topologyId:bform.topologyId,offsets:[{vertexId:original.meshTopologies[0].vertexIds[0],dx:3,dy:4}]},context);
+ assert.ok(sample.meshId);assert.ok(sample.sampleId);assert.equal(h.document.session.project.meshes.length,1);
  const frame=await send('render.project',{transitionId:transition.transitionId,timeTicks:120000});assert.equal(frame.artwork.length,1);
  const saved=await send('session.serialize');await send('session.open',{document:saved.document});
  assert.deepEqual((await send('render.project',{transitionId:transition.transitionId,timeTicks:120000})).plan,frame.plan);

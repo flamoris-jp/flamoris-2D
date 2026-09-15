@@ -63,7 +63,7 @@ public sealed class TimelineViewport : FrameworkElement
             }
             y+=Row;
         }
-        if(_state.GetProperty("selectedClipId").ValueKind==JsonValueKind.Null)
+        if(_state.GetProperty("selectedClipId").ValueKind==JsonValueKind.Null&&!_state.TryGetProperty("transitionId",out _))
         {
             Lane("viewItems","原画・遷移 / ViewLane","view",Brushes.DarkSlateBlue);
             Lane("clipInstances","クリップ配置","clip",Brushes.DarkCyan);
