@@ -128,6 +128,8 @@ public partial class MainWindow
         client.AssertCurrent(token, response.Revision.Value);
         if (!ReferenceEquals(client, _client) || _targets.SelectedId != nodeId) return;
         MeshCanvas.Apply(response, artwork, nodeId);
+        var currentArtworkIds=artwork.Select(a=>a.Id).ToHashSet();
+        foreach(var id in _textures.Keys.Where(id=>!currentArtworkIds.Contains(id)).ToArray())_textures.Remove(id);
         if (MeshCanvas.GeneratedPreview is null) ApplyGeneratedButton.IsEnabled = false;
         _updatingMeshChoices = true;
         try
@@ -165,6 +167,8 @@ public partial class MainWindow
         MeshCanvas.Cancel(); CancelGenerated();
         var mesh = _editingContext == EditingContext.Mesh;
         MeshCanvas.MeshEnabled = mesh;
+        MeshCanvas.DeformEnabled=_editingContext==EditingContext.Deform;
+        if(MeshCanvas.DeformEnabled){MeshCanvas.Tool="移動";ToolList.ItemsSource=new[]{"選択","移動"};ToolList.SelectedItem="移動";}
         MeshOptions.Visibility = MeshPropertiesPanel.Visibility = mesh ? Visibility.Visible : Visibility.Collapsed;
         if (mesh)
         {
@@ -179,6 +183,7 @@ public partial class MainWindow
     {
         if (!_meshReady) return;
         MeshCanvas.Cancel();
+        if(_editingContext==EditingContext.Deform&&ToolList.SelectedItem is string deformTool)MeshCanvas.Tool=deformTool;
         var mesh = _editingContext == EditingContext.Mesh;
         if (mesh && ToolList.SelectedItem is string tool)
         {

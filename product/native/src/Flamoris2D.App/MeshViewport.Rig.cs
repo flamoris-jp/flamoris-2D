@@ -73,7 +73,7 @@ public sealed partial class MeshViewport
                 var influence=Items(entry,"influences").FirstOrDefault(v=>Id(v,"boneId")==_boneId);
                 var weight=influence.ValueKind==JsonValueKind.Object?influence.GetProperty("weight").GetDouble():0;
                 var colour=new SolidColorBrush(Color.FromRgb((byte)(255*weight),50,(byte)(255*(1-weight))));
-                dc.DrawEllipse(colour,new Pen(Selected.Contains(VertexIds[i])||_paintVertices.Contains(VertexIds[i])?Brushes.White:Brushes.Black,2),Screen(Positions[i*2],Positions[i*2+1]),5,5);
+                dc.DrawEllipse(colour,new Pen(Selected.Contains(VertexIds[i])||_paintVertices.Contains(VertexIds[i])?Brushes.White:Brushes.Black,2),Screen(DisplayedPositions[i*2],DisplayedPositions[i*2+1]),5,5);
             }
         }
         if(RigTool=="追加"&&_rigStart is { } from&&_rigCurrent is { } to)dc.DrawLine(new Pen(Brushes.Gold,3),RigScreen(from),RigScreen(to));
@@ -109,7 +109,7 @@ public sealed partial class MeshViewport
         }
         else if(RigSubcontext=="Weight")
         {
-            var hit=VertexPicking.Hit(Positions,pointer,Camera,World,12);
+            var hit=VertexPicking.Hit(DisplayedPositions,pointer,Camera,World,12);
             if(hit>=0)
             {
                 if(RigTool=="選択"){if(!Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))Selected.Clear();Selected.Add(VertexIds[hit]);SelectionChanged?.Invoke();}
@@ -122,7 +122,7 @@ public sealed partial class MeshViewport
     {
         if(_rigStart is null)return false;_rigCurrent=Camera.ToDocument(pointer);
         if(RigSubcontext=="Weight")
-            for(var i=0;i<VertexIds.Length;i++){var p=Screen(Positions[i*2],Positions[i*2+1]);if(Math.Pow(p.X-pointer.X,2)+Math.Pow(p.Y-pointer.Y,2)<=144)_paintVertices.Add(VertexIds[i]);}
+            for(var i=0;i<VertexIds.Length;i++){var p=Screen(DisplayedPositions[i*2],DisplayedPositions[i*2+1]);if(Math.Pow(p.X-pointer.X,2)+Math.Pow(p.Y-pointer.Y,2)<=144)_paintVertices.Add(VertexIds[i]);}
         InvalidateVisual();return true;
     }
     private bool RigUp(Point2 pointer)

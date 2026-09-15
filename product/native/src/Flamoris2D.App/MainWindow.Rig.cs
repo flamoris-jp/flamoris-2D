@@ -16,6 +16,7 @@ public partial class MainWindow
     private readonly HashSet<string> _selectedControlPoints = [];
     private void InitializeRigUi()
     {
+        MeshCanvas.FormMoveRequested+=async(delta,revision)=>await RunRigEditAsync(()=>RigEdit.FormMove(MeshCanvas.Selected.ToArray(),delta.X,delta.Y),revision:revision);
         MeshCanvas.BonePicked+=id=>{_selectedBoneId=id;_contextDraft=false;_=RefreshRigSurfaceAsync();};
         MeshCanvas.ControlPointPicked+=(id,additive)=>
         {
@@ -198,7 +199,7 @@ public partial class MainWindow
     private void BuildFormPanel(RigContext context,long revision)
     {
         Note(AuthoringPanel,"形状補正：骨やWarpで動かした後の形を整えます。メッシュの構造・原画上の位置決めは変更しません。");
-        Note(AuthoringPanel,"メッシュ画面で頂点を選び、この画面で補正量を確定できます。");
+        Note(AuthoringPanel,"頂点を選択・ドラッグして補正します。Shiftで複数選択、Ctrl+Aで全選択、Escで取消。");
         var x=Field(AuthoringPanel,"補正 X",0);var y=Field(AuthoringPanel,"補正 Y",0);
         ActionButton(AuthoringPanel,"選択頂点へ補正を加える",()=>RunRigEditAsync(()=>RigEdit.FormMove(MeshCanvas.Selected.ToArray(),ReadNumber(x),ReadNumber(y)),context,revision));
         ActionButton(AuthoringPanel,"この原画の補正をリセット",()=>RunRigEditAsync(RigEdit.ResetForm,context,revision));

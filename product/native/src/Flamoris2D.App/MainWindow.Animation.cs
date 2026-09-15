@@ -71,8 +71,9 @@ public partial class MainWindow
     {if(TimelineCanvas is not null)TimelineCanvas.Width=Math.Max(900,TimelineScroll.ActualWidth)*e.NewValue;}
     private void UpdateTimeDisplay()
     {
-        _updatingTime=true;try{TimeSlider.Value=_timeTicks;PlayheadText.Text=$"{_timeTicks} ticks";TimelineCanvas.Playhead=_timeTicks;TimelineCanvas.InvalidateVisual();}finally{_updatingTime=false;}
+        _updatingTime=true;try{TimeSlider.Value=_timeTicks;PlayheadText.Text=_timeLabel;TimelineCanvas.Playhead=_timeTicks;TimelineCanvas.InvalidateVisual();}finally{_updatingTime=false;}
     }
+    private string _timeLabel="0 ticks";
     private void ConfigureAnimationContext()
     {
         var animated=_editingContext is EditingContext.Animation or EditingContext.Preview;
@@ -178,11 +179,12 @@ public partial class MainWindow
         }
         var place=Choices(panel,"配置するクリップ",ArrayOf(_timelineSnapshot,"clips").Select(c=>new EntityChoice(String(c,"id")!,String(c,"displayName")??"Clip")),context.ClipId);
         var item=ArrayOf(_timelineSnapshot,"clipInstances").FirstOrDefault(i=>String(i,"id")==_selectedClipInstanceId);
+        var placementLoop=Check(panel,"この配置をループ",String(item,"loopMode")=="loop");
         var start=Field(panel,"配置 開始ticks",Number(item,"startTicks",_timeTicks));var end=Field(panel,"配置 終了ticks",Number(item,"endTicks",Number(Property(_timelineSnapshot,"sequence"),"durationTicks",1)));
         var offset=Field(panel,"クリップ内の開始ticks",Number(item,"sourceOffsetTicks"));var rate=Property(item,"playbackRate");
         var numerator=Field(panel,"速度 分子",Number(rate,"numerator",1));var denominator=Field(panel,"速度 分母",Number(rate,"denominator",1));
         var weight=Field(panel,"配置のウェイト",Number(item,"weight",1));var layer=Field(panel,"重ね順",Number(item,"layer"));var enabled=Check(panel,"配置を有効にする",Property(item,"enabled").ValueKind!=JsonValueKind.False);
-        ClipPlacement Placement()=>new(ReadTicks(start),ReadTicks(end),ReadTicks(offset),checked((int)ReadTicks(numerator)),checked((int)ReadTicks(denominator)),loop.IsChecked==true,ReadNumber(weight),checked((int)ReadNumber(layer)),enabled.IsChecked==true);
+        ClipPlacement Placement()=>new(ReadTicks(start),ReadTicks(end),ReadTicks(offset),checked((int)ReadTicks(numerator)),checked((int)ReadTicks(denominator)),placementLoop.IsChecked==true,ReadNumber(weight),checked((int)ReadNumber(layer)),enabled.IsChecked==true);
         ActionButton(panel,"クリップを配置",()=>RunTimelineEditAsync(()=>TimelineEdit.PlaceClip(Chosen(place),Placement()),context,revision));
         if(_selectedClipInstanceId is { } id)
         {

@@ -319,7 +319,7 @@ export class ProductHostService {
       case "rig.projection":return rigProjection(document.session,payload);
       case "rig.tool":return executeRigTool(document.session,payload);
       case "render.project":
-        if (payload.layoutPreview) this.#assertExpectedRevision(request, document);
+        if (payload.layoutPreview || payload.rigPreview) this.#assertExpectedRevision(request, document);
         if(payload.playback) {
           const clock=playbackTick(document.session,payload);
           return {...evaluatedProjection(document,this.assets,{...payload,timeTicks:clock.timeTicks}),playing:clock.playing};

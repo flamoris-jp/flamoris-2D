@@ -42,6 +42,11 @@ test('native Bone/Warp/Skin/form tools commit through one history and preserve e
  await tool('bone.createAt',{start:{x:10,y:10},end:{x:15,y:15}});
  const rendered=await send(host,'render.project',{keyArtId});assert.equal(rendered.plan.unsupportedReasons.length,0);
  const before=structuredClone(host.document.session.project);
+ const revision=host.revision;
+ const preview=await send(host,'render.project',{keyArtId,rigPreview:{context,tool:'form.move',input:{vertexIds:[snapshot.part.topology.vertexIds[0]],x:3,y:-2}}});
+ assert.notDeepEqual(preview.plan,rendered.plan);assert.deepEqual(host.document.session.project,before);assert.equal(host.revision,revision);
+ await send(host,'rig.tool',{context,tool:'form.move',input:{vertexIds:[snapshot.part.topology.vertexIds[0]],x:3,y:-2}});
+ assert.deepEqual((await send(host,'render.project',{keyArtId})).plan,preview.plan);await send(host,'session.undo');
  const stale=(await host.handle({protocolVersion:1,requestId:'stale-rig',method:'rig.tool',documentToken:host.documentToken,
  expectedRevision:host.revision-1,payload:{context,tool:'bone.pose',input:{x:0,y:0,rotation:1}}})).response;
  assert.equal(stale.error.code,'revision.conflict');assert.deepEqual(host.document.session.project,before);

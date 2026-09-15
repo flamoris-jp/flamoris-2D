@@ -22,10 +22,17 @@ public partial class MainWindow
     private long _timeTicks;
     private CancellationTokenSource? _renderWork;
     private LayoutRenderPreview? _pendingLayoutPreview;
+    private RigRenderPreview? _pendingRigPreview;
     private bool _layoutRenderRunning;
 
     private void InitializeRenderUi()
     {
+        MeshCanvas.FormPreviewChanged += delta =>
+        {
+            _pendingRigPreview = delta is { } d ? new(CurrentRigContext(),RigEdit.FormMove(MeshCanvas.Selected.ToArray(),d.X,d.Y)) : null;
+            Interlocked.Increment(ref _layoutInputGeneration);Interlocked.Increment(ref _renderGeneration);_renderWork?.Cancel();
+            if(!_layoutRenderRunning)_=DrainLayoutPreviewAsync();
+        };
         MeshCanvas.LayoutPreviewChanged += positions =>
         {
             _pendingLayoutPreview = positions is null || MeshCanvas.KeyformId is null ? null : new(MeshCanvas.KeyformId, positions);
@@ -44,7 +51,7 @@ public partial class MainWindow
             {
                 var generation = _layoutInputGeneration;
                 if (_client?.HasAuthoritativeProjection == true)
-                    await RefreshEvaluatedFrameAsync(_client, _pendingLayoutPreview);
+                    await RefreshEvaluatedFrameAsync(_client, _pendingLayoutPreview, _pendingRigPreview);
                 if (generation == _layoutInputGeneration) break;
             }
         }
@@ -76,23 +83,23 @@ public partial class MainWindow
     private void ClearRenderProjection()
     {
         Interlocked.Increment(ref _renderGeneration); _renderWork?.Cancel();
-        _pendingLayoutPreview = null; _renderTextures.Clear(); _lastRenderKey = null; _renderChoice = null;
+        _pendingLayoutPreview = null; _pendingRigPreview=null; _renderTextures.Clear(); _lastRenderKey = null; _renderChoice = null;
         MeshCanvas.ClearEvaluatedFrame();
     }
-    private async Task RefreshEvaluatedFrameAsync(ProductHostClient client, LayoutRenderPreview? preview = null)
+    private async Task RefreshEvaluatedFrameAsync(ProductHostClient client, LayoutRenderPreview? preview = null, RigRenderPreview? rigPreview = null)
     {
         if (_renderChoice is not { } choice || !client.HasAuthoritativeProjection) { MeshCanvas.ClearEvaluatedFrame(); return; }
-        if (preview is not null && choice.Kind != "keyArt") return;
+        if ((preview is not null || rigPreview is not null) && choice.Kind != "keyArt") return;
         var token = client.DocumentToken!; var revision = client.Revision;
         var key = $"{token}/{revision}/{choice.Kind}/{choice.Id}/{_timeTicks}/{_editingContext}";
-        if (preview is null && _lastRenderKey == key && _pendingLayoutPreview is null) return;
+        if (preview is null && rigPreview is null && _lastRenderKey == key && _pendingLayoutPreview is null && _pendingRigPreview is null) return;
         var generation = Interlocked.Increment(ref _renderGeneration);
         _renderWork?.Cancel(); var work = new CancellationTokenSource(); _renderWork = work;
         try
         {
             var frame = await client.ProjectRenderAsync(choice.Kind == "keyArt" ? choice.Id : null,
                 choice.Kind == "transition" ? choice.Id : null, choice.Kind == "sequence" ? choice.Id : null,
-                _timeTicks, work.Token, preview, revision, preview is null ? _playbackSample : null);
+                _timeTicks, work.Token, preview, revision, preview is null && rigPreview is null ? _playbackSample : null, rigPreview);
             var artwork = new Dictionary<string, RenderTexture>();
             foreach (var a in frame.Payload.GetProperty("artwork").EnumerateArray())
             {
@@ -107,6 +114,9 @@ public partial class MainWindow
             }
             var canvas = frame.Payload.GetProperty("canvas");
             var width = canvas.GetProperty("width").GetInt32(); var height = canvas.GetProperty("height").GetInt32();
+            var documentWidth=width;var documentHeight=height;
+            var scale=Math.Min(1,2048d/Math.Max(width,height));width=Math.Max(1,(int)Math.Ceiling(width*scale));height=Math.Max(1,(int)Math.Ceiling(height*scale));
+            var mapped=scale==1?frame.Payload:RenderView.Map(frame.Payload,(double)width/documentWidth,(double)height/documentHeight);
             var clock = Stopwatch.StartNew();
             var pixels = await Task.Run(() =>
             {
@@ -119,7 +129,7 @@ public partial class MainWindow
                     catch { _renderer = new Direct3DRenderer(software: true); }
                     }
                 }
-                return _renderer.Render(frame.Payload, artwork, width, height, work.Token);
+                return _renderer.Render(mapped, artwork, width, height, work.Token);
             }, work.Token);
             client.AssertCurrent(token, revision);
             if (generation != _renderGeneration || !ReferenceEquals(client, _client) || choice != _renderChoice) return;
@@ -128,13 +138,15 @@ public partial class MainWindow
             try { TimeSlider.Maximum=Math.Max(1,Number(frame.Payload,"durationTicks",1)); }
             finally { _updatingTime=false; }
             UpdateTimeDisplay();
-            PlayheadText.Text=String(frame.Payload,"timeLabel")??$"{_timeTicks} ticks";
+            _timeLabel=String(frame.Payload,"timeLabel")??$"{_timeTicks} ticks";PlayheadText.Text=_timeLabel;
             if(frame.Payload.TryGetProperty("playing",out var playing)&&!playing.GetBoolean())StopPlayback();
             var bitmap = BitmapSource.Create(width, height, 96, 96, PixelFormats.Pbgra32, null, pixels, width * 4); bitmap.Freeze();
             var represented = artwork.Keys.ToHashSet();
-            MeshCanvas.ApplyEvaluatedFrame(bitmap, represented, choice.Kind == "keyArt" && _editingContext is EditingContext.Source or EditingContext.Mesh);
+            var currentIds=frame.Payload.GetProperty("artwork").EnumerateArray().Select(a=>a.GetProperty("id").GetString()!).ToHashSet();
+            foreach(var id in _renderTextures.Keys.Where(id=>!currentIds.Contains(id)).ToArray())_renderTextures.Remove(id);
+            MeshCanvas.ApplyEvaluatedFrame(bitmap, represented, choice.Kind == "keyArt" && _editingContext is EditingContext.Source or EditingContext.Mesh,documentWidth,documentHeight,Property(frame.Payload,"authoringMeshes"));
             RenderStatusText.Text = $"{width} × {height} · {clock.Elapsed.TotalMilliseconds:0} ms · {_renderer!.Driver}";
-            if (preview is null) _lastRenderKey = key;
+            if (preview is null && rigPreview is null) _lastRenderKey = key;
             else _lastRenderKey = null;
         }
         catch (OperationCanceledException) { }
