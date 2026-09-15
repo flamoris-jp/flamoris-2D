@@ -21,7 +21,7 @@ FLAMORIS 2D is intentionally focused. It is not intended to reproduce every Live
 
 The Phase 1-8 production core is implemented.
 
-The native WPF production candidate in [PR #101](https://github.com/flamoris-jp/flamoris-2D/pull/101) now supports Source through Export and save/reopen. See the [Japanese native workflow](docs/native-production-workflow.md) and [completion ledger](docs/native-capability-map.md). Electron remains the default release until final Windows acceptance and reviewed cutover.
+The native WPF production candidate in [PR #101](https://github.com/flamoris-jp/flamoris-2D/pull/101) now supports Source through Export, Recovery, PSD/Cutwork import, textured Mesh authoring, Rig/Deform, Sequence animation, Preview, PNG/MP4 export, and save/reopen/resume. See the [Japanese native workflow](docs/native-production-workflow.md) and [completion ledger](docs/native-capability-map.md). Electron remains the default installed/released shell until final Windows acceptance and a reviewed release cutover.
 
 Current checkpoint:
 
@@ -32,11 +32,12 @@ Current checkpoint:
 - Phase 6 clipping + Warp/Lattice Deformer — complete
 - Phase 7 Bones / FK / rigid and weighted skinning / form correction / constraints / IK — complete
 - Phase 8 Multi-Key-Art Sequence / AnimationClip / deterministic mixer / timeline authoring — complete
-- Phase 9 Production Robustness / Internal Beta — current hardening stage
+- Phase 9 Production Robustness / Internal Beta — active hardening stage
+- Native WPF migration (#96 / PR #101) — Source-through-Export implementation candidate complete; final real-art Windows acceptance and release cutover remain
 
-The immediate production gate is real packaged-Windows end-to-end QA in Issue #78. Phase 9 hardening is tracked in Issue #79.
+The immediate gate is the final Windows hands-on pass for the native production candidate under Issue #96 / PR #101 using real FLAMORIS artwork and projects. Issue #78 remains the broader post-Phase-8 packaged-Windows QA checklist, and Issue #79 remains the Phase 9 hardening umbrella. Issues #97/#98 have implementation in PR #101 but stay open until review and final acceptance are complete.
 
-Phase 5 flat-image part decomposition remains an experimental/deferred input-simplification track and does not block the current PSD/part-based production workflow.
+Phase 5 flat-image part decomposition remains an experimental/deferred input-simplification track and does not block the current PSD/Cutwork production workflow.
 
 ## Current capabilities
 
@@ -47,19 +48,22 @@ Phase 5 flat-image part decomposition remains an experimental/deferred input-sim
 - deterministic Query / Command / Transaction / EditorSession architecture
 - Undo / Redo and grouped history
 - Save / Save As / Incremental Save / Save Copy
-- dirty/save-point tracking, recovery, Recent Files, and native Windows dialogs
+- dirty/save-point tracking, lineage-scoped native Recovery, Recent Files, and native Windows dialogs
 - PSD import/re-import and Cutwork `.flimg` v1 source-art import with document-coordinate placement
-- Windows Desktop shell and `.fl2d` file association
-- typed MCP-ready command/query boundaries
+- native WPF production candidate plus the currently released Electron Windows shell
+- installed `.fl2d` file association remains owned by the Electron release until cutover; the portable native candidate does not change system association
+- typed MCP-ready command/query boundaries with one shared EditorSession authority
 
 ### Mesh and Key Art authoring
 
-- Object / Edit / Deform / Topology authoring modes
+- separate Mesh Structure / Layout and Deform authoring semantics
 - stable mesh vertex IDs and optional semantic labels
 - add / remove / connect / subdivide topology operations
 - Grid Mesh and deterministic Contour AutoMesh
 - per-Key-Art MeshKeyforms over shared topology
-- deterministic correspondence assistance
+- textured native Layout preview and commit
+- whole-mesh position / rotation / scale alignment and explicit UV editing
+- deterministic correspondence assistance and pins
 - explicit SemanticSlot correspondence across Key Arts
 
 ### Transition, deformation, and rigging
@@ -72,10 +76,12 @@ Phase 5 flat-image part decomposition remains an experimental/deferred input-sim
 - Bones and deterministic FK
 - rigid Bone attachment
 - weighted skinning using stable mesh vertex IDs
+- weight painting/numeric editing and normalization
 - MeshFormCorrection after skeletal deformation
 - rotation constraints
 - analytic two-bone IK as an authoring helper
 - mirror helpers
+- reusable MeshDeformation samples for animation
 
 ### Sequence and reusable motion
 
@@ -83,24 +89,33 @@ Phase 5 flat-image part decomposition remains an experimental/deferred input-sim
 - KeyArtHold and retimed TransitionInstance placement
 - reusable AnimationClip / ClipInstance
 - Once / Loop playback semantics
-- TransformTrack / BoneTrack / DeformerTrack / MeshDeformationTrack / CameraTrack
+- TransformTrack / BoneTrack / DeformerTrack / MeshDeformationTrack / CameraTrack plus existing opacity/presence/draw-order/clipping channels
 - reusable Blink / Breath / HairSway-style motion
 - deterministic typed contribution mixer
-- Sequence timeline, scrub, playback, clip placement, and keyframe editing
+- native Sequence timeline, scrub, playback, clip placement/trim, zoom/scroll, and keyframe editing
 - explicit Bezier interpolation with authoring ease presets
 
 ### Preview and export
 
-- shared evaluated-frame path for preview and export
+- one canonical evaluated-frame/render-plan path for native Preview and Export
+- D3D11 hardware renderer with WARP fallback, selected by measured ADR 0008 evidence
 - deterministic frame planning from rational FPS
-- viewport-independent offscreen rendering
 - deterministic PNG frame sequence export
-- Windows MP4/H.264 export boundary using FFmpeg with Media Foundation `h264_mf`
-- progress, cancellation, conflict handling, diagnostics, and temporary-frame cleanup paths
+- Windows MP4/H.264 export using pinned LGPL FFmpeg and Media Foundation `h264_mf`
+- progress, cancellation, conflict handling, diagnostics, and explicit partial-output policy
+- packaged automated eight-second workflow verifies 240 PNGs and an H.264 MP4, then Save/Open/resumed editing
 
-The remaining real-device validation work belongs to Production QA / Phase 9 rather than missing animation architecture.
+The remaining real-device validation work is perceptual/operational acceptance: real artwork, DPI/focus/input feel, dense timeline usability, output inspection, and release cutover policy. It is not a missing Source-to-Export architecture stage.
 
-## Run Windows Desktop
+## Run the native Windows candidate
+
+PR #101 publishes `flamoris2d-native-production-candidate-win-x64` from the Native Shell Boundary workflow. Extract the whole artifact and run `Flamoris2D.exe` on Windows x64.
+
+The candidate bundles the self-contained .NET 10 runtime, Node 24.21.0, the reviewed Product Host graph, PSD decoder, and pinned LGPL shared FFmpeg. Keep the package directory intact. It does not install itself or replace the current Electron file association.
+
+For development builds and the full native workflow, see [`product/native/README.md`](product/native/README.md) and [`docs/native-production-workflow.md`](docs/native-production-workflow.md).
+
+## Run the current Electron Windows Desktop
 
 From the repository root:
 
@@ -122,6 +137,8 @@ Create an NSIS installer:
 npm run desktop:dist
 ```
 
+Electron remains the default release until the native retirement/cutover criteria pass.
+
 ## Run browser shell
 
 From the repository root:
@@ -134,7 +151,7 @@ npm start
 
 Open `http://127.0.0.1:4173`.
 
-The Windows Desktop application is the production target. The browser shell remains a development-compatible adapter.
+The browser shell remains a development-compatible adapter, not the native production target.
 
 ## Repository boundaries
 
@@ -152,12 +169,13 @@ See `AGENTS.md` and `docs/repository-boundaries.md`.
 
 ## Architecture principles
 
-- GitHub `main` is the reviewed source of truth.
+- GitHub `main` is the reviewed source of truth; open migration PRs are candidates until merged.
 - Persistent animation time uses one canonical integer tick domain: 120000 ticks/sec.
 - `TemporalProgram` is shared by Transitions, Sequences, and AnimationClips rather than duplicated into parallel timing models.
 - Stable IDs, not display names or array positions, are authoritative for Scene, mesh, rig, and animation targets.
 - Major visual changes are represented by Key Arts; reusable ordinary motion is layered through AnimationClips.
-- Preview, PNG, and MP4 source frames share the same evaluated semantics.
+- WPF gestures, headless/MCP operations, and tests converge on one authoritative JavaScript `EditorSession` through the Product Host.
+- Preview, PNG, and MP4 source frames share the same evaluated semantics and native compositor in the production candidate.
 - The renderer consumes final evaluated geometry/compositing state and remains unaware of Sequence/Clip/Bone authoring semantics.
 - Persistent mutations go through deterministic Commands / Transactions and remain Undo/Redo-safe.
 - Transient UI state such as selection, playhead, hover, drag preview, and playback state does not become Project authority.
@@ -168,6 +186,10 @@ See `AGENTS.md` and `docs/repository-boundaries.md`.
 Current design index: `docs/README.md`
 
 Current roadmap: `docs/roadmap.md`
+
+Native migration completion ledger: `docs/native-capability-map.md`
+
+Native production workflow: `docs/native-production-workflow.md`
 
 Phase 8 sequencing design: `docs/phase8-animation-sequencing.md`
 
@@ -195,8 +217,11 @@ Non-trivial defects found during Production QA should become focused Issues rath
 
 ## Current follow-up work
 
-- #78 — packaged Windows end-to-end Production QA
-- #79 — Phase 9 Production Robustness / Internal Beta
+- #96 / PR #101 — final native Source-to-Export review and real Windows acceptance; release cutover remains open
+- #97 — native Recovery decision/acceptance; implementation is in PR #101
+- #98 — native bulk artwork/renderer proof; implementation and measured renderer decision are in PR #101
+- #78 — broader packaged Windows end-to-end Production QA checklist
+- #79 — Phase 9 Production Robustness / Internal Beta umbrella
 - #58 — production UX cleanup and Japanese-first labels
 - #6 — dependency lockfile / reproducibility
 - #43 — public repository release preparation
