@@ -49,10 +49,13 @@ public partial class MainWindow
         var sequence=await client.EditTimelineAsync(new(),TimelineEdit.CreateSequence("Native eight-second shot",8,keyArtId),client.Revision);
         var sequenceId=String(sequence.Payload,"sequenceId")!;_renderChoice=new(sequenceId,"sequence","Native shot");await RefreshProjectionAsync();
         var target=JsonSerializer.SerializeToElement(new {boneId=_selectedBoneId});
-        var track=await client.EditTimelineAsync(new(sequenceId),TimelineEdit.AddTrack(AnimationTrackKind.BoneTrack,target),client.Revision);
+        var clip=await client.EditTimelineAsync(new(sequenceId),TimelineEdit.CreateClip("Bone motion",8,false),client.Revision);
+        var clipId=String(clip.Payload,"clipId")!;
+        var track=await client.EditTimelineAsync(new(sequenceId,clipId),TimelineEdit.AddTrack(AnimationTrackKind.BoneTrack,target),client.Revision);
         var trackId=String(track.Payload,"trackId")!;
-        await client.EditTimelineAsync(new(sequenceId),TimelineEdit.AddKey(trackId,"rotation",0,AnimationValue.Scalar(0)),client.Revision);
-        await client.EditTimelineAsync(new(sequenceId),TimelineEdit.AddKey(trackId,"rotation",960000,AnimationValue.Scalar(.5)),client.Revision);
+        await client.EditTimelineAsync(new(sequenceId,clipId),TimelineEdit.AddKey(trackId,"rotation",0,AnimationValue.Scalar(0)),client.Revision);
+        await client.EditTimelineAsync(new(sequenceId,clipId),TimelineEdit.AddKey(trackId,"rotation",960000,AnimationValue.Scalar(.5)),client.Revision);
+        await client.EditTimelineAsync(new(sequenceId),TimelineEdit.PlaceClip(clipId,new(0,960000,0,1,1,false,1,0,true)),client.Revision);
         await RefreshProjectionAsync();await ScrubAsync(480000);var evaluated=FramePixels(MeshCanvas.EvaluatedFrame);
         SwitchContext(EditingContext.Preview,false);await RefreshProjectionAsync();if(!evaluated.SequenceEqual(FramePixels(MeshCanvas.EvaluatedFrame)))throw new Exception("Animation/Preview frame mismatch.");
         var directory=Path.Combine(fixtureDirectory,"native-eight-second-frames");if(Directory.Exists(directory))Directory.Delete(directory,true);

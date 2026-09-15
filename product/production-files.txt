@@ -72,6 +72,7 @@ src/core/export-frame-evaluator.js
 src/core/export-frame-planner.js
 src/core/export-offscreen-renderer.js
 src/core/png-frame-encoder.js
+src/core/frame-sequence-contract.js
 src/core/frame-sequence-export.js
 src/core/export-job-controller.js
 src/core/export-settings.js

@@ -68,7 +68,8 @@ raster copy and runtime overhead are additional bounded allocations, not include
 the JS heap limit. Cancel signals only the matching preview ID/document token; the
 Worker terminates before another preview is admitted. Failed previews write no history.
 
-The binary endpoint permits at most two simultaneous connections. All attached assets
+The binary endpoint permits at most sixteen connections, with a one-second idle
+keep-alive timeout so pooled clients do not exhaust the socket cap. All attached assets
 and upload reservations share the 64 MiB Host raster budget. Native presentation caches
 only these immutable bitmaps; one input decode/upload runs at a time. Replacing a large
 session may exceed the shared budget: explicitly choose New (discard confirmation)

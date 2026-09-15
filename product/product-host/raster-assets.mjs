@@ -60,7 +60,11 @@ export class RasterAssets {
   clear() { for (const id of [...this.entries.keys()]) this.release(id); }
   async start() {
     this.server = createServer((req, res) => this.serve(req, res));
-    this.server.maxConnections = 2;
+    // HttpClient/undici retain idle pooled sockets between requests. A two-socket
+    // cap drops otherwise valid sequential requests before authentication runs.
+    // Bytes and upload reservations remain independently bounded.
+    this.server.maxConnections = 16;
+    this.server.keepAliveTimeout = 1000;
     this.server.requestTimeout = 30000;
     this.server.headersTimeout = 10000;
     await new Promise((resolve, reject) => {
