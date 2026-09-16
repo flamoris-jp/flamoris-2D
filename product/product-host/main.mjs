@@ -9,13 +9,28 @@ const service = new ProductHostService();
 service.bulkEndpoint = await service.assets.start();
 const decoder = new ControlFrameDecoder();
 let outputQueue = Promise.resolve();
+let controlFailed = false;
+const failControlAuthority = () => {
+  if (controlFailed) return;
+  controlFailed = true;
+  service.mcp.revoke();
+  service.generation?.cancel();
+  service.importJob?.cancel();
+  service.shutdownRequested = true;
+  process.exitCode = 1;
+  stdin.destroy();
+};
 const write = (messages) => {
   outputQueue = outputQueue.then(async () => {
     for (const message of messages) await writeControlFrame(stdout, message);
   });
   return outputQueue;
 };
-service.onExternalEvents = events => write(events);
+service.onExternalEvents = async events => {
+  try { await write(events); }
+  catch (error) { failControlAuthority(); throw error; }
+};
+stdout.on("error", failControlAuthority);
 
 decoder.on("data", (request) => {
   void service.handle(request).then(async ({ response, events }) => {
@@ -23,15 +38,13 @@ decoder.on("data", (request) => {
     if (service.shutdownRequested) stdin.destroy();
   }).catch(() => {
     stderr.write("[product-host] Control channel failed.\n");
-    process.exitCode = 1;
-    stdin.destroy();
+    failControlAuthority();
   });
 });
 
 decoder.on("error", (error) => {
   stderr.write("[product-host] Invalid control frame.\n");
-  process.exitCode = 1;
-  stdin.destroy();
+  failControlAuthority();
 });
 
 stdin.pipe(decoder);

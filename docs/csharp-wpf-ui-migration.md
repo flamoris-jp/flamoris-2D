@@ -560,6 +560,8 @@ ADR 0010 now owns external MCP transport/security. ProductHostService serializes
 both WPF and live MCP; the stdio control protocol remains the internal WPF boundary.
 Same-session typed mutations and source-history Undo/Redo emit the existing change
 event. The separate loopback MCP capability never reveals the internal bulk secret.
+Loss of that WPF control channel is fail-closed: WPF terminates the Host, while a
+Host-side response/event write failure revokes MCP and shuts down the process.
 The Native menu owns opt-in, permissions and credential rotation. Older sections
 that describe public MCP as future work are historical migration staging, superseded
 for this boundary by [ADR 0010](decisions/0010-native-live-mcp.md).

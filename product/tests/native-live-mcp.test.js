@@ -18,7 +18,8 @@ async function setup(t, permission = 'edit') {
   const enabled = await send(service, 'mcp.enable', { permission });
   assert.equal(enabled.ok, true, JSON.stringify(enabled));
   const connection = enabled.payload;
-  const client = new Client({ name: 'flamoris-live-proof', version: '1.0.0' });
+  const client = new Client({ name: 'flamoris-live-proof', version: '1.0.0' },
+    { versionNegotiation: { mode: { pin: '2026-07-28' } } });
   await client.connect(new StreamableHTTPClientTransport(new URL(connection.endpoint), { requestInit: { headers: { Authorization: `Bearer ${connection.token}` } } }));
   t.after(() => client.close());
   return { service, client, connection };

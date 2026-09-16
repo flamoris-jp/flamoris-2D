@@ -13,6 +13,7 @@ await TestRoundTripAsync(hostPath);
 await TestTargetPropertiesAsync(hostPath);
 await TestMeshArtworkAsync(hostPath);
 await TestCrashInvalidationAsync(hostPath);
+await TestControlChannelLossRevokesMcpAsync(hostPath);
 await DocumentTests.RunAsync(hostPath);
 RasterizerTests.Run();
 await ExportTests.RunAsync();
@@ -212,6 +213,69 @@ static async Task TestCrashInvalidationAsync(string hostPath)
     Assert(!client.HasAuthoritativeProjection,
         "Host failure must invalidate, not preserve, the client projection.");
     Assert(client.DocumentToken is null, "Host failure must clear the document token.");
+}
+
+static async Task TestControlChannelLossRevokesMcpAsync(string hostPath)
+{
+    await using var client = new ProductHostClient();
+    var lost = new TaskCompletionSource<AuthorityLostEventArgs>(
+        TaskCreationOptions.RunContinuationsAsynchronously);
+    client.AuthorityLost += (_, eventArgs) => lost.TrySetResult(eventArgs);
+    await client.StartAsync(hostPath);
+    await client.CreateSessionAsync("Broken control channel", 640, 360);
+    var rootId = (await client.GetSceneTreeAsync()).Payload.GetProperty("id").GetString()!;
+    var connection = await client.EnableMcpAsync(McpPermission.Edit);
+    var documentToken = client.DocumentToken!;
+    var revision = client.Revision;
+    Assert(client.IsRunning, "The Host must still be alive before breaking only the control channel.");
+
+    using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+    HttpRequestMessage Request(string tool, object arguments)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, connection.Endpoint);
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", connection.Token);
+        request.Headers.TryAddWithoutValidation("Accept", "application/json, text/event-stream");
+        request.Headers.Add("MCP-Protocol-Version", "2026-07-28");
+        request.Headers.Add("Mcp-Method", "tools/call");
+        request.Headers.Add("Mcp-Name", tool);
+        var parameters = new Dictionary<string, object>
+        {
+            ["name"] = tool,
+            ["arguments"] = arguments,
+            ["_meta"] = new Dictionary<string, object>
+            {
+                ["io.modelcontextprotocol/protocolVersion"] = "2026-07-28",
+                ["io.modelcontextprotocol/clientInfo"] = new { name = "authority-loss-proof", version = "1" },
+                ["io.modelcontextprotocol/clientCapabilities"] = new { },
+            },
+        };
+        request.Content = new StringContent(JsonSerializer.Serialize(
+            new { jsonrpc = "2.0", id = 1, method = "tools/call", @params = parameters }),
+            System.Text.Encoding.UTF8, "application/json");
+        return request;
+    }
+
+    using (var before = Request("live.context", new { }))
+    using (var response = await http.SendAsync(before))
+        Assert(response.IsSuccessStatusCode, "Live MCP endpoint was not usable before control-channel loss.");
+    client.BreakControlChannelForTesting();
+    await lost.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    Assert(!client.HasAuthoritativeProjection, "Broken control channel must invalidate WPF authority.");
+    Assert(!client.IsRunning, "Broken control channel must terminate the still-running Host.");
+
+    using var request = Request("command.scene.rename_node", new
+    {
+        documentToken,
+        expectedRevision = revision,
+        payload = new { nodeId = rootId, displayName = "Must not commit" },
+    });
+    try
+    {
+        using var response = await http.SendAsync(request);
+        Assert(!response.IsSuccessStatusCode, "Old MCP capability remained usable after WPF authority loss.");
+    }
+    catch (HttpRequestException) { }
+    catch (TaskCanceledException) { }
 }
 
 static void Assert(bool condition, string message)

@@ -37,6 +37,10 @@ retroactively undo a committed edit. Callers must query after ambiguous network
 failure. Disable revokes immediately, even while a long Host operation awaits.
 Replacement revokes before installing the new document. Host loss/shutdown
 closes HTTP connections and revokes all requests. Tokens are never persisted.
+The WPF control channel is also an authority lease: a parse/read/write failure
+terminates the still-running Product Host before WPF publishes authority loss,
+and a Product Host event-write failure revokes MCP and shuts the Host down. MCP
+therefore cannot remain as a sole editor after the Native shell is detached.
 
 ## Exposure and permissions
 

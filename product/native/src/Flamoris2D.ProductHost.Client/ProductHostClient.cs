@@ -214,6 +214,15 @@ public sealed partial class ProductHostClient : IAsyncDisposable
         if (_process is { HasExited: false } process) process.Kill(true);
     }
 
+    internal void BreakControlChannelForTesting()
+    {
+        if (_process is not { HasExited: false } process)
+            throw new InvalidOperationException("Product Host is not running.");
+        // Simulate WPF losing the authoritative stdout control channel while
+        // the child itself is still alive. LoseAuthority must fail closed.
+        process.StandardOutput.BaseStream.Dispose();
+    }
+
     private Task<ProductHostResponse> ExecuteAsync(
         ProductCommand command,
         string label,
@@ -400,6 +409,17 @@ public sealed partial class ProductHostClient : IAsyncDisposable
         _projectionStale = false;
         var exception = error ?? new EndOfStreamException(reason);
         foreach (var completion in _pending.Values) completion.TrySetException(exception);
+        // The WPF control channel is the Native authority lease. If it is lost,
+        // a still-running Host must not leave its live MCP capability behind.
+        // Terminate before publishing AuthorityLost so observers cannot race an
+        // old endpoint after the UI has declared the document detached.
+        var process = _process;
+        if (process is { HasExited: false })
+        {
+            try { process.StandardInput.Close(); } catch { }
+            try { if (!process.HasExited) process.Kill(true); } catch { }
+            try { process.WaitForExit(5000); } catch { }
+        }
         AuthorityLost?.Invoke(this, new AuthorityLostEventArgs(reason, error));
     }
 
