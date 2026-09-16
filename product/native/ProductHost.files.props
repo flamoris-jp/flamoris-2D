@@ -1,25 +1,28 @@
 <Project>
-  <!-- Reviewed Node runtime graph, including both worker entry points. No browser shell or tests. -->
+  <!-- Exact reviewed Product Host and worker module graph. -->
   <ItemGroup>
-    <None Include="$(MSBuildThisFileDirectory)..\product-host\document-artwork.mjs" Link="ProductHost\document-artwork.mjs" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)..\product-host\document-lifecycle.mjs" Link="ProductHost\document-lifecycle.mjs" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)..\product-host\document-transfer.mjs" Link="ProductHost\document-transfer.mjs" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)..\product-host\evaluated-projection.mjs" Link="ProductHost\evaluated-projection.mjs" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)..\product-host\key-state-authoring.mjs" Link="ProductHost\key-state-authoring.mjs" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)..\product-host\main.mjs" Link="ProductHost\main.mjs" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)..\product-host\mesh-generation-worker.mjs" Link="ProductHost\mesh-generation-worker.mjs" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)..\product-host\mesh-hands-on.mjs" Link="ProductHost\mesh-hands-on.mjs" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)..\product-host\native-export.mjs" Link="ProductHost\native-export.mjs" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)..\product-host\protocol.mjs" Link="ProductHost\protocol.mjs" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)..\product-host\raster-assets.mjs" Link="ProductHost\raster-assets.mjs" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)..\product-host\rig-authoring.mjs" Link="ProductHost\rig-authoring.mjs" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)..\product-host\runtime-audit.mjs" Link="ProductHost\runtime-audit.mjs" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)..\product-host\session-service.mjs" Link="ProductHost\session-service.mjs" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)..\product-host\source-import-worker.mjs" Link="ProductHost\source-import-worker.mjs" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)..\product-host\source-import.mjs" Link="ProductHost\source-import.mjs" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)..\product-host\source-reimport.mjs" Link="ProductHost\source-reimport.mjs" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)..\product-host\timeline-authoring.mjs" Link="ProductHost\timeline-authoring.mjs" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)..\product-host\transition-timeline.mjs" Link="ProductHost\transition-timeline.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\document-artwork.mjs" Link="product-host\document-artwork.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\document-lifecycle.mjs" Link="product-host\document-lifecycle.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\document-transfer.mjs" Link="product-host\document-transfer.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\evaluated-projection.mjs" Link="product-host\evaluated-projection.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\key-state-authoring.mjs" Link="product-host\key-state-authoring.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\live-mcp-facade.mjs" Link="product-host\live-mcp-facade.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\live-mcp-policy.mjs" Link="product-host\live-mcp-policy.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\live-mcp-transport.mjs" Link="product-host\live-mcp-transport.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\main.mjs" Link="product-host\main.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\mesh-generation-worker.mjs" Link="product-host\mesh-generation-worker.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\mesh-hands-on.mjs" Link="product-host\mesh-hands-on.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\native-export.mjs" Link="product-host\native-export.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\protocol.mjs" Link="product-host\protocol.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\raster-assets.mjs" Link="product-host\raster-assets.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\rig-authoring.mjs" Link="product-host\rig-authoring.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\runtime-audit.mjs" Link="product-host\runtime-audit.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\session-service.mjs" Link="product-host\session-service.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\source-import-worker.mjs" Link="product-host\source-import-worker.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\source-import.mjs" Link="product-host\source-import.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\source-reimport.mjs" Link="product-host\source-reimport.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\timeline-authoring.mjs" Link="product-host\timeline-authoring.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\transition-timeline.mjs" Link="product-host\transition-timeline.mjs" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(MSBuildThisFileDirectory)..\src\commands\animation-clip-command-handlers.js" Link="src\commands\animation-clip-command-handlers.js" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(MSBuildThisFileDirectory)..\src\commands\bone-command-handlers.js" Link="src\commands\bone-command-handlers.js" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(MSBuildThisFileDirectory)..\src\commands\bone-constraint-command-handlers.js" Link="src\commands\bone-constraint-command-handlers.js" CopyToOutputDirectory="PreserveNewest" />
