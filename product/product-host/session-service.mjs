@@ -123,6 +123,7 @@ export class ProductHostService {
     this.queue = Promise.resolve();
     this.commitGuard = null;
     this.mcpControlEpoch = 0;
+    this.pendingJobs = new Set();
     this.onExternalEvents = null;
     this.mcp = new LiveMcpEndpoint(this);
     this.document = null;
@@ -136,6 +137,8 @@ export class ProductHostService {
   }
 
   cancelImport(request) {
+    if (request?.protocolVersion === PRODUCT_HOST_PROTOCOL_VERSION && request.method === 'source.cancel')
+      for (const job of this.pendingJobs) if (job.kind === 'import' && job.token === request.documentToken && job.id === request.payload?.jobId) job.cancelled = true;
     if (request?.protocolVersion === PRODUCT_HOST_PROTOCOL_VERSION && request.method === "source.cancel" &&
         request.documentToken === this.documentToken && request.payload?.jobId === this.importJob?.id)
       this.importJob.cancel();
@@ -159,6 +162,8 @@ export class ProductHostService {
   }
 
   cancelMeshPreview(request) {
+    if (request?.protocolVersion === PRODUCT_HOST_PROTOCOL_VERSION && request.method === 'mesh.cancelPreview')
+      for (const job of this.pendingJobs) if (job.kind === 'preview' && job.token === request.documentToken && job.id === request.payload?.previewId) job.cancelled = true;
     if (request?.protocolVersion === PRODUCT_HOST_PROTOCOL_VERSION && request.method === "mesh.cancelPreview" &&
         request.documentToken === this.documentToken && request.payload?.previewId === this.generation?.id)
       this.generation?.cancel();
@@ -479,8 +484,14 @@ export class ProductHostService {
 
   handle(request, { guard = null, external = false } = {}) {
     const epoch = ['mcp.enable', 'mcp.disable'].includes(request?.method) ? ++this.mcpControlEpoch : null;
+    const jobKind = request?.method === 'mesh.generatePreview' ? 'preview' :
+      ['source.import', 'source.analyzeReimport'].includes(request?.method) ? 'import' : null;
+    const job = jobKind ? { kind: jobKind, token: request.documentToken,
+      id: jobKind === 'preview' ? request.payload?.previewId : request.payload?.jobId, cancelled: false } : null;
+    if (job) this.pendingJobs.add(job);
     const admissionGuard = () => {
       guard?.();
+      if (job?.cancelled) throw Object.assign(new Error('Operation cancelled.'), { code: 'operation.cancelled' });
       if (request?.method === 'mcp.enable' && epoch !== this.mcpControlEpoch)
         throw Object.assign(new Error('MCP permission request superseded.'), { code: 'mcp.revoked' });
     };
@@ -496,7 +507,7 @@ export class ProductHostService {
         const result = await this.#handle(request, admissionGuard);
         if (external && result.events.length) await this.onExternalEvents?.(result.events);
         return result;
-      } finally { this.commitGuard = null; }
+      } finally { this.commitGuard = null; if (job) this.pendingJobs.delete(job); }
     });
     this.queue = operation.catch(() => {});
     return operation;

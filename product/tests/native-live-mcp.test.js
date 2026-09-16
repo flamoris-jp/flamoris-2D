@@ -160,3 +160,91 @@ test('disable/re-enable, replacement, shutdown and restart revoke old credential
   const restarted = (await send(other, 'mcp.enable')).payload;
   assert.equal((await raw({ ...restarted, token: last.token })).status, 401);
 });
+
+function modern(method, params = {}) {
+  return { jsonrpc: '2.0', id: 10, method, params: { ...params, _meta: {
+    'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+    'io.modelcontextprotocol/clientInfo': { name: 'wire-proof', version: '1' },
+    'io.modelcontextprotocol/clientCapabilities': {},
+  } } };
+}
+const modernHeaders = (method, name) => ({ 'MCP-Protocol-Version': '2026-07-28', 'Mcp-Method': method, ...(name ? { 'Mcp-Name': name } : {}) });
+async function until(condition) {
+  const end = Date.now() + 3000;
+  while (!condition()) { if (Date.now() > end) throw new Error('Timed out waiting for admission.'); await new Promise(r => setTimeout(r, 5)); }
+}
+
+test('2026-07-28 metadata/version and header-body agreement are enforced by official SDK', async t => {
+  const { connection: c, service: s } = await setup(t);
+  const discovery = await raw(c, { headers: modernHeaders('server/discover'), body: JSON.stringify(modern('server/discover')) });
+  assert.equal(discovery.status, 200); await discovery.arrayBuffer();
+  const name = 'command.scene.rename_node';
+  const body = JSON.stringify(modern('tools/call', { name, arguments: rename(s, 'Rejected') }));
+  for (const headers of [
+    { ...modernHeaders('tools/call', name), 'Mcp-Method': 'tools/list' },
+    { ...modernHeaders('tools/call', name), 'Mcp-Name': 'query.scene.get_tree' },
+    { ...modernHeaders('tools/call', name), 'MCP-Protocol-Version': '2025-11-25' },
+    { ...modernHeaders('tools/call', name), 'MCP-Protocol-Version': '2099-01-01' },
+  ]) {
+    const response = await raw(c, { headers, body }); assert.equal(response.status, 400); await response.arrayBuffer();
+  }
+  assert.equal(s.revision, 0);
+  const malformed = await raw(c, { headers: modernHeaders('tools/call', name), body: JSON.stringify(modern('tools/call', { name, arguments: { ...rename(s, 'Bad'), payload: { nodeId: 123, displayName: '' } } })) });
+  assert.ok([200, 400].includes(malformed.status)); await malformed.arrayBuffer(); assert.equal(s.revision, 0);
+});
+
+test('real HTTP disconnect and disable invalidate queued writes before commit', async t => {
+  const { connection: c, service: s } = await setup(t);
+  const name = 'command.scene.rename_node';
+  let release;
+  const barrier = new Promise(r => { release = r; }); s.queue = barrier;
+  const rescue = setTimeout(() => release(), 1500);
+  const abort = new AbortController();
+  const pending = fetch(c.endpoint, { method: 'POST', signal: abort.signal,
+    headers: { Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', ...modernHeaders('tools/call', name) },
+    body: JSON.stringify(modern('tools/call', { name, arguments: rename(s, 'Cancelled over HTTP') })) }).catch(e => e);
+  await until(() => s.queue !== barrier);
+  const scope = [...s.mcp.attachment.scopes].at(-1);
+  abort.abort();
+  await until(() => scope.abort.signal.aborted);
+  release(); clearTimeout(rescue); await pending; await s.queue;
+  assert.equal(s.revision, 0);
+
+  let resume; const stopped = new Promise(r => { resume = r; }); s.queue = stopped;
+  const rescue2 = setTimeout(() => resume(), 1500);
+  const queued = raw(c, { headers: modernHeaders('tools/call', name), body: JSON.stringify(modern('tools/call', { name, arguments: rename(s, 'Revoked') })) }).catch(e => e);
+  await until(() => s.queue !== stopped);
+  const disable = send(s, 'mcp.disable'); assert.equal(s.mcp.status().enabled, false);
+  resume(); clearTimeout(rescue2); await disable; await queued;
+  assert.equal(s.revision, 0);
+});
+
+test('disable supersedes an enable waiting behind a Native operation', async t => {
+  const { service: s } = await setup(t);
+  let resume; s.queue = new Promise(r => { resume = r; });
+  const enable = send(s, 'mcp.enable', { permission: 'edit' });
+  const disable = send(s, 'mcp.disable');
+  resume(); assert.equal((await enable).error.code, 'mcp.revoked'); await disable;
+  assert.equal(s.mcp.status().enabled, false);
+});
+
+test('request admission bounds slow bodies, chunked oversize and nesting without mutation', async t => {
+  const { service: s, connection: c } = await setup(t);
+  const sockets = [];
+  t.after(() => { for (const req of sockets) req.destroy(); });
+  for (let i = 0; i < LIVE_MCP_LIMITS.concurrent; i++) {
+    const req = httpRequest(c.endpoint, { method: 'POST', headers: { Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json', 'Content-Length': 200 } });
+    req.on('error', () => {}); req.write('{'); sockets.push(req);
+  }
+  await until(() => s.mcp.status().active === LIVE_MCP_LIMITS.concurrent);
+  const limited = await raw(c); assert.equal(limited.status, 429); await limited.arrayBuffer();
+  for (const req of sockets) req.destroy();
+  await until(() => s.mcp.status().active === 0);
+  const huge = await new Promise((resolve, reject) => {
+    const req = httpRequest(c.endpoint, { method: 'POST', headers: { Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json' } }, res => { res.resume(); resolve(res.statusCode); });
+    req.on('error', reject); req.write(' '.repeat(LIVE_MCP_LIMITS.bodyBytes)); req.end('more');
+  });
+  assert.equal(huge, 413);
+  const nested = await raw(c, { body: '['.repeat(70) + '0' + ']'.repeat(70) }); assert.equal(nested.status, 400);
+  assert.equal(s.revision, 0);
+});
