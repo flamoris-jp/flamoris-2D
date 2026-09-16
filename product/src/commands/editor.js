@@ -70,11 +70,12 @@ function transactionValidationIssues(beforeProject, afterProject) {
 }
 
 export class EditorSession {
-  constructor(project, { onChange = null } = {}) {
+  constructor(project, { onChange = null, beforeCommit = null } = {}) {
     const errors = validationErrors(project);
     if (errors.length) throw new TransactionError(errors);
     this.project = cloneProject(project);
     this.onChange = onChange;
+    this.beforeCommit = beforeCommit;
     this.undoStack = [];
     this.redoStack = [];
     this.history = [];
@@ -122,6 +123,7 @@ export class EditorSession {
 
   executeTransaction(commands, { label = "Edit" } = {}) {
     const { draft, inverses, affected, issues } = this.prepareTransaction(commands);
+    this.beforeCommit?.();
     const entry = {
       label,
       commands: cloneProject(commands),
@@ -149,7 +151,7 @@ export class EditorSession {
   }
 
   undo() {
-    const entry = this.undoStack.pop();
+    const entry = this.undoStack.at(-1);
     if (!entry) return null;
     const draft = cloneProject(this.project);
     entry.inverses.forEach((command) => {
@@ -159,6 +161,8 @@ export class EditorSession {
     const issues = transactionValidationIssues(this.project, draft)
       .filter((entry) => entry.severity === "error");
     if (issues.length) throw new TransactionError(issues);
+    this.beforeCommit?.();
+    this.undoStack.pop();
     this.project = draft;
     this.currentRevision = entry.beforeRevision;
     this.redoStack.push(entry);
@@ -172,7 +176,7 @@ export class EditorSession {
   }
 
   redo() {
-    const entry = this.redoStack.pop();
+    const entry = this.redoStack.at(-1);
     if (!entry) return null;
     const draft = cloneProject(this.project);
     entry.commands.forEach((command) => {
@@ -182,6 +186,8 @@ export class EditorSession {
     const issues = transactionValidationIssues(this.project, draft)
       .filter((entry) => entry.severity === "error");
     if (issues.length) throw new TransactionError(issues);
+    this.beforeCommit?.();
+    this.redoStack.pop();
     this.project = draft;
     this.currentRevision = entry.afterRevision;
     this.undoStack.push(entry);

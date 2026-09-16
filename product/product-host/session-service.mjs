@@ -1,3 +1,4 @@
+import { LiveMcpEndpoint } from "./live-mcp-transport.mjs";
 import { randomUUID } from "node:crypto";
 import { normalizePreferences } from '../src/preferences.js';
 import { incrementalFilename } from '../src/io/project-files.js';
@@ -38,6 +39,7 @@ const MUTATING_METHODS = new Set([
 ]);
 
 const METHODS = new Set([
+  "mcp.enable", "mcp.disable", "mcp.status",
   "native.preferences", "document.incrementalName",
   "keyState.projection", "keyState.tool", "keyState.correspondence",
   "source.analyzeReimport", "source.changeReview", "source.applyReview", "source.discardReview",
@@ -118,6 +120,11 @@ function assertEnvelope(request) {
 export class ProductHostService {
   constructor({ createToken = () => `document-${randomUUID()}` } = {}) {
     this.createToken = createToken;
+    this.queue = Promise.resolve();
+    this.commitGuard = null;
+    this.mcpControlEpoch = 0;
+    this.onExternalEvents = null;
+    this.mcp = new LiveMcpEndpoint(this);
     this.document = null;
     this.shutdownRequested = false;
     this.assets = new RasterAssets(() => ({ token: this.documentToken, revision: this.revision }), NATIVE_ARTWORK_LIMITS);
@@ -190,7 +197,8 @@ export class ProductHostService {
   }
 
   #openProject(project, envelope = {}, prepared = null) {
-    const session = new EditorSession(project);
+    const session = new EditorSession(project, { beforeCommit: () => this.commitGuard?.() });
+    this.mcp.revoke();
     this.assets.clear();
     this.transfers.clear();
     this.document = {
@@ -258,6 +266,7 @@ export class ProductHostService {
       };
     }
     if (request.method === "host.shutdown") {
+      this.mcp.revoke();
       this.shutdownRequested = true;
       return { accepted: true };
     }
@@ -296,6 +305,11 @@ export class ProductHostService {
     }
 
     switch (request.method) {
+      case "mcp.enable":
+        this.#assertExpectedRevision(request, document);
+        return this.mcp.enable(payload.permission);
+      case "mcp.disable": return this.mcp.status();
+      case "mcp.status": return this.mcp.status();
       case 'native.preferences':return normalizePreferences(payload.preferences);
       case 'document.incrementalName':
         if(!Array.isArray(payload.existingFileNames)||payload.existingFileNames.length>10000||!payload.existingFileNames.every(n=>typeof n==='string'&&n.length<=260))throw new Error('Invalid incremental filename list.');
@@ -379,7 +393,7 @@ export class ProductHostService {
           throw new Error("Invalid artwork selection.");
         const assets = payload.assetIds.map(id => this.assets.get(id, document.token, document.revision));
         const { project, bindings } = createHandsOnProject(assets);
-        const session = new EditorSession(project);
+        const session = new EditorSession(project, { beforeCommit: () => this.commitGuard?.() });
         // Bootstrap through ordinary Product transactions, then attach this validated session.
         for (const [nodeId, id] of bindings) {
           const asset = assets.find(a => a.id === id);
@@ -389,6 +403,7 @@ export class ProductHostService {
         }
         const token = this.createToken();
         this.assets.adopt(payload.assetIds, document.token, document.revision, token);
+        this.mcp.revoke();
         this.document = { token, revision: 0, session, headless: new HeadlessProductAdapter(session), bindings };
         return { documentToken: token, revision: 0, proofOnly: true,
           summary: session.query("project.get_summary", {}) };
@@ -462,10 +477,44 @@ export class ProductHostService {
     }
   }
 
-  async handle(request) {
+  handle(request, { guard = null, external = false } = {}) {
+    const epoch = ['mcp.enable', 'mcp.disable'].includes(request?.method) ? ++this.mcpControlEpoch : null;
+    const admissionGuard = () => {
+      guard?.();
+      if (request?.method === 'mcp.enable' && epoch !== this.mcpControlEpoch)
+        throw Object.assign(new Error('MCP permission request superseded.'), { code: 'mcp.revoked' });
+    };
+    // Signal cancellation/revocation at admission, not behind a worker job.
+    this.cancelMeshPreview(request);
+    this.cancelImport(request);
+    if (request?.protocolVersion === PRODUCT_HOST_PROTOCOL_VERSION &&
+        request.method === "mcp.disable" && request.documentToken === this.documentToken)
+      this.mcp.revoke();
+    const operation = this.queue.then(async () => {
+      this.commitGuard = admissionGuard;
+      try {
+        const result = await this.#handle(request, admissionGuard);
+        if (external && result.events.length) await this.onExternalEvents?.(result.events);
+        return result;
+      } finally { this.commitGuard = null; }
+    });
+    this.queue = operation.catch(() => {});
+    return operation;
+  }
+
+  async close() {
+    this.mcp.revoke();
+    this.generation?.cancel(); this.importJob?.cancel();
+    await this.queue;
+    await this.mcp.close();
+    await this.assets.close();
+  }
+
+  async #handle(request, guard) {
     const requestId = typeof request?.requestId === "string" ? request.requestId : null;
     const previousRevision = this.revision;
     try {
+      guard?.();
       assertEnvelope(request);
       const payload = await this.#dispatch(request);
       const mutated = MUTATING_METHODS.has(request.method) && payload !== null;
