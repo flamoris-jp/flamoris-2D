@@ -128,6 +128,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             await RefreshTimelineAsync(client);
             await RefreshExportAsync(client);
             await RefreshKeyStateAsync(client);
+            await RefreshMcpStatusAsync(client);
         }
         catch (StaleProjectionException)
         {
@@ -245,6 +246,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private void ClearProjection()
     {
+        ClearMcpStatus();
         ClearRenderProjection();
         ClearMeshProjection();
         _propertySnapshot = null;
