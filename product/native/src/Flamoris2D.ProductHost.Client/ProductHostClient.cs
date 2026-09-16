@@ -13,6 +13,7 @@ public sealed partial class ProductHostClient : IAsyncDisposable
     private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> _pending = new();
     private readonly SemaphoreSlim _writeGate = new(1, 1);
     private readonly CancellationTokenSource _lifetime = new();
+    private readonly CancellationTokenSource _controlReader = new();
     private readonly StaleProjectionGate _projectionGate = new();
     private Process? _process;
     private Task? _readerTask;
@@ -58,7 +59,7 @@ public sealed partial class ProductHostClient : IAsyncDisposable
             if (!_shutdownRequested) LoseAuthority("Product Host exited.", null);
         };
         if (!_process.Start()) throw new InvalidOperationException("Product Host could not be started.");
-        _readerTask = ReadLoopAsync(_process.StandardOutput.BaseStream, _lifetime.Token);
+        _readerTask = ReadLoopAsync(_process.StandardOutput.BaseStream, _controlReader.Token);
         _stderrTask = ReadDiagnosticsAsync(_process.StandardError, _lifetime.Token);
 
         using var startupTimeout = CancellationTokenSource.CreateLinkedTokenSource(
@@ -214,6 +215,15 @@ public sealed partial class ProductHostClient : IAsyncDisposable
         if (_process is { HasExited: false } process) process.Kill(true);
     }
 
+    internal void BreakControlChannelForTesting()
+    {
+        if (_process is not { HasExited: false })
+            throw new InvalidOperationException("Product Host is not running.");
+        // Simulate WPF losing the authoritative stdout control channel while
+        // the child itself is still alive. LoseAuthority must fail closed.
+        _controlReader.Cancel();
+    }
+
     private Task<ProductHostResponse> ExecuteAsync(
         ProductCommand command,
         string label,
@@ -356,7 +366,7 @@ public sealed partial class ProductHostClient : IAsyncDisposable
                 }
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested || _shutdownRequested) { }
         catch (Exception error)
         {
             if (!_shutdownRequested) LoseAuthority("Product Host control channel failed.", error);
@@ -400,6 +410,17 @@ public sealed partial class ProductHostClient : IAsyncDisposable
         _projectionStale = false;
         var exception = error ?? new EndOfStreamException(reason);
         foreach (var completion in _pending.Values) completion.TrySetException(exception);
+        // The WPF control channel is the Native authority lease. If it is lost,
+        // a still-running Host must not leave its live MCP capability behind.
+        // Terminate before publishing AuthorityLost so observers cannot race an
+        // old endpoint after the UI has declared the document detached.
+        var process = _process;
+        if (process is { HasExited: false })
+        {
+            try { process.StandardInput.Close(); } catch { }
+            try { if (!process.HasExited) process.Kill(true); } catch { }
+            try { process.WaitForExit(5000); } catch { }
+        }
         AuthorityLost?.Invoke(this, new AuthorityLostEventArgs(reason, error));
     }
 
@@ -422,6 +443,7 @@ public sealed partial class ProductHostClient : IAsyncDisposable
     {
         try { await ShutdownAsync(); } catch { }
         _lifetime.Cancel();
+        _controlReader.Cancel();
         if (_readerTask is not null)
         {
             try { await _readerTask; } catch { }
@@ -432,6 +454,7 @@ public sealed partial class ProductHostClient : IAsyncDisposable
         }
         _process?.Dispose();
         _writeGate.Dispose();
+        _controlReader.Dispose();
         _lifetime.Dispose();
     }
 }

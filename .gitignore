@@ -11,3 +11,8 @@ coverage/
 !staging/fixtures/*.psd
 !staging/fixtures/*.psb
 *.flamoris2d.autosave
+
+# Native build intermediates and outputs
+product/native/**/bin/
+product/native/**/obj/
+product/native/**/*_wpftmp.csproj

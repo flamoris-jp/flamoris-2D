@@ -47,6 +47,30 @@ test('native package allowlist is exactly the Product Host and worker dependency
   const props=await readFile(new URL('../native/ProductHost.files.props',import.meta.url),'utf8');
   const entries=[...props.matchAll(/<None Include="\$\(MSBuildThisFileDirectory\)\.\.\\([^"\n]+)"/gu)].map(m=>m[1].replaceAll('\\','/'));
   assert.deepEqual(entries.sort(),[...graph].sort());
+  // Native startup resolves ProductHost/main.mjs. Preserve its published layout,
+  // including workers' sibling imports, rather than mirroring source directory names.
+  const links = [...props.matchAll(/<None Include="\$\(MSBuildThisFileDirectory\)\.\.\\([^"\n]+)" Link="([^"\n]+)"/gu)];
+  assert.equal(links.length, entries.length);
+  for (const [, source, target] of links)
+    assert.equal(target.replaceAll('\\', '/'), source.replaceAll('\\', '/').replace(/^product-host\//u, 'ProductHost/'));
   const product=new Set(await productionFiles());
   for(const entry of entries){assert.ok(entry.startsWith('product-host/')||product.has(entry),entry);assert.doesNotMatch(entry,/(?:tests|staging|history)\/|src\/app\.js|(?:-view|renderer)\.js$/u);}
+});
+
+test('native MCP runtime allowlist matches locked production SDK dependencies and excludes client/test packages', async () => {
+  const lock = JSON.parse(await readFile(new URL('../package-lock.json', import.meta.url), 'utf8'));
+  const runtime = Object.entries(lock.packages).filter(([name, entry]) => name && !entry.dev).map(([name]) => name.slice('node_modules/'.length));
+  const expected = ['@hono/node-server', '@modelcontextprotocol/core', '@modelcontextprotocol/node', '@modelcontextprotocol/server', 'hono', 'zod'];
+  assert.deepEqual(runtime.filter(name => !['ag-psd', 'base64-js', 'pako'].includes(name)).sort(), expected);
+  for (const name of expected) {
+    const entry = lock.packages[`node_modules/${name}`];
+    assert.ok(entry.integrity?.startsWith('sha512-'), name);
+    if (name.startsWith('@modelcontextprotocol/')) assert.equal(entry.version, '2.0.0');
+  }
+  const props = await readFile(new URL('../native/McpRuntime.files.props', import.meta.url), 'utf8');
+  const included = [...props.matchAll(/node_modules\\([^"*]+?)\\(?:\*\*|LICENSE)/g)].map(m => m[1].replaceAll('\\', '/'));
+  assert.deepEqual([...new Set(included)].sort(), expected);
+  assert.doesNotMatch(props, /client|tests|fixtures|staging|\.ts"/);
+  const csproj = await readFile(new URL('../native/src/Flamoris2D.App/Flamoris2D.App.csproj', import.meta.url), 'utf8');
+  assert.match(csproj, /McpRuntime\.files\.props/);
 });

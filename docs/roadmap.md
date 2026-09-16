@@ -422,3 +422,12 @@ For each capability:
 7. tag meaningful checkpoints.
 
 Large implementation work should be committed in resumable logical slices such as foundation / domain / evaluator / command / UI / tests / fixes. Phase numbers should describe actual architectural checkpoints rather than preserve an obsolete implementation order for appearance alone.
+
+## Issue #102 — Native live MCP transport
+
+Implemented for PR review: current SDK/protocol Streamable HTTP, explicit local
+capabilities, read/edit permissions, same Host mutation queue and source-art history,
+revision conflicts, request cancellation/revocation and Native management UI.
+Protocol/security/shared-session tests and packaged external WPF edit proof protect
+this milestone. Final physical Windows acceptance remains the documented hands-on
+check; remote transport, providers, stdio bridge and semantic AI authoring are deferred.

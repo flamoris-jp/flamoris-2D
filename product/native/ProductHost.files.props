@@ -1,11 +1,14 @@
 <Project>
-  <!-- Reviewed Node runtime graph, including both worker entry points. No browser shell or tests. -->
+  <!-- Exact reviewed Product Host and worker module graph. -->
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)..\product-host\document-artwork.mjs" Link="ProductHost\document-artwork.mjs" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(MSBuildThisFileDirectory)..\product-host\document-lifecycle.mjs" Link="ProductHost\document-lifecycle.mjs" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(MSBuildThisFileDirectory)..\product-host\document-transfer.mjs" Link="ProductHost\document-transfer.mjs" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(MSBuildThisFileDirectory)..\product-host\evaluated-projection.mjs" Link="ProductHost\evaluated-projection.mjs" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(MSBuildThisFileDirectory)..\product-host\key-state-authoring.mjs" Link="ProductHost\key-state-authoring.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\live-mcp-facade.mjs" Link="ProductHost\live-mcp-facade.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\live-mcp-policy.mjs" Link="ProductHost\live-mcp-policy.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\live-mcp-transport.mjs" Link="ProductHost\live-mcp-transport.mjs" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(MSBuildThisFileDirectory)..\product-host\main.mjs" Link="ProductHost\main.mjs" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(MSBuildThisFileDirectory)..\product-host\mesh-generation-worker.mjs" Link="ProductHost\mesh-generation-worker.mjs" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(MSBuildThisFileDirectory)..\product-host\mesh-hands-on.mjs" Link="ProductHost\mesh-hands-on.mjs" CopyToOutputDirectory="PreserveNewest" />

@@ -63,3 +63,5 @@ The original draft remains useful as project history, but it predates the succes
 Design decisions should be recorded in GitHub before or together with implementation changes. Large architectural choices are captured as ADRs under `docs/decisions/`.
 
 Current proposals remain draft until reviewed/merged. Prototype branches are runnable snapshots and do not automatically override current design authority.
+
+- [ADR 0010 — Native live MCP transport/security](decisions/0010-native-live-mcp.md): current external attachment contract under Issue #102.
