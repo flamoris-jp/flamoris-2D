@@ -58,3 +58,19 @@ pointer feel, overlay contrast, discoverability and file-dialog/save behavior. T
 portable smoke does not prove a signed installer, association, update/uninstall, live
 external MCP attachment, or Electron retirement. Those accepted release gates remain
 open; Electron stays until the migration design's stop conditions pass.
+
+## Live MCP (Issue #102)
+
+The `MCP / AI` menu enables a document-scoped loopback Streamable HTTP endpoint,
+disabled by default. See [workflow](../../docs/native-production-workflow.md) and
+[ADR 0010](../../docs/decisions/0010-native-live-mcp.md). Official SDK 2.0.0 implements
+2026-07-28 plus stateless 2025 compatibility. No separate Host or stdio bridge.
+
+Before a local native build, install locked packages with
+`npm ci --prefix product --workspaces=false --ignore-scripts`.
+`McpRuntime.files.props` includes only named, reviewed production dependencies;
+SDK client/fixtures/tests are excluded from the candidate. The package's bundled
+Node runs the endpoint even with developer Node/.NET absent from PATH.
+The production smoke uses an independent HTTP client for modern discovery,
+visible rename/Mesh edits, automatic WPF refresh and shared history; it then
+continues the established Source→Export→Save/reopen path.

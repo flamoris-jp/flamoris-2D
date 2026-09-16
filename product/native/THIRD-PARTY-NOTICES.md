@@ -29,3 +29,13 @@ file association, or replace the Electron release.
 this exact directory with Node/.NET removed from PATH and exports a real H.264
 video using the packaged encoder. Installer, signing, update and default file
 association policy remain part of the separately reviewed release cutover.
+
+## Local MCP runtime (Issue #102)
+
+Official Model Context Protocol TypeScript SDK server/core/node 2.0.0 (MIT),
+@hono/node-server 1.19.17 (MIT), hono 4.13.8 (MIT), zod 4.6.5 (MIT).
+Exact package integrity hashes and transitive versions are pinned in
+`product/package-lock.json`. Their runtime modules, package metadata and LICENSE
+files are included by `McpRuntime.files.props`. SDK distributions include their
+bundled validation dependencies and upstream notices. The official client SDK is
+a test-only dependency and is not part of the native candidate.

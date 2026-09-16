@@ -553,3 +553,13 @@ Retiring the Electron shell does **not** require rewriting the authoritative Jav
 - Small migration stages, risks, and a concrete Electron stop condition are explicit in Sections 15–18.
 - Long-lived unresolved choices are routed to ADRs in Section 19.
 - This proposal changes no implementation file and does not pretend the Electron implementation never existed.
+
+## Issue #102 live attachment update
+
+ADR 0010 now owns external MCP transport/security. ProductHostService serializes
+both WPF and live MCP; the stdio control protocol remains the internal WPF boundary.
+Same-session typed mutations and source-history Undo/Redo emit the existing change
+event. The separate loopback MCP capability never reveals the internal bulk secret.
+The Native menu owns opt-in, permissions and credential rotation. Older sections
+that describe public MCP as future work are historical migration staging, superseded
+for this boundary by [ADR 0010](decisions/0010-native-live-mcp.md).
