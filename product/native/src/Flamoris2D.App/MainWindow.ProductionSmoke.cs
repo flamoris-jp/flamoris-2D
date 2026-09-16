@@ -27,6 +27,7 @@ public partial class MainWindow
         var grid=await client.GenerateMeshAsync(nodeId,false,4,4,.1,.45,.65,.3,client.Revision);
         await CommitMeshAsync(MeshEdit.Generated(grid.Payload.GetProperty("candidate"),true),client.Revision);
         MeshCanvas.Fit();
+        await RunLiveMcpSmokeAsync(nodeId,keyArtId);
         var initial=FramePixels(MeshCanvas.EvaluatedFrame);var positions=(double[])MeshCanvas.Positions.Clone();positions[0]+=9;positions[1]+=7;
         MeshCanvas.Structure=false;ConfigureMeshContext();await CommitMeshAsync(MeshEdit.Move(positions),client.Revision);
         var moved=FramePixels(MeshCanvas.EvaluatedFrame);if(initial.SequenceEqual(moved))throw new Exception("Layout moved overlay without deforming artwork.");

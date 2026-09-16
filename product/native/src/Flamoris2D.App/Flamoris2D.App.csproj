@@ -18,6 +18,7 @@
     <ProjectReference Include="..\Flamoris2D.ProductHost.Client\Flamoris2D.ProductHost.Client.csproj" />
   </ItemGroup>
   <Import Project="..\..\ProductHost.files.props" />
+  <Import Project="..\..\McpRuntime.files.props" />
   <ItemGroup>
     <None Include="..\..\..\package.json"
           Link="package.json"

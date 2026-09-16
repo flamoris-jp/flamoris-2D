@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import assert from 'node:assert/strict';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -41,21 +42,32 @@ function psd(red = 255) {
     imageData:{width:2,height:2,data:new Uint8ClampedArray([red,0,0,255,0,255,0,128,0,0,255,255,255,255,255,0])}}] }));
 }
 
-test('reviewed native PSD update retains authored topology and restores exact artwork through shared Undo/Redo',async()=>{
+test('reviewed native PSD update retains authored topology and restores exact artwork through shared Undo/Redo',async(t)=>{
  const h=new ProductHostService();await send(h,'session.create');
  async function upload(bytes){const r=await send(h,'document.reserve',{byteLength:bytes.length});h.transfers.entries.get(r.id).bytes=Buffer.from(bytes);return r.id;}
  const id=await upload(psd());await send(h,'source.import',{id,kind:'psd',fileName:'art.psd',jobId:'initial'});
  const nodeId=[...h.document.bindings.keys()][0];
  const candidate=await send(h,'mesh.generatePreview',{nodeId,previewId:'mesh',kind:'grid',columns:2,rows:2});
  await send(h,'mesh.tool',{nodeId,context:'structure',tool:'topology.automesh',input:{candidate:candidate.candidate}});
+ const connection=(await send(h,'mcp.enable',{permission:'edit'}));
+ const mcp=new Client({name:'source-history-proof',version:'1'});
+ await mcp.connect(new StreamableHTTPClientTransport(new URL(connection.endpoint),{requestInit:{headers:{Authorization:`Bearer ${connection.token}`}}}));
+ t.after(async()=>{await mcp.close();await h.close();});
+ async function remote(name,args){const r=await mcp.callTool({name,arguments:args});assert.ok(!r.isError,JSON.stringify(r));return r.structuredContent;}
+ const beforeMesh=structuredClone(h.document.session.project);
+ const form=h.document.session.project.meshKeyforms[0];const positions=[...form.positions];positions[0]+=1;
+ await remote('command.mesh_keyform.move_vertices',{documentToken:h.documentToken,expectedRevision:h.revision,payload:{keyformId:form.id,positions}});
+ assert.deepEqual(h.document.session.project.meshKeyforms[0].positions,positions);
+ await send(h,'session.undo');assert.deepEqual(h.document.session.project,beforeMesh);
+ await send(h,'session.redo');
  const beforeProject=structuredClone(h.document.session.project),beforeAssets=structuredClone(h.document.renderAssets),beforeHandle=h.document.bindings.get(nodeId);
  const r=await send(h,'source.analyzeReimport',{id:await upload(psd(10)),kind:'psd',fileName:'art.psd',jobId:'update'});
  assert.equal(r.canApply,true);assert.deepEqual(h.document.session.project,beforeProject);assert.equal(h.assets.entries.size,2);
  await send(h,'source.applyReview',{id:r.id});const afterProject=structuredClone(h.document.session.project),afterAssets=structuredClone(h.document.renderAssets),afterHandle=h.document.bindings.get(nodeId);
  assert.notEqual(afterHandle,beforeHandle);assert.notDeepEqual(afterAssets,beforeAssets);
  assert.deepEqual(afterProject.meshes,beforeProject.meshes);assert.deepEqual(Object.keys(afterProject.scene.nodes),Object.keys(beforeProject.scene.nodes));
- await send(h,'session.undo');assert.deepEqual(h.document.session.project,beforeProject);assert.deepEqual(h.document.renderAssets,beforeAssets);assert.equal(h.document.bindings.get(nodeId),beforeHandle);
- await send(h,'session.redo');assert.deepEqual(h.document.session.project,afterProject);assert.deepEqual(h.document.renderAssets,afterAssets);
+ await remote('live.undo',{documentToken:h.documentToken,expectedRevision:h.revision});assert.deepEqual(h.document.session.project,beforeProject);assert.deepEqual(h.document.renderAssets,beforeAssets);assert.equal(h.document.bindings.get(nodeId),beforeHandle);
+ await remote('live.redo',{documentToken:h.documentToken,expectedRevision:h.revision});assert.deepEqual(h.document.session.project,afterProject);assert.deepEqual(h.document.renderAssets,afterAssets);
  await send(h,'session.undo');
  await send(h,'headless.execute',{command:{type:'scene.rename_node',payload:{nodeId:h.document.session.project.scene.rootId,displayName:'forked'}}});
  assert.equal(h.assets.entries.size,1);assert.equal(h.assets.entries.has(afterHandle),false);

@@ -1,6 +1,64 @@
 # FLAMORIS 2D MCP-First Design
 
-Status: draft
+Status: current live contract below; original sections retain the MCP-first design rationale.
+
+
+## Live MCP attachment (Issue #102)
+
+Current contract: [ADR 0010](decisions/0010-native-live-mcp.md). The Native Product
+Host exposes an optional **local, authenticated, stateless Streamable HTTP**
+endpoint over the same EditorSession and source-artwork history. It is disabled
+by default. The WPF `MCP / AI` menu controls Read only / Edit, disable, connection
+copy and credential rotation; status shows request activity, not a client count.
+
+Protocol: **2026-07-28**, official TypeScript SDK **2.0.0**. Modern clients use
+`server/discover` and request metadata; 2025-03-26/06-18/11-25 clients may use the
+SDK's stateless initialize compatibility. There is no protocol session ID or
+legacy SSE endpoint. stdio forwarding was not required and is not shipped.
+Clients must support custom bearer headers to reach this local endpoint; OAuth-only,
+remote/cloud and browser-origin clients are outside this capability.
+
+1. Read `live.context` for the active `documentToken` and `revision`.
+2. Discover typed `query.*` and `command.*` tools with `tools/list` (32 per page),
+   or `flamoris://schema/<tool-name>` resources. The deterministic
+   `flamoris://live/dispositions` resource accounts for every public Product
+   Command/Query/import, including intentionally excluded operations.
+3. Supply `documentToken` for queries and also `expectedRevision` for edits.
+   `live.transaction` accepts 1–64 ordinary commands and one label, creating one
+   shared history unit. `live.undo`/`live.redo` traverse Native source-art history.
+4. After a successful edit, WPF receives ordinary `document.changed` and refreshes.
+   A stale edit fails with `revision.conflict`; read again and reconsider explicitly.
+
+Read only permits queries/validation/evaluation/discovery. Edit never grants
+save/import/replacement/export-to-path or binary access. `source.apply_psd_reimport`
+requires Native review and retained artwork; `animation.mesh_target.restore_internal`
+is internal history machinery. Neither is publicly executable. Queries absent from
+public MCP schemas have an explicit disposition; Native export stays in Native.
+
+The endpoint binds only to 127.0.0.1 with an ephemeral port, validates exact Host,
+rejects every Origin header and requires a fresh 256-bit capability. Disable,
+permission change/rotation, replacement and Host shutdown/restart revoke it.
+No token is persisted; only explicit connection copy exposes it to the clipboard.
+The copy format is a conventional `mcpServers` entry; adapt the client wrapper
+while retaining the endpoint and Authorization header. Old pasted credentials
+cannot edit a replacement document.
+
+Limits: 1 MiB body, depth 64, 8 active requests, 16 sockets, 15 s deadline,
+4 MiB query results and 64 commands per transaction. Oversized queries can be
+replaced with narrower typed queries. Both WPF and MCP enter ProductHostService's
+queue; cancellation and deadline guards run at admission and immediately before
+Product commit, including Undo/Redo. Synchronous Product work cannot be preempted
+mid-instruction; the guard prevents a transaction that exceeds its deadline from
+committing. A response lost after commit is ambiguous: query the shared state
+before retrying; there is no automatic replay/rebase or remote rollback.
+
+Tests cover official current SDK and legacy initialization, header/version mismatch,
+auth/Origin/Host rejection, body/concurrency limits, real disconnect while queued,
+revision conflicts, atomic transactions, replacement/restart, Mesh mutation and
+Native PSD re-import artwork Undo/Redo. The packaged WPF production smoke additionally
+checks automatic target/image refresh after an external Mesh transaction, shared
+Undo/Redo and the existing subsequent Save/reopen path. Physical hands-on acceptance
+is separate from automated results.
 
 ## 1. Principle
 
@@ -415,8 +473,7 @@ Phase 1 requirements:
 Phase 1C provides the minimal in-process proof through
 `product/src/mcp/adapter.js`: hierarchy queries and persistent edits share the
 normal Query API, command schemas, `EditorSession`, validation, Undo/Redo, and
-UI-visible Project state. A general networked MCP service remains a later
-adapter concern.
+UI-visible Project state. The live Native transport is now specified and implemented by ADR 0010.
 
 Later MCP implementation becomes an adapter over these existing capabilities rather than a retrofit.
 

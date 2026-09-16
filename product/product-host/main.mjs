@@ -8,31 +8,46 @@ assertNodeRuntimeCapabilities();
 const service = new ProductHostService();
 service.bulkEndpoint = await service.assets.start();
 const decoder = new ControlFrameDecoder();
-let queue = Promise.resolve();
+let outputQueue = Promise.resolve();
+let controlFailed = false;
+const failControlAuthority = () => {
+  if (controlFailed) return;
+  controlFailed = true;
+  service.mcp.revoke();
+  service.generation?.cancel();
+  service.importJob?.cancel();
+  service.shutdownRequested = true;
+  process.exitCode = 1;
+  stdin.destroy();
+};
+const write = (messages) => {
+  outputQueue = outputQueue.then(async () => {
+    for (const message of messages) await writeControlFrame(stdout, message);
+  });
+  return outputQueue;
+};
+service.onExternalEvents = async events => {
+  try { await write(events); }
+  catch (error) { failControlAuthority(); throw error; }
+};
+stdout.on("error", failControlAuthority);
 
 decoder.on("data", (request) => {
-  // Cancellation only signals the matching bounded preview worker. Responses/mutations stay serialized.
-  service.cancelMeshPreview(request);
-  service.cancelImport(request);
-  queue = queue.then(async () => {
-    const { response, events } = await service.handle(request);
-    await writeControlFrame(stdout, response);
-    for (const event of events) await writeControlFrame(stdout, event);
+  void service.handle(request).then(async ({ response, events }) => {
+    await write([response, ...events]);
     if (service.shutdownRequested) stdin.destroy();
-  }).catch((error) => {
-    stderr.write(`[product-host] ${error?.stack || error}\n`);
-    process.exitCode = 1;
-    stdin.destroy();
+  }).catch(() => {
+    stderr.write("[product-host] Control channel failed.\n");
+    failControlAuthority();
   });
 });
 
 decoder.on("error", (error) => {
-  stderr.write(`[product-host] ${error?.stack || error}\n`);
-  process.exitCode = 1;
-  stdin.destroy();
+  stderr.write("[product-host] Invalid control frame.\n");
+  failControlAuthority();
 });
 
 stdin.pipe(decoder);
-await new Promise((resolve) => stdin.on("close", () => { service.generation?.cancel(); service.importJob?.cancel(); resolve(); }));
-await queue;
-await service.assets.close();
+await new Promise((resolve) => stdin.on("close", () => { service.mcp.revoke(); service.generation?.cancel(); service.importJob?.cancel(); resolve(); }));
+await service.close();
+await outputQueue.catch(() => {});

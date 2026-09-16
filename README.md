@@ -231,3 +231,12 @@ The public-release and licensing work in #43 is intentionally separate from curr
 ## Historical reference
 
 The original v0.3 prototype snapshot remains preserved on `prototype/psd-import-zoom-pan-v0.3` for history/reference. It is not the branch for continuing Product development.
+
+### Native live MCP
+
+Issue #102 adds opt-in, local Streamable HTTP attachment to the running Native
+editor's **same EditorSession and Undo/Redo history**. `MCP / AI` offers Read only /
+Edit, connection copy, activity and revocation. Current protocol 2026-07-28 uses
+official SDK 2.0.0; file/import/save capabilities stay Native-only.
+See [connection and hands-on guide](docs/native-production-workflow.md),
+[MCP design](docs/mcp-design.md), and [ADR 0010](docs/decisions/0010-native-live-mcp.md).

@@ -14,9 +14,12 @@
     "test": "node --check desktop/main.mjs && node --check desktop/preload.cjs && node --test tests/*.test.js"
   },
   "dependencies": {
+    "@modelcontextprotocol/node": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
     "ag-psd": "31.0.2"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "2.0.0",
     "electron": "44.1.0",
     "electron-builder": "26.15.7"
   },
@@ -32,14 +35,18 @@
       "node_modules/ag-psd/**/*"
     ],
     "win": {
-      "target": ["nsis"]
+      "target": [
+        "nsis"
+      ]
     },
-    "fileAssociations": [{
-      "ext": "fl2d",
-      "name": "FLAMORIS 2D Project",
-      "description": "FLAMORIS 2D Project",
-      "role": "Editor"
-    }],
+    "fileAssociations": [
+      {
+        "ext": "fl2d",
+        "name": "FLAMORIS 2D Project",
+        "description": "FLAMORIS 2D Project",
+        "role": "Editor"
+      }
+    ],
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true

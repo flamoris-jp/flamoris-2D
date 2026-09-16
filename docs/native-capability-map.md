@@ -26,7 +26,7 @@ Tests prove the contracts stated; no CI result substitutes for physical Windows 
 | G2 — Bulk assets / envelope ownership | Implemented | PSD/flimg decode workers, authenticated binary document/raster handles, artwork round-trip and reimport/history retention; 128 MiB document, 256 MiB transfer pool, 512 MiB artwork admission including decode/history/candidate residency |
 | G3 — Native renderer choice | Implemented; ADR 0008 measured decision | D3D11 hardware + WARP fallback, shared Preview/Export; software reference; full-HD measurement and error tolerances below |
 | G4 — Production acceptance / packaging | Portable candidate implemented; final human/release gate open | Self-contained .NET 10 + Node 24.21.0 + pinned shared FFmpeg; exact Host/worker allowlist and packaged smoke with developer runtimes absent from PATH. Physical DPI/focus/feel, private production artwork, signed installer/update/association/default release still require acceptance |
-| G5 — Live MCP transport | Intentionally deferred by accepted design | Same-session in-process adapter is proven. Public live-desktop discovery/authentication/multi-client attachment requires its separate ADR; no hidden MCP-only editor |
+| G5 — Live MCP transport | Implemented under #102; PR / Windows acceptance required | ADR 0010; SDK 2.0.0 local Streamable HTTP, Native permission menu, same Host queue/session/source history, revocation and protocol/security tests, packaged WPF external-edit smoke. No filesystem capability. |
 
 ADR 0009 exposes identity-only Commands for the existing Phase 8 mesh animation target,
 allowing fresh PSD/flimg projects to author MeshDeformation samples/tracks. It does not
@@ -81,7 +81,7 @@ provides the complete import-to-reopen path and final Windows checklist.
 | Stable-ID search / target details | `queries/project.js` | `scene.search`, `scene.get_node` | Source | Object | right Targets / Properties | migrated | `editor-core.test.js`; product-host.test.js; C# client tests / WPF smoke | Targets name/ID filter over authoritative projection; target details retained independently; animation target lists reuse scene.search. |
 | Host handshake / lifecycle | `product-host/main.mjs`, native client | version/requestId/token/health | all | Session | status | migrated | `product-host.test.js`, native client tests; product-host.test.js; C# client tests / WPF smoke | Version/request/token negotiation; one supervised Node Host; protocol mismatch fails closed. |
 | Undo / Redo / Transaction | `commands/editor.js` | one `EditorSession` | all | History | menu/toolbar | migrated | `product-host.test.js`, native client tests; product-host.test.js; C# client tests / WPF smoke | One authoritative EditorSession and history shared by all native tools; no persistent C# Project or alternate history. |
-| Headless shared history | `mcp/adapter.js` | same session commands | all | Session | Host | migrated | `product-host.test.js`; product-host.test.js; C# client tests / WPF smoke | Existing MCP adapter and native requests use the same session; ordering/transaction/Undo/Redo tests. External live attachment remains G5. |
+| Headless shared history | `mcp/adapter.js` | same session commands | all | Session | Host | migrated | `product-host.test.js`; product-host.test.js; C# client tests / WPF smoke | Existing MCP adapter and native requests use the same session; ordering/transaction/Undo/Redo tests. External live attachment is implemented under G5 / ADR 0010. |
 | Host crash / stale rejection | native client and shell | token/revision invalidation | all | Session | banner/status | migrated | native client tests; product-host.test.js; C# client tests / WPF smoke | Authority invalidation clears projections and cancels editing; explicit restart/Recovery; no WPF projection serialized as a document. |
 | PNG hands-on raster delivery | `product-host/raster-assets.mjs`, native `ArtworkLoader` | token/revision-qualified binary handles | Source | Disposable proof | menu / viewport | superseded | `native-mesh-host.test.js`, native binary client test; product-host.test.js; C# client tests / WPF smoke | Superseded as the primary workflow by PSD/flimg/Open. Retained only under File > 開発用, explicitly disposable and unsavable. |
 | Mesh vertex picking / drag | native `MeshViewport`, `ViewportGeometry` | local preview then existing typed Product tool/command | Mesh | Structure / Layout | canvas | migrated | native geometry/gesture tests, Host history tests; native-mesh-host.test.js; native geometry tests; WPF production smoke | WPF DIP hit testing, capture/Esc cancellation, stable vertex IDs; one Layout/Form command on release. |
@@ -366,3 +366,13 @@ open/commit/render pipeline. Internal inverse commands are not public native too
 | Query | `sequence.project_clip_instances` | `src/queries/project.js` | Canonical open/commit validation or bundled authoring/evaluated projection; no second evaluator | superseded |
 | Query | `export.get_frame_plan` | `src/queries/project.js` | Export > Output | migrated |
 | Query | `export.evaluate_frame` | `src/queries/project.js` | Export > Output | migrated |
+
+## Live MCP disposition authority
+
+`product/product-host/live-mcp-policy.mjs` is the audited, fail-closed operation list.
+`flamoris://live/dispositions` deterministically accounts for **every** public
+Command/Query/import from current schemas/implementations. Safe commands have
+individual typed tools; queries without a public MCP schema are explicitly excluded,
+not silently dropped. Native reviewed reimport and internal restore commands are
+excluded even in Edit mode. Native file/binary capabilities remain Native-only.
+See [MCP design](mcp-design.md) for paging, revisions, limits and compatibility.
