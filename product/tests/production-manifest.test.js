@@ -47,6 +47,12 @@ test('native package allowlist is exactly the Product Host and worker dependency
   const props=await readFile(new URL('../native/ProductHost.files.props',import.meta.url),'utf8');
   const entries=[...props.matchAll(/<None Include="\$\(MSBuildThisFileDirectory\)\.\.\\([^"\n]+)"/gu)].map(m=>m[1].replaceAll('\\','/'));
   assert.deepEqual(entries.sort(),[...graph].sort());
+  // Native startup resolves ProductHost/main.mjs. Preserve its published layout,
+  // including workers' sibling imports, rather than mirroring source directory names.
+  const links = [...props.matchAll(/<None Include="\$\(MSBuildThisFileDirectory\)\.\.\\([^"\n]+)" Link="([^"\n]+)"/gu)];
+  assert.equal(links.length, entries.length);
+  for (const [, source, target] of links)
+    assert.equal(target.replaceAll('\\', '/'), source.replaceAll('\\', '/').replace(/^product-host\//u, 'ProductHost/'));
   const product=new Set(await productionFiles());
   for(const entry of entries){assert.ok(entry.startsWith('product-host/')||product.has(entry),entry);assert.doesNotMatch(entry,/(?:tests|staging|history)\/|src\/app\.js|(?:-view|renderer)\.js$/u);}
 });
