@@ -53,7 +53,11 @@ public partial class MainWindow
             await RefreshMcpStatusAsync(client);
             StatusText.Text = "MCP接続を有効にしました。「接続情報をコピー」でクライアントへ登録できます。";
         }
-        catch (Exception error) { ClearMcpStatus(); StatusText.Text = $"MCPを有効にできませんでした: {error.Message}"; }
+        catch (Exception error)
+        {
+            try { await RefreshMcpStatusAsync(client); } catch { ClearMcpStatus(); }
+            StatusText.Text = $"MCPを有効にできませんでした: {error.Message}";
+        }
         finally { _mcpBusy = false; }
     }
     private async void McpDisable_Click(object sender, RoutedEventArgs e)

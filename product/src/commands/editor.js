@@ -123,15 +123,16 @@ export class EditorSession {
 
   executeTransaction(commands, { label = "Edit" } = {}) {
     const { draft, inverses, affected, issues } = this.prepareTransaction(commands);
-    this.beforeCommit?.();
     const entry = {
       label,
       commands: cloneProject(commands),
       inverses,
       affectedIds: [...affected],
       beforeRevision: this.currentRevision,
-      afterRevision: ++this.revisionCounter,
+      afterRevision: this.revisionCounter + 1,
     };
+    this.beforeCommit?.();
+    this.revisionCounter = entry.afterRevision;
     this.project = draft;
     this.currentRevision = entry.afterRevision;
     this.undoStack.push(entry);
