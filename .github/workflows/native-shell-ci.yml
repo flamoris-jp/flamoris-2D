@@ -95,3 +95,4 @@ jobs:
           name: flamoris2d-native-production-candidate-win-x64
           path: out/native-win-x64
           if-no-files-found: error
+          retention-days: 3
