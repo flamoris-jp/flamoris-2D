@@ -16,6 +16,7 @@ await TestTargetPropertiesAsync(hostPath);
 await TestMeshArtworkAsync(hostPath);
 await TestCrashInvalidationAsync(hostPath);
 await TestControlChannelLossRevokesMcpAsync(hostPath);
+await TestDiagnosticBoundaryAsync();
 await TestLoggingIntegrationAsync(hostPath);
 await DocumentTests.RunAsync(hostPath);
 RasterizerTests.Run();
@@ -65,6 +66,37 @@ static void TestLoggingConfiguration()
         };
         var failureSafeLogger = NativeLoggingConfiguration.CreateLogger(failureOptions, root);
         failureSafeLogger.Info("app", "This sink failure must not escape.");
+    }
+    finally
+    {
+        try { Directory.Delete(root, true); } catch { }
+    }
+}
+
+static async Task TestDiagnosticBoundaryAsync()
+{
+    var root = Path.Combine(Path.GetTempPath(), "Flamoris2D.Logging.Tests", Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    var secret = "mcp-secret-must-not-log";
+    try
+    {
+        var options = NativeLoggingConfiguration.CreateDefaultOptions();
+        options.Outputs = [new LogOutputOptions { Type = "file", Path = "diagnostics.log" }];
+        var logger = NativeLoggingConfiguration.CreateLogger(options, root);
+        await using var client = new ProductHostClient(logger);
+        var diagnostics = string.Join('\n',
+            """FLAMORIS_DIAGNOSTIC {"category":"mcp.auth"}""",
+            $$"""FLAMORIS_DIAGNOSTIC {"level":"warn","category":"mcp.auth","message":"MCP authentication failed","properties":{"statusCode":401,"innocent":"{{secret}}","payload":{"token":"{{secret}}"}}}""",
+            string.Empty);
+        await using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(diagnostics));
+        using var reader = new StreamReader(stream);
+        await client.ReadDiagnosticsForTestingAsync(reader);
+
+        var text = File.ReadAllText(Path.Combine(root, "diagnostics.log"));
+        Assert(text.Contains("[WARN ] [mcp.auth]") && text.Contains("statusCode=401"),
+            "A valid diagnostic after a malformed envelope was not logged.");
+        Assert(!text.Contains(secret) && !text.Contains("payload") && !text.Contains("innocent"),
+            "Unknown diagnostic properties crossed the safe-field boundary.");
     }
     finally
     {
