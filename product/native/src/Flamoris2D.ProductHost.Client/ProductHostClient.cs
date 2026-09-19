@@ -10,6 +10,34 @@ public sealed partial class ProductHostClient : IAsyncDisposable
 {
     public const int ProtocolVersion = 1;
     private const int MaximumFrameBytes = 8 * 1024 * 1024;
+    private const int MaximumDiagnosticStringLength = 128;
+    private static readonly IReadOnlyDictionary<(string Category, string Message), string[]> AllowedHostDiagnosticProperties =
+        new Dictionary<(string, string), string[]>
+        {
+            [("mcp.transport", "Starting live MCP endpoint")] = ["permission"],
+            [("mcp.session", "Live MCP access attached")] = ["permission", "protocol"],
+            [("mcp.transport", "Live MCP server started")] = ["transport", "loopback"],
+            [("mcp.transport", "Live MCP server failed to start")] = ["code"],
+            [("mcp.session", "MCP client detached")] = ["permission", "requests", "active"],
+            [("mcp.session", "Live MCP access detached")] = ["permission", "requests", "active"],
+            [("mcp.session", "Revoked MCP access rejected")] = ["statusCode"],
+            [("mcp.auth", "MCP origin or host rejected")] = ["statusCode"],
+            [("mcp.auth", "Duplicate MCP security header rejected")] = ["statusCode"],
+            [("mcp.auth", "MCP authentication failed")] = ["statusCode"],
+            [("mcp.auth", "MCP authentication succeeded")] = ["transport"],
+            [("mcp.session", "MCP client attached")] = ["permission", "transport"],
+            [("mcp.protocol", "MCP request rejected")] = ["statusCode"],
+            [("mcp.transport", "MCP request timed out")] = ["statusCode"],
+            [("mcp.protocol", "MCP request failed")] = ["code"],
+            [("mcp.transport", "MCP request disconnected")] = ["active", "requests"],
+            [("mcp.auth", "MCP permission denied")] = ["permission", "tool"],
+            [("mcp.command", "MCP revision conflict rejected")] = ["tool", "code", "revision"],
+            [("mcp.query", "MCP revision conflict rejected")] = ["tool", "code", "revision"],
+            [("mcp.command", "MCP operation failed")] = ["tool", "code", "revision"],
+            [("mcp.query", "MCP operation failed")] = ["tool", "code", "revision"],
+            [("mcp.command", "MCP operation completed")] = ["tool", "revision"],
+            [("mcp.query", "MCP operation completed")] = ["tool", "revision"],
+        };
 
     private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> _pending = new();
     private readonly SemaphoreSlim _writeGate = new(1, 1);
@@ -449,6 +477,9 @@ public sealed partial class ProductHostClient : IAsyncDisposable
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
     }
 
+    internal Task ReadDiagnosticsForTestingAsync(StreamReader reader, CancellationToken cancellationToken = default) =>
+        ReadDiagnosticsAsync(reader, cancellationToken);
+
     private bool TryLogHostDiagnostic(string line)
     {
         const string prefix = "FLAMORIS_DIAGNOSTIC ";
@@ -457,37 +488,80 @@ public sealed partial class ProductHostClient : IAsyncDisposable
         {
             using var document = JsonDocument.Parse(line[prefix.Length..]);
             var root = document.RootElement;
-            var category = root.GetProperty("category").GetString() ?? "app";
-            var message = root.GetProperty("message").GetString() ?? "Product Host diagnostic";
-            var level = root.GetProperty("level").GetString() switch
+            if (root.ValueKind != JsonValueKind.Object ||
+                !TryReadDiagnosticString(root, "category", out var category) ||
+                !TryReadDiagnosticString(root, "message", out var message) ||
+                !TryReadDiagnosticString(root, "level", out var levelName) ||
+                !AllowedHostDiagnosticProperties.TryGetValue((category, message), out var allowedFields))
+                return false;
+
+            var level = levelName switch
             {
                 "error" => LogLevel.Error,
                 "warn" => LogLevel.Warn,
                 "info" => LogLevel.Info,
-                _ => LogLevel.Debug,
+                "debug" => LogLevel.Debug,
+                _ => (LogLevel?)null,
             };
+            if (level is null) return false;
+
             var properties = new Dictionary<string, object?>();
-            if (root.TryGetProperty("properties", out var fields) && fields.ValueKind == JsonValueKind.Object)
+            if (root.TryGetProperty("properties", out var fields))
             {
-                foreach (var field in fields.EnumerateObject())
+                if (fields.ValueKind != JsonValueKind.Object) return false;
+                foreach (var fieldName in allowedFields)
                 {
-                    properties[field.Name] = field.Value.ValueKind switch
-                    {
-                        JsonValueKind.String => field.Value.GetString(),
-                        JsonValueKind.Number when field.Value.TryGetInt64(out var number) => number,
-                        JsonValueKind.True => true,
-                        JsonValueKind.False => false,
-                        JsonValueKind.Null => null,
-                        _ => field.Value.GetRawText(),
-                    };
+                    if (fields.TryGetProperty(fieldName, out var field) &&
+                        TryReadDiagnosticValue(field, out var value))
+                        properties[fieldName] = value;
                 }
             }
-            _logger?.Log(level, category, message, properties);
+            _logger?.Log(level.Value, category, message, properties);
             return true;
         }
-        catch (JsonException)
+        catch (Exception error) when (error is JsonException or InvalidOperationException or FormatException or OverflowException)
         {
             return false;
+        }
+    }
+
+    private static bool TryReadDiagnosticString(JsonElement root, string name, out string value)
+    {
+        value = string.Empty;
+        if (!root.TryGetProperty(name, out var element) || element.ValueKind != JsonValueKind.String)
+            return false;
+        var candidate = element.GetString();
+        if (string.IsNullOrWhiteSpace(candidate) || candidate.Length > MaximumDiagnosticStringLength)
+            return false;
+        value = candidate;
+        return true;
+    }
+
+    private static bool TryReadDiagnosticValue(JsonElement element, out object? value)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.String:
+                var text = element.GetString() ?? string.Empty;
+                value = text.Length <= MaximumDiagnosticStringLength
+                    ? text
+                    : text[..MaximumDiagnosticStringLength];
+                return true;
+            case JsonValueKind.Number when element.TryGetInt64(out var number):
+                value = number;
+                return true;
+            case JsonValueKind.True:
+                value = true;
+                return true;
+            case JsonValueKind.False:
+                value = false;
+                return true;
+            case JsonValueKind.Null:
+                value = null;
+                return true;
+            default:
+                value = null;
+                return false;
         }
     }
 
