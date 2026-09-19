@@ -84,6 +84,8 @@ static async Task TestDiagnosticBoundaryAsync()
         options.Outputs = [new LogOutputOptions { Type = "file", Path = "diagnostics.log" }];
         var logger = NativeLoggingConfiguration.CreateLogger(options, root);
         await using var client = new ProductHostClient(logger);
+        var rawDiagnostics = new List<string>();
+        client.DiagnosticReceived += (_, line) => rawDiagnostics.Add(line);
         var validDiagnostic = "FLAMORIS_DIAGNOSTIC " + JsonSerializer.Serialize(new
         {
             level = "warn",
@@ -96,9 +98,18 @@ static async Task TestDiagnosticBoundaryAsync()
                 ["payload"] = new { token = secret },
             },
         });
+        var oversizedDiagnostic = "FLAMORIS_DIAGNOSTIC " + JsonSerializer.Serialize(new
+        {
+            level = "warn",
+            category = "mcp.auth",
+            message = "MCP authentication failed",
+            properties = new { payload = new string('x', 4096) + secret },
+        });
         var diagnostics = string.Join('\n',
-            """FLAMORIS_DIAGNOSTIC {"category":"mcp.auth"}""",
+            $$$"""FLAMORIS_DIAGNOSTIC {"category":"mcp.auth","payload":"{{{secret}}}"}""",
+            oversizedDiagnostic,
             validDiagnostic,
+            "ordinary stderr diagnostic",
             string.Empty);
         await using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(diagnostics));
         using var reader = new StreamReader(stream);
@@ -106,9 +117,11 @@ static async Task TestDiagnosticBoundaryAsync()
 
         var text = File.ReadAllText(Path.Combine(root, "diagnostics.log"));
         Assert(text.Contains("[WARN ] [mcp.auth]") && text.Contains("statusCode=401"),
-            "A valid diagnostic after a malformed envelope was not logged.");
+            "A valid diagnostic after an oversized envelope was not logged.");
         Assert(!text.Contains(secret) && !text.Contains("payload") && !text.Contains("innocent"),
-            "Unknown diagnostic properties crossed the safe-field boundary.");
+            "Rejected diagnostic content crossed the safe logging boundary.");
+        Assert(rawDiagnostics.SequenceEqual(["ordinary stderr diagnostic"]),
+            "Structured or rejected diagnostic content crossed the legacy UI event boundary.");
     }
     finally
     {
@@ -120,6 +133,7 @@ static async Task TestLoggingIntegrationAsync(string hostPath)
 {
     var root = Path.Combine(Path.GetTempPath(), "Flamoris2D.Logging.Tests", Guid.NewGuid().ToString("N"));
     Directory.CreateDirectory(root);
+    var logPath = Path.Combine(root, "integration.log");
     var options = NativeLoggingConfiguration.CreateDefaultOptions();
     options.Outputs = [new LogOutputOptions { Type = "file", Path = "integration.log" }];
     var logger = NativeLoggingConfiguration.CreateLogger(options, root);
@@ -128,19 +142,10 @@ static async Task TestLoggingIntegrationAsync(string hostPath)
     {
         await using (var client = new ProductHostClient(logger))
         {
-            var attached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var authenticationFailed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var detached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            client.DiagnosticReceived += (_, line) =>
-            {
-                if (line.Contains("Live MCP access attached", StringComparison.Ordinal)) attached.TrySetResult();
-                if (line.Contains("MCP authentication failed", StringComparison.Ordinal)) authenticationFailed.TrySetResult();
-                if (line.Contains("Live MCP access detached", StringComparison.Ordinal)) detached.TrySetResult();
-            };
             await client.StartAsync(hostPath);
             await client.CreateSessionAsync("Logging proof");
             var connection = await client.EnableMcpAsync(McpPermission.Edit);
-            await attached.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await WaitForLogAsync(logPath, "Live MCP access attached");
             secret = connection.Token;
             using var http = new HttpClient();
             using var request = new HttpRequestMessage(HttpMethod.Post, connection.Endpoint);
@@ -150,11 +155,11 @@ static async Task TestLoggingIntegrationAsync(string hostPath)
             using var response = await http.SendAsync(request);
             Assert(response.StatusCode == System.Net.HttpStatusCode.Unauthorized,
                 "Bad MCP credential was not rejected.");
-            await authenticationFailed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await WaitForLogAsync(logPath, "MCP authentication failed");
             await client.DisableMcpAsync();
-            await detached.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await WaitForLogAsync(logPath, "Live MCP access detached");
         }
-        var text = File.ReadAllText(Path.Combine(root, "integration.log"));
+        var text = File.ReadAllText(logPath);
         Assert(text.Contains("[INFO ] [mcp.session]") && text.Contains("[WARN ] [mcp.auth]"),
             "MCP attach/detach/auth diagnostics did not reach Flamoris.Logging.");
         Assert(secret is null || !text.Contains(secret), "MCP credential leaked into the log.");
@@ -163,6 +168,23 @@ static async Task TestLoggingIntegrationAsync(string hostPath)
     {
         try { Directory.Delete(root, true); } catch { }
     }
+}
+
+static async Task WaitForLogAsync(string path, string expected)
+{
+    var deadline = DateTime.UtcNow.AddSeconds(5);
+    while (DateTime.UtcNow < deadline)
+    {
+        try
+        {
+            if (File.Exists(path) &&
+                File.ReadAllText(path).Contains(expected, StringComparison.Ordinal))
+                return;
+        }
+        catch (IOException) { }
+        await Task.Delay(25);
+    }
+    throw new InvalidOperationException($"Timed out waiting for diagnostic: {expected}");
 }
 
 static void TestViewportGeometry()
