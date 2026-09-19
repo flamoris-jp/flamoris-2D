@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Text;
 using System.Text.Json;
 using Flamoris.Logging;
 
@@ -10,7 +11,9 @@ public sealed partial class ProductHostClient : IAsyncDisposable
 {
     public const int ProtocolVersion = 1;
     private const int MaximumFrameBytes = 8 * 1024 * 1024;
+    private const int MaximumDiagnosticLineLength = 2 * 1024;
     private const int MaximumDiagnosticStringLength = 128;
+    private const string HostDiagnosticPrefix = "FLAMORIS_DIAGNOSTIC ";
     private static readonly IReadOnlyDictionary<(string Category, string Message), string[]> AllowedHostDiagnosticProperties =
         new Dictionary<(string, string), string[]>
         {
@@ -464,17 +467,60 @@ public sealed partial class ProductHostClient : IAsyncDisposable
 
     private async Task ReadDiagnosticsAsync(StreamReader reader, CancellationToken cancellationToken)
     {
+        var buffer = new char[512];
+        var line = new StringBuilder();
+        var overlong = false;
         try
         {
-            while (!cancellationToken.IsCancellationRequested &&
-                await reader.ReadLineAsync(cancellationToken) is { } line)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                if (!TryLogHostDiagnostic(line))
-                    _logger?.Debug("app", "Product Host emitted an unstructured diagnostic");
-                DiagnosticReceived?.Invoke(this, line);
+                var count = await reader.ReadAsync(buffer.AsMemory(), cancellationToken);
+                if (count == 0) break;
+                for (var index = 0; index < count; index++)
+                {
+                    var character = buffer[index];
+                    if (character == '\n')
+                    {
+                        ProcessHostDiagnosticLine(line, overlong);
+                        line.Clear();
+                        overlong = false;
+                        continue;
+                    }
+                    if (overlong) continue;
+                    if (line.Length >= MaximumDiagnosticLineLength)
+                    {
+                        line.Clear();
+                        overlong = true;
+                        continue;
+                    }
+                    line.Append(character);
+                }
             }
+            if (overlong || line.Length > 0)
+                ProcessHostDiagnosticLine(line, overlong);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+    }
+
+    private void ProcessHostDiagnosticLine(StringBuilder builder, bool overlong)
+    {
+        if (overlong)
+        {
+            _logger?.Debug("app", "Product Host diagnostic exceeded the safe line limit");
+            return;
+        }
+
+        var line = builder.ToString();
+        if (line.EndsWith('\r')) line = line[..^1];
+        if (line.StartsWith(HostDiagnosticPrefix, StringComparison.Ordinal))
+        {
+            if (!TryLogHostDiagnostic(line))
+                _logger?.Debug("app", "Product Host emitted an invalid structured diagnostic");
+            return;
+        }
+
+        _logger?.Debug("app", "Product Host emitted an unstructured diagnostic");
+        DiagnosticReceived?.Invoke(this, line);
     }
 
     internal Task ReadDiagnosticsForTestingAsync(StreamReader reader, CancellationToken cancellationToken = default) =>
@@ -482,11 +528,10 @@ public sealed partial class ProductHostClient : IAsyncDisposable
 
     private bool TryLogHostDiagnostic(string line)
     {
-        const string prefix = "FLAMORIS_DIAGNOSTIC ";
-        if (!line.StartsWith(prefix, StringComparison.Ordinal)) return false;
+        if (!line.StartsWith(HostDiagnosticPrefix, StringComparison.Ordinal)) return false;
         try
         {
-            using var document = JsonDocument.Parse(line[prefix.Length..]);
+            using var document = JsonDocument.Parse(line[HostDiagnosticPrefix.Length..]);
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object ||
                 !TryReadDiagnosticString(root, "category", out var category) ||
