@@ -13,6 +13,8 @@ const send = async (s, method, payload = {}, overrides = {}) => (await s.handle(
   method, documentToken: s.documentToken, expectedRevision: s.revision, payload, ...overrides })).response;
 async function setup(t, permission = 'edit') {
   const service = new ProductHostService();
+  const diagnostics = [];
+  service.emitDiagnostic = diagnostic => diagnostics.push(diagnostic);
   await send(service, 'session.create');
   t.after(() => service.close());
   const enabled = await send(service, 'mcp.enable', { permission });
@@ -22,7 +24,7 @@ async function setup(t, permission = 'edit') {
     { versionNegotiation: { mode: { pin: '2026-07-28' } } });
   await client.connect(new StreamableHTTPClientTransport(new URL(connection.endpoint), { requestInit: { headers: { Authorization: `Bearer ${connection.token}` } } }));
   t.after(() => client.close());
-  return { service, client, connection };
+  return { service, client, connection, diagnostics };
 }
 const result = r => r.structuredContent || JSON.parse(r.content[0].text);
 async function call(client, name, args = {}) { return result(await client.callTool({ name, arguments: args })); }
@@ -67,6 +69,21 @@ test('official current SDK attaches to same session and shares ordinary transact
   await send(s, 'session.open', { document: serialized.payload.document });
   assert.equal(s.document.session.project.scene.nodes[tree.result.id].displayName, 'Grouped');
   assert.equal(s.mcp.status().enabled, false);
+});
+
+test('MCP diagnostics are structured and never contain credentials or payloads', async t => {
+  const { service: s, client, connection, diagnostics } = await setup(t, 'read-only');
+  const denied = await call(client, 'command.scene.rename_node', rename(s, 'Secret payload must not log'));
+  assert.equal(denied.error.code, 'mcp.read_only');
+  const badAuth = await raw({ ...connection, token: 'not-the-token' });
+  assert.equal(badAuth.status, 401); await badAuth.arrayBuffer();
+  await send(s, 'mcp.disable');
+  assert.ok(diagnostics.some(d => d.category === 'mcp.session' && d.level === 'info'));
+  assert.ok(diagnostics.some(d => d.category === 'mcp.auth' && d.message === 'MCP permission denied'));
+  assert.ok(diagnostics.some(d => d.category === 'mcp.auth' && d.message === 'MCP authentication failed'));
+  const serialized = JSON.stringify(diagnostics);
+  assert.ok(!serialized.includes(connection.token));
+  assert.ok(!serialized.includes('Secret payload must not log'));
 });
 
 test('SDK discovery is deterministic, complete and typed; Native lifecycle and internal restore excluded', async t => {

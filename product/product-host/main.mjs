@@ -6,6 +6,10 @@ import { assertNodeRuntimeCapabilities } from "./runtime-audit.mjs";
 
 assertNodeRuntimeCapabilities();
 const service = new ProductHostService();
+service.emitDiagnostic = diagnostic => {
+  try { stderr.write(`FLAMORIS_DIAGNOSTIC ${JSON.stringify(diagnostic)}\n`); }
+  catch { /* Diagnostics must never affect Product Host availability. */ }
+};
 service.bulkEndpoint = await service.assets.start();
 const decoder = new ControlFrameDecoder();
 let outputQueue = Promise.resolve();

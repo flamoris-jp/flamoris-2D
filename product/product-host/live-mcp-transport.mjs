@@ -18,7 +18,13 @@ function boundedJson(bytes) {
 }
 
 export class LiveMcpEndpoint {
-  constructor(service) { this.service = service; this.attachment = null; this.closing = Promise.resolve(); }
+  constructor(service, emitDiagnostic = null) {
+    this.service = service; this.emitDiagnostic = emitDiagnostic;
+    this.attachment = null; this.closing = Promise.resolve();
+  }
+  diagnose(level, category, message, properties = {}) {
+    try { this.emitDiagnostic?.({ level, category, message, properties }); } catch { }
+  }
   status() {
     const a = this.attachment;
     return a ? { enabled: true, permission: a.permission, endpoint: a.endpoint, requests: a.requests, active: a.active,
@@ -29,6 +35,7 @@ export class LiveMcpEndpoint {
     if (host !== '127.0.0.1') fail('mcp.loopback_required');
     if (!this.service.documentToken || this.service.shutdownRequested) fail('mcp.no_authority');
     this.revoke(); await this.closing;
+    this.diagnose('debug', 'mcp.transport', 'Starting live MCP endpoint', { permission });
     const a = { permission, documentToken: this.service.documentToken, secret: randomBytes(32).toString('hex'),
       requests: 0, active: 0, lastActivity: null, scopes: new Set(), endpoint: null, revoked: false };
     this.attachment = a;
@@ -41,14 +48,22 @@ export class LiveMcpEndpoint {
       await new Promise((resolve, reject) => { a.server.once('error', reject); a.server.listen(0, host, resolve); });
       if (a.revoked) fail('mcp.revoked');
       a.endpoint = `http://127.0.0.1:${a.server.address().port}/mcp`;
+      this.diagnose('info', 'mcp.session', 'Live MCP access attached', { permission, protocol: '2026-07-28' });
+      this.diagnose('info', 'mcp.transport', 'Live MCP server started', { transport: 'streamable-http', loopback: true });
       // Only the internal Native enable response carries the capability.
       return { ...this.status(), token: a.secret };
-    } catch (error) { this.revoke(); throw error; }
+    } catch (error) {
+      this.diagnose('error', 'mcp.transport', 'Live MCP server failed to start',
+        { code: error?.code || 'mcp.start_failed' });
+      this.revoke(); throw error;
+    }
   }
   revoke() {
     const a = this.attachment;
     this.attachment = null;
     if (!a) return;
+    this.diagnose('info', 'mcp.session', 'Live MCP access detached',
+      { permission: a.permission, requests: a.requests, active: a.active });
     a.revoked = true; a.secret = '';
     for (const scope of a.scopes) scope.abort.abort();
     a.server?.closeAllConnections();
@@ -58,15 +73,21 @@ export class LiveMcpEndpoint {
   async close() { this.revoke(); await this.closing; }
   async serve(a, req, res) {
     let scope, timer, handler;
-    const reject = code => { if (!res.headersSent && !res.destroyed) res.writeHead(code, { 'Cache-Control': 'no-store', Connection: 'close' }).end(); req.resume(); };
+    const reject = (code, category = 'mcp.protocol', message = 'MCP request rejected') => {
+      this.diagnose(code >= 500 ? 'error' : 'warn', category, message, { statusCode: code });
+      if (!res.headersSent && !res.destroyed) res.writeHead(code, { 'Cache-Control': 'no-store', Connection: 'close' }).end();
+      req.resume();
+    };
     try {
-      if (a.revoked || a !== this.attachment || this.service.shutdownRequested) return reject(403);
-      if (Object.hasOwn(req.headers, 'origin') || req.headers.host !== new URL(a.endpoint).host) return reject(403);
+      if (a.revoked || a !== this.attachment || this.service.shutdownRequested) return reject(403, 'mcp.session', 'Revoked MCP access rejected');
+      if (Object.hasOwn(req.headers, 'origin') || req.headers.host !== new URL(a.endpoint).host) return reject(403, 'mcp.auth', 'MCP origin or host rejected');
       // Reject duplicate security headers rather than accepting Node's first-value normalization.
       const names = req.rawHeaders.filter((_, i) => i % 2 === 0).map(n => n.toLowerCase());
-      if (['host', 'authorization', 'origin'].some(n => names.filter(x => x === n).length > 1)) return reject(403);
+      if (['host', 'authorization', 'origin'].some(n => names.filter(x => x === n).length > 1)) return reject(403, 'mcp.auth', 'Duplicate MCP security header rejected');
       const got = Buffer.from(req.headers.authorization || ''), expected = Buffer.from(`Bearer ${a.secret}`);
-      if (got.length !== expected.length || !timingSafeEqual(got, expected)) return reject(401);
+      if (got.length !== expected.length || !timingSafeEqual(got, expected))
+        return reject(401, 'mcp.auth', 'MCP authentication failed');
+      this.diagnose('debug', 'mcp.auth', 'MCP authentication succeeded', { transport: 'streamable-http' });
       if (req.url !== '/mcp') return reject(404);
       if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return reject(405); }
       if (a.active >= LIVE_MCP_LIMITS.concurrent) return reject(429);
@@ -81,7 +102,7 @@ export class LiveMcpEndpoint {
       a.scopes.add(scope);
       res.once('close', () => { if (!res.writableFinished) abort.abort(); });
       req.once('aborted', () => abort.abort());
-      timer = setTimeout(() => { abort.abort(); reject(408); req.destroy(); }, LIVE_MCP_LIMITS.timeoutMs);
+      timer = setTimeout(() => { abort.abort(); reject(408, 'mcp.transport', 'MCP request timed out'); req.destroy(); }, LIVE_MCP_LIMITS.timeoutMs);
       const chunks = []; let size = 0;
       for await (const chunk of req) {
         scope.guard(); size += chunk.length;
@@ -95,10 +116,18 @@ export class LiveMcpEndpoint {
       handler = createMcpHandler(() => createLiveMcpServer(this.service, a, scope), { legacy: 'stateless', responseMode: 'auto', maxSubscriptions: 0, onerror: () => {} });
       res.setHeader('Cache-Control', 'no-store');
       await toNodeHandler(handler, { onerror: () => {} })(req, res, body);
-    } catch { reject(400); }
+    } catch (error) {
+      this.diagnose(error?.code === 'mcp.timeout' ? 'warn' : 'debug', 'mcp.protocol',
+        'MCP request failed', { code: error?.code || 'mcp.request_failed' });
+      reject(400);
+    }
     finally {
       clearTimeout(timer);
-      if (scope) { a.active--; a.scopes.delete(scope); }
+      if (scope) {
+        a.active--; a.scopes.delete(scope);
+        this.diagnose('debug', 'mcp.transport', 'MCP request disconnected',
+          { active: a.active, requests: a.requests });
+      }
       await handler?.close().catch(() => {});
     }
   }
