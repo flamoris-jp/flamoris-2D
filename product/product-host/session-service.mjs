@@ -125,7 +125,8 @@ export class ProductHostService {
     this.mcpControlEpoch = 0;
     this.pendingJobs = new Set();
     this.onExternalEvents = null;
-    this.mcp = new LiveMcpEndpoint(this);
+    this.emitDiagnostic = null;
+    this.mcp = new LiveMcpEndpoint(this, diagnostic => this.diagnose(diagnostic));
     this.document = null;
     this.shutdownRequested = false;
     this.assets = new RasterAssets(() => ({ token: this.documentToken, revision: this.revision }), NATIVE_ARTWORK_LIMITS);
@@ -134,6 +135,10 @@ export class ProductHostService {
     this.bulkEndpoint = null;
     this.generation = null;
     this.importJob = null;
+  }
+
+  diagnose(diagnostic) {
+    try { this.emitDiagnostic?.(diagnostic); } catch { }
   }
 
   cancelImport(request) {

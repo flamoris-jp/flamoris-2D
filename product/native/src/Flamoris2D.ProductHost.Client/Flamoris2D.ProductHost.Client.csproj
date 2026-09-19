@@ -6,4 +6,7 @@
     <RootNamespace>Flamoris.Flamoris2D.ProductHost</RootNamespace>
     <AssemblyName>Flamoris2D.ProductHost.Client</AssemblyName>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Flamoris.Logging" Version="1.0.0" />
+  </ItemGroup>
 </Project>

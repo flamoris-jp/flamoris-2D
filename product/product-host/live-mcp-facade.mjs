@@ -62,7 +62,11 @@ export function createLiveMcpServer(service, attachment, scope) {
   server.setRequestHandler('tools/call', async (request, ctx) => {
     const tool = toolByName.get(request.params.name);
     if (!tool) throw new InvalidParamsError('Unknown live Product tool.');
-    if (!tool.readOnly && attachment.permission !== 'edit') return failure('mcp.read_only');
+    if (!tool.readOnly && attachment.permission !== 'edit') {
+      service.diagnose({ level: 'warn', category: 'mcp.auth', message: 'MCP permission denied',
+        properties: { permission: attachment.permission, tool: tool.name } });
+      return failure('mcp.read_only');
+    }
     const args = request.params.arguments ?? {};
     const valid = await validators.get(tool.name)['~standard'].validate(args);
     if (valid.issues) throw new InvalidParamsError('Arguments do not match the Product tool schema.');
@@ -74,7 +78,15 @@ export function createLiveMcpServer(service, attachment, scope) {
     const { response } = await service.handle({ protocolVersion: 1, requestId: `mcp-${randomUUID()}`, method: tool.method,
       documentToken: tool.name === 'live.context' ? attachment.documentToken : args.documentToken,
       expectedRevision: args.expectedRevision, payload }, { guard, external: true });
-    if (!response.ok) return failure(response.error.code);
+    if (!response.ok) {
+      const category = tool.readOnly ? 'mcp.query' : 'mcp.command';
+      service.diagnose({ level: response.error.code === 'revision.conflict' ? 'warn' : 'error',
+        category, message: response.error.code === 'revision.conflict' ? 'MCP revision conflict rejected' : 'MCP operation failed',
+        properties: { tool: tool.name, code: response.error.code, revision: response.revision } });
+      return failure(response.error.code);
+    }
+    service.diagnose({ level: 'debug', category: tool.readOnly ? 'mcp.query' : 'mcp.command',
+      message: 'MCP operation completed', properties: { tool: tool.name, revision: response.revision } });
     const result = { documentToken: response.documentToken, revision: response.revision,
       permission: attachment.permission, result: response.payload };
     // A successful edit response remains tiny; do not turn a committed edit into an ambiguous size error.

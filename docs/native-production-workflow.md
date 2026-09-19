@@ -4,6 +4,42 @@ Windows x64向けの制作候補です。ZIPをすべて展開し、`Flamoris2D.
 同じフォルダーにある実行環境・描画ライブラリ・素材読込機能も必要なので、exeだけを移動しないでください。
 .NET、Node、MP4用のFFmpegを同梱しています。従来版のインストールやファイル関連付けは変更しません。
 
+
+## Diagnostics and logging
+
+The Native application uses `Flamoris.Logging` 1.0.0 from the FLAMORIS GitHub Packages feed. It does not copy or vendor the logging DLL. Relative log paths resolve against the writable per-user directory `%LOCALAPPDATA%/FLAMORIS/2D`.
+
+Logging is configured in the ordinary `native-settings.json` file under that directory. The default file is `logs/flamoris-2d.log`, with bounded size rotation. Example:
+
+~~~json
+{
+  "logging": {
+    "level": "debug",
+    "categories": {
+      "mcp": "info",
+      "mcp.transport": "debug",
+      "mcp.auth": "warn"
+    },
+    "outputs": [
+      { "type": "console" },
+      {
+        "type": "file",
+        "path": "logs/flamoris-2d.log",
+        "format": "text",
+        "rotation": {
+          "enabled": true,
+          "maxFileSizeMb": 20,
+          "maxFiles": 10
+        }
+      }
+    ]
+  }
+}
+~~~
+
+Logs contain lifecycle metadata, operation categories, revisions, and bounded error context. Project/media contents, MCP request or response bodies, authorization headers, and connection tokens are intentionally excluded.
+
+
 ## 1. 素材を開く
 
 「素材を読み込む…」からPSDまたはCutworkの`.flimg`を選びます。
