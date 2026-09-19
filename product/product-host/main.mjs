@@ -4,10 +4,16 @@ import { ControlFrameDecoder, writeControlFrame } from "./protocol.mjs";
 import { ProductHostService } from "./session-service.mjs";
 import { assertNodeRuntimeCapabilities } from "./runtime-audit.mjs";
 
+const maximumDiagnosticBytes = 2 * 1024;
+
 assertNodeRuntimeCapabilities();
 const service = new ProductHostService();
 service.emitDiagnostic = diagnostic => {
-  try { stderr.write(`FLAMORIS_DIAGNOSTIC ${JSON.stringify(diagnostic)}\n`); }
+  try {
+    const serialized = JSON.stringify(diagnostic);
+    if (Buffer.byteLength(serialized, "utf8") > maximumDiagnosticBytes) return;
+    stderr.write(`FLAMORIS_DIAGNOSTIC ${serialized}\n`);
+  }
   catch { /* Diagnostics must never affect Product Host availability. */ }
 };
 service.bulkEndpoint = await service.assets.start();
