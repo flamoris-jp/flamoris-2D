@@ -61,7 +61,11 @@ public partial class MainWindow
                 if (generation == _layoutInputGeneration) break;
             }
         }
-        catch (Exception error) { StatusText.Text = $"描画できませんでした: {error.Message}"; }
+        catch (Exception error)
+        {
+            _logger.Error("preview", "Interactive preview update failed", error);
+            StatusText.Text = $"描画できませんでした: {error.Message}";
+        }
         finally { _layoutRenderRunning = false; }
     }
     private void UpdateRenderChoices(JsonElement workspace)
@@ -132,7 +136,12 @@ public partial class MainWindow
                     if (_renderer is null)
                     {
                     try { _renderer = new Direct3DRenderer(); }
-                    catch { _renderer = new Direct3DRenderer(software: true); }
+                    catch (Exception error)
+                    {
+                        _logger.Warn("render", "Hardware renderer unavailable; using software rendering",
+                            new Dictionary<string, object?> { ["exceptionType"] = error.GetType().Name });
+                        _renderer = new Direct3DRenderer(software: true);
+                    }
                     }
                 }
                 return _renderer.Render(mapped, artwork, width, height, work.Token);
@@ -159,7 +168,12 @@ public partial class MainWindow
         catch (StaleProjectionException) { }
         catch (Exception error)
         {
-            if (generation == _renderGeneration) { StopPlayback(); MeshCanvas.ClearEvaluatedFrame(); RenderStatusText.Text = $"描画停止: {error.Message}"; }
+            if (generation == _renderGeneration)
+            {
+                _logger.Error("preview", "Preview generation failed", error,
+                    new Dictionary<string, object?> { ["kind"] = choice.Kind, ["revision"] = revision, ["timeTicks"] = _timeTicks });
+                StopPlayback(); MeshCanvas.ClearEvaluatedFrame(); RenderStatusText.Text = $"描画停止: {error.Message}";
+            }
         }
         finally { if (ReferenceEquals(_renderWork, work)) _renderWork = null; work.Dispose(); }
     }

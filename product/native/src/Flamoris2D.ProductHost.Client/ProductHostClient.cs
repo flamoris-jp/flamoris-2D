@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json;
+using Flamoris.Logging;
 
 namespace Flamoris.Flamoris2D.ProductHost;
 
@@ -15,6 +16,7 @@ public sealed partial class ProductHostClient : IAsyncDisposable
     private readonly CancellationTokenSource _lifetime = new();
     private readonly CancellationTokenSource _controlReader = new();
     private readonly StaleProjectionGate _projectionGate = new();
+    private readonly FlamorisLogger? _logger;
     private Process? _process;
     private Task? _readerTask;
     private Task? _stderrTask;
@@ -22,6 +24,8 @@ public sealed partial class ProductHostClient : IAsyncDisposable
     private int _authorityLost;
     private bool _shutdownRequested;
     private volatile bool _projectionStale;
+
+    public ProductHostClient(FlamorisLogger? logger = null) => _logger = logger;
 
     public event EventHandler<DocumentChangedEventArgs>? DocumentChanged;
     public event EventHandler<AuthorityLostEventArgs>? AuthorityLost;
@@ -39,6 +43,8 @@ public sealed partial class ProductHostClient : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         if (_process is not null) throw new InvalidOperationException("Product Host is already started.");
+        _logger?.Debug("app.startup", "Starting Product Host",
+            new Dictionary<string, object?> { ["runtime"] = string.IsNullOrWhiteSpace(nodeExecutable) ? "node" : "configured" });
         hostScriptPath = Path.GetFullPath(hostScriptPath);
         if (!File.Exists(hostScriptPath)) throw new FileNotFoundException("Product Host entry was not found.", hostScriptPath);
 
@@ -85,6 +91,13 @@ public sealed partial class ProductHostClient : IAsyncDisposable
             payload.GetProperty("runtime").GetProperty("actual").GetString() ?? "");
         if (handshake.ProtocolVersion != ProtocolVersion)
             throw new ProductHostException("Product Host protocol mismatch.", "protocol.version_unsupported", default, false);
+        _logger?.Info("app.startup", "Product Host connected",
+            new Dictionary<string, object?>
+            {
+                ["protocolVersion"] = handshake.ProtocolVersion,
+                ["productSchemaVersion"] = handshake.ProductSchemaVersion,
+                ["mcpSchemaVersion"] = handshake.McpSchemaVersion,
+            });
         return handshake;
     }
 
@@ -208,6 +221,7 @@ public sealed partial class ProductHostClient : IAsyncDisposable
         }
         _projectionGate.Invalidate();
         _projectionStale = false;
+        _logger?.Info("app.shutdown", "Product Host stopped");
     }
 
     internal void TerminateHostForTesting()
@@ -292,7 +306,21 @@ public sealed partial class ProductHostClient : IAsyncDisposable
             }
 
             var root = await completion.Task.WaitAsync(cancellationToken);
-            return ParseResponse(root, documentScoped && !replacingDocument, mutating);
+            return ParseResponse(root, documentScoped && !replacingDocument, mutating, method);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger?.Warn(method.StartsWith("mcp.", StringComparison.Ordinal) ? "mcp.transport" : "command.failure",
+                "Operation cancelled",
+                new Dictionary<string, object?> { ["method"] = method });
+            throw;
+        }
+        catch (Exception error) when (error is not ProductHostException)
+        {
+            _logger?.Error(method.StartsWith("mcp.", StringComparison.Ordinal) ? "mcp.transport" : "command.failure",
+                "Operation failed before a Product response was received", error,
+                new Dictionary<string, object?> { ["method"] = method, ["mutating"] = mutating });
+            throw;
         }
         finally
         {
@@ -300,7 +328,7 @@ public sealed partial class ProductHostClient : IAsyncDisposable
         }
     }
 
-    private ProductHostResponse ParseResponse(JsonElement root, bool documentScoped, bool mutating)
+    private ProductHostResponse ParseResponse(JsonElement root, bool documentScoped, bool mutating, string method)
     {
         var requestId = root.GetProperty("requestId").GetString() ?? "";
         var documentToken = root.TryGetProperty("documentToken", out var tokenElement) &&
@@ -317,11 +345,25 @@ public sealed partial class ProductHostClient : IAsyncDisposable
                 _projectionGate.Accept(documentToken, revision.Value);
                 _projectionStale = true;
             }
-            throw new ProductHostException(
+            var exception = new ProductHostException(
                 error.GetProperty("message").GetString() ?? "Product Host operation failed.",
                 error.GetProperty("code").GetString() ?? "product.operation_failed",
                 error.TryGetProperty("details", out var details) ? details.Clone() : default,
                 error.TryGetProperty("retryable", out var retryable) && retryable.GetBoolean());
+            var category = method.StartsWith("mcp.", StringComparison.Ordinal)
+                ? "mcp.session"
+                : mutating ? "command.failure" : "command.failure";
+            var properties = new Dictionary<string, object?>
+            {
+                ["method"] = method,
+                ["code"] = exception.Code,
+                ["revision"] = revision,
+            };
+            if (exception.Code == "revision.conflict")
+                _logger?.Warn(category, "Revision conflict rejected", properties);
+            else
+                _logger?.Error(category, "Product operation failed", exception, properties);
+            throw exception;
         }
         if (documentScoped)
         {
@@ -398,9 +440,56 @@ public sealed partial class ProductHostClient : IAsyncDisposable
         {
             while (!cancellationToken.IsCancellationRequested &&
                 await reader.ReadLineAsync(cancellationToken) is { } line)
+            {
+                if (!TryLogHostDiagnostic(line))
+                    _logger?.Debug("app", "Product Host diagnostic",
+                        new Dictionary<string, object?> { ["message"] = line });
                 DiagnosticReceived?.Invoke(this, line);
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+    }
+
+    private bool TryLogHostDiagnostic(string line)
+    {
+        const string prefix = "FLAMORIS_DIAGNOSTIC ";
+        if (!line.StartsWith(prefix, StringComparison.Ordinal)) return false;
+        try
+        {
+            using var document = JsonDocument.Parse(line[prefix.Length..]);
+            var root = document.RootElement;
+            var category = root.GetProperty("category").GetString() ?? "app";
+            var message = root.GetProperty("message").GetString() ?? "Product Host diagnostic";
+            var level = root.GetProperty("level").GetString() switch
+            {
+                "error" => LogLevel.Error,
+                "warn" => LogLevel.Warn,
+                "info" => LogLevel.Info,
+                _ => LogLevel.Debug,
+            };
+            var properties = new Dictionary<string, object?>();
+            if (root.TryGetProperty("properties", out var fields) && fields.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var field in fields.EnumerateObject())
+                {
+                    properties[field.Name] = field.Value.ValueKind switch
+                    {
+                        JsonValueKind.String => field.Value.GetString(),
+                        JsonValueKind.Number when field.Value.TryGetInt64(out var number) => number,
+                        JsonValueKind.True => true,
+                        JsonValueKind.False => false,
+                        JsonValueKind.Null => null,
+                        _ => field.Value.GetRawText(),
+                    };
+                }
+            }
+            _logger?.Log(level, category, message, properties);
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     private void LoseAuthority(string reason, Exception? error)
@@ -409,6 +498,8 @@ public sealed partial class ProductHostClient : IAsyncDisposable
         _projectionGate.Invalidate();
         _projectionStale = false;
         var exception = error ?? new EndOfStreamException(reason);
+        _logger?.Error("mcp.transport", "Product Host authority lost; live MCP access was revoked",
+            exception, new Dictionary<string, object?> { ["reason"] = reason });
         foreach (var completion in _pending.Values) completion.TrySetException(exception);
         // The WPF control channel is the Native authority lease. If it is lost,
         // a still-running Host must not leave its live MCP capability behind.

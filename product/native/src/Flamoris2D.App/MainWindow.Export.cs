@@ -44,7 +44,11 @@ public partial class MainWindow
         ActionButton(panel,"MP4エンコーダーを確認",async()=>
         {
             try{await NativeVideoEncoder.ProbeAsync(client,encoder.Text,CancellationToken.None);StatusText.Text="H.264 Media Foundationエンコーダーを確認しました。";}
-            catch(Exception error){StatusText.Text=$"エンコーダーを利用できません: {error.Message}";}
+            catch(Exception error)
+            {
+                _logger.Error("media", "Video encoder probe failed", error);
+                StatusText.Text=$"エンコーダーを利用できません: {error.Message}";
+            }
         });
         _exportProgressText=new TextBlock{Text="待機中",TextWrapping=TextWrapping.Wrap,Foreground=System.Windows.Media.Brushes.White,Margin=new Thickness(0,10,0,4)};panel.Children.Add(_exportProgressText);
         _exportProgressBar=new ProgressBar{Minimum=0,Maximum=1,Height=8};panel.Children.Add(_exportProgressBar);
@@ -123,7 +127,12 @@ public partial class MainWindow
             _exportProgressText!.Text=$"完了: {written}フレーム\n{directory}";StatusText.Text=$"書き出しました: {directory}";
         }
         catch(OperationCanceledException){_exportProgressText!.Text=$"中止しました。{written}枚のPNGを保持しています。";}
-        catch(Exception error){_exportProgressText!.Text=$"失敗: {error.Message}\n書き込み済みPNG {written}枚を保持しています。";StatusText.Text=error.Message;}
+        catch(Exception error)
+        {
+            _logger.Error("render", "Export failed", error,
+                new Dictionary<string, object?> { ["writtenFrames"] = written, ["video"] = settings.Video, ["revision"] = revision });
+            _exportProgressText!.Text=$"失敗: {error.Message}\n書き込み済みPNG {written}枚を保持しています。";StatusText.Text=error.Message;
+        }
         finally
         {
             if(videoTemporary is not null)try{File.Delete(videoTemporary);}catch(IOException){}

@@ -68,8 +68,14 @@ public partial class MainWindow
             TargetList.SelectedItem = _targets.Targets.FirstOrDefault(t => t.Kind == "part");
             await RefreshProjectionAsync(); MeshCanvas.Fit(); StatusText.Text = "素材を読み込みました。パーツを選んでメッシュを生成できます。";
             imported=true;
+            _logger.Info("document.import", "Source artwork imported",
+                new Dictionary<string, object?> { ["sourceKind"] = kind.ToString(), ["byteLength"] = input.Length });
         }
-        catch (Exception error) { StatusText.Text = $"素材を読み込めませんでした: {error.Message}"; }
+        catch (Exception error)
+        {
+            _logger.Error("document.import", "Source artwork import failed", error);
+            StatusText.Text = $"素材を読み込めませんでした: {error.Message}";
+        }
         finally
         {
             if (started)
@@ -90,7 +96,11 @@ public partial class MainWindow
             if (dialog.ShowDialog(this) != true) return;
             await OpenDocumentPathAsync(dialog.FileName);
         }
-        catch (Exception error) { StatusText.Text = $"開けませんでした: {error.Message}"; }
+        catch (Exception error)
+        {
+            _logger.Error("document.open", "Project open failed", error);
+            StatusText.Text = $"開けませんでした: {error.Message}";
+        }
     }
     private async Task OpenDocumentPathAsync(string path)
     {
@@ -106,6 +116,8 @@ public partial class MainWindow
             AttachDocumentWorkspace(_client.DocumentToken!); await RefreshProjectionAsync();
             MeshCanvas.Fit(); StatusText.Text = $"開きました: {Path.GetFileName(path)}";
             await RememberRecentAsync(path);
+            _logger.Info("document.open", "Project opened",
+                new Dictionary<string, object?> { ["byteLength"] = input.Length, ["revision"] = _client.Revision });
         }
         finally { _documentBusy = false; SetMeshBusy(false); SaveMenuItem.IsEnabled = !_hasHandsOn && _client?.HasAuthoritativeProjection == true; }
     }
@@ -156,9 +168,17 @@ public partial class MainWindow
             await RefreshProjectionAsync();
             await RememberRecentAsync(path);
             StatusText.Text = cleanupWarning ?? $"保存しました: {Path.GetFileName(path)}";
+            _logger.Info("document.save", "Project saved",
+                new Dictionary<string, object?> { ["operation"] = operation, ["byteLength"] = prepared.ByteLength, ["revision"] = prepared.Identity.Revision });
             return true;
         }
-        catch (Exception error) { StatusText.Text = $"保存できませんでした: {error.Message}"; return false; }
+        catch (Exception error)
+        {
+            _logger.Error("document.save", "Project save failed", error,
+                new Dictionary<string, object?> { ["operation"] = operation });
+            StatusText.Text = $"保存できませんでした: {error.Message}";
+            return false;
+        }
         finally
         {
             if (prepared is not null) await client.ReleaseDocumentAsync(prepared.Id, prepared.Identity.DocumentToken, prepared.Identity.Revision);
@@ -178,7 +198,11 @@ public partial class MainWindow
             await _recovery.SaveAsync(prepared, _currentPath, (stream, ct) => client.DownloadDocumentAsync(prepared, stream, ct));
             _lastRecovery = (prepared.Identity.DocumentToken, prepared.Identity.Revision);
         }
-        catch (Exception error) { StatusText.Text = $"最新状態の復元用保存に失敗しました（以前のデータは保持）: {error.Message}"; }
+        catch (Exception error)
+        {
+            _logger.Error("document.recovery", "Recovery snapshot failed", error);
+            StatusText.Text = $"最新状態の復元用保存に失敗しました（以前のデータは保持）: {error.Message}";
+        }
         finally
         {
             if (prepared is not null) await client.ReleaseDocumentAsync(prepared.Id, prepared.Identity.DocumentToken, prepared.Identity.Revision);

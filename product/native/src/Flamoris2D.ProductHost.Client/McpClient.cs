@@ -29,15 +29,23 @@ public sealed partial class ProductHostClient
         cancellationToken.ThrowIfCancellationRequested();
         var response = await SendAsync("mcp.enable", new { permission = permission == McpPermission.Edit ? "edit" : "read-only" },
             true, true, CancellationToken.None);
-        return new McpConnection
+        var connection = new McpConnection
         {
             Endpoint = response.Payload.GetProperty("endpoint").GetString()!,
             Token = response.Payload.GetProperty("token").GetString()!,
             DocumentToken = response.DocumentToken!, Permission = permission,
         };
+        _logger?.Info("mcp.session", "Live MCP access enabled",
+            new Dictionary<string, object?> { ["permission"] = permission.ToString(), ["revision"] = response.Revision });
+        return connection;
     }
-    public Task<ProductHostResponse> DisableMcpAsync() =>
-        SendAsync("mcp.disable", new { }, false, true, CancellationToken.None);
+    public async Task<ProductHostResponse> DisableMcpAsync()
+    {
+        var response = await SendAsync("mcp.disable", new { }, false, true, CancellationToken.None);
+        _logger?.Info("mcp.session", "Live MCP access revoked",
+            new Dictionary<string, object?> { ["revision"] = response.Revision });
+        return response;
+    }
     public Task<ProductHostResponse> GetMcpStatusAsync(CancellationToken cancellationToken = default) =>
         SendAsync("mcp.status", new { }, false, true, cancellationToken);
 }
