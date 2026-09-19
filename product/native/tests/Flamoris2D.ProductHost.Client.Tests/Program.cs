@@ -155,7 +155,7 @@ static async Task TestLoggingIntegrationAsync(string hostPath)
             await detached.Task.WaitAsync(TimeSpan.FromSeconds(5));
         }
         var text = File.ReadAllText(Path.Combine(root, "integration.log"));
-        Assert(text.Contains("[INFO] [mcp.session]") && text.Contains("[WARN ] [mcp.auth]"),
+        Assert(text.Contains("[INFO ] [mcp.session]") && text.Contains("[WARN ] [mcp.auth]"),
             "MCP attach/detach/auth diagnostics did not reach Flamoris.Logging.");
         Assert(secret is null || !text.Contains(secret), "MCP credential leaked into the log.");
     }
