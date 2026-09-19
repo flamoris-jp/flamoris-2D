@@ -7,6 +7,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using Flamoris.Flamoris2D.ProductHost;
+using Flamoris.Logging;
 
 namespace Flamoris.Flamoris2D.App;
 
@@ -15,6 +16,8 @@ public partial class MainWindow : Window, IAsyncDisposable
     private readonly Dictionary<EditingContext, string> _activeTools = [];
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly bool _autoConnect;
+    private readonly FlamorisLogger _logger;
+    private readonly LoggingOptions _loggingOptions;
     private ProductHostClient? _client;
     private EditingContext _editingContext = EditingContext.Source;
     private bool _closingAfterShutdown;
@@ -30,10 +33,15 @@ public partial class MainWindow : Window, IAsyncDisposable
          TargetVisibleEditor.IsChecked != original.Visible ||
          TargetLockedEditor.IsChecked != original.Locked);
 
-    public MainWindow(bool autoConnect = true)
+    public MainWindow(
+        bool autoConnect = true,
+        FlamorisLogger? logger = null,
+        LoggingOptions? loggingOptions = null)
     {
         InitializeComponent();
         _autoConnect = autoConnect;
+        _loggingOptions = loggingOptions ?? NativeLoggingConfiguration.CreateDefaultOptions();
+        _logger = logger ?? NativeLoggingConfiguration.CreateLogger(_loggingOptions);
         foreach (var definition in EditingContextCatalog.All)
             _activeTools[definition.Context] = definition.Tools[0];
         InitializeMeshUi();
@@ -56,7 +64,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         SetBusy("Product Hostを起動しています…");
         RecoveryBanner.Visibility = Visibility.Collapsed;
         if (_client is not null) await _client.DisposeAsync();
-        _client = new ProductHostClient();
+        _client = new ProductHostClient(_logger);
         _client.AuthorityLost += Client_AuthorityLost;
         _client.DocumentChanged += Client_DocumentChanged;
         _client.DiagnosticReceived += (_, message) =>

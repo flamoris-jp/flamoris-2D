@@ -9,7 +9,7 @@ public partial class MainWindow
 {
     private JsonElement _nativePreferences=JsonSerializer.SerializeToElement(new {});
     private readonly List<string> _recentFiles=[];
-    private static string SettingsPath=>Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"FLAMORIS","2D","native-settings.json");
+    private static string SettingsPath => NativeLoggingConfiguration.SettingsPath;
     private bool PreferenceFlag(string key,bool fallback=false)=>Property(_nativePreferences,key).ValueKind is JsonValueKind.True or JsonValueKind.False?Property(_nativePreferences,key).GetBoolean():fallback;
     private async Task LoadNativeSettingsAsync()
     {
@@ -36,7 +36,7 @@ public partial class MainWindow
     private async Task SaveNativeSettingsAsync()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
-        var bytes=JsonSerializer.SerializeToUtf8Bytes(new {preferences=_nativePreferences,recentFiles=_recentFiles,encoderPath=_encoderPath});
+        var bytes=JsonSerializer.SerializeToUtf8Bytes(new {preferences=_nativePreferences,recentFiles=_recentFiles,encoderPath=_encoderPath,logging=_loggingOptions},NativeLoggingConfiguration.JsonOptions);
         await AtomicDocumentFile.WriteAsync(SettingsPath,(stream,ct)=>stream.WriteAsync(bytes,ct).AsTask());
     }
     private async Task RememberRecentAsync(string path)
