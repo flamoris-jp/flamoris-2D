@@ -37,7 +37,7 @@ export class LiveMcpEndpoint {
     this.revoke(); await this.closing;
     this.diagnose('debug', 'mcp.transport', 'Starting live MCP endpoint', { permission });
     const a = { permission, documentToken: this.service.documentToken, secret: randomBytes(32).toString('hex'),
-      requests: 0, active: 0, lastActivity: null, scopes: new Set(), endpoint: null, revoked: false };
+      requests: 0, active: 0, lastActivity: null, scopes: new Set(), endpoint: null, revoked: false, clientAttached: false };
     this.attachment = a;
     a.server = createServer({ maxHeaderSize: 8192 }, (req, res) => { void this.serve(a, req, res); });
     a.server.maxConnections = LIVE_MCP_LIMITS.connections;
@@ -62,6 +62,9 @@ export class LiveMcpEndpoint {
     const a = this.attachment;
     this.attachment = null;
     if (!a) return;
+    if (a.clientAttached)
+      this.diagnose('info', 'mcp.session', 'MCP client detached',
+        { permission: a.permission, requests: a.requests, active: a.active });
     this.diagnose('info', 'mcp.session', 'Live MCP access detached',
       { permission: a.permission, requests: a.requests, active: a.active });
     a.revoked = true; a.secret = '';
@@ -88,6 +91,11 @@ export class LiveMcpEndpoint {
       if (got.length !== expected.length || !timingSafeEqual(got, expected))
         return reject(401, 'mcp.auth', 'MCP authentication failed');
       this.diagnose('debug', 'mcp.auth', 'MCP authentication succeeded', { transport: 'streamable-http' });
+      if (!a.clientAttached) {
+        a.clientAttached = true;
+        this.diagnose('info', 'mcp.session', 'MCP client attached',
+          { permission: a.permission, transport: 'streamable-http' });
+      }
       if (req.url !== '/mcp') return reject(404);
       if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return reject(405); }
       if (a.active >= LIVE_MCP_LIMITS.concurrent) return reject(429);

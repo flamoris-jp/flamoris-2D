@@ -42,6 +42,12 @@ jobs:
         env:
           NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Authenticate FLAMORIS package source
+        shell: pwsh
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: dotnet nuget update source flamoris --configfile NuGet.config --username flamoris-jp --password $env:NUGET_AUTH_TOKEN --store-password-in-clear-text
+
       - name: Install locked Product and MCP test dependencies
         run: npm ci --prefix product --workspaces=false --ignore-scripts
 

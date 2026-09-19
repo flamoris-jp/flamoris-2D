@@ -96,11 +96,7 @@ public partial class MainWindow
             if (dialog.ShowDialog(this) != true) return;
             await OpenDocumentPathAsync(dialog.FileName);
         }
-        catch (Exception error)
-        {
-            _logger.Error("document.open", "Project open failed", error);
-            StatusText.Text = $"開けませんでした: {error.Message}";
-        }
+        catch (Exception error) { StatusText.Text = $"開けませんでした: {error.Message}"; }
     }
     private async Task OpenDocumentPathAsync(string path)
     {
@@ -118,6 +114,11 @@ public partial class MainWindow
             await RememberRecentAsync(path);
             _logger.Info("document.open", "Project opened",
                 new Dictionary<string, object?> { ["byteLength"] = input.Length, ["revision"] = _client.Revision });
+        }
+        catch (Exception error)
+        {
+            _logger.Error("document.open", "Project open failed", error);
+            throw;
         }
         finally { _documentBusy = false; SetMeshBusy(false); SaveMenuItem.IsEnabled = !_hasHandsOn && _client?.HasAuthoritativeProjection == true; }
     }
@@ -145,7 +146,12 @@ public partial class MainWindow
                 var next=await _client.IncrementalNameAsync(Path.GetFileName(path),Directory.EnumerateFiles(directory,"*.fl2d").Select(p=>Path.GetFileName(p)!).Take(10001).ToArray(),_nativePreferences);
                 var fileName=String(next.Payload,"fileName")!;if(Path.GetFileName(fileName)!=fileName)throw new InvalidDataException("Invalid incremental name.");path=Path.Combine(directory,fileName);
             }
-            catch(Exception error){StatusText.Text=error.Message;return false;}
+            catch(Exception error)
+            {
+                _logger.Error("document.save", "Incremental save naming failed", error,
+                    new Dictionary<string, object?> { ["operation"] = operation });
+                StatusText.Text=error.Message;return false;
+            }
         }
         _documentBusy = true; PreparedDocument? prepared = null;
         var client = _client;

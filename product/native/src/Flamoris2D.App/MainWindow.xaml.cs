@@ -90,6 +90,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         }
         catch (Exception error)
         {
+            _logger.Error("app.startup", "Product Host startup failed", error);
             ShowAuthorityLost($"Product Hostを起動できませんでした: {error.Message}");
         }
     }
