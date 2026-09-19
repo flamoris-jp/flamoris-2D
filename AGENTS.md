@@ -176,3 +176,13 @@ Important documents include:
 ## 12. Source precedent
 
 The repository-boundary, testing, and CI philosophy is adapted from the current `flamoris-net/flamoris-george` README/AGENTS rules, especially physical responsibility separation, production allowlisting, milestone-based testing, and CI-as-regression-boundary discipline.
+
+
+## Shared FLAMORIS repository policy
+
+Organization-wide repository, licensing, security, contribution, and public-release principles are defined in:
+
+- `flamoris-jp/flamoris-commons/docs/repository-policy.md`
+- `flamoris-jp/flamoris-commons/AGENTS.md`
+
+This repository-specific `AGENTS.md` remains authoritative for product/domain rules. Where the shared policy and repository-specific rules differ, preserve the more specific product rule unless an explicit FLAMORIS-wide policy change says otherwise.
