@@ -63,7 +63,7 @@ export function createLiveMcpServer(service, attachment, scope) {
     const tool = toolByName.get(request.params.name);
     if (!tool) throw new InvalidParamsError('Unknown live Product tool.');
     if (!tool.readOnly && attachment.permission !== 'edit') {
-      service.emitDiagnostic?.({ level: 'warn', category: 'mcp.auth', message: 'MCP permission denied',
+      service.diagnose({ level: 'warn', category: 'mcp.auth', message: 'MCP permission denied',
         properties: { permission: attachment.permission, tool: tool.name } });
       return failure('mcp.read_only');
     }
@@ -80,12 +80,12 @@ export function createLiveMcpServer(service, attachment, scope) {
       expectedRevision: args.expectedRevision, payload }, { guard, external: true });
     if (!response.ok) {
       const category = tool.readOnly ? 'mcp.query' : 'mcp.command';
-      service.emitDiagnostic?.({ level: response.error.code === 'revision.conflict' ? 'warn' : 'error',
+      service.diagnose({ level: response.error.code === 'revision.conflict' ? 'warn' : 'error',
         category, message: response.error.code === 'revision.conflict' ? 'MCP revision conflict rejected' : 'MCP operation failed',
         properties: { tool: tool.name, code: response.error.code, revision: response.revision } });
       return failure(response.error.code);
     }
-    service.emitDiagnostic?.({ level: 'debug', category: tool.readOnly ? 'mcp.query' : 'mcp.command',
+    service.diagnose({ level: 'debug', category: tool.readOnly ? 'mcp.query' : 'mcp.command',
       message: 'MCP operation completed', properties: { tool: tool.name, revision: response.revision } });
     const result = { documentToken: response.documentToken, revision: response.revision,
       permission: attachment.permission, result: response.payload };

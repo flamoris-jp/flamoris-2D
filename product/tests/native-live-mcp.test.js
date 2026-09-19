@@ -90,6 +90,15 @@ test('MCP diagnostics are structured and never contain credentials or payloads',
   assert.ok(!serialized.includes('Secret payload must not log'));
 });
 
+test('diagnostic callback failure never changes MCP behavior', async t => {
+  const { service: s, client } = await setup(t);
+  s.emitDiagnostic = () => { throw new Error('diagnostic sink unavailable'); };
+  const context = await call(client, 'live.context');
+  assert.equal(context.documentToken, s.documentToken);
+  const changed = await call(client, 'command.scene.rename_node', rename(s, 'Still commits'));
+  assert.equal(changed.revision, 1);
+});
+
 test('SDK discovery is deterministic, complete and typed; Native lifecycle and internal restore excluded', async t => {
   const { client } = await setup(t);
   const first = await client.listTools();
