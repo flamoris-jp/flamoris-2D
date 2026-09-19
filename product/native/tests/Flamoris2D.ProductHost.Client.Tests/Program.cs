@@ -1,11 +1,13 @@
 using System.Text.Json;
 using Flamoris.Flamoris2D.ProductHost;
 using Flamoris.Flamoris2D.App;
+using Flamoris.Logging;
 
 if (args.Length != 1)
     throw new ArgumentException("Pass the Product Host main.mjs path.");
 
 var hostPath = Path.GetFullPath(args[0]);
+TestLoggingConfiguration();
 TestStaleProjectionGate();
 TestTargetWorkspace();
 TestViewportGeometry();
@@ -14,10 +16,98 @@ await TestTargetPropertiesAsync(hostPath);
 await TestMeshArtworkAsync(hostPath);
 await TestCrashInvalidationAsync(hostPath);
 await TestControlChannelLossRevokesMcpAsync(hostPath);
+await TestLoggingIntegrationAsync(hostPath);
 await DocumentTests.RunAsync(hostPath);
 RasterizerTests.Run();
 await ExportTests.RunAsync();
 Console.WriteLine("Product Host C# client tests passed.");
+
+static void TestLoggingConfiguration()
+{
+    var root = Path.Combine(Path.GetTempPath(), "Flamoris2D.Logging.Tests", Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    try
+    {
+        var settings = Path.Combine(root, "native-settings.json");
+        File.WriteAllText(settings, """
+            {
+              "logging": {
+                "level": "info",
+                "categories": { "mcp.transport": "debug" },
+                "outputs": [
+                  {
+                    "type": "file",
+                    "path": "logs/test.log",
+                    "format": "text",
+                    "rotation": { "enabled": true, "maxFileSizeMb": 1, "maxFiles": 2 }
+                  }
+                ]
+              }
+            }
+            """);
+        var options = NativeLoggingConfiguration.Load(out var warning, settings);
+        Assert(warning is null && options.Level == "info", "Logging configuration did not bind.");
+        Assert(options.Categories["mcp.transport"] == "debug", "Logging category override did not bind.");
+        var logger = NativeLoggingConfiguration.CreateLogger(options, root);
+        logger.Error("document.save", "Save failed", new InvalidOperationException("proof"),
+            new Dictionary<string, object?> { ["operation"] = "save" });
+        var path = Path.Combine(root, "logs", "test.log");
+        Assert(File.Exists(path), "Logger did not use the supplied writable base path.");
+        var text = File.ReadAllText(path);
+        Assert(text.Contains("[ERROR] [document.save]") && text.Contains("operation=save") &&
+            text.Contains("InvalidOperationException"), "Structured exception event was not written.");
+
+        var blocked = Path.Combine(root, "blocked");
+        File.WriteAllText(blocked, "not a directory");
+        var failureOptions = new LoggingOptions
+        {
+            Outputs = [new LogOutputOptions { Type = "file", Path = "blocked/app.log" }],
+        };
+        var failureSafeLogger = NativeLoggingConfiguration.CreateLogger(failureOptions, root);
+        failureSafeLogger.Info("app", "This sink failure must not escape.");
+    }
+    finally
+    {
+        try { Directory.Delete(root, true); } catch { }
+    }
+}
+
+static async Task TestLoggingIntegrationAsync(string hostPath)
+{
+    var root = Path.Combine(Path.GetTempPath(), "Flamoris2D.Logging.Tests", Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    var options = NativeLoggingConfiguration.CreateDefaultOptions();
+    options.Outputs = [new LogOutputOptions { Type = "file", Path = "integration.log" }];
+    var logger = NativeLoggingConfiguration.CreateLogger(options, root);
+    string? secret = null;
+    try
+    {
+        await using (var client = new ProductHostClient(logger))
+        {
+            await client.StartAsync(hostPath);
+            await client.CreateSessionAsync("Logging proof");
+            var connection = await client.EnableMcpAsync(McpPermission.Edit);
+            secret = connection.Token;
+            using var http = new HttpClient();
+            using var request = new HttpRequestMessage(HttpMethod.Post, connection.Endpoint);
+            request.Headers.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "invalid");
+            request.Content = new StringContent("{}");
+            using var response = await http.SendAsync(request);
+            Assert(response.StatusCode == System.Net.HttpStatusCode.Unauthorized,
+                "Bad MCP credential was not rejected.");
+            await client.DisableMcpAsync();
+        }
+        var text = File.ReadAllText(Path.Combine(root, "integration.log"));
+        Assert(text.Contains("[INFO] [mcp.session]") && text.Contains("[WARN ] [mcp.auth]"),
+            "MCP attach/detach/auth diagnostics did not reach Flamoris.Logging.");
+        Assert(secret is null || !text.Contains(secret), "MCP credential leaked into the log.");
+    }
+    finally
+    {
+        try { Directory.Delete(root, true); } catch { }
+    }
+}
 
 static void TestViewportGeometry()
 {

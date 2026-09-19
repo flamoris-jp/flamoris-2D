@@ -72,14 +72,18 @@ test('official current SDK attaches to same session and shares ordinary transact
 });
 
 test('MCP diagnostics are structured and never contain credentials or payloads', async t => {
-  const { service: s, client, connection, diagnostics } = await setup(t, 'read-only');
-  const denied = await call(client, 'command.scene.rename_node', rename(s, 'Secret payload must not log'));
-  assert.equal(denied.error.code, 'mcp.read_only');
+  const { service: s, client, connection, diagnostics } = await setup(t, 'edit');
+  const stale = rename(s, 'Secret payload must not log');
+  await call(client, 'command.scene.rename_node', stale);
+  const conflict = await call(client, 'command.scene.rename_node', stale);
+  assert.equal(conflict.error.code, 'revision.conflict');
   const badAuth = await raw({ ...connection, token: 'not-the-token' });
   assert.equal(badAuth.status, 401); await badAuth.arrayBuffer();
   await send(s, 'mcp.disable');
   assert.ok(diagnostics.some(d => d.category === 'mcp.session' && d.level === 'info'));
-  assert.ok(diagnostics.some(d => d.category === 'mcp.auth' && d.message === 'MCP permission denied'));
+  assert.ok(diagnostics.some(d => d.category === 'mcp.transport' && d.level === 'debug'));
+  assert.ok(diagnostics.some(d => d.category === 'mcp.command' &&
+    d.properties.code === 'revision.conflict' && d.level === 'warn'));
   assert.ok(diagnostics.some(d => d.category === 'mcp.auth' && d.message === 'MCP authentication failed'));
   const serialized = JSON.stringify(diagnostics);
   assert.ok(!serialized.includes(connection.token));
