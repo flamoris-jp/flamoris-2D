@@ -84,9 +84,21 @@ static async Task TestDiagnosticBoundaryAsync()
         options.Outputs = [new LogOutputOptions { Type = "file", Path = "diagnostics.log" }];
         var logger = NativeLoggingConfiguration.CreateLogger(options, root);
         await using var client = new ProductHostClient(logger);
+        var validDiagnostic = "FLAMORIS_DIAGNOSTIC " + JsonSerializer.Serialize(new
+        {
+            level = "warn",
+            category = "mcp.auth",
+            message = "MCP authentication failed",
+            properties = new Dictionary<string, object?>
+            {
+                ["statusCode"] = 401,
+                ["innocent"] = secret,
+                ["payload"] = new { token = secret },
+            },
+        });
         var diagnostics = string.Join('\n',
             """FLAMORIS_DIAGNOSTIC {"category":"mcp.auth"}""",
-            $$"""FLAMORIS_DIAGNOSTIC {"level":"warn","category":"mcp.auth","message":"MCP authentication failed","properties":{"statusCode":401,"innocent":"{{secret}}","payload":{"token":"{{secret}}"}}}""",
+            validDiagnostic,
             string.Empty);
         await using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(diagnostics));
         using var reader = new StreamReader(stream);
