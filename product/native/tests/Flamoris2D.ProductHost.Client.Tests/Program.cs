@@ -128,9 +128,19 @@ static async Task TestLoggingIntegrationAsync(string hostPath)
     {
         await using (var client = new ProductHostClient(logger))
         {
+            var attached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var authenticationFailed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var detached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            client.DiagnosticReceived += (_, line) =>
+            {
+                if (line.Contains("Live MCP access attached", StringComparison.Ordinal)) attached.TrySetResult();
+                if (line.Contains("MCP authentication failed", StringComparison.Ordinal)) authenticationFailed.TrySetResult();
+                if (line.Contains("Live MCP access detached", StringComparison.Ordinal)) detached.TrySetResult();
+            };
             await client.StartAsync(hostPath);
             await client.CreateSessionAsync("Logging proof");
             var connection = await client.EnableMcpAsync(McpPermission.Edit);
+            await attached.Task.WaitAsync(TimeSpan.FromSeconds(5));
             secret = connection.Token;
             using var http = new HttpClient();
             using var request = new HttpRequestMessage(HttpMethod.Post, connection.Endpoint);
@@ -140,7 +150,9 @@ static async Task TestLoggingIntegrationAsync(string hostPath)
             using var response = await http.SendAsync(request);
             Assert(response.StatusCode == System.Net.HttpStatusCode.Unauthorized,
                 "Bad MCP credential was not rejected.");
+            await authenticationFailed.Task.WaitAsync(TimeSpan.FromSeconds(5));
             await client.DisableMcpAsync();
+            await detached.Task.WaitAsync(TimeSpan.FromSeconds(5));
         }
         var text = File.ReadAllText(Path.Combine(root, "integration.log"));
         Assert(text.Contains("[INFO] [mcp.session]") && text.Contains("[WARN ] [mcp.auth]"),
