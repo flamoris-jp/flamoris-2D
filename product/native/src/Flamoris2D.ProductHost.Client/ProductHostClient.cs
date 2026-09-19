@@ -442,8 +442,7 @@ public sealed partial class ProductHostClient : IAsyncDisposable
                 await reader.ReadLineAsync(cancellationToken) is { } line)
             {
                 if (!TryLogHostDiagnostic(line))
-                    _logger?.Debug("app", "Product Host diagnostic",
-                        new Dictionary<string, object?> { ["message"] = line });
+                    _logger?.Debug("app", "Product Host emitted an unstructured diagnostic");
                 DiagnosticReceived?.Invoke(this, line);
             }
         }
