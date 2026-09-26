@@ -384,7 +384,7 @@ export async function readCutworkFlimg(input, options = {}) {
   if (!Number.isInteger(manifest.schemaVersion)) {
     throw error("schemaVersion must be an integer.", "flimg.manifest_malformed");
   }
-  if (manifest.schemaVersion !== 1) {
+  if (![1, 2].includes(manifest.schemaVersion)) {
     throw error(`Cutwork schema ${manifest.schemaVersion} is unsupported.`, "flimg.schema_unsupported", {
       schemaVersion: manifest.schemaVersion,
     });
@@ -399,7 +399,7 @@ export async function readCutworkFlimg(input, options = {}) {
     width > limits.maximumDimension || height > limits.maximumDimension ||
     !Number.isSafeInteger(canvasPixels) || canvasPixels > limits.maximumPixels ||
     colorSpace !== "srgb8" || pixelFormat !== "straight-bgra32") {
-    throw error("Canvas metadata is invalid for .flimg v1.", "flimg.canvas_invalid");
+    throw error("Canvas metadata is invalid for .flimg.", "flimg.canvas_invalid");
   }
   const canvas = { width, height, colorSpace, pixelFormat };
   exactKeys(manifest.original, ["asset", "sha256", "sourceName"], "original");
@@ -415,6 +415,8 @@ export async function readCutworkFlimg(input, options = {}) {
   const referenced = new Set(["manifest.json", "assets/original.png"]);
   const layers = [];
   let baseIndex = -1;
+  const partOrders = new Set();
+  const partIds = new Set();
   for (const [index, layer] of manifest.layers.entries()) {
     const path = `layers.${index}`;
     if (!layer || typeof layer !== "object" || Array.isArray(layer)) {
@@ -424,6 +426,10 @@ export async function readCutworkFlimg(input, options = {}) {
     const kindKeys = layer.kind === "base" ? []
       : layer.kind === "patch" ? ["asset", "sha256", "transform", "sourcePolygon"]
         : ["asset", "sha256"];
+    if (manifest.schemaVersion === 2 && layer.kind === "part") kindKeys.push("partOrder");
+    // In v2, only owned Repairs have ownerPartId; legacy/global Repairs omit it.
+    if (manifest.schemaVersion === 2 && layer.kind === "repair" &&
+      Object.hasOwn(layer, "ownerPartId")) kindKeys.push("ownerPartId");
     exactKeys(layer, [...common, ...kindKeys], path);
     const id = parseId(layer.id, `${path}.id`);
     if (identities.has(id)) throw error(`Duplicate stable ID ${id}.`, "flimg.identity_duplicate", { path: `${path}.id`, id });
@@ -434,6 +440,15 @@ export async function readCutworkFlimg(input, options = {}) {
       throw error(`${path} metadata is invalid.`, "flimg.layer_invalid", { path });
     }
     const bounds = parseBounds(layer.bounds, canvas, `${path}.bounds`);
+    if (layer.kind === "part") {
+      if (manifest.schemaVersion === 2 &&
+        (!Number.isSafeInteger(layer.partOrder) || layer.partOrder < 0 ||
+          layer.partOrder >= 2_147_483_647 || partOrders.has(layer.partOrder))) {
+        throw error(`${path}.partOrder must be a unique non-negative integer.`, "flimg.layer_invalid", { path });
+      }
+      if (manifest.schemaVersion === 2) partOrders.add(layer.partOrder);
+      partIds.add(id);
+    }
     if (layer.kind === "base") {
       if (baseIndex >= 0 || bounds.x !== 0 || bounds.y !== 0 || bounds.width !== width || bounds.height !== height) {
         throw error("The layer stack must contain exactly one full-canvas Base.", "flimg.base_invalid", { path });
@@ -454,6 +469,11 @@ export async function readCutworkFlimg(input, options = {}) {
     const normalized = { id, kind: layer.kind, name: layer.name,
       semanticName: layer.semanticName, visible: layer.visible, bounds, asset,
       sha256: layer.sha256 };
+    if (manifest.schemaVersion === 2 && layer.kind === "part") normalized.partOrder = layer.partOrder;
+    if (manifest.schemaVersion === 2 && layer.kind === "repair" &&
+      Object.hasOwn(layer, "ownerPartId")) {
+      normalized.ownerPartId = parseId(layer.ownerPartId, `${path}.ownerPartId`);
+    }
     if (layer.kind === "patch") {
       normalized.transform = validatePatchTransform(layer.transform, bounds, canvas, `${path}.transform`);
       normalized.sourcePolygon = validateSourcePolygon(layer.sourcePolygon, canvas, `${path}.sourcePolygon`);
@@ -463,6 +483,12 @@ export async function readCutworkFlimg(input, options = {}) {
   if (baseIndex < 0 || layers.some((layer, index) =>
     index < baseIndex ? layer.kind !== "part" : index > baseIndex ? !["patch", "repair"].includes(layer.kind) : false)) {
     throw error("Cutwork layer bands or Base position are invalid.", "flimg.layer_order_invalid");
+  }
+  for (const layer of layers) {
+    if (layer.ownerPartId && !partIds.has(layer.ownerPartId)) {
+      throw error(`Repair ${layer.id} refers to a missing Part.`, "flimg.layer_invalid",
+        { layerId: layer.id, ownerPartId: layer.ownerPartId });
+    }
   }
   const unexpected = [...entries.keys()].filter((path) => !referenced.has(path));
   if (unexpected.length) {
@@ -479,7 +505,7 @@ export async function readCutworkFlimg(input, options = {}) {
   }
   return {
     format: manifest.format,
-    schemaVersion: 1,
+    schemaVersion: manifest.schemaVersion,
     documentId,
     canvas,
     original: {

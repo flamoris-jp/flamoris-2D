@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
+import { deflateSync } from 'node:zlib';
 import { writePsd, initializeCanvas } from 'ag-psd';
 import { ProductHostService } from '../product-host/session-service.mjs';
 import { encodeRgbaPng } from '../product-host/document-artwork.mjs';
@@ -28,13 +29,29 @@ function storedZip(entries) {
   end.writeUInt16LE(entries.length,8); end.writeUInt16LE(entries.length,10); end.writeUInt32LE(directory.length,12); end.writeUInt32LE(offset,16);
   return Buffer.concat([...local,directory,end]);
 }
+function grayPng() {
+  function chunk(type, bytes) {
+    const name=Buffer.from(type), data=Buffer.from(bytes), length=Buffer.alloc(4), checksum=Buffer.alloc(4);
+    length.writeUInt32BE(data.length);checksum.writeUInt32BE(crc32(Buffer.concat([name,data])));
+    return Buffer.concat([length,name,data,checksum]);
+  }
+  const header=Buffer.from([0,0,0,2,0,0,0,2,8,0,0,0,0]);
+  return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',header),
+    chunk('IDAT',deflateSync(Buffer.from([0,255,0,0,128,255]))),chunk('IEND',Buffer.alloc(0))]);
+}
 function cutwork() {
   const png = encodeRgbaPng(2,2,new Uint8Array(16).fill(255));
-  const manifest = { format: 'flamoris-cutwork', schemaVersion: 1, documentId: '10000000-0000-0000-0000-000000000001',
+  const mask=grayPng(), partId='20000000-0000-0000-0000-000000000001';
+  const maskPath=`layers/${partId.replaceAll('-','')}/mask.png`;
+  const manifest = { format: 'flamoris-cutwork', schemaVersion: 2, documentId: '10000000-0000-0000-0000-000000000001',
     canvas: { width: 2, height: 2, colorSpace: 'srgb8', pixelFormat: 'straight-bgra32' },
     original: { asset: 'assets/original.png', sha256: createHash('sha256').update(png).digest('hex'), sourceName: 'Akino.png' },
-    layers: [{ id: '30000000-0000-0000-0000-000000000001', kind: 'base', name: 'Base', visible: true, semanticName: null, bounds: { x:0, y:0, width:2, height:2 } }] };
-  return storedZip([['manifest.json',JSON.stringify(manifest)],['assets/original.png',png]]);
+    layers: [
+      { id:partId,kind:'part',name:'Eye',semanticName:'eye_left',partOrder:0,visible:true,
+        bounds:{x:0,y:0,width:2,height:2},asset:maskPath,sha256:createHash('sha256').update(mask).digest('hex') },
+      { id: '30000000-0000-0000-0000-000000000001', kind: 'base', name: 'Base', visible: true, semanticName: null, bounds: { x:0, y:0, width:2, height:2 } },
+    ] };
+  return storedZip([['manifest.json',JSON.stringify(manifest)],['assets/original.png',png],[maskPath,mask]]);
 }
 function psd(red = 255) {
   initializeCanvas(() => { throw new Error('Unexpected canvas'); }, (width,height) => ({ width,height,data:new Uint8ClampedArray(width*height*4) }));
@@ -79,7 +96,7 @@ for (const [kind, fixture] of [['psd',psd],['flimg',cutwork]]) {
     const h = new ProductHostService(); await send(h,'session.create'); const bytes = fixture();
     const reserve = await send(h,'document.reserve',{byteLength:bytes.length}); h.transfers.entries.get(reserve.id).bytes=Buffer.from(bytes);
     await send(h,'source.import',{id:reserve.id,kind,fileName:`art.${kind}`,jobId:`test-${kind}`});
-    assert.equal(h.document.session.isDirty,true); assert.equal(h.document.renderAssets.length,1);
+    assert.equal(h.document.session.isDirty,true); assert.equal(h.document.renderAssets.length,kind==='flimg'?2:1);
     const nodeId=[...h.document.bindings.keys()][0]; const original=structuredClone(h.document.session.project);
     const preview=await send(h,'mesh.generatePreview',{nodeId,previewId:`grid-${kind}`,kind:'grid',columns:2,rows:2});
     await send(h,'mesh.tool',{nodeId,context:'structure',tool:'topology.automesh',input:{candidate:preview.candidate}});
@@ -87,7 +104,7 @@ for (const [kind, fixture] of [['psd',psd],['flimg',cutwork]]) {
     await send(h,'session.redo'); assert.deepEqual(h.document.session.project,edited);
     const saved=await send(h,'session.serialize'); const assets=structuredClone(h.document.renderAssets);
     await send(h,'session.open',{document:saved.document}); assert.deepEqual(h.document.renderAssets,assets);
-    assert.deepEqual(h.document.session.project,edited); assert.equal(h.assets.entries.size,1);
+    assert.deepEqual(h.document.session.project,edited); assert.equal(h.assets.entries.size,kind==='flimg'?2:1);
   });
 }
 
