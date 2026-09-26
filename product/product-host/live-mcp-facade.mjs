@@ -19,9 +19,11 @@ export function resolveLiveTool(name, input) {
   const tool = toolByName.get(name);
   if (!tool) reject();
   const issues = [];
-  validateValue(input, tool.inputSchema, '$', issues);
+  const validationSchema = name === 'live.transaction' ? { ...tool.inputSchema, properties: { ...tool.inputSchema.properties, commands: { type: 'array', minItems: 1, maxItems: 64 } } } : tool.inputSchema;
+  validateValue(input, validationSchema, '$', issues);
   if (issues.length) reject();
   if (name === 'live.transaction') {
+    if (input.label.length > 160) reject();
     // Product's validator intentionally does not implement JSON Schema oneOf.
     for (const command of input.commands) {
       if (!LIVE_COMMANDS.has(command?.type)) reject();

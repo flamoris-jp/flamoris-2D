@@ -1,5 +1,5 @@
 import test from 'node:test';
-import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import { callLiveTool } from './support/live-mcp-control.js';
 import assert from 'node:assert/strict';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -50,10 +50,8 @@ test('reviewed native PSD update retains authored topology and restores exact ar
  const candidate=await send(h,'mesh.generatePreview',{nodeId,previewId:'mesh',kind:'grid',columns:2,rows:2});
  await send(h,'mesh.tool',{nodeId,context:'structure',tool:'topology.automesh',input:{candidate:candidate.candidate}});
  const connection=(await send(h,'mcp.enable',{permission:'edit'}));
- const mcp=new Client({name:'source-history-proof',version:'1'});
- await mcp.connect(new StreamableHTTPClientTransport(new URL(connection.endpoint),{requestInit:{headers:{Authorization:`Bearer ${connection.token}`}}}));
- t.after(async()=>{await mcp.close();await h.close();});
- async function remote(name,args){const r=await mcp.callTool({name,arguments:args});assert.ok(!r.isError,JSON.stringify(r));return r.structuredContent;}
+ t.after(()=>h.close());
+ async function remote(name,args){const {documentToken,expectedRevision,...input}=args;return callLiveTool(h,connection.leaseId,name,input);}
  const beforeMesh=structuredClone(h.document.session.project);
  const form=h.document.session.project.meshKeyforms[0];const positions=[...form.positions];positions[0]+=1;
  await remote('command.mesh_keyform.move_vertices',{documentToken:h.documentToken,expectedRevision:h.revision,payload:{keyformId:form.id,positions}});
