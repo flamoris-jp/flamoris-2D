@@ -120,7 +120,7 @@ For development builds and the full native workflow, see [`product/native/README
 From the repository root:
 
 ```powershell
-npm install
+npm ci
 npm test
 npm run desktop
 ```
@@ -144,7 +144,7 @@ Electron remains the default release until the native retirement/cutover criteri
 From the repository root:
 
 ```powershell
-npm install
+npm ci
 npm test
 npm start
 ```
@@ -201,6 +201,8 @@ Documentation may mix Japanese and English. Use translation tools or AI translat
 
 Use focused Issues and reviewable branches. Keep implementation commits small enough that interrupted work can resume safely.
 
+This public repository inherits the organization's [contribution policy](https://github.com/flamoris-jp/.github/blob/main/CONTRIBUTING.md) and [security policy](https://github.com/flamoris-jp/.github/blob/main/SECURITY.md). Issues are welcome; pull requests are accepted from repository collaborators. Do not report sensitive vulnerabilities or credentials in public Issues.
+
 Typical flow:
 
 ```text
@@ -223,10 +225,9 @@ Non-trivial defects found during Production QA should become focused Issues rath
 - #78 — broader packaged Windows end-to-end Production QA checklist
 - #79 — Phase 9 Production Robustness / Internal Beta umbrella
 - #58 — production UX cleanup and Japanese-first labels
-- #6 — dependency lockfile / reproducibility
-- #43 — public repository release preparation
+- #43 — post-public dependency, package, and history audit
 
-The public-release and licensing work in #43 is intentionally separate from current product hardening. Do not infer licensing of FLAMORIS creative assets from the software repository until that release work is completed.
+The remaining release audit in #43 is separate from product hardening. See the [audit evidence and remaining release gates](docs/reviews/issue-43-release-hygiene.md). The software license does not grant rights to FLAMORIS creative assets.
 
 ## Historical reference
 
@@ -253,7 +254,7 @@ FLAMORIS software is provided as-is. We do not provide guaranteed individual sup
 If FLAMORIS helps you or you find it interesting, your support helps fund development and keeps the project growing. 🌱  
 <sub>Mostly GPU bills.</sub>
 
-FLAMORIS characters, character designs, artwork, illustrations, PSD source assets, music, audio, logos, trademarks, branding, video, and other creative assets are **not automatically licensed under Apache-2.0**. Their applicable licenses or rights statements must be provided separately.
+FLAMORIS characters, character designs, artwork, illustrations, PSD source assets, music, audio, logos, trademarks, branding, video, and other creative assets are **not covered by Apache-2.0; all rights reserved unless separately licensed**. Their applicable licenses or rights statements must be provided separately.
 
 ### 方針
 
@@ -269,4 +270,4 @@ FLAMORISのソフトウェアは現状のまま提供されます。個別サポ
 FLAMORISは元気になって育ちます。🌱  
 <sub>主にGPU代とか。</sub>
 
-FLAMORISのキャラクター、キャラクターデザイン、イラスト、PSD素材、音楽・音声、ロゴ、商標・ブランド、映像その他のクリエイティブ素材は、**Apache-2.0によって自動的にライセンスされるものではありません**。各素材に適用されるライセンスや権利表示を別途確認してください。
+FLAMORISのキャラクター、キャラクターデザイン、イラスト、PSD素材、音楽・音声、ロゴ、商標・ブランド、映像その他のクリエイティブ素材は、**Apache-2.0の対象外です。別途ライセンスが明記されていない限り、すべての権利を留保します**。各素材に適用されるライセンスや権利表示を別途確認してください。

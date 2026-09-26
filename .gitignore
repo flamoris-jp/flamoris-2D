@@ -6,6 +6,11 @@ Thumbs.db
 dist/
 out/
 coverage/
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
 *.psd
 *.psb
 !staging/fixtures/*.psd

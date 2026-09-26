@@ -2,12 +2,15 @@
   "name": "flamoris-2d-repository",
   "version": "0.3.0",
   "private": true,
-  "workspaces": ["product"],
+  "workspaces": [
+    "product"
+  ],
   "scripts": {
     "start": "npm --workspace flamoris-2d start",
     "desktop": "npm --workspace flamoris-2d run desktop",
     "desktop:pack": "npm --workspace flamoris-2d run desktop:pack",
     "desktop:dist": "npm --workspace flamoris-2d run desktop:dist",
     "test": "npm --workspace flamoris-2d test"
-  }
+  },
+  "license": "Apache-2.0"
 }
