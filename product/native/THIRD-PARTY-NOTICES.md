@@ -30,12 +30,16 @@ this exact directory with Node/.NET removed from PATH and exports a real H.264
 video using the packaged encoder. Installer, signing, update and default file
 association policy remain part of the separately reviewed release cutover.
 
-## Local MCP runtime (Issue #102)
+## Local MCP runtime (Issue #107)
 
-Official Model Context Protocol TypeScript SDK server/core/node 2.0.0 (MIT),
-@hono/node-server 1.19.17 (MIT), hono 4.13.8 (MIT), zod 4.6.5 (MIT).
-Exact package integrity hashes and transitive versions are pinned in
-`product/package-lock.json`. Their runtime modules, package metadata and LICENSE
-files are included by `McpRuntime.files.props`. SDK distributions include their
-bundled validation dependencies and upstream notices. The official client SDK is
-a test-only dependency and is not part of the native candidate.
+Flamoris.Mcp.Core 1.1.0 and Flamoris.Logging 1.0.0 (Apache-2.0), consumed from
+GitHub Packages. Official ModelContextProtocol.Core 2.2.0 (MIT) and transitive
+NuGet versions are recorded in published `.deps.json` files. The self-contained
+bridge runtime is in `mcp/` and contains no Product Host/editor content.
+See https://github.com/flamoris-jp/flamoris-mcp-core and
+https://github.com/modelcontextprotocol/csharp-sdk for upstream code/notices.
+
+Chipsy is supplied FLAMORIS artwork, not covered by the code license. Its canonical
+WebP comes unchanged from the Core package; a decoded PNG cache is produced during
+candidate assembly solely for WPF display. Asset usage follows Core's assets/README.md.
+The superseded TypeScript MCP server/node/hono/zod runtime is no longer packaged.

@@ -3,62 +3,94 @@
 Status: current live contract below; original sections retain the MCP-first design rationale.
 
 
-## Live MCP attachment (Issue #102)
+## Live MCP attachment (Issue #107)
 
-Current contract: [ADR 0010](decisions/0010-native-live-mcp.md). The Native Product
-Host exposes an optional **local, authenticated, stateless Streamable HTTP**
-endpoint over the same EditorSession and source-artwork history. It is disabled
-by default. The WPF `MCP / AI` menu controls Read only / Edit, disable, connection
-copy and credential rotation; status shows request activity, not a client count.
+Current contract: [ADR 0011](decisions/0011-mcp-core-migration.md), superseding the
+historical HTTP transport in [ADR 0010](decisions/0010-native-live-mcp.md).
 
-Protocol: **2026-07-28**, official TypeScript SDK **2.0.0**. Modern clients use
-`server/discover` and request metadata; 2025-03-26/06-18/11-25 clients may use the
-SDK's stateless initialize compatibility. There is no protocol session ID or
-legacy SSE endpoint. stdio forwarding was not required and is not shipped.
-Clients must support custom bearer headers to reach this local endpoint; OAuth-only,
-remote/cloud and browser-origin clients are outside this capability.
+External MCP client → packaged `mcp/Flamoris.Mcp.Bridge.exe` → authenticated,
+same-user local named pipe → `Flamoris.Mcp.Core 1.1.0` → Native Product Host adapter
+→ the same Node EditorSession, Project and source-artwork Undo/Redo history.
 
-1. Read `live.context` for the active `documentToken` and `revision`.
-2. Discover typed `query.*` and `command.*` tools with `tools/list` (32 per page),
-   or `flamoris://schema/<tool-name>` resources. The deterministic
-   `flamoris://live/dispositions` resource accounts for every public Product
-   Command/Query/import, including intentionally excluded operations.
-3. Supply `documentToken` for queries and also `expectedRevision` for edits.
-   `live.transaction` accepts 1–64 ordinary commands and one label, creating one
-   shared history unit. `live.undo`/`live.redo` traverse Native source-art history.
-4. After a successful edit, WPF receives ordinary `document.changed` and refreshes.
-   A stale edit fails with `revision.conflict`; read again and reconsider explicitly.
+Manual connection is disabled by default. `MCP / AI` offers Read only / Edit,
+Disable, credential rotation and explicit connection copy. The copied entry starts
+the bridge with `--pipe <name>` and passes the transient capability only through
+`FLAMORIS_MCP_CAPABILITY`. Do not save that capability in application settings,
+project data, command arguments, logs or provider profile files. Only explicit
+clipboard export discloses it. No tunnel-client provider is installed or managed.
 
-Read only permits queries/validation/evaluation/discovery. Edit never grants
-save/import/replacement/export-to-path or binary access. `source.apply_psd_reimport`
-requires Native review and retained artwork; `animation.mesh_target.restore_internal`
-is internal history machinery. Neither is publicly executable. Queries absent from
-public MCP schemas have an explicit disposition; Native export stays in Native.
+1. Call `mcp.context` (empty arguments) to obtain `runtimeId`, `documentToken` and
+   `revision` (a decimal **string**, per Core's common contract).
+2. `tools/list` publishes schema-derived named `query.*`, `command.*`,
+   `live.transaction`, `live.undo` and `live.redo` tools. Discovery pages contain
+   32 tools; read-only discovery omits mutations. `live.dispositions` is a query
+   tool replacing the former disposition resource; exact schemas are in tool discovery.
+3. Tool arguments have Core's `{ guard, input }` envelope. For example:
 
-The endpoint binds only to 127.0.0.1 with an ephemeral port, validates exact Host,
-rejects every Origin header and requires a fresh 256-bit capability. Disable,
-permission change/rotation, replacement and Host shutdown/restart revoke it.
-No token is persisted; only explicit connection copy exposes it to the clipboard.
-The copy format is a conventional `mcpServers` entry; adapt the client wrapper
-while retaining the endpoint and Authorization header. Old pasted credentials
-cannot edit a replacement document.
+```json
+{
+  "guard": { "runtimeId": "<context runtime>", "documentToken": "<context document>", "expectedRevision": "12" },
+  "input": { "payload": { "nodeId": "<stable node ID>", "displayName": "Eye" } }
+}
+```
 
-Limits: 1 MiB body, depth 64, 8 active requests, 16 sockets, 15 s deadline,
-4 MiB query results and 64 commands per transaction. Oversized queries can be
-replaced with narrower typed queries. Both WPF and MCP enter ProductHostService's
-queue; cancellation and deadline guards run at admission and immediately before
-Product commit, including Undo/Redo. Synchronous Product work cannot be preempted
-mid-instruction; the guard prevents a transaction that exceeds its deadline from
-committing. A response lost after commit is ambiguous: query the shared state
-before retrying; there is no automatic replay/rebase or remote rollback.
+This example is for `command.scene.rename_node`. Query inputs are
+`{ "input": { ...Product query fields... } }` inside Core's `input` envelope.
+`live.transaction` input contains 1–64 typed `commands` and `label`; Undo/Redo and
+`live.context` have empty input objects. `live.context` retains the ordinary Native
+workspace/history projection; `mcp.context` supplies the common identity guards.
 
-Tests cover official current SDK and legacy initialization, header/version mismatch,
-auth/Origin/Host rejection, body/concurrency limits, real disconnect while queued,
-revision conflicts, atomic transactions, replacement/restart, Mesh mutation and
-Native PSD re-import artwork Undo/Redo. The packaged WPF production smoke additionally
-checks automatic target/image refresh after an external Mesh transaction, shared
-Undo/Redo and the existing subsequent Save/reopen path. Physical hands-on acceptance
-is separate from automated results.
+The exact Product schemas, stable IDs, 120000 ticks/sec, Mesh/Rig/Animation commands
+and source-art history stay in 2D. Native Save/Open/import/export-to-path, binary
+access, process/eval and internal restore commands remain excluded. Edit is never
+filesystem authority. WPF observes the usual `document.changed` events; one MCP
+transaction is one normal history unit. Revision conflict never silently rebases.
+
+### Cross-process serialization and lifetime
+
+The adapter reserves the existing Product Host serialization lane for each Core
+snapshot/read/commit callback. WPF and other MCP work wait on that same queue.
+The snapshot is read at the real authority, and Product Host validates the
+reservation, runtime, document, revision and permission again before dispatch.
+The existing EditorSession `beforeCommit` hook checks revocation and a monotonic
+reservation deadline before installing any prepared transaction or history change.
+The ordinary Product transaction/history preparation is separate from its small
+atomic commit closure. After preparation, C# rechecks the request token before
+sending commit acknowledgement. Cancel/timeout drops that draft without touching
+Project or source-art history. WPF uses the same methods synchronously. No second
+session, Product Host, document authority or history exists in C# or bridge.
+
+Each reservation is bounded to five seconds including queue wait, with at most
+8 pending reservations; release/cancel/disable bypass queued work. Core allows
+4 active requests, bounds frames to 4 MiB and depth 64, and applies its 15-second
+request deadline. Query results are capped at 1 MiB before control-channel serialization.
+A started partial frame is bounded by Core; healthy idle time
+has no idle expiration. Synchronous preparation is not preempted mid-instruction;
+its draft cannot commit until C# acknowledges the still-live request. Revocation
+and deadline are rechecked at the final atomic commit, including Undo/Redo.
+A response lost after commit remains ambiguous; query before retrying, never replay.
+
+Document replacement revokes at the Product Host before installing the replacement.
+Native attachment then invalidates the Core grant. Disable revokes at Node before
+Core endpoint cleanup. Control-channel loss terminates the owned Host and revokes
+Core before publishing authority loss. Every enable rotates pipe/capability.
+
+### Protocol, status and package
+
+Core's official C# SDK owns MCP stdio protocol/version negotiation (modern
+2026-07-28 and legacy initialization tested by the shared bridge integration).
+The Node MCP HTTP server, HTTP bearer configuration and Node SDK runtime are removed.
+The private raster/document bulk channel remains a separate Native capability.
+
+The status is green for an authenticated connected bridge and red otherwise, with
+text distinguishing disabled, waiting and connected. Foreground activity uses
+Core's activity projection, a Chipsy indicator and temporary wait cursor; completion,
+cancellation, disconnection and shutdown restore the current host cursor.
+
+Existing Windows CI publishes the matching self-contained bridge, exercises an
+official client, and runs the packaged WPF Mesh/transaction/Undo smoke. Node tests
+protect authority reservations and source-art history. Physical Windows checks
+still cover manual client configuration, Ctrl+Z/Ctrl+Y, real artwork and DPI.
 
 ## 1. Principle
 
@@ -473,7 +505,7 @@ Phase 1 requirements:
 Phase 1C provides the minimal in-process proof through
 `product/src/mcp/adapter.js`: hierarchy queries and persistent edits share the
 normal Query API, command schemas, `EditorSession`, validation, Undo/Redo, and
-UI-visible Project state. The live Native transport is now specified and implemented by ADR 0010.
+UI-visible Project state. The live Native transport is now specified and implemented by ADR 0011.
 
 Later MCP implementation becomes an adapter over these existing capabilities rather than a retrofit.
 

@@ -19,8 +19,13 @@ Core requires synchronous atomic callbacks on the authority's serialization lane
 The adapter reserves that lane through the existing private control channel. A
 reservation returns the actual Product snapshot while holding subsequent WPF and
 MCP work. Core then validates that snapshot and invokes one synchronous callback.
-The callback forwards a named, schema-checked Product tool under the reservation;
-it does not execute domain logic in C#. Completion/release resumes the same queue.
+The callback forwards a named, schema-checked Product tool under the reservation.
+Mutations first prepare the existing ordinary Product draft without side effects;
+C# then rechecks the request cancellation/deadline token and acknowledges commit.
+The Host commits that one prepared command/history operation. Ordinary WPF calls
+use the same preparation/commit methods synchronously. This adds no second document
+or session, and avoids a cancelled C# request committing after expensive Node
+preparation. Completion/release resumes the same queue.
 
 Reservations are bounded and cancellation is signalled out of queue. Product Host
 rechecks reservation identity, runtime, document, revision, permission, expiry and

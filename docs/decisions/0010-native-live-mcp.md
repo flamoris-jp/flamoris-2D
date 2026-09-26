@@ -1,6 +1,7 @@
 # ADR 0010: Live Native MCP attachment and local capability boundary
 
-Status: implementation decision under Issue #102; subject to PR review.
+Status: historical Issue #102 decision; MCP transport superseded by [ADR 0011](0011-mcp-core-migration.md).
+The original decision below is preserved as historical context.
 Baseline: main f717f282 (merged #101). No Project/schema/timebase change.
 
 ## Protocol and implementation
