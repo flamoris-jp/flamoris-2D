@@ -1207,7 +1207,7 @@ function matchesType(value, type) {
   return typeof value === type;
 }
 
-function validateValue(value, schema, path, issues) {
+export function validateValue(value, schema, path, issues) {
   if (!matchesType(value, schema.type)) {
     issues.push({
       code: "command.payload_type",
