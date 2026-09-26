@@ -621,7 +621,6 @@ public sealed partial class ProductHostClient : IAsyncDisposable
     private void LoseAuthority(string reason, Exception? error)
     {
         if (Interlocked.Exchange(ref _authorityLost, 1) != 0) return;
-        RevokeLocalMcp();
         _projectionGate.Invalidate();
         _projectionStale = false;
         var exception = error ?? new EndOfStreamException(reason);
@@ -639,6 +638,7 @@ public sealed partial class ProductHostClient : IAsyncDisposable
             try { if (!process.HasExited) process.Kill(true); } catch { }
             try { process.WaitForExit(5000); } catch { }
         }
+        RevokeLocalMcp();
         AuthorityLost?.Invoke(this, new AuthorityLostEventArgs(reason, error));
     }
 

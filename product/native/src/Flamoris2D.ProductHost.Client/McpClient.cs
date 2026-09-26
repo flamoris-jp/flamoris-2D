@@ -58,7 +58,7 @@ public sealed partial class ProductHostClient
             var host = new ProductMcpHost(this, response.Payload.GetProperty("leaseId").GetString()!);
             _mcpHost = host;
             var options = new McpOptions { MaxRequestBytes = 4 * 1024 * 1024, MaxConcurrentRequests = 4 };
-            var boundary = new McpBoundary(host, host.Tools(response.Payload.GetProperty("tools")), options, new McpDiagnostics(_logger));
+            var boundary = new McpBoundary(host, host.Tools(response.Payload.GetProperty("tools")), options, new McpDiagnostics(_logger ?? Flamoris.Logging.FlamorisLogger.Create(new Flamoris.Logging.LoggingOptions { Level = "error" })));
             _mcpBoundary = boundary;
             boundary.Status.Changed += PublishMcpStatus;
             var grant = await boundary.EnableAsync(permission == McpPermission.Edit ? CorePermission.Edit : CorePermission.ReadOnly);
