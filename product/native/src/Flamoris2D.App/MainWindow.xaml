@@ -377,6 +377,7 @@
                                    Text="{DynamicResource Panel.Properties}" />
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel Margin="10,2">
+                            <Expander x:Name="TargetPropertiesExpander" Header="選択対象の設定" Foreground="White" IsExpanded="False">
                             <StackPanel x:Name="TargetPropertiesPanel">
                             <TextBlock Text="選択対象" Foreground="#AEB0B5" />
                             <TextBlock x:Name="SelectedTargetText" Text="—"
@@ -395,6 +396,7 @@
                                        TextWrapping="Wrap"
                                        Text="表示とロックは選択とは別です。確定した変更は、まとめて1回で元に戻せます。" />
                             </StackPanel>
+                            </Expander>
                             <StackPanel x:Name="AuthoringPanel" Visibility="Collapsed" Margin="0,12,0,0" />
                             <StackPanel x:Name="KeyStatePanel" Visibility="Collapsed" Margin="0,12,0,0" />
                             <StackPanel x:Name="MeshPropertiesPanel" Visibility="Collapsed" Margin="0,12,0,0">

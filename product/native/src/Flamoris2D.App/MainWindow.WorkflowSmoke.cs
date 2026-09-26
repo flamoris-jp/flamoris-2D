@@ -15,10 +15,17 @@ public partial class MainWindow
         var selectedId = _targets.SelectedId;
         SwitchContext(EditingContext.Source, false);
         await RefreshProjectionAsync();
-        if ((TargetPropertiesPanel.Visibility == Visibility.Visible) != hasParts)
+        if (TargetPropertiesExpander.IsExpanded != hasParts)
             throw new InvalidOperationException("Selection controls must not dominate the empty Source screen.");
         if (!WorkflowHintText.Text.Contains(hasParts ? "メッシュ" : "素材を読み込む"))
             throw new InvalidOperationException("Source does not explain the next production action.");
+        if (!hasParts)
+        {
+            TargetPropertiesExpander.IsExpanded = true;
+            if (!DisplayNameEditor.IsEnabled || !ApplyNameButton.IsEnabled)
+                throw new InvalidOperationException("Empty-project target properties became unreachable.");
+            TargetPropertiesExpander.IsExpanded = false;
+        }
         var detail = FindWorkflowSection(KeyStatePanel,"詳細設定：原画・パーツ対応");
         if (detail.IsExpanded)
             throw new InvalidOperationException("Source advanced authoring must start collapsed.");
@@ -37,8 +44,8 @@ public partial class MainWindow
         {
             SwitchContext(definition.Context, false);
             await RefreshProjectionAsync();
-            var showProperties = hasParts && definition.Context is EditingContext.Source or EditingContext.Mesh or EditingContext.Rig or EditingContext.Deform;
-            if ((TargetPropertiesPanel.Visibility == Visibility.Visible) != showProperties)
+            var showProperties = definition.Context is EditingContext.Source or EditingContext.Mesh or EditingContext.Rig or EditingContext.Deform;
+            if ((TargetPropertiesExpander.Visibility == Visibility.Visible) != showProperties)
                 throw new InvalidOperationException("Unrelated selection controls leaked into the workflow.");
             if ((TimeSplitter.Visibility == Visibility.Visible) != definition.ShowTimeSurface)
                 throw new InvalidOperationException("Timeline resize handle does not follow Animation visibility.");

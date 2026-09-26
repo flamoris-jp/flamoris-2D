@@ -5,14 +5,21 @@ namespace Flamoris.Flamoris2D.App;
 public partial class MainWindow
 {
     private double _timelineHeight = 190;
+    private bool? _propertiesHadParts;
 
     private void UpdateWorkflowPresentation()
     {
         var ready = _client?.HasAuthoritativeProjection == true;
         var hasParts = ready && _targets.Targets.Any(target => target.Kind == "part");
         var selectedPart = _targets.Selected?.Kind == "part";
-        TargetPropertiesPanel.Visibility = hasParts && _targets.Selected is not null &&
-            _editingContext is EditingContext.Source or EditingContext.Mesh or EditingContext.Rig or EditingContext.Deform
+        if (_propertiesHadParts != hasParts)
+        {
+            // Keep root/group rename and visibility reachable even before importing artwork.
+            TargetPropertiesExpander.IsExpanded = hasParts;
+            _propertiesHadParts = hasParts;
+        }
+        TargetPropertiesExpander.Visibility = ready && _targets.Selected is not null &&
+            (_editingContext is EditingContext.Source or EditingContext.Mesh or EditingContext.Rig or EditingContext.Deform)
             ? Visibility.Visible : Visibility.Collapsed;
         MeshPropertiesPanel.Visibility = hasParts && selectedPart && _editingContext == EditingContext.Mesh
             && MeshCanvas.KeyformId is not null ? Visibility.Visible : Visibility.Collapsed;
@@ -35,7 +42,7 @@ public partial class MainWindow
         {
             EditingContext.Source => "パーツの表示・重なり・配置を確認したら、右のパーツを選んで「メッシュ」へ進みます。",
             EditingContext.Mesh when !selectedPart => "右の一覧から画像のパーツを選びます。メッシュはパーツごとに作成・編集します。",
-            EditingContext.Mesh when MeshCanvas.GeneratedPreview is not null => "生成結果はまだ保存されていません。形を確認して「プレビューを適用」で確定します。",
+            EditingContext.Mesh when MeshCanvas.GeneratedPreview is not null => "生成結果はまだ確定していません。形を確認して「プレビューを適用」で確定します。",
             EditingContext.Mesh when MeshCanvas.KeyformId is null => "「構造」→「生成」で格子または輪郭を試し、「プレビューを適用」でメッシュを作成します。",
             EditingContext.Mesh => "「構造」で点・辺・面を編集し、「位置決め」で画像上の頂点を動かします。ポーズの補正は「変形」で行います。",
             EditingContext.Rig => "骨・格子・ウェイトで動かす仕組みを作ります。必要な方法を上から選びます。",

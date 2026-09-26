@@ -299,7 +299,7 @@ public partial class MainWindow : Window, IAsyncDisposable
     private void SwitchContext(EditingContext context, bool returnFocus)
     {
         if (_editingContext == EditingContext.Animation && TimeSurfaceRow.Height.Value > 0)
-            _timelineHeight = Math.Clamp(TimeSurfaceRow.ActualHeight, 96, 300);
+            _timelineHeight = Math.Clamp(TimeSurfaceRow.Height.Value, 96, 300);
         _editingContext = context;
         var definition = EditingContextCatalog.Get(context);
         foreach (var button in WorkflowButtons())

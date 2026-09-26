@@ -38,7 +38,8 @@ and Save/Open. #96/#97/#98 keep their existing real-art Windows/release gates.
 
 - Source/Mesh advanced groups and timeline task sections preserve expansion across
   projection refreshes. Timeline item selection opens the matching task section.
-- Selected-object controls are limited to Source/Mesh/Rig/Deform. Advanced rig,
+- Selected-object controls are limited to Source/Mesh/Rig/Deform, initially folded
+  on empty projects but still available for root/group edits. Advanced rig,
   empty sequence, group and resource setup remain available without source parts.
 - Current task/empty-project guidance lives above the canvas; no instruction overlay.
 - Inspector width, target/property split and Animation timeline height are resizable
