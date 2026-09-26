@@ -63,6 +63,7 @@ public sealed partial class ProductHostClient
             boundary.Status.Changed += PublishMcpStatus;
             var grant = await boundary.EnableAsync(permission == McpPermission.Edit ? CorePermission.Edit : CorePermission.ReadOnly);
             _mcpEndpointTask = new LocalMcpEndpoint(boundary).RunAsync(grant, _lifetime.Token);
+            if (!boundary.Status.Current.EndpointAvailable) throw new McpFault(McpErrors.TransportUnavailable);
             _logger?.Info("mcp.session", "Live MCP access enabled");
             return new McpConnection { Endpoint = options.PipeName, Token = grant.ExportCredential(),
                 DocumentToken = grant.Snapshot.DocumentToken, Permission = permission };

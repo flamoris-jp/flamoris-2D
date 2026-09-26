@@ -511,8 +511,10 @@ export class ProductHostService {
     this.cancelMeshPreview(request);
     this.cancelImport(request);
     if (request?.protocolVersion === PRODUCT_HOST_PROTOCOL_VERSION &&
-        request.method === "mcp.disable" && request.documentToken === this.documentToken)
+        request.method === "mcp.disable" && request.documentToken === this.documentToken) {
       this.mcp.revoke();
+      return Promise.resolve(this.mcp.response(request, this.mcp.status()));
+    }
     const operation = this.queue.then(async () => {
       this.commitGuard = admissionGuard;
       try {
