@@ -160,6 +160,7 @@ public partial class MainWindow
     {
         ClearProjection();
         _targets.Attach(token);
+        _sectionExpansion.Clear();
     }
     private void ConfigureMeshContext()
     {
@@ -192,13 +193,12 @@ public partial class MainWindow
             if (MeshCanvas.Structure) _structureTool = tool; else _layoutTool = tool;
             var mode = MeshCanvas.Structure ? "構造" : "位置決め";
             ActiveContextBadge.Text = $"メッシュ / {mode}";
-            ViewportContextText.Text = $"メッシュ / {mode} — {tool}";
             var hint = tool switch { "移動" => "頂点をドラッグ。Shiftで複数選択、Escで取消",
                 "頂点を追加" => "点を追加した後、3頂点を選び「面を作成」で画像を貼る面に接続", "頂点を削除" => "頂点をクリックして削除",
                 "面を作成" => "3頂点を選択して上の作成ボタン", "辺を分割" => "辺の両端2頂点を選択して上の分割ボタン",
-                "生成" => "上でGrid／輪郭を試して、プレビューを明示的に適用", _ => "頂点を選択。Shiftで追加／解除" };
+                "生成" => "上で格子／輪郭を試して、プレビューを明示的に適用", _ => "頂点を選択。Shiftで追加／解除" };
             ActiveToolSettingsText.Text = $"{tool} — {hint}";
-            ClickMeaningText.Text = hint + " · ホイール拡縮 / 右ドラッグ移動";
+            MeshCanvas.ToolTip = hint + " · ホイール拡縮 / 右ドラッグ移動";
         }
         GenerateOptions.Visibility = mesh && MeshCanvas.Structure && MeshCanvas.Tool == "生成" ? Visibility.Visible : Visibility.Collapsed;
         MeshActionButton.Visibility = mesh && MeshCanvas.Structure && MeshCanvas.Tool is "面を作成" or "辺を分割"
@@ -297,7 +297,7 @@ public partial class MainWindow
     private void FitArtwork_Click(object sender, RoutedEventArgs e) => MeshCanvas.Fit();
     private void SelectAllVertices_Click(object sender, RoutedEventArgs e) => MeshCanvas.SelectAll();
     private void CancelMeshWork_Click(object sender, RoutedEventArgs e) { _meshWork?.Cancel(); MeshCanvas.Cancel(); CancelGenerated(); }
-    private void CancelGenerated() { if (!_meshReady) return; MeshCanvas.GeneratedPreview = null; _generatedRevision = -1; ApplyGeneratedButton.IsEnabled = false; MeshCanvas.InvalidateVisual(); }
+    private void CancelGenerated() { if (!_meshReady) return; MeshCanvas.GeneratedPreview = null; _generatedRevision = -1; ApplyGeneratedButton.IsEnabled = false; MeshCanvas.InvalidateVisual(); UpdateWorkflowPresentation(); }
     private void CancelGenerated_Click(object sender, RoutedEventArgs e) => CancelGenerated();
     private void MeshGenerationSettings_Changed(object sender, TextChangedEventArgs e) => CancelGenerated();
     private async void GridPreview_Click(object sender, RoutedEventArgs e) => await GeneratePreviewAsync(false);
@@ -324,7 +324,7 @@ public partial class MainWindow
             if (candidate.ValueKind != JsonValueKind.Object)
                 throw new InvalidOperationException("輪郭を作成できません: " + result.Payload.GetProperty("diagnostics"));
             MeshCanvas.GeneratedPreview = candidate.Clone(); _generatedRevision = revision;
-            ApplyGeneratedButton.IsEnabled = true; MeshCanvas.InvalidateVisual();
+            ApplyGeneratedButton.IsEnabled = true; MeshCanvas.InvalidateVisual(); UpdateWorkflowPresentation();
             StatusText.Text = "橙色は生成プレビューです。まだ履歴には入りません。適用または取消を選択してください。";
         }
         catch (OperationCanceledException) { StatusText.Text = "生成プレビューを中止しました。メッシュは変更していません。"; }

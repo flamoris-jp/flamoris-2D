@@ -19,6 +19,7 @@ public partial class MainWindow
         await RefreshProjectionAsync();
         TargetList.SelectedItem = _targets.Targets.First(t => t.Kind == "part");
         await RefreshProjectionAsync();
+        await RunWorkflowUiSmokeAsync(hasParts: true);
         SwitchContext(EditingContext.Mesh, false);
         MeshCanvas.Fit();
         if (MeshCanvas.ActualWidth <= 0 || MeshCanvas.ActualHeight <= 0)

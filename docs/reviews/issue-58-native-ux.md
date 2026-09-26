@@ -33,3 +33,18 @@ check the import → mesh → motion → preview → export path without documen
 confirm terms and advanced controls are discoverable, resize beside Cutwork, and
 check 100/125/150/200% DPI, focus and pointer feel. Include representative Undo/Redo
 and Save/Open. #96/#97/#98 keep their existing real-art Windows/release gates.
+
+## Implemented and locally checked
+
+- Source/Mesh advanced groups and timeline task sections preserve expansion across
+  projection refreshes. Timeline item selection opens the matching task section.
+- Selected-object controls are limited to Source/Mesh/Rig/Deform. Advanced rig,
+  empty sequence, group and resource setup remain available without source parts.
+- Current task/empty-project guidance lives above the canvas; no instruction overlay.
+- Inspector width, target/property split and Animation timeline height are resizable
+  with minimum sizes; View resets sizes. No persisted layout or new dependency.
+- Japanese-first bone/warp/interpolation labels retain original command IDs and values.
+- Local Product regression: 802 passed; XAML XML parsing and `git diff --check` passed.
+- Native build and the extended packaged WPF smoke require the existing Windows CI;
+  this Linux workspace has no .NET SDK/WPF runtime. Final CI results are recorded on
+  the PR, separately from human visual acceptance.

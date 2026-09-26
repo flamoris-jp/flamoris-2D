@@ -11,10 +11,15 @@ public partial class MainWindow
     private long _pinRevision=-1;
     private string? _selectedSampleId;
     private readonly Dictionary<string,VertexOffset> _sampleOffsets=[];
-    private static StackPanel Section(Panel parent,string label,bool open=false)
+    private readonly Dictionary<(EditingContext Context, string Label), bool> _sectionExpansion = [];
+    private StackPanel Section(Panel parent,string label,bool open=false)
     {
         var content=new StackPanel {Margin=new Thickness(5)};
-        parent.Children.Add(new Expander {Header=label,Content=content,IsExpanded=open,Foreground=Brushes.White,Margin=new Thickness(0,6,0,0)});return content;
+        var key = (_editingContext, label);
+        var expander = new Expander {Header=label,Content=content,IsExpanded=_sectionExpansion.GetValueOrDefault(key,open),Foreground=Brushes.White,Margin=new Thickness(0,6,0,0)};
+        expander.Expanded += (_, e) => { if (ReferenceEquals(e.Source, expander)) _sectionExpansion[key] = true; };
+        expander.Collapsed += (_, e) => { if (ReferenceEquals(e.Source, expander)) _sectionExpansion[key] = false; };
+        parent.Children.Add(expander);return content;
     }
     private KeyStateContext CurrentKeyState()=>new(_renderChoice?.Kind=="keyArt"?_renderChoice.Id:null,_keyTransitionId,_keySlotId,_targets.SelectedId);
     private async Task RunKeyStateAsync(Func<KeyStateEdit> make,KeyStateContext context,long revision)
@@ -45,8 +50,27 @@ public partial class MainWindow
         if(_pinRevision!=revision){_correspondencePins.Clear();_pinRevision=revision;}
         var key=$"{response.DocumentToken}/{context}/{_editingContext}/{_targets.SelectedId}/{MeshCanvas.KeyformId}";
         if(_contextDraft&&_keyPanelKey==key)return;_keyPanelKey=key;KeyStatePanel.Children.Clear();
-        if(_editingContext==EditingContext.Source)BuildObjectPanel(state,context,revision);
-        var artPanel=Section(KeyStatePanel,"原画の状態",context.KeyArtId is null);
+        var hasParts = _targets.Targets.Any(t => t.Kind == "part");
+        if(_editingContext==EditingContext.Source && hasParts)BuildObjectPanel(KeyStatePanel,state,context,revision);
+        // Source/Mesh keep transition authoring available without making it the first task.
+        var detailParent = _editingContext == EditingContext.Deform ? KeyStatePanel :
+            Section(KeyStatePanel,"詳細設定：原画・パーツ対応");
+        if(_editingContext==EditingContext.Source && !hasParts)BuildObjectPanel(detailParent,state,context,revision);
+        BuildArtPanel(detailParent,state,context,revision);
+        if(_editingContext==EditingContext.Mesh&&context.KeyArtId is not null&&MeshCanvas.KeyformId is { } keyformId&&!MeshCanvas.Structure)
+        {
+            var panel=Section(KeyStatePanel,"メッシュ全体の位置決め",true);Note(panel,"原画上の配置を変更します。ポーズ補正は「変形」で編集します。");
+            var x=Field(panel,"移動 X",0);var y=Field(panel,"移動 Y",0);var r=Field(panel,"回転（度）",0);var sx=Field(panel,"拡大率 X",1);var sy=Field(panel,"拡大率 Y",1);
+            var px=Field(panel,"基準点 X",0);var py=Field(panel,"基準点 Y",0);
+            ActionButton(panel,"位置決めを適用",()=>RunKeyStateAsync(()=>KeyStateEdit.Alignment(keyformId,ReadNumber(x),ReadNumber(y),ReadNumber(r)*Math.PI/180,ReadNumber(sx),ReadNumber(sy),ReadNumber(px),ReadNumber(py)),context,revision));
+        }
+        BuildTransitionPanel(detailParent,state,context,revision);
+        if(_editingContext==EditingContext.Deform)BuildSamplePanel(state,context,revision);
+        if(_editingContext==EditingContext.Mesh)BuildMeshResourcePanel(state,context,revision);
+    }
+    private void BuildArtPanel(Panel parent,JsonElement state,KeyStateContext context,long revision)
+    {
+        var artPanel=Section(parent,"原画の状態");
         var selected=Property(state,"selectedKeyArt");var name=Field(artPanel,"原画名",String(selected,"displayName")??"新しい原画");
         ActionButton(artPanel,"全パーツを表示対象へ含める",()=>RunKeyStateAsync(KeyStateEdit.IncludeSource,context,revision));
         if(context.KeyArtId is not null)
@@ -62,16 +86,6 @@ public partial class MainWindow
                 var node=String(member,"nodeId")!;ActionButton(artPanel,"パーツの表示状態を更新",()=>RunKeyStateAsync(()=>KeyStateEdit.Member(node,ReadNumber(opacity),Chosen(presence),checked((int)ReadNumber(order))),context,revision));
             }
         }
-        if(_editingContext==EditingContext.Mesh&&context.KeyArtId is not null&&MeshCanvas.KeyformId is { } keyformId&&!MeshCanvas.Structure)
-        {
-            var panel=Section(KeyStatePanel,"メッシュ全体の位置決め",true);Note(panel,"原画上の配置を変更します。ポーズ補正は「変形」で編集します。");
-            var x=Field(panel,"移動 X",0);var y=Field(panel,"移動 Y",0);var r=Field(panel,"回転（度）",0);var sx=Field(panel,"拡大率 X",1);var sy=Field(panel,"拡大率 Y",1);
-            var px=Field(panel,"基準点 X",0);var py=Field(panel,"基準点 Y",0);
-            ActionButton(panel,"位置決めを適用",()=>RunKeyStateAsync(()=>KeyStateEdit.Alignment(keyformId,ReadNumber(x),ReadNumber(y),ReadNumber(r)*Math.PI/180,ReadNumber(sx),ReadNumber(sy),ReadNumber(px),ReadNumber(py)),context,revision));
-        }
-        BuildTransitionPanel(state,context,revision);
-        if(_editingContext==EditingContext.Deform)BuildSamplePanel(state,context,revision);
-        if(_editingContext==EditingContext.Mesh)BuildMeshResourcePanel(state,context,revision);
     }
     private void BuildMeshResourcePanel(JsonElement state,KeyStateContext context,long revision)
     {
@@ -90,9 +104,9 @@ public partial class MainWindow
         var topology=Choices(panel,"削除する未使用のメッシュ構造",ArrayOf(state,"topologies").Select(t=>new EntityChoice(String(t,"id")!,String(t,"id")!)));
         ActionButton(panel,"未使用のメッシュ構造を削除",()=>RunKeyStateAsync(()=>KeyStateEdit.RemoveTopology(Chosen(topology)),context,revision));
     }
-    private void BuildObjectPanel(JsonElement state,KeyStateContext context,long revision)
+    private void BuildObjectPanel(Panel parent,JsonElement state,KeyStateContext context,long revision)
     {
-        var node=Property(state,"node");var panel=Section(KeyStatePanel,"配置・グループ",true);
+        var node=Property(state,"node");var panel=Section(parent,"配置・グループ",true);
         var groups=Choices(panel,"親グループ",ArrayOf(state,"groups").Select(g=>new EntityChoice(String(g,"id")!,String(g,"displayName")!)),String(node,"parentId"));
         var groupName=Field(panel,"新しいグループ名","グループ");
         ActionButton(panel,"グループを作成",()=>RunKeyStateAsync(()=>KeyStateEdit.CreateGroup(Chosen(groups),groupName.Text),context,revision));
@@ -104,9 +118,9 @@ public partial class MainWindow
         var index=Field(panel,"グループ内の位置（0から）",0);
         ActionButton(panel,"親グループ・並び順を変更",()=>RunKeyStateAsync(()=>KeyStateEdit.Reparent(Chosen(groups),checked((int)ReadTicks(index))),context,revision));
     }
-    private void BuildTransitionPanel(JsonElement state,KeyStateContext context,long revision)
+    private void BuildTransitionPanel(Panel parent,JsonElement state,KeyStateContext context,long revision)
     {
-        var panel=Section(KeyStatePanel,"遷移・パーツ対応",_editingContext==EditingContext.Deform);
+        var panel=Section(parent,"遷移・パーツ対応");
         var transitions=Choices(panel,"編集する遷移",ArrayOf(state,"transitions").Select(t=>new EntityChoice(String(t,"id")!,String(t,"displayName")!)),_keyTransitionId);
         transitions.SelectionChanged+=async(_,_)=>{_keyTransitionId=(transitions.SelectedItem as EntityChoice)?.Id;_contextDraft=false;_keyPanelKey=null;_correspondencePins.Clear();await RefreshRigSurfaceAsync();};
         var transition=Property(state,"activeTransition");var name=Field(panel,"遷移名",String(transition,"displayName")??"新しい遷移");var seconds=Field(panel,"長さ（秒）",Number(state,"durationSeconds",1));
@@ -151,12 +165,12 @@ public partial class MainWindow
                 ActionButton(panel,acknowledged?"確認済みを取り消す":"この診断を確認済みにする",()=>RunKeyStateAsync(()=>acknowledged?KeyStateEdit.ClearDiagnosticAcknowledgement(diagnosticKey):KeyStateEdit.AcknowledgeDiagnostic(diagnosticKey),context,revision));
             }
         }
-        BuildCorrespondencePanel(state,context,revision,part);
+        BuildCorrespondencePanel(parent,state,context,revision,part);
     }
-    private void BuildCorrespondencePanel(JsonElement state,KeyStateContext context,long revision,JsonElement part)
+    private void BuildCorrespondencePanel(Panel parent,JsonElement state,KeyStateContext context,long revision,JsonElement part)
     {
         var topology=ArrayOf(state,"topologies").FirstOrDefault(t=>String(t,"id")==String(part,"topologyId"));if(topology.ValueKind!=JsonValueKind.Object)return;
-        var panel=Section(KeyStatePanel,"対応付けピン・位置の補助");
+        var panel=Section(parent,"対応付けピン・位置の補助");
         var vertices=Property(topology,"vertexIds").EnumerateArray().Select((v,i)=>new EntityChoice(v.GetString()!,$"頂点 {i+1} · {v.GetString()}"));
         var vertex=Choices(panel,"固定する頂点",vertices,MeshCanvas.Selected.FirstOrDefault());var x=Field(panel,"対応先 X",0);var y=Field(panel,"対応先 Y",0);
         var preset=Choices(panel,"補助の強さ",new[]{new EntityChoice("soft","柔らかく"),new("normal","標準"),new("firm","強く")},"normal");var reverse=Check(panel,"B → Aへ対応付け",false);

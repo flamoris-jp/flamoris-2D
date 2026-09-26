@@ -24,10 +24,10 @@ public partial class MainWindow
     {
         _playTimer.Tick+=async(_,_)=>await PlaybackFrameAsync();
         TimelineCanvas.Scrubbed+=async tick=>await ScrubAsync(tick);
-        TimelineCanvas.KeyPicked+=(track,channel,id)=>{_timelineContext=_timelineContext with {TrackId=track,Channel=channel,KeyframeId=id};_contextDraft=false;_=RefreshRigSurfaceAsync();};
-        TimelineCanvas.TrackPicked+=track=>{_timelineContext=_timelineContext with {TrackId=track,KeyframeId=null,Channel=null};_contextDraft=false;_=RefreshRigSurfaceAsync();};
-        TimelineCanvas.ViewPicked+=id=>{_selectedViewId=id;_selectedClipInstanceId=null;_contextDraft=false;_=RefreshRigSurfaceAsync();};
-        TimelineCanvas.ClipPicked+=id=>{_selectedClipInstanceId=id;_selectedViewId=null;_contextDraft=false;_=RefreshRigSurfaceAsync();};
+        TimelineCanvas.KeyPicked+=(track,channel,id)=>{_sectionExpansion[(EditingContext.Animation,"動きのキーを編集")]=true;_timelineContext=_timelineContext with {TrackId=track,Channel=channel,KeyframeId=id};_contextDraft=false;_=RefreshRigSurfaceAsync();};
+        TimelineCanvas.TrackPicked+=track=>{_sectionExpansion[(EditingContext.Animation,"動きのキーを編集")]=true;_timelineContext=_timelineContext with {TrackId=track,KeyframeId=null,Channel=null};_contextDraft=false;_=RefreshRigSurfaceAsync();};
+        TimelineCanvas.ViewPicked+=id=>{_sectionExpansion[(EditingContext.Animation,"原画・遷移の区間を配置")]=true;_selectedViewId=id;_selectedClipInstanceId=null;_contextDraft=false;_=RefreshRigSurfaceAsync();};
+        TimelineCanvas.ClipPicked+=id=>{_sectionExpansion[(EditingContext.Animation,"クリップを作成・配置")]=true;_selectedClipInstanceId=id;_selectedViewId=null;_contextDraft=false;_=RefreshRigSurfaceAsync();};
         TimelineCanvas.KeyMoved+=async(track,channel,id,tick,revision)=>await RunTimelineEditAsync(()=>TimelineEdit.MoveKey(track,channel,id,tick),CurrentTimelineContext(),revision);
         TimelineCanvas.ClipMoved+=async(id,start,end,revision)=>await RunTimelineEditAsync(()=>
         {
@@ -124,9 +124,9 @@ public partial class MainWindow
         var clipChoices=ArrayOf(_timelineSnapshot,"clips").Select(c=>new EntityChoice(String(c,"id")!,String(c,"displayName")??"Clip")).Prepend(new EntityChoice("","シーケンス全体のトラック"));
         var clipSelect=Choices(panel,"編集するトラックの所属",clipChoices,context.ClipId??"");
         clipSelect.SelectionChanged+=(_,_)=>{_timelineContext=_timelineContext with {ClipId=(clipSelect.SelectedItem as EntityChoice)?.Id is {Length:>0} id?id:null,TrackId=null,KeyframeId=null,Channel=null};_contextDraft=false;_=RefreshRigSurfaceAsync();};
-        BuildTrackPanel(panel,context,revision);
-        BuildClipPanel(panel,context,revision);
-        BuildViewPanel(panel,context,revision);
+        BuildTrackPanel(Section(panel,"動きのキーを編集",true),context,revision);
+        BuildClipPanel(Section(panel,"クリップを作成・配置"),context,revision);
+        BuildViewPanel(Section(panel,"原画・遷移の区間を配置"),context,revision);
         ActionButton(panel,"このシーケンスを削除",()=>RunTimelineEditAsync(TimelineEdit.RemoveSequence,context,revision));
     }
     private void BuildTrackPanel(Panel panel,TimelineContext context,long revision)

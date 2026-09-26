@@ -63,7 +63,16 @@ public partial class MainWindow
         await client.EditTimelineAsync(new(sequenceId,clipId),TimelineEdit.AddKey(meshTrackId,"deformation",0,AnimationValue.Deformation(sampleId,0)),client.Revision);
         await client.EditTimelineAsync(new(sequenceId,clipId),TimelineEdit.AddKey(meshTrackId,"deformation",960000,AnimationValue.Deformation(sampleId,1)),client.Revision);
         await client.EditTimelineAsync(new(sequenceId),TimelineEdit.PlaceClip(clipId,new(0,960000,0,1,1,false,1,0,true)),client.Revision);
-        await RefreshProjectionAsync();await ScrubAsync(480000);
+        await RefreshProjectionAsync();
+        var clipSection = FindWorkflowSection(AuthoringPanel,"クリップを作成・配置");
+        var viewSection = FindWorkflowSection(AuthoringPanel,"原画・遷移の区間を配置");
+        if (clipSection.IsExpanded || viewSection.IsExpanded)
+            throw new Exception("Advanced timeline sections should start collapsed.");
+        clipSection.IsExpanded = true;
+        await RefreshProjectionAsync();
+        if (!FindWorkflowSection(AuthoringPanel,"クリップを作成・配置").IsExpanded)
+            throw new Exception("Timeline section expansion was lost on refresh.");
+        await ScrubAsync(480000);
         // Context changes schedule projection refreshes. Settle that serialized queue
         // before reading pixels; a superseded render intentionally returns early.
         await RefreshProjectionAsync();if(_timeTicks!=480000)throw new Exception("Scrub did not settle at the requested Product tick.");
