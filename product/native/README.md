@@ -23,8 +23,8 @@ not register `.fl2d` or replace the installed Electron version.
 
 ## Build and tests
 
-Development prerequisites: Windows 10/11 x64, .NET 10 SDK, Node 24 and authenticated
-access to the FLAMORIS NuGet feed configured in `NuGet.config`. From the repository
+Development prerequisites: Windows 10/11 x64, .NET 10 SDK and Node 24.
+`NuGet.config` uses public nuget.org packages without GitHub authentication. From the repository
 root, install the locked Product dependencies (including development dependencies),
 using the same command as the Native Shell Boundary workflow, then build and test:
 
