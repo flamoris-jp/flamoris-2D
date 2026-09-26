@@ -33,7 +33,7 @@ association policy remain part of the separately reviewed release cutover.
 ## Local MCP runtime (Issue #107)
 
 Flamoris.Mcp.Core 1.1.0 and Flamoris.Logging 1.0.0 (Apache-2.0), consumed from
-GitHub Packages. Official ModelContextProtocol.Core 2.2.0 (MIT) and transitive
+nuget.org. Official ModelContextProtocol.Core 2.2.0 (MIT) and transitive
 NuGet versions are recorded in published `.deps.json` files. The self-contained
 bridge runtime is in `mcp/` and contains no Product Host/editor content.
 See https://github.com/flamoris-jp/flamoris-mcp-core and
