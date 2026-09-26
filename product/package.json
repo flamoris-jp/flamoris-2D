@@ -7,8 +7,8 @@
   "scripts": {
     "start": "node scripts/serve.mjs",
     "desktop": "electron .",
-    "desktop:pack": "electron-builder --win --dir",
-    "desktop:dist": "electron-builder --win nsis",
+    "desktop:pack": "node scripts/release-hygiene.mjs prepare && electron-builder --win --dir && node scripts/release-hygiene.mjs verify-electron",
+    "desktop:dist": "node scripts/release-hygiene.mjs prepare && electron-builder --win nsis && node scripts/release-hygiene.mjs verify-electron",
     "product-host": "node product-host/main.mjs",
     "test:product-host": "node --test tests/product-host.test.js",
     "test": "node --check desktop/main.mjs && node --check desktop/preload.cjs && node --test tests/*.test.js"
@@ -47,6 +47,17 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
-    }
-  }
+    },
+    "extraFiles": [
+      {
+        "from": "../LICENSE",
+        "to": "LICENSE-FLAMORIS.txt"
+      },
+      {
+        "from": "dist/third-party-licenses",
+        "to": "third-party-licenses"
+      }
+    ]
+  },
+  "license": "Apache-2.0"
 }

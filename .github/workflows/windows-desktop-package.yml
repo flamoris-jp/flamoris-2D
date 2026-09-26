@@ -9,9 +9,17 @@ on:
       - "product/src/**"
       - "product/index.html"
       - "product/package.json"
+      - "product/package-lock.json"
+      - "product/scripts/release-hygiene.mjs"
+      - "LICENSE"
       - "package.json"
+      - "package-lock.json"
       - ".github/workflows/windows-desktop-package.yml"
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -30,7 +38,7 @@ jobs:
           node-version: "24"
 
       - name: Install Desktop dependencies
-        run: npm install
+        run: npm ci
 
       - name: Product tests on Windows
         run: npm test

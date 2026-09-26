@@ -88,6 +88,17 @@ review/comment bodies, release attachments, or Actions logs/artifacts. Do not
 use this scan as evidence to close the full public-data audit. No history was
 rewritten and no sensitive matching values were published.
 
+## Local validation
+
+- Product regression: 802 tests passed (799 existing plus 3 focused release checks).
+- Actual ASAR regression fixture: missing Chromium notices, runtime version drift,
+  and staging content are rejected. This fixture is not the Windows app artifact.
+- `npm audit --prefix product --workspaces=false --json`: 0 reported vulnerabilities
+  at audit time; this is advisory-database evidence, not a security guarantee.
+- Lock consistency, notice preparation and `git diff --check`: passed.
+- Windows package/Native CI results are recorded on the PR. No local Windows or
+  .NET runtime was available in this Linux environment.
+
 ## Remaining release gates
 
 - Review the listed development-license exceptions, including the package with

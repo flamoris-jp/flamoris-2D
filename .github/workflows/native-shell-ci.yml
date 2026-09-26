@@ -12,6 +12,8 @@ on:
       - "product/tests/native-*.test.js"
       - "product/tests/production-manifest.test.js"
       - "product/package.json"
+      - "product/package-lock.json"
+      - "LICENSE"
       - ".github/workflows/native-shell-ci.yml"
   workflow_dispatch:
 
@@ -100,6 +102,7 @@ jobs:
             if (!(Test-Path (Join-Path $package $required))) { throw "Missing Native MCP runtime: $required" }
           }
           if (Test-Path (Join-Path $package 'node_modules/@modelcontextprotocol')) { throw 'Obsolete Node MCP runtime packaged' }
+          Copy-Item 'LICENSE' (Join-Path $package 'LICENSE-FLAMORIS.txt')
           Copy-Item 'product/native/THIRD-PARTY-NOTICES.md' $package
           Copy-Item 'docs/native-production-workflow.md' (Join-Path $package 'README.md')
           Get-ChildItem $package -File -Recurse | ForEach-Object { '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash, $_.FullName.Substring($package.Length + 1) } | Set-Content (Join-Path $env:RUNNER_TEMP 'native-sha256.txt')

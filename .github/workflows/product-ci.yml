@@ -7,6 +7,7 @@ on:
     paths:
       - "product/**"
       - "package.json"
+      - "package-lock.json"
       - ".github/workflows/product-ci.yml"
 
 
@@ -31,6 +32,9 @@ jobs:
 
       - name: Install locked Product and MCP test dependencies
         run: npm ci --prefix product --workspaces=false --ignore-scripts
+
+      - name: Check locked dependency licenses and graph consistency
+        run: node product/scripts/release-hygiene.mjs check
 
       - name: Deterministic Product unit tests
         run: npm test
