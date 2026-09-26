@@ -1,7 +1,7 @@
 // Release checks; never imported by Product runtime.
 import assert from 'node:assert/strict';
 import { readFile, readdir, mkdir, rm, copyFile, writeFile } from 'node:fs/promises';
-import { resolve, dirname } from 'node:path';
+import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const product = fileURLToPath(new URL('../', import.meta.url));
@@ -98,7 +98,7 @@ export async function verifyElectron(lock, packageDirectory) {
       assert.ok(expected.has(dirname(path).replaceAll('\\', '/')), `Unreviewed packaged dependency: ${path}`);
   }
   for (const [path, p] of runtime) {
-    assert.equal(JSON.parse(extractFile(archive, `${path}/package.json`)).version, p.version, `Packaged version mismatch: ${path}`);
+    assert.equal(JSON.parse(extractFile(archive, join(path, 'package.json'))).version, p.version, `Packaged version mismatch: ${path}`);
     const source = await installed(path);
     for (const name of [...await noticeNames(source), 'package.json']) {
       assert.deepEqual(await readFile(resolve(packageDirectory, 'third-party-licenses', path, name)), await readFile(resolve(source, name)), `Missing/changed packaged notice: ${path}/${name}`);
