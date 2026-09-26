@@ -61,7 +61,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async Task ConnectHostAsync(bool createDocument)
     {
-        SetBusy("Product Hostを起動しています…");
+        SetBusy("編集エンジンを起動しています…");
         RecoveryBanner.Visibility = Visibility.Collapsed;
         if (_client is not null) await _client.DisposeAsync();
         _client = new ProductHostClient(_logger);
@@ -79,7 +79,8 @@ public partial class MainWindow : Window, IAsyncDisposable
             var handshake = await _client.StartAsync(hostPath, nodePath);
             HostStatusIndicator.Fill = Brushes.SeaGreen;
             HostStatusText.Text =
-                $"接続済み · protocol {handshake.ProtocolVersion} · schema {handshake.ProductSchemaVersion}";
+                "接続済み";
+            HostStatusText.ToolTip = $"Product Host · protocol {handshake.ProtocolVersion} · schema {handshake.ProductSchemaVersion}";
             if (createDocument)
             {
                 await _client.CreateSessionAsync("名称未設定", 1920, 1080);
@@ -87,7 +88,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             }
             if (_client.DocumentToken is { } token) AttachDocumentWorkspace(token);
             await RefreshProjectionAsync();
-            StatusText.Text = "Product HostのEditorSessionに接続しました。";
+            StatusText.Text = "編集の準備ができました。";
         }
         catch (Exception error)
         {
@@ -139,6 +140,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             await RefreshExportAsync(client);
             await RefreshKeyStateAsync(client);
             await RefreshMcpStatusAsync(client);
+            UpdateWorkflowPresentation();
         }
         catch (StaleProjectionException)
         {
@@ -240,7 +242,7 @@ public partial class MainWindow : Window, IAsyncDisposable
     private void Client_AuthorityLost(object? sender, AuthorityLostEventArgs e) =>
         Dispatcher.InvokeAsync(() => {
             if (!_disposed && ReferenceEquals(sender, _client)) ShowAuthorityLost(
-                "Product Hostとの接続を失いました。staleな表示を破棄し、保存と編集を停止しました。");
+                "編集エンジンとの接続を失いました。古い表示を消し、保存と編集を停止しました。");
         });
 
     private void ShowAuthorityLost(string message)
@@ -250,7 +252,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         RecoveryBanner.Visibility = Visibility.Visible;
         HostStatusIndicator.Fill = Brushes.IndianRed;
         HostStatusText.Text = "切断";
-        StatusText.Text = "authoritative stateはProduct Hostとともに失われました。";
+        StatusText.Text = "編集エンジンを再起動して、保存済みのファイルまたは復元候補を開いてください。";
         RevisionText.Text = "revision —";
     }
 
@@ -274,6 +276,9 @@ public partial class MainWindow : Window, IAsyncDisposable
         UndoMenuItem.IsEnabled = UndoButton.IsEnabled = false;
         RedoMenuItem.IsEnabled = RedoButton.IsEnabled = false;
         SaveMenuItem.IsEnabled = false;
+        AuthoringPanel.Children.Clear();
+        KeyStatePanel.Children.Clear();
+        UpdateWorkflowPresentation();
     }
 
     private async void Reconnect_Click(object sender, RoutedEventArgs e) =>
@@ -293,25 +298,29 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private void SwitchContext(EditingContext context, bool returnFocus)
     {
+        if (_editingContext == EditingContext.Animation && TimeSurfaceRow.Height.Value > 0)
+            _timelineHeight = Math.Clamp(TimeSurfaceRow.Height.Value, 96, 300);
         _editingContext = context;
         var definition = EditingContextCatalog.Get(context);
         foreach (var button in WorkflowButtons())
             button.IsChecked = string.Equals(button.Tag?.ToString(), context.ToString(),
                 StringComparison.Ordinal);
         ActiveContextBadge.Text = $"{definition.JapaneseName} / {definition.EnglishName}";
-        ViewportContextText.Text = ActiveContextBadge.Text;
-        ClickMeaningText.Text = $"click: {definition.ClickMeaning}";
         ToolList.ItemsSource = definition.Tools;
         ToolList.SelectedItem = _activeTools[context];
         TimeSurface.Visibility = definition.ShowTimeSurface
             ? Visibility.Visible : Visibility.Collapsed;
-        TimeSurfaceRow.Height = definition.ShowTimeSurface
-            ? new GridLength(190) : new GridLength(0);
+        TimeSplitter.Visibility = TimeSurface.Visibility;
+        TimeSplitterRow.Height = new GridLength(definition.ShowTimeSurface ? 6 : 0);
+        TimeSurfaceRow.MinHeight = definition.ShowTimeSurface ? 96 : 0;
+        TimeSurfaceRow.MaxHeight = definition.ShowTimeSurface ? 300 : double.PositiveInfinity;
+        TimeSurfaceRow.Height = new GridLength(definition.ShowTimeSurface ? _timelineHeight : 0);
         UpdateToolSettings();
         ConfigureMeshContext();
         ConfigureRigContext();
         ConfigureAnimationContext();
         ConfigureExportContext();
+        UpdateWorkflowPresentation();
         if (_client?.HasAuthoritativeProjection == true) _ = RefreshRigSurfaceAsync();
         if (returnFocus) MeshCanvas.Focus();
     }
@@ -511,6 +520,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         await ConnectHostAsync(createDocument: true);
         if (_client?.HasAuthoritativeProjection != true)
             throw new InvalidOperationException("Smoke proof did not attach Product authority.");
+        await RunWorkflowUiSmokeAsync(hasParts: false);
         var tree = await _client.GetSceneTreeAsync();
         var rootId = tree.Payload.GetProperty("id").GetString()
             ?? throw new InvalidOperationException("Scene root projection is missing.");

@@ -94,6 +94,7 @@
             <MenuItem Header="{DynamicResource Menu.View}">
                 <MenuItem Header="{DynamicResource Menu.FocusViewport}"
                           InputGestureText="Esc" Click="FocusViewport_Click" />
+                <MenuItem Header="パネルの配置を戻す" Click="ResetLayout_Click" />
             </MenuItem>
             <MenuItem Header="MCP / AI" SubmenuOpened="McpMenu_Opened">
                 <MenuItem x:Name="McpReadOnly" Header="有効にする（読み取り専用）" Click="McpEnable_Click" />
@@ -119,6 +120,7 @@
                                 Click="NewDocument_Click" />
                         <Button Style="{StaticResource CommandButton}" Content="素材を読み込む…"
                                 Click="ImportSource_Click" ToolTip="PSDまたはCutwork素材を読み込みます。" />
+                        <Button Style="{StaticResource CommandButton}" Content="開く…" Click="OpenDocument_Click" ToolTip="保存した.fl2dプロジェクトを開きます。" />
                         <Button x:Name="CancelArtworkButton" Content="中止" Click="CancelMeshWork_Click" Visibility="Collapsed" />
                         <Button x:Name="RefreshButton" Style="{StaticResource CommandButton}"
                                 Content="状態を更新" Click="Refresh_Click" IsEnabled="False" />
@@ -129,7 +131,7 @@
                                 Content="やり直し" Click="Redo_Click" IsEnabled="False" />
                         <Separator />
                         <TextBlock VerticalAlignment="Center" Margin="7,0,3,0"
-                                   Foreground="#555" Text="Product Host" />
+                                   Foreground="#555" Text="編集エンジン" ToolTip="Product Host" />
                         <Ellipse x:Name="HostStatusIndicator" Width="9" Height="9"
                                  Fill="#9A9A9A" Margin="4,0" />
                         <TextBlock x:Name="HostStatusText" VerticalAlignment="Center"
@@ -223,9 +225,9 @@
                     <TextBlock x:Name="PlayheadText" VerticalAlignment="Center" Margin="8,0" />
                 </WrapPanel>
                 <WrapPanel x:Name="RigContextOptions" Margin="8,4" Visibility="Collapsed">
-                    <Button Content="Bone / 骨" Tag="Bone" Click="RigContext_Click" Padding="10,5" Margin="3" />
-                    <Button Content="Warp / 格子" Tag="Warp" Click="RigContext_Click" Padding="10,5" Margin="3" />
-                    <Button Content="Weight / ウェイト" Tag="Weight" Click="RigContext_Click" Padding="10,5" Margin="3" />
+                    <Button Content="骨（Bone）" Tag="Bone" Click="RigContext_Click" Padding="10,5" Margin="3" />
+                    <Button Content="格子（Warp）" Tag="Warp" Click="RigContext_Click" Padding="10,5" Margin="3" />
+                    <Button Content="ウェイト（Weight）" Tag="Weight" Click="RigContext_Click" Padding="10,5" Margin="3" />
                 </WrapPanel>
                 <StackPanel x:Name="MeshOptions" Visibility="Collapsed" Background="#EEEAE7">
                     <WrapPanel Margin="8,4">
@@ -248,10 +250,10 @@
                                 Padding="6,3" Margin="4,0" Visibility="Collapsed" />
                     </WrapPanel>
                     <WrapPanel x:Name="GenerateOptions" Visibility="Collapsed" Margin="10,3,10,6">
-                        <TextBlock Text="Grid 横 / 縦" VerticalAlignment="Center" />
+                        <TextBlock Text="格子 横 / 縦" VerticalAlignment="Center" />
                         <TextBox x:Name="GridColumns" Text="4" Width="35" Margin="4,0" TextChanged="MeshGenerationSettings_Changed" />
                         <TextBox x:Name="GridRows" Text="4" Width="35" Margin="4,0" TextChanged="MeshGenerationSettings_Changed" />
-                        <Button Content="Gridを試す" Click="GridPreview_Click" Padding="6,3" />
+                        <Button Content="格子を試す" Click="GridPreview_Click" Padding="6,3" />
                         <TextBlock Text="輪郭 α / 密度 / 角 / 内側" VerticalAlignment="Center" Margin="10,0,4,0" />
                         <TextBox x:Name="ContourAlpha" Text="0.1" Width="38" TextChanged="MeshGenerationSettings_Changed" />
                         <TextBox x:Name="ContourDensity" Text="0.45" Width="38" Margin="3,0" TextChanged="MeshGenerationSettings_Changed" />
@@ -270,12 +272,17 @@
                 Background="#4A251A" BorderBrush="#F09A65" BorderThickness="0,0,0,1"
                 Padding="12,8">
             <DockPanel>
-                <Button DockPanel.Dock="Right" Content="Product Hostを再起動"
+                <Button DockPanel.Dock="Right" Content="編集エンジンを再起動"
                         Padding="10,4" Click="Reconnect_Click" />
                 <TextBlock x:Name="RecoveryMessage" Foreground="#FFF3EC"
                            VerticalAlignment="Center"
-                           Text="Product Hostとの接続を失いました。staleな表示を破棄し、保存と編集を停止しました。" />
+                           Text="編集エンジンとの接続を失いました。古い表示を消し、保存と編集を停止しました。" />
             </DockPanel>
+        </Border>
+
+        <Border DockPanel.Dock="Top" Background="#FFF3D8" Padding="10,6">
+            <TextBlock x:Name="WorkflowHintText" TextWrapping="Wrap"
+                       Text="まず「素材を読み込む…」でPSD / Cutwork素材を読み込むか、「開く…」で制作を再開します。" />
         </Border>
 
         <Border DockPanel.Dock="Bottom" Background="#292B2F" Padding="10,5">
@@ -291,11 +298,13 @@
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="112" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="320" />
+                <ColumnDefinition Width="*" MinWidth="260" />
+                <ColumnDefinition Width="6" />
+                <ColumnDefinition x:Name="InspectorColumn" Width="320" MinWidth="260" MaxWidth="480" />
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
-                <RowDefinition Height="*" />
+                <RowDefinition Height="*" MinHeight="140" />
+                <RowDefinition x:Name="TimeSplitterRow" Height="0" />
                 <RowDefinition x:Name="TimeSurfaceRow" Height="0" />
             </Grid.RowDefinitions>
 
@@ -313,19 +322,17 @@
             <Border x:Name="ViewportHost" Grid.Column="1" Background="{StaticResource CanvasBrush}"
                     BorderBrush="#111216" BorderThickness="1" Focusable="True"
                     FocusVisualStyle="{x:Null}">
-                <Grid>
-                    <local:MeshViewport x:Name="MeshCanvas" />
-                    <StackPanel IsHitTestVisible="False" VerticalAlignment="Bottom" Background="#CC202124" Margin="4">
-                        <TextBlock x:Name="ViewportContextText" Foreground="White" Text="素材 / Source" Margin="6,2" />
-                        <TextBlock x:Name="ClickMeaningText" Foreground="#C7C9CD" Text="PNGでMesh体験を開始" Margin="6,2" />
-                    </StackPanel>
-                </Grid>
+                <local:MeshViewport x:Name="MeshCanvas" />
             </Border>
 
-            <Grid Grid.Column="2" Background="{StaticResource PanelBrush}">
+            <GridSplitter Grid.Column="2" Width="6" HorizontalAlignment="Stretch"
+                          ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Background="#41444A"
+                          ToolTip="左右にドラッグしてパーツ・プロパティの幅を調整" />
+            <Grid Grid.Column="3" Background="{StaticResource PanelBrush}">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="1.05*" />
-                    <RowDefinition Height="0.95*" />
+                    <RowDefinition x:Name="TargetsRow" Height="1.05*" MinHeight="70" />
+                    <RowDefinition Height="6" />
+                    <RowDefinition x:Name="PropertiesRow" Height="0.95*" MinHeight="70" />
                 </Grid.RowDefinitions>
                 <Border Margin="8,8,8,4" BorderBrush="{StaticResource PanelBorderBrush}"
                         BorderThickness="1">
@@ -360,13 +367,18 @@
                         </ListBox>
                     </DockPanel>
                 </Border>
-                <Border Grid.Row="1" Margin="8,4,8,8"
+                <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch"
+                              ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" Background="#41444A"
+                              ToolTip="上下にドラッグしてパーツとプロパティの高さを調整" />
+                <Border Grid.Row="2" Margin="8,4,8,8"
                         BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1">
                     <DockPanel>
                         <TextBlock DockPanel.Dock="Top" Style="{StaticResource PanelHeader}"
                                    Text="{DynamicResource Panel.Properties}" />
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel Margin="10,2">
+                            <Expander x:Name="TargetPropertiesExpander" Header="選択対象の設定" Foreground="White" IsExpanded="False">
+                            <StackPanel x:Name="TargetPropertiesPanel">
                             <TextBlock Text="選択対象" Foreground="#AEB0B5" />
                             <TextBlock x:Name="SelectedTargetText" Text="—"
                                        Foreground="White" FontWeight="SemiBold" Margin="0,2,0,12" />
@@ -383,6 +395,8 @@
                             <TextBlock Margin="0,16,0,0" Foreground="#8F9298"
                                        TextWrapping="Wrap"
                                        Text="表示とロックは選択とは別です。確定した変更は、まとめて1回で元に戻せます。" />
+                            </StackPanel>
+                            </Expander>
                             <StackPanel x:Name="AuthoringPanel" Visibility="Collapsed" Margin="0,12,0,0" />
                             <StackPanel x:Name="KeyStatePanel" Visibility="Collapsed" Margin="0,12,0,0" />
                             <StackPanel x:Name="MeshPropertiesPanel" Visibility="Collapsed" Margin="0,12,0,0">
@@ -400,7 +414,10 @@
                 </Border>
             </Grid>
 
-            <Border x:Name="TimeSurface" Grid.Row="1" Grid.ColumnSpan="3"
+            <GridSplitter x:Name="TimeSplitter" Grid.Row="1" Grid.ColumnSpan="4" Height="6"
+                          HorizontalAlignment="Stretch" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext"
+                          Background="#41444A" Visibility="Collapsed" ToolTip="上下にドラッグしてタイムラインの高さを調整" />
+            <Border x:Name="TimeSurface" Grid.Row="2" Grid.ColumnSpan="4"
                     Background="#25272B" BorderBrush="#41444A" BorderThickness="0,1,0,0" Visibility="Collapsed">
                 <DockPanel>
                     <WrapPanel DockPanel.Dock="Top" Margin="8,4">
