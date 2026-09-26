@@ -178,7 +178,7 @@ The native WPF candidate now uses the same canonical evaluated plan and D3D11 co
 
 Goal: reduce setup effort when no layered PSD exists.
 
-The historical classical-cutout experiment was split into the separate Cutwork product. FLAMORIS 2D now imports Cutwork `.flimg` v1 as ordinary source art, while mask/repair authoring stays outside this editor.
+The historical classical-cutout experiment was split into the separate Cutwork product. FLAMORIS 2D imports Cutwork `.flimg` v1/v2 as ordinary source art, while mask/repair authoring stays outside this editor.
 
 This phase is not a blocker for the main production loop. Future AI-assisted input should still follow the same principle:
 

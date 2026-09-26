@@ -1,8 +1,8 @@
-# Cutwork `.flimg` v1 import
+# Cutwork `.flimg` v1/v2 import
 
 Status: implemented for Issue #86
 
-FLAMORIS 2D consumes the documented Cutwork `.flimg` v1 contract as external
+FLAMORIS 2D consumes the documented Cutwork `.flimg` v1 and v2 contracts as external
 source art. `.flimg` is not a native Project format and does not replace `.fl2d`
 or PSD import.
 
@@ -16,7 +16,9 @@ or PSD import.
 ```
 
 The importer is independent of the Cutwork runtime. The cross-repository
-authority is `flamoris-cutwork/docs/flimg-schema-v1.md`.
+authority is `flamoris-cutwork/docs/flimg-schema-v1.md` and
+`flamoris-cutwork/docs/flimg-schema-v2.md`. Cutwork currently writes v2; old
+v1 archives remain readable. Unknown versions fail explicitly.
 
 ## Conversion contract
 
@@ -26,6 +28,9 @@ authority is `flamoris-cutwork/docs/flimg-schema-v1.md`.
   `sourceAsset.metadata`, `sourceRef.cutwork`, and KeyArt/SemanticSlot metadata.
 - Manifest order is top-to-bottom. KeyArt draw order is assigned in reverse
   numeric order so the existing bottom-to-top renderer preserves the stack.
+- v2 Part `partOrder` and Repair `ownerPartId` are validated and retained in
+  source provenance. Part semantic order does not change compositor draw order;
+  owned Repair layers retain their own scene nodes and raster placement.
 - Part artwork is cropped Original RGBA with alpha multiplied by the authored
   Gray8 mask. Gray values are not thresholded.
 - Base artwork is full-canvas Original with alpha multiplied by the inverse of

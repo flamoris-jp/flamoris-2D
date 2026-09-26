@@ -49,7 +49,7 @@ Phase 5 flat-image part decomposition remains an experimental/deferred input-sim
 - Undo / Redo and grouped history
 - Save / Save As / Incremental Save / Save Copy
 - dirty/save-point tracking, lineage-scoped native Recovery, Recent Files, and native Windows dialogs
-- PSD import/re-import and Cutwork `.flimg` v1 source-art import with document-coordinate placement
+- PSD import/re-import and Cutwork `.flimg` v1/v2 source-art import with document-coordinate placement
 - native WPF production candidate plus the currently released Electron Windows shell
 - installed `.fl2d` file association remains owned by the Electron release until cutover; the portable native candidate does not change system association
 - typed MCP-ready command/query boundaries with one shared EditorSession authority
