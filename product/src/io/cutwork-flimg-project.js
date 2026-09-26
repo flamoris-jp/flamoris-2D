@@ -166,6 +166,8 @@ export function createProjectFromCutworkFlimg(document, {
           layerKind: layer.kind,
           semanticName: layer.semanticName,
           manifestIndex,
+          ...(layer.partOrder !== undefined ? { partOrder: layer.partOrder } : {}),
+          ...(layer.ownerPartId ? { ownerPartId: layer.ownerPartId } : {}),
           authoredBounds: { ...layer.bounds },
           ...(layer.asset ? { asset: layer.asset, sha256: layer.sha256 } : {}),
           ...(layer.transform ? { transform: { ...layer.transform } } : {}),

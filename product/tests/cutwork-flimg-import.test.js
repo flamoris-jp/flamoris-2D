@@ -234,6 +234,58 @@ test("preserves top-to-bottom stack through deterministic draw order", async () 
     project.scene.nodes[id].displayName), ["Top", "Middle", "Base"]);
 });
 
+test("imports Cutwork v2 semantic Part order and owned Repair without changing compositor order", async () => {
+  const repairBytes = png(1, 1, rgba([1, 2, 3, 255]), 6);
+  const layers = [
+    part(PART_A, [255, 0], { name: "Top", partOrder: 4 }),
+    part(PART_B, [0, 255], { name: "Middle", partOrder: 2 }),
+    baseLayer(),
+    assetLayer("repair", REPAIR, { x: 0, y: 0, width: 1, height: 1 }, repairBytes,
+      { ownerPartId: PART_A, _bytes: repairBytes }),
+  ];
+  const imported = await importCutworkFlimg(fixture({ layers,
+    manifest: { schemaVersion: 2 } }).archive, { idFactory: createIdFactory("v2") });
+  assert.equal(imported.project.sourceAssets[0].metadata.schemaVersion, 2);
+  assert.equal(imported.project.keyArts[0].metadata.cutworkSchemaVersion, 2);
+  const byKind = new Map(Object.values(imported.project.scene.nodes).filter(node => node.sourceRef)
+    .map(node => [node.sourceRef.cutwork.layerId, node]));
+  assert.equal(byKind.get(PART_A).sourceRef.cutwork.partOrder, 4);
+  assert.equal(byKind.get(PART_B).sourceRef.cutwork.partOrder, 2);
+  assert.equal(byKind.get(REPAIR).sourceRef.cutwork.ownerPartId, PART_A);
+  assert.deepEqual(imported.renderAssets.map(asset => asset.cutworkLayerId),
+    [REPAIR, BASE, PART_B, PART_A]);
+  const saved = serializeProject(imported.project, 2);
+  assert.equal(parseProjectDocument(saved).project.scene.nodes[byKind.get(REPAIR).id]
+    .sourceRef.cutwork.ownerPartId, PART_A);
+});
+
+test("v2 accepts global Repair while rejecting invalid Part order and Repair ownership", async () => {
+  const repairBytes = png(1, 1, rgba([1, 2, 3, 255]), 6);
+  const repair = assetLayer("repair", REPAIR, { x: 0, y: 0, width: 1, height: 1 }, repairBytes,
+    { _bytes: repairBytes });
+  const valid = [part(PART_A, [255, 0], { partOrder: 0 }), baseLayer(), repair];
+  const v2 = layers => fixture({ manifest: { schemaVersion: 2 }, layers });
+  assert.equal((await readCutworkFlimg(v2(valid).archive)).layers[2].ownerPartId, undefined);
+  for (const order of [undefined, null, -1, 0.5, 2_147_483_647, "0"]) {
+    await rejects(order === undefined ? "flimg.manifest_malformed" : "flimg.layer_invalid", v2([part(PART_A, [255, 0],
+      { partOrder: order }), baseLayer()]));
+  }
+  await rejects("flimg.layer_invalid", v2([
+    part(PART_A, [255, 0], { partOrder: 0 }),
+    part(PART_B, [0, 255], { partOrder: 0 }), baseLayer(),
+  ]));
+  for (const ownerPartId of [BASE, REPAIR, "not-a-uuid", null]) {
+    const code = ownerPartId === "not-a-uuid" || ownerPartId === null
+      ? "flimg.identity_invalid" : "flimg.layer_invalid";
+    await rejects(code, v2([valid[0], valid[1], { ...repair, ownerPartId }]));
+  }
+  await rejects("flimg.manifest_malformed", v2([baseLayer({ partOrder: 0 })]));
+  await rejects("flimg.manifest_malformed", v2([valid[0], valid[1], { ...repair, partOrder: 1 }]));
+  await rejects("flimg.manifest_malformed", fixture({ layers: [
+    part(PART_A, [255, 0], { partOrder: 0 }), baseLayer(),
+  ] })); // v1 may not silently accept v2 metadata.
+});
+
 test("maps Patch raster/transform and Repair document bounds without baking", async () => {
   const patchBytes = png(1, 1, rgba([200, 100, 50, 128]), 6);
   const repairBytes = png(1, 1, rgba([1, 2, 3, 255]), 6);
@@ -268,7 +320,7 @@ async function rejects(code, options) {
 
 test("rejects wrong format, unsupported schema, and malformed manifest", async () => {
   await rejects("flimg.format_invalid", fixture({ manifest: { format: "other" } }));
-  await rejects("flimg.schema_unsupported", fixture({ manifest: { schemaVersion: 2 } }));
+  await rejects("flimg.schema_unsupported", fixture({ manifest: { schemaVersion: 3 } }));
   const valid = fixture();
   const original = [...zip([["manifest.json", new TextEncoder().encode('{"format":"flamoris-cutwork",')]])];
   await rejects("flimg.manifest_malformed", { archive: Uint8Array.from(original) });
