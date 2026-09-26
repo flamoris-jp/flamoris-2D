@@ -7,7 +7,7 @@ Windows x64向けの制作候補です。ZIPをすべて展開し、`Flamoris2D.
 
 ## Diagnostics and logging
 
-The Native application uses `Flamoris.Logging` 1.0.0 from the FLAMORIS GitHub Packages feed. It does not copy or vendor the logging DLL. Relative log paths resolve against the writable per-user directory `%LOCALAPPDATA%/FLAMORIS/2D`.
+The Native application uses `Flamoris.Logging` 1.0.0 from nuget.org. It does not copy or vendor the logging DLL. Relative log paths resolve against the writable per-user directory `%LOCALAPPDATA%/FLAMORIS/2D`.
 
 Logging is configured in the ordinary `native-settings.json` file under that directory. The default file is `logs/flamoris-2d.log`, with bounded size rotation. Example:
 
