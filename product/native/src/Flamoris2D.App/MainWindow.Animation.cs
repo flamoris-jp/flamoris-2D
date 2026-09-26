@@ -162,7 +162,7 @@ public partial class MainWindow
         if(context.KeyframeId is { } keyId)
         {
             ActionButton(panel,"キーフレームを更新",()=>RunTimelineEditAsync(()=>TimelineEdit.UpdateKey(context.TrackId!,selectedChannel,keyId,ReadTicks(tick),read()),context,revision));
-            var easing=Choices(panel,"補間",new[]{"step","linear","ease-in","ease-out","ease-in-out","bezier"}.Select(i=>new EntityChoice(i,i)),"linear");
+            var easing=Choices(panel,"補間",new[]{"step","linear","ease-in","ease-out","ease-in-out","bezier"}.Select(i=>new EntityChoice(i,AuthoringLabels.Interpolation(i))),"linear");
             var x1=Field(panel,"Bezier x1",.42);var y1=Field(panel,"Bezier y1",0);var x2=Field(panel,"Bezier x2",.58);var y2=Field(panel,"Bezier y2",1);
             ActionButton(panel,"補間を設定",()=>RunTimelineEditAsync(()=>Chosen(easing).StartsWith("ease")?TimelineEdit.EaseKey(context.TrackId!,selectedChannel,keyId,Chosen(easing)):
                 TimelineEdit.InterpolateKey(context.TrackId!,selectedChannel,keyId,Chosen(easing),ReadNumber(x1),ReadNumber(y1),ReadNumber(x2),ReadNumber(y2)),context,revision));

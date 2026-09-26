@@ -129,7 +129,7 @@
                                 Content="やり直し" Click="Redo_Click" IsEnabled="False" />
                         <Separator />
                         <TextBlock VerticalAlignment="Center" Margin="7,0,3,0"
-                                   Foreground="#555" Text="Product Host" />
+                                   Foreground="#555" Text="編集エンジン" ToolTip="Product Host" />
                         <Ellipse x:Name="HostStatusIndicator" Width="9" Height="9"
                                  Fill="#9A9A9A" Margin="4,0" />
                         <TextBlock x:Name="HostStatusText" VerticalAlignment="Center"
@@ -223,9 +223,9 @@
                     <TextBlock x:Name="PlayheadText" VerticalAlignment="Center" Margin="8,0" />
                 </WrapPanel>
                 <WrapPanel x:Name="RigContextOptions" Margin="8,4" Visibility="Collapsed">
-                    <Button Content="Bone / 骨" Tag="Bone" Click="RigContext_Click" Padding="10,5" Margin="3" />
-                    <Button Content="Warp / 格子" Tag="Warp" Click="RigContext_Click" Padding="10,5" Margin="3" />
-                    <Button Content="Weight / ウェイト" Tag="Weight" Click="RigContext_Click" Padding="10,5" Margin="3" />
+                    <Button Content="骨（Bone）" Tag="Bone" Click="RigContext_Click" Padding="10,5" Margin="3" />
+                    <Button Content="格子（Warp）" Tag="Warp" Click="RigContext_Click" Padding="10,5" Margin="3" />
+                    <Button Content="ウェイト（Weight）" Tag="Weight" Click="RigContext_Click" Padding="10,5" Margin="3" />
                 </WrapPanel>
                 <StackPanel x:Name="MeshOptions" Visibility="Collapsed" Background="#EEEAE7">
                     <WrapPanel Margin="8,4">
@@ -248,10 +248,10 @@
                                 Padding="6,3" Margin="4,0" Visibility="Collapsed" />
                     </WrapPanel>
                     <WrapPanel x:Name="GenerateOptions" Visibility="Collapsed" Margin="10,3,10,6">
-                        <TextBlock Text="Grid 横 / 縦" VerticalAlignment="Center" />
+                        <TextBlock Text="格子 横 / 縦" VerticalAlignment="Center" />
                         <TextBox x:Name="GridColumns" Text="4" Width="35" Margin="4,0" TextChanged="MeshGenerationSettings_Changed" />
                         <TextBox x:Name="GridRows" Text="4" Width="35" Margin="4,0" TextChanged="MeshGenerationSettings_Changed" />
-                        <Button Content="Gridを試す" Click="GridPreview_Click" Padding="6,3" />
+                        <Button Content="格子を試す" Click="GridPreview_Click" Padding="6,3" />
                         <TextBlock Text="輪郭 α / 密度 / 角 / 内側" VerticalAlignment="Center" Margin="10,0,4,0" />
                         <TextBox x:Name="ContourAlpha" Text="0.1" Width="38" TextChanged="MeshGenerationSettings_Changed" />
                         <TextBox x:Name="ContourDensity" Text="0.45" Width="38" Margin="3,0" TextChanged="MeshGenerationSettings_Changed" />

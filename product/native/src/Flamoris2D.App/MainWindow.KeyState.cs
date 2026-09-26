@@ -46,7 +46,7 @@ public partial class MainWindow
         var key=$"{response.DocumentToken}/{context}/{_editingContext}/{_targets.SelectedId}/{MeshCanvas.KeyformId}";
         if(_contextDraft&&_keyPanelKey==key)return;_keyPanelKey=key;KeyStatePanel.Children.Clear();
         if(_editingContext==EditingContext.Source)BuildObjectPanel(state,context,revision);
-        var artPanel=Section(KeyStatePanel,"原画・Key State",context.KeyArtId is null);
+        var artPanel=Section(KeyStatePanel,"原画の状態",context.KeyArtId is null);
         var selected=Property(state,"selectedKeyArt");var name=Field(artPanel,"原画名",String(selected,"displayName")??"新しい原画");
         ActionButton(artPanel,"全パーツを表示対象へ含める",()=>RunKeyStateAsync(KeyStateEdit.IncludeSource,context,revision));
         if(context.KeyArtId is not null)
@@ -120,7 +120,7 @@ public partial class MainWindow
             ActionButton(panel,"終了原画を変更",()=>RunKeyStateAsync(()=>KeyStateEdit.Endpoint(false,Chosen(to)),context,revision));
             ActionButton(panel,"遷移を削除",()=>RunKeyStateAsync(KeyStateEdit.RemoveTransition,context,revision));
             async Task SelectEndpoint(bool start){var art=start?Chosen(from):Chosen(to);_renderChoice=new(art,"keyArt","原画");_meshChoices.Clear();_contextDraft=false;await RefreshRigSurfaceAsync();}
-            ActionButton(panel,"AのKey Stateを編集",()=>SelectEndpoint(true));ActionButton(panel,"BのKey Stateを編集",()=>SelectEndpoint(false));
+            ActionButton(panel,"Aの原画の状態を編集",()=>SelectEndpoint(true));ActionButton(panel,"Bの原画の状態を編集",()=>SelectEndpoint(false));
             ActionButton(panel,"遷移をプレビュー",async()=>{_renderChoice=new(context.TransitionId,"transition","遷移");_timeTicks=0;SwitchContext(EditingContext.Preview,false);await RefreshRigSurfaceAsync();});
         }
         var slot=Choices(panel,"対応するパーツ",ArrayOf(state,"slots").Select(s=>new EntityChoice(String(s,"id")!,String(s,"displayName")!)),context.SemanticSlotId);
@@ -183,8 +183,8 @@ public partial class MainWindow
     {
         var form=ArrayOf(state,"keyforms").FirstOrDefault(k=>String(k,"id")==MeshCanvas.KeyformId);if(form.ValueKind!=JsonValueKind.Object)return;
         var topologyId=String(form,"topologyId")!;
-        var panel=Section(KeyStatePanel,"アニメーション用の形状・MeshDeformation",true);
-        Note(panel,"骨・Warp・原画補正の後へ加える変位を作ります。AnimationのClipでMeshDeformationTrackに配置できます。");
+        var panel=Section(KeyStatePanel,"アニメーション用の形状",true);
+        Note(panel,"骨・格子・原画補正の後へ加える変位を作ります。「動き」でクリップの「メッシュ変形」トラックに配置できます。");
         var samples=ArrayOf(state,"samples").Where(s=>String(s,"topologyId")==topologyId).ToArray();
         var select=Choices(panel,"編集する変形",samples.Select((s,i)=>new EntityChoice(String(s,"id")!,$"変形 {i+1}")),_selectedSampleId);
         var selected=samples.FirstOrDefault(s=>String(s,"id")==_selectedSampleId);_sampleOffsets.Clear();
