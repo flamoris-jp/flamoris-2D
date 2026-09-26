@@ -4,6 +4,7 @@ import {mkdtemp, mkdir, readFile, writeFile, cp, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createPackage, uncacheAll} from '@electron/asar';
+import {FileMatcher, copyFiles} from 'app-builder-lib/out/fileMatcher.js';
 import {auditLocks, verifyElectron, installed} from '../scripts/release-hygiene.mjs';
 
 const readJson = async path => JSON.parse(await readFile(new URL(path, import.meta.url), 'utf8'));
@@ -44,13 +45,15 @@ test('packaged audit rejects missing notices, version drift and unintended conte
       const metadata = join(installedPath, 'package.json');
       const license = join(installedPath, 'LICENSE');
       await cp(metadata, join(target, 'package.json'));
-      const notices = join(output, 'third-party-licenses', path);
+      const notices = join(temp, 'notices', path.replaceAll('node_modules/', 'packages/'));
       await mkdir(notices, {recursive: true});
       await cp(metadata, join(notices, 'package.json'));
       await cp(license, join(notices, 'LICENSE'));
       inventory.push({path, version: p.version, license: p.license, integrity: p.integrity, notices: ['LICENSE']});
     }
-    await writeFile(join(output, 'third-party-licenses/inventory.json'), JSON.stringify(inventory));
+    await writeFile(join(temp, 'notices/inventory.json'), JSON.stringify(inventory));
+    // Exercise the actual builder copy filter, which silently omits root node_modules.
+    await copyFiles([new FileMatcher(join(temp, 'notices'), join(output, 'third-party-licenses'), value => value)]);
     await cp(new URL('../../LICENSE', import.meta.url), join(output, 'LICENSE-FLAMORIS.txt'));
     for (const name of ['LICENSE.electron.txt', 'LICENSES.chromium.html'])
       await writeFile(join(output, name), 'Synthetic notice used only in test. '.repeat(10));

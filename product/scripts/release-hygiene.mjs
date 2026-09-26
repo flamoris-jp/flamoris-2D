@@ -9,6 +9,8 @@ const repository = resolve(product, '..');
 const json = async path => JSON.parse(await readFile(path, 'utf8'));
 const entries = lock => Object.entries(lock.packages).filter(([path, item]) => path.includes('node_modules/') && !item.link);
 const nameOf = path => path.split('node_modules/').at(-1);
+// electron-builder excludes a top-level node_modules directory even in extraFiles.
+const noticePath = path => path.replaceAll('node_modules/', 'packages/');
 const common = new Set(['MIT', 'ISC', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', '0BSD', '(MIT AND Zlib)']);
 // Inventory exceptions, not a legal compatibility approval. See Issue #43 audit.
 const review = new Set([
@@ -78,7 +80,7 @@ async function prepare(lock) {
     assert.equal((await json(resolve(source, 'package.json'))).version, p.version);
     const notices = await noticeNames(source);
     assert.ok(notices.length, `Missing upstream license: ${path}`);
-    const target = resolve(destination, path);
+    const target = resolve(destination, noticePath(path));
     await mkdir(target, {recursive: true});
     for (const name of [...notices, 'package.json']) await copyFile(resolve(source, name), resolve(target, name));
     inventory.push({path, version: p.version, license: p.license, integrity: p.integrity, notices});
@@ -101,7 +103,7 @@ export async function verifyElectron(lock, packageDirectory) {
     assert.equal(JSON.parse(extractFile(archive, join(path, 'package.json'))).version, p.version, `Packaged version mismatch: ${path}`);
     const source = await installed(path);
     for (const name of [...await noticeNames(source), 'package.json']) {
-      assert.deepEqual(await readFile(resolve(packageDirectory, 'third-party-licenses', path, name)), await readFile(resolve(source, name)), `Missing/changed packaged notice: ${path}/${name}`);
+      assert.deepEqual(await readFile(resolve(packageDirectory, 'third-party-licenses', noticePath(path), name)), await readFile(resolve(source, name)), `Missing/changed packaged notice: ${path}/${name}`);
     }
   }
   const inventory = await json(resolve(packageDirectory, 'third-party-licenses/inventory.json'));
