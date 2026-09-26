@@ -73,7 +73,12 @@ jobs:
           $encoder = (Get-ChildItem $destination -Filter ffmpeg.exe -Recurse | Select-Object -First 1).FullName
           "FLAMORIS_TEST_FFMPEG=$encoder" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
+      - name: Publish matching MCP bridge
+        run: dotnet publish product/native/src/Flamoris2D.Bridge -c Release -r win-x64 --self-contained true -o out/native-win-x64/mcp
+
       - name: C# client and crash-invalidation tests
+        env:
+          FLAMORIS_TEST_BRIDGE: ${{ github.workspace }}/out/native-win-x64/mcp/Flamoris.Mcp.Bridge.exe
         run: dotnet run --project product/native/tests/Flamoris2D.ProductHost.Client.Tests -c Release --no-build -- product/product-host/main.mjs
 
       - name: Publish native candidate
@@ -89,6 +94,12 @@ jobs:
           Invoke-WebRequest 'https://raw.githubusercontent.com/nodejs/node/v24.21.0/LICENSE' -OutFile (Join-Path $runtime 'LICENSE.txt')
           $ffmpegRoot = Split-Path (Split-Path $env:FLAMORIS_TEST_FFMPEG)
           Copy-Item $ffmpegRoot (Join-Path $package 'ffmpeg') -Recurse
+          & $env:FLAMORIS_TEST_FFMPEG -v error -i (Join-Path $package 'mcp-assets/chipsy-activity.webp') -frames:v 1 (Join-Path $package 'mcp-assets/chipsy-decoded.png')
+          if ($LASTEXITCODE -ne 0) { throw 'Chipsy decode failed' }
+          foreach ($required in @('mcp/Flamoris.Mcp.Bridge.exe', 'mcp/Flamoris.Mcp.Core.dll', 'Flamoris.Mcp.Core.dll', 'mcp-assets/chipsy-decoded.png')) {
+            if (!(Test-Path (Join-Path $package $required))) { throw "Missing Native MCP runtime: $required" }
+          }
+          if (Test-Path (Join-Path $package 'node_modules/@modelcontextprotocol')) { throw 'Obsolete Node MCP runtime packaged' }
           Copy-Item 'product/native/THIRD-PARTY-NOTICES.md' $package
           Copy-Item 'docs/native-production-workflow.md' (Join-Path $package 'README.md')
           Get-ChildItem $package -File -Recurse | ForEach-Object { '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash, $_.FullName.Substring($package.Length + 1) } | Set-Content (Join-Path $env:RUNNER_TEMP 'native-sha256.txt')

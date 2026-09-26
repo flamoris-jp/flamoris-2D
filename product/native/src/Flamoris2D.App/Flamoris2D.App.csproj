@@ -14,11 +14,12 @@
     <VersionPrefix>0.4.0</VersionPrefix>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Flamoris.Mcp.Core" Version="1.1.0" GeneratePathProperty="true" />
+    <None Include="$(PkgFlamoris_Mcp_Core)/assets/runtime/chipsy-activity.webp" Link="mcp-assets/chipsy-activity.webp" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="..\Flamoris2D.Rendering\Flamoris2D.Rendering.csproj" />
     <ProjectReference Include="..\Flamoris2D.ProductHost.Client\Flamoris2D.ProductHost.Client.csproj" />
   </ItemGroup>
   <Import Project="..\..\ProductHost.files.props" />
-  <Import Project="..\..\McpRuntime.files.props" />
   <ItemGroup>
     <None Include="..\..\..\package.json"
           Link="package.json"
