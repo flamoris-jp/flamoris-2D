@@ -57,20 +57,15 @@ test('native package allowlist is exactly the Product Host and worker dependency
   for(const entry of entries){assert.ok(entry.startsWith('product-host/')||product.has(entry),entry);assert.doesNotMatch(entry,/(?:tests|staging|history)\/|src\/app\.js|(?:-view|renderer)\.js$/u);}
 });
 
-test('native MCP runtime allowlist matches locked production SDK dependencies and excludes client/test packages', async () => {
+test('native MCP uses packaged Core/bridge and has no Node HTTP production runtime', async () => {
   const lock = JSON.parse(await readFile(new URL('../package-lock.json', import.meta.url), 'utf8'));
   const runtime = Object.entries(lock.packages).filter(([name, entry]) => name && !entry.dev).map(([name]) => name.slice('node_modules/'.length));
-  const expected = ['@hono/node-server', '@modelcontextprotocol/core', '@modelcontextprotocol/node', '@modelcontextprotocol/server', 'hono', 'zod'];
-  assert.deepEqual(runtime.filter(name => !['ag-psd', 'base64-js', 'pako'].includes(name)).sort(), expected);
-  for (const name of expected) {
-    const entry = lock.packages[`node_modules/${name}`];
-    assert.ok(entry.integrity?.startsWith('sha512-'), name);
-    if (name.startsWith('@modelcontextprotocol/')) assert.equal(entry.version, '2.0.0');
-  }
-  const props = await readFile(new URL('../native/McpRuntime.files.props', import.meta.url), 'utf8');
-  const included = [...props.matchAll(/node_modules\\([^"*]+?)\\(?:\*\*|LICENSE)/g)].map(m => m[1].replaceAll('\\', '/'));
-  assert.deepEqual([...new Set(included)].sort(), expected);
-  assert.doesNotMatch(props, /client|tests|fixtures|staging|\.ts"/);
-  const csproj = await readFile(new URL('../native/src/Flamoris2D.App/Flamoris2D.App.csproj', import.meta.url), 'utf8');
-  assert.match(csproj, /McpRuntime\.files\.props/);
+  assert.deepEqual(runtime.sort(), ['ag-psd', 'base64-js', 'pako']);
+  const client = await readFile(new URL('../native/src/Flamoris2D.ProductHost.Client/Flamoris2D.ProductHost.Client.csproj', import.meta.url), 'utf8');
+  assert.match(client, /Include="Flamoris.Mcp.Core" Version="1.1.0"/);
+  const bridge = await readFile(new URL('../native/src/Flamoris2D.Bridge/Flamoris2D.Bridge.csproj', import.meta.url), 'utf8');
+  assert.match(bridge, /<AssemblyName>Flamoris.Mcp.Bridge<\/AssemblyName>/);
+  assert.doesNotMatch(bridge, /ProjectReference|ProductHost/);
+  const host = await readFile(new URL('../product-host/session-service.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(host, /StreamableHTTP|live-mcp-transport/);
 });

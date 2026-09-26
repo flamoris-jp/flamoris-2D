@@ -67,6 +67,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         _client = new ProductHostClient(_logger);
         _client.AuthorityLost += Client_AuthorityLost;
         _client.DocumentChanged += Client_DocumentChanged;
+        _client.McpStatusChanged += Client_McpStatusChanged;
         _client.DiagnosticReceived += (_, message) =>
             Dispatcher.InvokeAsync(() => StatusText.Text = message);
         try

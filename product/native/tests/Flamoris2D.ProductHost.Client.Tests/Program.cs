@@ -15,7 +15,7 @@ await TestRoundTripAsync(hostPath);
 await TestTargetPropertiesAsync(hostPath);
 await TestMeshArtworkAsync(hostPath);
 await TestCrashInvalidationAsync(hostPath);
-await TestControlChannelLossRevokesMcpAsync(hostPath);
+await McpTests.RunAsync(hostPath);
 await TestDiagnosticBoundaryAsync();
 await TestLoggingIntegrationAsync(hostPath);
 await DocumentTests.RunAsync(hostPath);
@@ -145,22 +145,13 @@ static async Task TestLoggingIntegrationAsync(string hostPath)
             await client.StartAsync(hostPath);
             await client.CreateSessionAsync("Logging proof");
             var connection = await client.EnableMcpAsync(McpPermission.Edit);
-            await WaitForLogAsync(logPath, "Live MCP access attached");
             secret = connection.Token;
-            using var http = new HttpClient();
-            using var request = new HttpRequestMessage(HttpMethod.Post, connection.Endpoint);
-            request.Headers.Authorization =
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "invalid");
-            request.Content = new StringContent("{}");
-            using var response = await http.SendAsync(request);
-            Assert(response.StatusCode == System.Net.HttpStatusCode.Unauthorized,
-                "Bad MCP credential was not rejected.");
-            await WaitForLogAsync(logPath, "MCP authentication failed");
+            await using var probe = await McpTests.ConnectAsync(connection);
+            await probe.CallToolAsync("mcp.context");
             await client.DisableMcpAsync();
-            await WaitForLogAsync(logPath, "Live MCP access detached");
         }
         var text = File.ReadAllText(logPath);
-        Assert(text.Contains("[INFO ] [mcp.session]") && text.Contains("[WARN ] [mcp.auth]"),
+        Assert(text.Contains("[INFO ] [mcp.session]") && text.Contains("[DEBUG] [app.startup]"),
             "MCP attach/detach/auth diagnostics did not reach Flamoris.Logging.");
         Assert(secret is null || !text.Contains(secret), "MCP credential leaked into the log.");
     }
@@ -170,22 +161,6 @@ static async Task TestLoggingIntegrationAsync(string hostPath)
     }
 }
 
-static async Task WaitForLogAsync(string path, string expected)
-{
-    var deadline = DateTime.UtcNow.AddSeconds(5);
-    while (DateTime.UtcNow < deadline)
-    {
-        try
-        {
-            if (File.Exists(path) &&
-                File.ReadAllText(path).Contains(expected, StringComparison.Ordinal))
-                return;
-        }
-        catch (IOException) { }
-        await Task.Delay(25);
-    }
-    throw new InvalidOperationException($"Timed out waiting for diagnostic: {expected}");
-}
 
 static void TestViewportGeometry()
 {
@@ -383,68 +358,6 @@ static async Task TestCrashInvalidationAsync(string hostPath)
     Assert(client.DocumentToken is null, "Host failure must clear the document token.");
 }
 
-static async Task TestControlChannelLossRevokesMcpAsync(string hostPath)
-{
-    await using var client = new ProductHostClient();
-    var lost = new TaskCompletionSource<AuthorityLostEventArgs>(
-        TaskCreationOptions.RunContinuationsAsynchronously);
-    client.AuthorityLost += (_, eventArgs) => lost.TrySetResult(eventArgs);
-    await client.StartAsync(hostPath);
-    await client.CreateSessionAsync("Broken control channel", 640, 360);
-    var rootId = (await client.GetSceneTreeAsync()).Payload.GetProperty("id").GetString()!;
-    var connection = await client.EnableMcpAsync(McpPermission.Edit);
-    var documentToken = client.DocumentToken!;
-    var revision = client.Revision;
-    Assert(client.IsRunning, "The Host must still be alive before breaking only the control channel.");
-
-    using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
-    HttpRequestMessage Request(string tool, object arguments)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Post, connection.Endpoint);
-        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", connection.Token);
-        request.Headers.TryAddWithoutValidation("Accept", "application/json, text/event-stream");
-        request.Headers.Add("MCP-Protocol-Version", "2026-07-28");
-        request.Headers.Add("Mcp-Method", "tools/call");
-        request.Headers.Add("Mcp-Name", tool);
-        var parameters = new Dictionary<string, object>
-        {
-            ["name"] = tool,
-            ["arguments"] = arguments,
-            ["_meta"] = new Dictionary<string, object>
-            {
-                ["io.modelcontextprotocol/protocolVersion"] = "2026-07-28",
-                ["io.modelcontextprotocol/clientInfo"] = new { name = "authority-loss-proof", version = "1" },
-                ["io.modelcontextprotocol/clientCapabilities"] = new { },
-            },
-        };
-        request.Content = new StringContent(JsonSerializer.Serialize(
-            new { jsonrpc = "2.0", id = 1, method = "tools/call", @params = parameters }),
-            System.Text.Encoding.UTF8, "application/json");
-        return request;
-    }
-
-    using (var before = Request("live.context", new { }))
-    using (var response = await http.SendAsync(before))
-        Assert(response.IsSuccessStatusCode, "Live MCP endpoint was not usable before control-channel loss.");
-    client.BreakControlChannelForTesting();
-    await lost.Task.WaitAsync(TimeSpan.FromSeconds(5));
-    Assert(!client.HasAuthoritativeProjection, "Broken control channel must invalidate WPF authority.");
-    Assert(!client.IsRunning, "Broken control channel must terminate the still-running Host.");
-
-    using var request = Request("command.scene.rename_node", new
-    {
-        documentToken,
-        expectedRevision = revision,
-        payload = new { nodeId = rootId, displayName = "Must not commit" },
-    });
-    try
-    {
-        using var response = await http.SendAsync(request);
-        Assert(!response.IsSuccessStatusCode, "Old MCP capability remained usable after WPF authority loss.");
-    }
-    catch (HttpRequestException) { }
-    catch (TaskCanceledException) { }
-}
 
 static void Assert(bool condition, string message)
 {

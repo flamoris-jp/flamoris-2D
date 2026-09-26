@@ -59,18 +59,34 @@ portable smoke does not prove a signed installer, association, update/uninstall,
 external MCP attachment, or Electron retirement. Those accepted release gates remain
 open; Electron stays until the migration design's stop conditions pass.
 
-## Live MCP (Issue #102)
+## Live MCP (Issue #107)
 
-The `MCP / AI` menu enables a document-scoped loopback Streamable HTTP endpoint,
-disabled by default. See [workflow](../../docs/native-production-workflow.md) and
-[ADR 0010](../../docs/decisions/0010-native-live-mcp.md). Official SDK 2.0.0 implements
-2026-07-28 plus stateless 2025 compatibility. No separate Host or stdio bridge.
+The `MCP / AI` menu enables a document-scoped Core 1.1.0 named-pipe endpoint.
+Manual connection is disabled by default. Connection copy starts the matching
+`mcp/Flamoris.Mcp.Bridge.exe`; capability travels only in
+`FLAMORIS_MCP_CAPABILITY`. See [workflow](../../docs/native-production-workflow.md),
+[wire contract](../../docs/mcp-design.md) and [ADR 0011](../../docs/decisions/0011-mcp-core-migration.md).
+The bridge owns no Product Host, Project or history. Node remains editing authority.
 
-Before a local native build, install locked packages with
-`npm ci --prefix product --workspaces=false --ignore-scripts`.
-`McpRuntime.files.props` includes only named, reviewed production dependencies;
-SDK client/fixtures/tests are excluded from the candidate. The package's bundled
-Node runs the endpoint even with developer Node/.NET absent from PATH.
-The production smoke uses an independent HTTP client for modern discovery,
-visible rename/Mesh edits, automatic WPF refresh and shared history; it then
-continues the established Source→Export→Save/reopen path.
+Build prerequisites remain .NET 10, Node and `npm ci --prefix product --workspaces=false
+--ignore-scripts`, plus authenticated access to the FLAMORIS NuGet feed. Both the
+client and bridge consume `Flamoris.Mcp.Core 1.1.0`; no DLL is vendored.
+
+For a portable candidate, publish both projects:
+
+```powershell
+dotnet publish product/native/src/Flamoris2D.Bridge -c Release -r win-x64 --self-contained true -o out/native-win-x64/mcp
+dotnet publish product/native/src/Flamoris2D.App -c Release -r win-x64 --self-contained true -o out/native-win-x64
+```
+
+The existing Native workflow then adds pinned Node/FFmpeg and notices, and decodes
+the canonical Chipsy sheet to a PNG display cache with the packaged FFmpeg. The
+original WebP remains byte-identical in `mcp-assets/`; WPF selects row 7/column 0.
+The cache and sheet are runtime artifacts, not committed derivatives. Development
+builds without the cache retain activity text and cursor.
+
+Set `FLAMORIS_TEST_BRIDGE` to the published executable before running the C# client
+suite. The existing Windows gate exercises official-client transport and the
+packaged WPF smoke verifies visible Mesh changes, automatic refresh and shared
+Undo/Redo before continuing Source→Export→Save/reopen. Node MCP HTTP dependencies
+are absent from the Native package. The private binary artwork channel is unchanged.

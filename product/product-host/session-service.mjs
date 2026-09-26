@@ -1,4 +1,4 @@
-import { LiveMcpEndpoint } from "./live-mcp-transport.mjs";
+import { McpReservation } from "./mcp-reservation.mjs";
 import { randomUUID } from "node:crypto";
 import { normalizePreferences } from '../src/preferences.js';
 import { incrementalFilename } from '../src/io/project-files.js';
@@ -126,7 +126,7 @@ export class ProductHostService {
     this.pendingJobs = new Set();
     this.onExternalEvents = null;
     this.emitDiagnostic = null;
-    this.mcp = new LiveMcpEndpoint(this, diagnostic => this.diagnose(diagnostic));
+    this.mcp = new McpReservation(this);
     this.document = null;
     this.shutdownRequested = false;
     this.assets = new RasterAssets(() => ({ token: this.documentToken, revision: this.revision }), NATIVE_ARTWORK_LIMITS);
@@ -487,7 +487,35 @@ export class ProductHostService {
     }
   }
 
+  prepareLiveMutation(request) {
+    const document = this.#requireDocument(request);
+    this.#assertExpectedRevision(request, document);
+    const { session, sourceHistory } = document;
+    switch (request.method) {
+      case 'session.execute':
+        return session.prepareTransactionCommit([request.payload.command], { label: request.payload.label });
+      case 'session.executeTransaction':
+        return session.prepareTransactionCommit(request.payload.commands, { label: request.payload.label });
+      case 'session.undo': {
+        const commit = session.prepareUndo();
+        return () => sourceHistory ? sourceHistory.undo(commit) : commit();
+      }
+      case 'session.redo': {
+        const commit = session.prepareRedo();
+        return () => sourceHistory ? sourceHistory.redo(commit) : commit();
+      }
+      default: throw Object.assign(new Error('Unsupported prepared operation.'), { code: 'forbidden' });
+    }
+  }
+
   handle(request, { guard = null, external = false } = {}) {
+    if (['mcp.reserve', 'mcp.invoke', 'mcp.prepare', 'mcp.commit', 'mcp.release', 'mcp.cancel'].includes(request?.method))
+      return this.mcp.control(request, async (inner, demand, prepared = null) => {
+        // The private reservation already owns the normal Product queue.
+        this.commitGuard = demand;
+        try { return await this.#handle(inner, demand, prepared); }
+        finally { this.commitGuard = null; }
+      });
     const epoch = ['mcp.enable', 'mcp.disable'].includes(request?.method) ? ++this.mcpControlEpoch : null;
     const jobKind = request?.method === 'mesh.generatePreview' ? 'preview' :
       ['source.import', 'source.analyzeReimport'].includes(request?.method) ? 'import' : null;
@@ -504,8 +532,10 @@ export class ProductHostService {
     this.cancelMeshPreview(request);
     this.cancelImport(request);
     if (request?.protocolVersion === PRODUCT_HOST_PROTOCOL_VERSION &&
-        request.method === "mcp.disable" && request.documentToken === this.documentToken)
+        request.method === "mcp.disable" && request.documentToken === this.documentToken) {
       this.mcp.revoke();
+      return Promise.resolve(this.mcp.response(request, this.mcp.status()));
+    }
     const operation = this.queue.then(async () => {
       this.commitGuard = admissionGuard;
       try {
@@ -526,13 +556,13 @@ export class ProductHostService {
     await this.assets.close();
   }
 
-  async #handle(request, guard) {
+  async #handle(request, guard, prepared = null) {
     const requestId = typeof request?.requestId === "string" ? request.requestId : null;
     const previousRevision = this.revision;
     try {
       guard?.();
       assertEnvelope(request);
-      const payload = await this.#dispatch(request);
+      const payload = prepared ? prepared() : await this.#dispatch(request);
       const mutated = MUTATING_METHODS.has(request.method) && payload !== null;
       if (mutated) this.document.revision += 1;
       if (this.document) collectSourceAssets(this.document, this.assets);

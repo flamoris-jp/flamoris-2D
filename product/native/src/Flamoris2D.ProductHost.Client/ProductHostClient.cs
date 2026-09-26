@@ -233,6 +233,7 @@ public sealed partial class ProductHostClient : IAsyncDisposable
     {
         var process = _process;
         if (process is null) return;
+        await DisableMcpAsync();
         _shutdownRequested = true;
         if (!process.HasExited)
         {
@@ -278,6 +279,7 @@ public sealed partial class ProductHostClient : IAsyncDisposable
 
     private void AttachOpenedDocument(ProductHostResponse response)
     {
+        RevokeLocalMcp();
         if (response.DocumentToken is null || response.Revision is null)
             throw new ProductHostException("Document response omitted authority tags.",
                 "protocol.authority_tags_missing", default, false);
@@ -327,9 +329,15 @@ public sealed partial class ProductHostClient : IAsyncDisposable
             await _writeGate.WaitAsync(cancellationToken);
             try
             {
-                await process.StandardInput.BaseStream.WriteAsync(header, cancellationToken);
-                await process.StandardInput.BaseStream.WriteAsync(bytes, cancellationToken);
-                await process.StandardInput.BaseStream.FlushAsync(cancellationToken);
+                using var writeTimeout = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+                writeTimeout.CancelAfter(TimeSpan.FromSeconds(5));
+                try
+                {
+                    await process.StandardInput.BaseStream.WriteAsync(header, writeTimeout.Token);
+                    await process.StandardInput.BaseStream.WriteAsync(bytes, writeTimeout.Token);
+                    await process.StandardInput.BaseStream.FlushAsync(writeTimeout.Token);
+                }
+                catch (Exception error) { LoseAuthority("Product Host control write failed.", error); throw; }
             }
             finally
             {
@@ -392,6 +400,8 @@ public sealed partial class ProductHostClient : IAsyncDisposable
             };
             if (exception.Code == "revision.conflict")
                 _logger?.Warn(category, "Revision conflict rejected", properties);
+            else if (method.StartsWith("mcp.", StringComparison.Ordinal))
+                _logger?.Error(category, "Product operation failed", properties: properties);
             else
                 _logger?.Error(category, "Product operation failed", exception, properties);
             throw exception;
@@ -630,6 +640,7 @@ public sealed partial class ProductHostClient : IAsyncDisposable
             try { if (!process.HasExited) process.Kill(true); } catch { }
             try { process.WaitForExit(5000); } catch { }
         }
+        RevokeLocalMcp();
         AuthorityLost?.Invoke(this, new AuthorityLostEventArgs(reason, error));
     }
 

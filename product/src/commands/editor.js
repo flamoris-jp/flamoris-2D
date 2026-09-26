@@ -121,7 +121,12 @@ export class EditorSession {
     return projectResult(this.prepareTransaction(commands).draft);
   }
 
-  executeTransaction(commands, { label = "Edit" } = {}) {
+  executeTransaction(commands, options = {}) {
+    return this.prepareTransactionCommit(commands, options)();
+  }
+
+  // The same ordinary Product draft, optionally committed after cross-process cancellation acknowledgement.
+  prepareTransactionCommit(commands, { label = "Edit" } = {}) {
     const { draft, inverses, affected, issues } = this.prepareTransaction(commands);
     const entry = {
       label,
@@ -131,16 +136,17 @@ export class EditorSession {
       beforeRevision: this.currentRevision,
       afterRevision: this.revisionCounter + 1,
     };
-    this.beforeCommit?.();
-    this.revisionCounter = entry.afterRevision;
-    this.project = draft;
-    this.currentRevision = entry.afterRevision;
-    this.undoStack.push(entry);
-    this.redoStack = [];
-    this.history.push({
-      label,
-      commandTypes: commands.map((command) => command.type),
-      affectedIds: [...affected],
+    const revision = this.currentRevision;
+    return this.preparedCommit(revision, () => {
+      this.revisionCounter = entry.afterRevision;
+      this.project = draft;
+      this.currentRevision = entry.afterRevision;
+      this.undoStack.push(entry);
+      this.redoStack = [];
+      this.history.push({
+        label,
+        commandTypes: commands.map((command) => command.type),
+        affectedIds: [...affected],
     });
     this.onChange?.(cloneProject(this.project), entry);
     return {
@@ -149,11 +155,26 @@ export class EditorSession {
       validation: { valid: true, issues },
       historyIndex: this.history.length - 1,
     };
+    });
   }
 
-  undo() {
+  preparedCommit(revision, commit) {
+    const counter = this.revisionCounter, project = this.project;
+    let used = false;
+    return () => {
+      if (used || this.project !== project || this.currentRevision !== revision || this.revisionCounter !== counter)
+        throw new CommandError("Prepared edit is stale.", "revision.conflict");
+      this.beforeCommit?.();
+      used = true;
+      return commit();
+    };
+  }
+
+  undo() { return this.prepareUndo()(); }
+
+  prepareUndo() {
     const entry = this.undoStack.at(-1);
-    if (!entry) return null;
+    if (!entry) return this.preparedCommit(this.currentRevision, () => null);
     const draft = cloneProject(this.project);
     entry.inverses.forEach((command) => {
       assertCommand(command, { allowInternal: true });
@@ -162,23 +183,26 @@ export class EditorSession {
     const issues = transactionValidationIssues(this.project, draft)
       .filter((entry) => entry.severity === "error");
     if (issues.length) throw new TransactionError(issues);
-    this.beforeCommit?.();
-    this.undoStack.pop();
-    this.project = draft;
-    this.currentRevision = entry.beforeRevision;
-    this.redoStack.push(entry);
-    this.history.push({
-      label: "Undo: " + entry.label,
-      commandTypes: entry.inverses.map((command) => command.type),
-      affectedIds: entry.affectedIds,
+    return this.preparedCommit(this.currentRevision, () => {
+      this.undoStack.pop();
+      this.project = draft;
+      this.currentRevision = entry.beforeRevision;
+      this.redoStack.push(entry);
+      this.history.push({
+        label: "Undo: " + entry.label,
+        commandTypes: entry.inverses.map((command) => command.type),
+        affectedIds: entry.affectedIds,
     });
     this.onChange?.(cloneProject(this.project), entry);
     return { label: entry.label, affectedIds: entry.affectedIds };
+    });
   }
 
-  redo() {
+  redo() { return this.prepareRedo()(); }
+
+  prepareRedo() {
     const entry = this.redoStack.at(-1);
-    if (!entry) return null;
+    if (!entry) return this.preparedCommit(this.currentRevision, () => null);
     const draft = cloneProject(this.project);
     entry.commands.forEach((command) => {
       assertCommand(command);
@@ -187,18 +211,19 @@ export class EditorSession {
     const issues = transactionValidationIssues(this.project, draft)
       .filter((entry) => entry.severity === "error");
     if (issues.length) throw new TransactionError(issues);
-    this.beforeCommit?.();
-    this.redoStack.pop();
-    this.project = draft;
-    this.currentRevision = entry.afterRevision;
-    this.undoStack.push(entry);
-    this.history.push({
-      label: "Redo: " + entry.label,
-      commandTypes: entry.commands.map((command) => command.type),
-      affectedIds: entry.affectedIds,
+    return this.preparedCommit(this.currentRevision, () => {
+      this.redoStack.pop();
+      this.project = draft;
+      this.currentRevision = entry.afterRevision;
+      this.undoStack.push(entry);
+      this.history.push({
+        label: "Redo: " + entry.label,
+        commandTypes: entry.commands.map((command) => command.type),
+        affectedIds: entry.affectedIds,
     });
     this.onChange?.(cloneProject(this.project), entry);
     return { label: entry.label, affectedIds: entry.affectedIds };
+    });
   }
 
   markSaved(revision = this.currentRevision) {

@@ -145,14 +145,16 @@ PSD更新は「PSDを再取込・照合…」で差分と対応を確認して�
 1. Native版でPSD / Cutwork / .fl2dを開き、編集対象を選びます。
 2. 上部の `MCP / AI` から `有効にする（読み取り専用）` または
    `有効にする（編集可）` を選びます。起動時は無効です。
-3. `接続情報をコピー` を選び、ローカルで動くMCPクライアントのHTTP設定に
+3. `接続情報をコピー` を選び、ローカルで動くMCPクライアントのstdio設定に
    貼り付けます。接続キーを含むため公開しないでください。クライアントに
-   よって設定の外側の書式は異なります。URLとAuthorizationヘッダーを使います。
-4. クライアントで `live.context` → `query.scene.get_tree` / `query.keyart.list` を
+   よって外側の書式は異なります。同梱の `mcp/Flamoris.Mcp.Bridge.exe` を起動し、
+   接続キーは `FLAMORIS_MCP_CAPABILITY` 環境変数だけで渡します。
+4. クライアントで `mcp.context` → `live.context` → `query.scene.get_tree` / `query.keyart.list` を
    読みます。2026-07-28対応クライアントはmodern discoveryを使い、旧2025世代は
    initialize経由で接続できます。
 5. 編集可で `command.scene.rename_node` または `command.scene.set_transform` を
-   実行します。contextのdocumentTokenとexpectedRevisionを渡します。
+   実行します。Coreの `guard` にruntimeId、documentToken、expectedRevision（文字列）を渡し、
+   `input` に既存Product操作の引数を渡します。書式は [MCP設計](mcp-design.md) を参照してください。
 6. WPFの対象名・プロパティ・画像が通常の変更通知で更新されることを確認します。
 7. キャンバスにフォーカスして Ctrl+Z → 変更が戻る、Ctrl+Y → 再適用を確認します。
 8. Meshの頂点位置も編集し、`live.transaction` の複数変更がCtrl+Z一回で戻ること、
@@ -162,8 +164,9 @@ PSD更新は「PSDを再取込・照合…」で差分と対応を確認して�
 10. 読み取り専用で編集を拒否すること、無効化・接続キー更新・Host再起動後に
     古いキーが使えないことを確認します。
 
-メニューには接続先と要求数・処理中の数、下部には権限状態を表示します。
-要求数はメニューを開いた時に更新されます。接続人数を示す値ではありません。
+メニューにはpipe接続先と処理中の数、下部には接続状態を表示します。
+緑は認証済みbridgeの接続中、赤は無効・接続待ちです。AI作業中はChipsyと待機カーソルを表示します。
 編集中のrevisionが変わった場合は競合として拒否し、上書きしません。
 MCPの編集許可に保存・素材取込・ファイル操作は含まれません。
-リモート/LAN、ブラウザー、クラウドからの接続やstdioブリッジは今回の対象外です。
+接続キーを引数、設定、ログ、Project、profileへ保存しないでください。
+リモート/LAN、ブラウザー、クラウド直結、tunnel-client自動管理は今回の対象外です。

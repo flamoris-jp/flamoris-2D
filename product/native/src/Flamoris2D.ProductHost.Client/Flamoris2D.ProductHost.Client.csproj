@@ -8,5 +8,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Flamoris.Logging" Version="1.0.0" />
+    <PackageReference Include="Flamoris.Mcp.Core" Version="1.1.0" />
   </ItemGroup>
 </Project>

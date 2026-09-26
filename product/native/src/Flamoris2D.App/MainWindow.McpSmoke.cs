@@ -1,6 +1,4 @@
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Text;
+using ModelContextProtocol.Client;
 using System.Text.Json;
 using Flamoris.Flamoris2D.ProductHost;
 
@@ -8,32 +6,6 @@ namespace Flamoris.Flamoris2D.App;
 
 public partial class MainWindow
 {
-    private static async Task<JsonElement> LiveProbeAsync(HttpClient http, McpConnection connection,
-        string method, object parameters, string? name = null)
-    {
-        var values = JsonSerializer.Deserialize<Dictionary<string, object>>(JsonSerializer.Serialize(parameters))!;
-        values["_meta"] = new Dictionary<string, object>
-        {
-            ["io.modelcontextprotocol/protocolVersion"] = "2026-07-28",
-            ["io.modelcontextprotocol/clientInfo"] = new { name = "packaged-wpf-proof", version = "1" },
-            ["io.modelcontextprotocol/clientCapabilities"] = new { },
-        };
-        using var request = new HttpRequestMessage(HttpMethod.Post, connection.Endpoint);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", connection.Token);
-        request.Headers.TryAddWithoutValidation("Accept", "application/json, text/event-stream");
-        request.Headers.Add("MCP-Protocol-Version", "2026-07-28");
-        request.Headers.Add("Mcp-Method", method);
-        if (name is not null) request.Headers.Add("Mcp-Name", name);
-        request.Content = new StringContent(JsonSerializer.Serialize(new { jsonrpc = "2.0", id = 1, method, @params = values }), Encoding.UTF8, "application/json");
-        using var response = await http.SendAsync(request);
-        response.EnsureSuccessStatusCode();
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        if (document.RootElement.TryGetProperty("error", out var error)) throw new Exception($"Live MCP protocol error: {error}");
-        var result = document.RootElement.GetProperty("result");
-        if (result.TryGetProperty("isError", out var failed) && failed.GetBoolean()) throw new Exception($"Live MCP tool failed: {result}");
-        return result.Clone();
-    }
-
     private async Task WaitForMcpProjectionAsync(Func<bool> ready)
     {
         var deadline = DateTime.UtcNow.AddSeconds(10);
@@ -49,13 +21,32 @@ public partial class MainWindow
     private async Task RunLiveMcpSmokeAsync(string nodeId, string keyArtId)
     {
         var client = _client!;
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
         _mcpConnection = await client.EnableMcpAsync(McpPermission.Edit);
         var connection = _mcpConnection;
         await RefreshMcpStatusAsync(client);
-        await LiveProbeAsync(http, connection, "server/discover", new { });
-        async Task<JsonElement> Tool(string name, object args) =>
-            (await LiveProbeAsync(http, connection, "tools/call", new { name, arguments = args }, name)).GetProperty("structuredContent");
+        await using var probe = await McpClient.CreateAsync(new StdioClientTransport(new()
+        {
+            Command = connection.BridgePath, Arguments = ["--pipe", connection.Endpoint],
+            EnvironmentVariables = new Dictionary<string, string?> { ["FLAMORIS_MCP_CAPABILITY"] = connection.Token },
+            ShutdownTimeout = TimeSpan.FromSeconds(3),
+        }));
+        await probe.ListToolsAsync();
+        async Task<JsonElement> Tool(string name, object args)
+        {
+            var input = JsonSerializer.SerializeToElement(args);
+            var values = input.EnumerateObject().Where(p => p.Name is not ("documentToken" or "expectedRevision"))
+                .ToDictionary(p => p.Name, p => (object?)p.Value.Clone());
+            var current = (await probe.CallToolAsync("mcp.context")).StructuredContent!.Value;
+            var parameters = new Dictionary<string, object?> { ["input"] = values,
+                ["guard"] = new { runtimeId = current.GetProperty("runtimeId").GetString(),
+                    documentToken = current.GetProperty("documentToken").GetString(),
+                    expectedRevision = input.TryGetProperty("expectedRevision", out var revision)
+                        ? revision.GetInt64().ToString(System.Globalization.CultureInfo.InvariantCulture)
+                        : current.GetProperty("revision").GetString() } };
+            var result = await probe.CallToolAsync(name, parameters);
+            if (result.IsError == true) throw new Exception("Packaged MCP operation failed: " + result.StructuredContent);
+            return result.StructuredContent!.Value;
+        }
         var context = await Tool("live.context", new { });
         var originalName = _targets.Targets.Single(t => t.Id == nodeId).DisplayName;
         var revision = context.GetProperty("revision").GetInt64();

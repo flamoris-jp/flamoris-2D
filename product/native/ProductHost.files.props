@@ -8,7 +8,7 @@
     <None Include="$(MSBuildThisFileDirectory)..\product-host\key-state-authoring.mjs" Link="ProductHost\key-state-authoring.mjs" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(MSBuildThisFileDirectory)..\product-host\live-mcp-facade.mjs" Link="ProductHost\live-mcp-facade.mjs" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(MSBuildThisFileDirectory)..\product-host\live-mcp-policy.mjs" Link="ProductHost\live-mcp-policy.mjs" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)..\product-host\live-mcp-transport.mjs" Link="ProductHost\live-mcp-transport.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)..\product-host\mcp-reservation.mjs" Link="ProductHost\mcp-reservation.mjs" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(MSBuildThisFileDirectory)..\product-host\main.mjs" Link="ProductHost\main.mjs" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(MSBuildThisFileDirectory)..\product-host\mesh-generation-worker.mjs" Link="ProductHost\mesh-generation-worker.mjs" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(MSBuildThisFileDirectory)..\product-host\mesh-hands-on.mjs" Link="ProductHost\mesh-hands-on.mjs" CopyToOutputDirectory="PreserveNewest" />

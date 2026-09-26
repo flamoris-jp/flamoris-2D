@@ -114,7 +114,7 @@ export class ReimportRenderHistory {
     return result;
   }
 
-  undo() {
+  undo(preparedCommit = null) {
     const entry = this.editor.session.undoStack.at(-1);
     const transition = entry && this.transitions.get(entry);
     if (transition) {
@@ -127,7 +127,7 @@ export class ReimportRenderHistory {
     }
     const revision = this.editor.session.currentRevision;
     try {
-      return this.editor.undo();
+      return preparedCommit ? preparedCommit() : this.editor.undo();
     } catch (error) {
       if (transition && this.editor.session.currentRevision === revision) {
         this.setParts(transition.afterParts);
@@ -136,7 +136,7 @@ export class ReimportRenderHistory {
     }
   }
 
-  redo() {
+  redo(preparedCommit = null) {
     const entry = this.editor.session.redoStack.at(-1);
     const transition = entry && this.transitions.get(entry);
     if (transition) {
@@ -149,7 +149,7 @@ export class ReimportRenderHistory {
     }
     const revision = this.editor.session.currentRevision;
     try {
-      return this.editor.redo();
+      return preparedCommit ? preparedCommit() : this.editor.redo();
     } catch (error) {
       if (transition && this.editor.session.currentRevision === revision) {
         this.setParts(transition.beforeParts);
