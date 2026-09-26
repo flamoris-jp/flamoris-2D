@@ -8,8 +8,11 @@ capability and public Command/Query disposition. PR #101 is the review surface.
 
 ## Run the portable candidate
 
-Download the `flamoris2d-native-production-candidate-win-x64` artifact from the latest
-successful Native Shell Boundary run on PR #101. Extract the entire directory and run
+The [Native Shell Boundary workflow](https://github.com/flamoris-jp/flamoris-2D/actions/workflows/native-shell-ci.yml)
+uploads `flamoris2d-native-production-candidate-win-x64` only after successful manual
+(`workflow_dispatch`) runs; artifacts expire after three days. PR checks build/test
+the package without uploading it. Download an available manual-run artifact, or
+use the development build instructions below if none is available. Extract the entire directory and run
 `Flamoris2D.exe` on Windows x64. The package includes a self-contained .NET 10 runtime,
 Node 24.21.0, the exact Product Host/worker dependency graph, pinned PSD decoder and
 pinned LGPL shared FFmpeg distribution. Keep these files beside the executable.

@@ -1,5 +1,8 @@
 # FLAMORIS 2D Documentation
 
+Start with the [product overview](../README.md) or the detailed
+[capabilities and status](product-status.md).
+
 ## Current design set
 
 - [`basic-design.md`](basic-design.md) — foundational domain/product design. Its browser/WebGL shell notes are historical where they conflict with the accepted native migration; current shell/rendering authority is the WPF migration design plus ADRs 0006–0009.
@@ -50,7 +53,7 @@ For questions such as “is this feature implemented now?”, prefer documents i
 4. phase-specific normative design documents for domain semantics;
 5. older reviews/drafts only as historical context.
 
-Open PR #101 is still a candidate until review/merge. Electron remains the default installed/released shell until the explicit retirement/cutover criteria pass.
+PR #101 is merged; final real-art Windows acceptance of the native production candidate remains open. Electron remains the default installed/released shell until the explicit retirement/cutover criteria pass.
 
 ## Earlier draft
 
