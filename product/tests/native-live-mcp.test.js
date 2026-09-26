@@ -78,7 +78,7 @@ test('cancellation, disable, replacement and close invalidate pending reservatio
   assert.equal((await send(s, 'mcp.reserve', { leaseId: fresh.leaseId, reservationId: 'old' })).ok, false);
   assert.equal(s.mcp.pending.size, 0);
 });
-test('final beforeCommit guard rejects expiry without changing project or history', async t => {
+test('final beforeCommit guard rejects revocation without changing project or history', async t => {
   const { s, call, root } = await setup(t);
   const before = structuredClone(s.document.session.project);
   const normal = s.document.session.beforeCommit;
@@ -91,4 +91,41 @@ test('disable supersedes queued enable', async t => {
   const enable = send(s, 'mcp.enable', { permission: 'edit' }); const disable = send(s, 'mcp.disable');
   release(); assert.equal((await enable).error.code, 'mcp.revoked'); await disable;
   assert.equal(s.mcp.status().enabled, false);
+});
+
+test('prepared mutations have no side effects; cancellation prevents commit and releases WPF lane', async t => {
+  const { s, leaseId, root } = await setup(t);
+  const reserved = await send(s, 'mcp.reserve', { leaseId, reservationId: 'prepare-cancel' });
+  const snapshot = reserved.payload;
+  const prepared = await send(s, 'mcp.prepare', { reservationId: 'prepare-cancel', runtimeId: snapshot.runtimeId,
+    documentToken: snapshot.documentToken, expectedRevision: snapshot.revision,
+    name: 'command.scene.rename_node', input: { payload: { nodeId: root, displayName: 'never' } } });
+  assert.equal(prepared.ok, true); assert.equal(s.revision, 0); assert.equal(s.document.session.undoStack.length, 0);
+  await send(s, 'mcp.cancel', { reservationId: 'prepare-cancel' });
+  assert.equal((await send(s, 'mcp.commit', { reservationId: 'prepare-cancel' })).ok, false);
+  assert.notEqual(s.document.session.project.scene.nodes[root].displayName, 'never');
+  assert.equal((await send(s, 'session.workspace')).ok, true);
+});
+test('ordinary prepared history is one-shot and rejects replacement/ABA state', async t => {
+  const { s, root } = await setup(t); const session = s.document.session;
+  const command = name => ({ type: 'scene.rename_node', payload: { nodeId: root, displayName: name } });
+  const prepared = session.prepareTransactionCommit([command('prepared')]);
+  session.execute(command('other')); session.undo();
+  assert.throws(prepared, /stale/);
+  const commit = session.prepareTransactionCommit([command('once')]); commit();
+  assert.throws(commit, /stale/);
+});
+
+test('monotonic deadline rejects a prepared late commit even before expiry timer runs', async t => {
+  const { s, leaseId, root } = await setup(t);
+  const { performance } = await import('node:perf_hooks');
+  const now = performance.now.bind(performance); let elapsed = 0;
+  t.mock.method(performance, 'now', () => now() + elapsed);
+  const { payload: snap } = await send(s, 'mcp.reserve', { leaseId, reservationId: 'deadline' });
+  assert.equal((await send(s, 'mcp.prepare', { reservationId: 'deadline', runtimeId: snap.runtimeId,
+    documentToken: snap.documentToken, expectedRevision: snap.revision, name: 'command.scene.rename_node',
+    input: { payload: { nodeId: root, displayName: 'late' } } })).ok, true);
+  elapsed = 6000;
+  assert.equal((await send(s, 'mcp.commit', { reservationId: 'deadline' })).error.code, 'timeout');
+  assert.equal(s.revision, 0); assert.equal(s.document.session.undoStack.length, 0);
 });

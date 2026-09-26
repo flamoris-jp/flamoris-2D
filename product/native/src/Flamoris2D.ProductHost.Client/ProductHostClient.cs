@@ -400,6 +400,8 @@ public sealed partial class ProductHostClient : IAsyncDisposable
             };
             if (exception.Code == "revision.conflict")
                 _logger?.Warn(category, "Revision conflict rejected", properties);
+            else if (method.StartsWith("mcp.", StringComparison.Ordinal))
+                _logger?.Error(category, "Product operation failed", properties: properties);
             else
                 _logger?.Error(category, "Product operation failed", exception, properties);
             throw exception;

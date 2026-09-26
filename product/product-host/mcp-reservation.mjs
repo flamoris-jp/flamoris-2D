@@ -46,17 +46,40 @@ export class McpReservation {
     return (async () => {
       try {
         reservation?.guard();
-        if (!reservation || !reservation.ready || reservation.used) throw fault('unauthorized');
-        reservation.used = true;
-        const tool = resolveLiveTool(payload.name, payload.input);
-        if (!tool.readOnly && this.lease.permission !== 'edit') throw fault('forbidden');
-        if (payload.runtimeId !== this.runtimeId) throw fault('stale_session');
-        if (payload.documentToken !== this.service.documentToken) throw fault('stale_document');
-        if (payload.expectedRevision !== this.service.revision) throw fault('stale_revision');
-        if (tool.name === 'live.dispositions') return this.response(request, dispositions());
-        const inner = { protocolVersion: 1, requestId: request.requestId, method: tool.method,
-          documentToken: payload.documentToken, expectedRevision: payload.expectedRevision, payload: tool.payload };
-        const result = await execute(inner, reservation.guard);
+        if (!reservation || !reservation.ready) throw fault('unauthorized');
+        let inner, prepared = null;
+        if (method === 'mcp.commit') {
+          if (!reservation.prepared || reservation.committed) throw fault('unauthorized');
+          reservation.committed = true;
+          inner = reservation.inner; prepared = reservation.prepared;
+          reservation.prepared = null;
+          if (inner.documentToken !== this.service.documentToken || inner.expectedRevision !== this.service.revision)
+            throw fault('stale_revision');
+          if (this.lease.permission !== 'edit') throw fault('forbidden');
+        } else {
+          if (reservation.used) throw fault('unauthorized');
+          reservation.used = true;
+          const tool = resolveLiveTool(payload.name, payload.input);
+          if (!tool.readOnly && this.lease.permission !== 'edit') throw fault('forbidden');
+          if (payload.runtimeId !== this.runtimeId) throw fault('stale_session');
+          if (payload.documentToken !== this.service.documentToken) throw fault('stale_document');
+          if (payload.expectedRevision !== this.service.revision) throw fault('stale_revision');
+          if (tool.name === 'live.dispositions') return this.response(request, dispositions());
+          inner = { protocolVersion: 1, requestId: request.requestId, method: tool.method,
+            documentToken: payload.documentToken, expectedRevision: payload.expectedRevision, payload: tool.payload };
+          if (method === 'mcp.prepare') {
+            if (tool.readOnly) throw fault('forbidden');
+            reservation.prepared = this.service.prepareLiveMutation(inner);
+            reservation.guard();
+            reservation.inner = inner;
+            return this.response(request, { prepared: true });
+          }
+          if (!tool.readOnly) throw fault('forbidden');
+        }
+        inner = { ...inner, requestId: request.requestId };
+        const result = await execute(inner, reservation.guard, prepared);
+        if (result.response.ok && !prepared && Buffer.byteLength(JSON.stringify(result.response.payload)) > 1024 * 1024)
+          return this.response(request, null, fault('mcp.result_too_large'));
         if (result.response.ok) result.response.payload = {
           documentToken: result.response.documentToken, revision: result.response.revision,
           permission: this.lease?.permission, result: result.response.payload,
@@ -76,7 +99,7 @@ export class McpReservation {
     const deadline = performance.now() + 5000;
     let timer;
     const reservation = { ready: false, used: false, finished: false,
-      finish: () => { reservation.finished = true; clearTimeout(timer); this.pending.delete(reservationId); release(); },
+      finish: () => { reservation.finished = true; reservation.prepared = null; clearTimeout(timer); this.pending.delete(reservationId); release(); },
       guard: () => {
         if (reservation.finished || this.lease !== lease) throw fault('cancelled');
         if (performance.now() >= deadline) throw fault('timeout');

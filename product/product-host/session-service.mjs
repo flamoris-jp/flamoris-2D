@@ -487,12 +487,33 @@ export class ProductHostService {
     }
   }
 
+  prepareLiveMutation(request) {
+    const document = this.#requireDocument(request);
+    this.#assertExpectedRevision(request, document);
+    const { session, sourceHistory } = document;
+    switch (request.method) {
+      case 'session.execute':
+        return session.prepareTransactionCommit([request.payload.command], { label: request.payload.label });
+      case 'session.executeTransaction':
+        return session.prepareTransactionCommit(request.payload.commands, { label: request.payload.label });
+      case 'session.undo': {
+        const commit = session.prepareUndo();
+        return () => sourceHistory ? sourceHistory.undo(commit) : commit();
+      }
+      case 'session.redo': {
+        const commit = session.prepareRedo();
+        return () => sourceHistory ? sourceHistory.redo(commit) : commit();
+      }
+      default: throw Object.assign(new Error('Unsupported prepared operation.'), { code: 'forbidden' });
+    }
+  }
+
   handle(request, { guard = null, external = false } = {}) {
-    if (['mcp.reserve', 'mcp.invoke', 'mcp.release', 'mcp.cancel'].includes(request?.method))
-      return this.mcp.control(request, async (inner, demand) => {
+    if (['mcp.reserve', 'mcp.invoke', 'mcp.prepare', 'mcp.commit', 'mcp.release', 'mcp.cancel'].includes(request?.method))
+      return this.mcp.control(request, async (inner, demand, prepared = null) => {
         // The private reservation already owns the normal Product queue.
         this.commitGuard = demand;
-        try { return await this.#handle(inner, demand); }
+        try { return await this.#handle(inner, demand, prepared); }
         finally { this.commitGuard = null; }
       });
     const epoch = ['mcp.enable', 'mcp.disable'].includes(request?.method) ? ++this.mcpControlEpoch : null;
@@ -535,13 +556,13 @@ export class ProductHostService {
     await this.assets.close();
   }
 
-  async #handle(request, guard) {
+  async #handle(request, guard, prepared = null) {
     const requestId = typeof request?.requestId === "string" ? request.requestId : null;
     const previousRevision = this.revision;
     try {
       guard?.();
       assertEnvelope(request);
-      const payload = await this.#dispatch(request);
+      const payload = prepared ? prepared() : await this.#dispatch(request);
       const mutated = MUTATING_METHODS.has(request.method) && payload !== null;
       if (mutated) this.document.revision += 1;
       if (this.document) collectSourceAssets(this.document, this.assets);

@@ -31,6 +31,7 @@ public sealed partial class ProductHostClient
     private McpBoundary? _mcpBoundary;
     private Task? _mcpEndpointTask;
     private McpPermission _mcpPermission;
+    private long _mcpEpoch;
     public event Action? McpStatusChanged;
     public McpStatus? McpStatus => _mcpBoundary?.Status.Current;
 
@@ -47,6 +48,7 @@ public sealed partial class ProductHostClient
     }
     public async Task<McpConnection> EnableMcpAsync(McpPermission permission, CancellationToken cancellationToken = default)
     {
+        var epoch = Interlocked.Increment(ref _mcpEpoch);
         await _mcpLifecycle.WaitAsync(cancellationToken);
         try
         {
@@ -54,6 +56,7 @@ public sealed partial class ProductHostClient
             cancellationToken.ThrowIfCancellationRequested();
             var response = await SendAsync("mcp.enable", new { permission = permission == McpPermission.Edit ? "edit" : "read-only" },
                 true, true, CancellationToken.None);
+            if (epoch != Interlocked.Read(ref _mcpEpoch)) throw new McpFault(McpErrors.Cancelled);
             _mcpPermission = permission;
             var host = new ProductMcpHost(this, response.Payload.GetProperty("leaseId").GetString()!);
             _mcpHost = host;
@@ -92,6 +95,14 @@ public sealed partial class ProductHostClient
     }
     public async Task<ProductHostResponse> DisableMcpAsync()
     {
+        Interlocked.Increment(ref _mcpEpoch);
+        // Supersede a pending enable immediately, even while Native import work owns the queue.
+        if (IsRunning && DocumentToken is not null)
+        {
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(6));
+            try { await SendAsync("mcp.disable", new { }, false, true, deadline.Token); }
+            catch { LoseAuthority("MCP revocation could not reach Product Host.", null); }
+        }
         await _mcpLifecycle.WaitAsync();
         try
         {
@@ -175,9 +186,17 @@ public sealed partial class ProductHostClient
                             if (reservation.Value is not { } id) throw new McpFault(McpErrors.HostUnavailable);
                             try
                             {
-                                var response = client.McpControlAsync("mcp.invoke", new { reservationId = id, name, input = input.Value,
+                                using var exchangeDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(6));
+                                var response = client.McpControlAsync(readOnly ? "mcp.invoke" : "mcp.prepare", new { reservationId = id, name, input = input.Value,
                                     runtimeId = Snapshot.RuntimeId, documentToken = Snapshot.DocumentToken,
-                                    expectedRevision = Snapshot.Revision }, CancellationToken.None).GetAwaiter().GetResult();
+                                    expectedRevision = Snapshot.Revision }, exchangeDeadline.Token).GetAwaiter().GetResult();
+                                if (!readOnly)
+                                {
+                                    // Product preparation made no persistent changes. Acknowledge cancellation
+                                    // before the small atomic commit on the reserved authoritative lane.
+                                    token.ThrowIfCancellationRequested();
+                                    response = client.McpControlAsync("mcp.commit", new { reservationId = id }, exchangeDeadline.Token).GetAwaiter().GetResult();
+                                }
                                 return response.Payload;
                             }
                             catch (ProductHostException e) { throw new McpFault(e.Code); }
