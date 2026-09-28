@@ -23,6 +23,6 @@ const serialized = JSON.stringify(fixtures, null, 2) + "\n";
 if (process.argv.includes("--write")) {
   await writeFile(fixturePath, serialized);
 } else {
-  assert.equal(await readFile(fixturePath, "utf8"), serialized,
+  assert.equal((await readFile(fixturePath, "utf8")).replaceAll("\r\n", "\n"), serialized,
     "Temporal fixtures differ from current Product JS; regenerate deliberately with --write");
 }
