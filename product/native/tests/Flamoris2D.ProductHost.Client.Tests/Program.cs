@@ -7,6 +7,7 @@ if (args.Length != 1)
     throw new ArgumentException("Pass the Product Host main.mjs path.");
 
 var hostPath = Path.GetFullPath(args[0]);
+NativeCoreTests.Run(hostPath);
 TestLoggingConfiguration();
 TestStaleProjectionGate();
 TestTargetWorkspace();

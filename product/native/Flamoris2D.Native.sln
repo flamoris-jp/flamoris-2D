@@ -10,12 +10,18 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flamoris2D.ProductHost.Clie
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flamoris2D.Bridge", "src\Flamoris2D.Bridge\Flamoris2D.Bridge.csproj", "{482E9B66-73FD-4540-ACF4-3321C60D2490}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flamoris2D.Core.Interop", "src\Flamoris2D.Core.Interop\Flamoris2D.Core.Interop.csproj", "{A12ED70A-56ED-4B86-8710-991AEBC8A101}"
+EndProject
 Global
     GlobalSection(SolutionConfigurationPlatforms) = preSolution
         Debug|Any CPU = Debug|Any CPU
         Release|Any CPU = Release|Any CPU
     EndGlobalSection
     GlobalSection(ProjectConfigurationPlatforms) = postSolution
+        {A12ED70A-56ED-4B86-8710-991AEBC8A101}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {A12ED70A-56ED-4B86-8710-991AEBC8A101}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {A12ED70A-56ED-4B86-8710-991AEBC8A101}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {A12ED70A-56ED-4B86-8710-991AEBC8A101}.Release|Any CPU.Build.0 = Release|Any CPU
         {482E9B66-73FD-4540-ACF4-3321C60D2490}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
         {482E9B66-73FD-4540-ACF4-3321C60D2490}.Debug|Any CPU.Build.0 = Debug|Any CPU
         {482E9B66-73FD-4540-ACF4-3321C60D2490}.Release|Any CPU.ActiveCfg = Release|Any CPU
