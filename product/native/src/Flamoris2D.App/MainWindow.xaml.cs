@@ -49,6 +49,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         InitializeRenderUi();
         InitializeRigUi();
         InitializeAnimationUi();
+        InitializeMcpUi();
         Loaded += MainWindow_Loaded;
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         SwitchContext(EditingContext.Source, returnFocus: false);
@@ -78,8 +79,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             if(string.IsNullOrWhiteSpace(nodePath)&&File.Exists(bundledNode))nodePath=bundledNode;
             var handshake = await _client.StartAsync(hostPath, nodePath);
             HostStatusIndicator.Fill = Brushes.SeaGreen;
-            HostStatusText.Text =
-                "接続済み";
+            HostStatusText.Text = "接続済み";
             HostStatusText.ToolTip = $"Product Host · protocol {handshake.ProtocolVersion} · schema {handshake.ProductSchemaVersion}";
             if (createDocument)
             {

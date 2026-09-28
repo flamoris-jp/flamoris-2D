@@ -62,10 +62,14 @@ test('native MCP uses packaged Core/bridge and has no Node HTTP production runti
   const runtime = Object.entries(lock.packages).filter(([name, entry]) => name && !entry.dev).map(([name]) => name.slice('node_modules/'.length));
   assert.deepEqual(runtime.sort(), ['ag-psd', 'base64-js', 'pako']);
   const client = await readFile(new URL('../native/src/Flamoris2D.ProductHost.Client/Flamoris2D.ProductHost.Client.csproj', import.meta.url), 'utf8');
-  assert.match(client, /Include="Flamoris.Mcp.Core" Version="1.1.0"/);
+  assert.match(client, /Include="Flamoris.Mcp.Core" Version="1.2.0"/);
   const bridge = await readFile(new URL('../native/src/Flamoris2D.Bridge/Flamoris2D.Bridge.csproj', import.meta.url), 'utf8');
   assert.match(bridge, /<AssemblyName>Flamoris.Mcp.Bridge<\/AssemblyName>/);
-  assert.doesNotMatch(bridge, /ProjectReference|ProductHost/);
+  assert.doesNotMatch(bridge, /ProductHost|Flamoris2D.App/);
+  // Unreleased cross-repository CI may reference Core source, never app authority.
+  for (const reference of bridge.matchAll(/<ProjectReference\b[^>]*Include="([^"]+)"/g)) {
+    assert.equal(reference[1], '$(FlamorisMcpSourceRoot)/src/Flamoris.Mcp.Core/Flamoris.Mcp.Core.csproj');
+  }
   const host = await readFile(new URL('../product-host/session-service.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(host, /StreamableHTTP|live-mcp-transport/);
 });

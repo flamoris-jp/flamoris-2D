@@ -14,7 +14,7 @@ The [Native Shell Boundary workflow](https://github.com/flamoris-jp/flamoris-2D/
 uploads `flamoris2d-native-production-candidate-win-x64` only after successful manual
 (`workflow_dispatch`) runs; artifacts expire after three days. PR checks build/test
 the package without uploading it. Download an available manual-run artifact, or
-use the development build instructions below if none is available. Extract the entire directory and run
+build it locally with `./product/packaging/publish-windows.ps1` if none is available. Extract the entire directory and run
 `Flamoris2D.exe` on Windows x64. The package includes a self-contained .NET 10 runtime,
 Node 24.21.0, the exact Product Host/worker dependency graph, pinned PSD decoder and
 pinned LGPL shared FFmpeg distribution. Keep these files beside the executable.
@@ -40,7 +40,7 @@ dotnet run --project product/native/src/Flamoris2D.App -c Release
 workers, closed over their relative import graph. Build dependencies include no tests,
 private artwork, Electron, index.html or DOM view modules. Existing pure JavaScript
 controllers/evaluators remain authoritative. The package graph is protected by
-`product/tests/production-manifest.test.js`. CI assembles the exact runtimes/notices,
+`product/tests/production-manifest.test.js`. The local packaging script and CI assemble the same runtimes/notices,
 records packaged SHA256 values and launches the published executable with developer
 Node/.NET absent from PATH. `THIRD-PARTY-NOTICES.md` records upstream provenance.
 
@@ -79,14 +79,13 @@ Use the shared prerequisites and locked dependency installation in
 [Build and tests](#build-and-tests). Both the client and bridge consume
 `Flamoris.Mcp.Core 1.1.0`; no DLL is vendored.
 
-For a portable candidate, publish both projects:
+For a portable candidate, run this from the repository root with .NET 10 SDK and Node 24.21.0 installed:
 
 ```powershell
-dotnet publish product/native/src/Flamoris2D.Bridge -c Release -r win-x64 --self-contained true -o out/native-win-x64/mcp
-dotnet publish product/native/src/Flamoris2D.App -c Release -r win-x64 --self-contained true -o out/native-win-x64
+./product/packaging/publish-windows.ps1
 ```
 
-The existing Native workflow then adds pinned Node/FFmpeg and notices, and decodes
+The script installs locked Product dependencies when needed, downloads the pinned LGPL FFmpeg archive and verifies its SHA256, then publishes the bridge and app with Node and notices to `artifacts/package/Flamoris2D-win-x64/`. CI uses this same script. The native runtime decodes
 the canonical Chipsy sheet to a PNG display cache with the packaged FFmpeg. The
 original WebP remains byte-identical in `mcp-assets/`; WPF selects row 7/column 0.
 The cache and sheet are runtime artifacts, not committed derivatives. Development

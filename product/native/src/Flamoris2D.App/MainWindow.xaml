@@ -96,16 +96,7 @@
                           InputGestureText="Esc" Click="FocusViewport_Click" />
                 <MenuItem Header="パネルの配置を戻す" Click="ResetLayout_Click" />
             </MenuItem>
-            <MenuItem Header="MCP / AI" SubmenuOpened="McpMenu_Opened">
-                <MenuItem x:Name="McpReadOnly" Header="有効にする（読み取り専用）" Click="McpEnable_Click" />
-                <MenuItem x:Name="McpEdit" Header="有効にする（編集可）" Click="McpEnable_Click" />
-                <MenuItem x:Name="McpDisable" Header="無効にする" Click="McpDisable_Click" IsEnabled="False" />
-                <Separator />
-                <MenuItem x:Name="McpEndpoint" Header="接続先: —" IsEnabled="False" />
-                <MenuItem x:Name="McpActivity" Header="要求: —" IsEnabled="False" />
-                <MenuItem x:Name="McpCopy" Header="接続情報をコピー" Click="McpCopy_Click" IsEnabled="False" />
-                <MenuItem x:Name="McpRotate" Header="接続キーを更新" Click="McpEnable_Click" IsEnabled="False" />
-            </MenuItem>
+            <MenuItem x:Name="McpMenu" Header="MCP / AI" />
             <MenuItem Header="{DynamicResource Menu.Help}">
                 <MenuItem Header="{DynamicResource Menu.About}" Click="About_Click" />
             </MenuItem>
@@ -287,10 +278,9 @@
 
         <Border DockPanel.Dock="Bottom" Background="#292B2F" Padding="10,5">
             <DockPanel>
+                <ContentControl x:Name="McpStatusPanel" DockPanel.Dock="Right" Margin="14,0,0,0" />
                 <TextBlock x:Name="RevisionText" DockPanel.Dock="Right"
                            Foreground="#C7C9CD" Text="revision —" />
-                <Image x:Name="McpChipsy" Width="24" Height="26" Margin="0,0,4,0" Visibility="Collapsed" ToolTip="Chipsy: AI作業中" />
-                <TextBlock x:Name="McpStatus" Text="MCP: 無効" Foreground="#ECECEC" Margin="0,0,14,0" />
                 <TextBlock x:Name="StatusText" Foreground="#ECECEC" Text="起動しています…" />
             </DockPanel>
         </Border>

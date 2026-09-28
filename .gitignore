@@ -5,6 +5,7 @@ product/node_modules/
 Thumbs.db
 dist/
 out/
+artifacts/
 coverage/
 .env
 .env.*
