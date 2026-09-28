@@ -25,8 +25,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  FlamorisMcpSourceRoot: ${{ github.workspace }}/.mcp-core
 
 jobs:
   windows-native-boundary:
@@ -37,13 +35,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Checkout MCP Core candidate for cross-repository validation
-        uses: actions/checkout@v4
-        with:
-          repository: flamoris-jp/flamoris-mcp-core
-          ref: 87f654d6c4579c21e2267554236ae3ce1bbe5a1c
-          path: .mcp-core
-
       - name: Set up Node 24
         uses: actions/setup-node@v5
         with:
