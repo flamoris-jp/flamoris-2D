@@ -49,6 +49,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         InitializeRenderUi();
         InitializeRigUi();
         InitializeAnimationUi();
+        InitializeMcpUi();
         Loaded += MainWindow_Loaded;
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         SwitchContext(EditingContext.Source, returnFocus: false);
@@ -77,10 +78,6 @@ public partial class MainWindow : Window, IAsyncDisposable
             var bundledNode = Path.Combine(AppContext.BaseDirectory,"runtime","node.exe");
             if(string.IsNullOrWhiteSpace(nodePath)&&File.Exists(bundledNode))nodePath=bundledNode;
             var handshake = await _client.StartAsync(hostPath, nodePath);
-            HostStatusIndicator.Fill = Brushes.SeaGreen;
-            HostStatusText.Text =
-                "接続済み";
-            HostStatusText.ToolTip = $"Product Host · protocol {handshake.ProtocolVersion} · schema {handshake.ProductSchemaVersion}";
             if (createDocument)
             {
                 await _client.CreateSessionAsync("名称未設定", 1920, 1080);
@@ -250,8 +247,6 @@ public partial class MainWindow : Window, IAsyncDisposable
         ClearProjection();
         RecoveryMessage.Text = message;
         RecoveryBanner.Visibility = Visibility.Visible;
-        HostStatusIndicator.Fill = Brushes.IndianRed;
-        HostStatusText.Text = "切断";
         StatusText.Text = "編集エンジンを再起動して、保存済みのファイルまたは復元候補を開いてください。";
         RevisionText.Text = "revision —";
     }
@@ -493,8 +488,6 @@ public partial class MainWindow : Window, IAsyncDisposable
     private void SetBusy(string message)
     {
         StatusText.Text = message;
-        HostStatusIndicator.Fill = Brushes.Goldenrod;
-        HostStatusText.Text = "接続中…";
         ClearProjection();
     }
 

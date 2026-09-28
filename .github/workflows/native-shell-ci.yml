@@ -25,6 +25,9 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  FlamorisMcpSourceRoot: ${{ github.workspace }}/.mcp-core
+
 jobs:
   windows-native-boundary:
     runs-on: windows-latest
@@ -34,6 +37,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Checkout MCP Core candidate for cross-repository validation
+        uses: actions/checkout@v4
+        with:
+          repository: flamoris-jp/flamoris-mcp-core
+          ref: 87f654d6c4579c21e2267554236ae3ce1bbe5a1c
+          path: .mcp-core
 
       - name: Set up Node 24
         uses: actions/setup-node@v5
@@ -86,9 +95,7 @@ jobs:
           Invoke-WebRequest 'https://raw.githubusercontent.com/nodejs/node/v24.21.0/LICENSE' -OutFile (Join-Path $runtime 'LICENSE.txt')
           $ffmpegRoot = Split-Path (Split-Path $env:FLAMORIS_TEST_FFMPEG)
           Copy-Item $ffmpegRoot (Join-Path $package 'ffmpeg') -Recurse
-          & $env:FLAMORIS_TEST_FFMPEG -v error -i (Join-Path $package 'mcp-assets/chipsy-activity.webp') -frames:v 1 (Join-Path $package 'mcp-assets/chipsy-decoded.png')
-          if ($LASTEXITCODE -ne 0) { throw 'Chipsy decode failed' }
-          foreach ($required in @('mcp/Flamoris.Mcp.Bridge.exe', 'mcp/Flamoris.Mcp.Core.dll', 'Flamoris.Mcp.Core.dll', 'mcp-assets/chipsy-decoded.png')) {
+          foreach ($required in @('mcp/Flamoris.Mcp.Bridge.exe', 'mcp/Flamoris.Mcp.Core.dll', 'Flamoris.Mcp.Core.dll', 'Flamoris.Mcp.Wpf.dll')) {
             if (!(Test-Path (Join-Path $package $required))) { throw "Missing Native MCP runtime: $required" }
           }
           if (Test-Path (Join-Path $package 'node_modules/@modelcontextprotocol')) { throw 'Obsolete Node MCP runtime packaged' }

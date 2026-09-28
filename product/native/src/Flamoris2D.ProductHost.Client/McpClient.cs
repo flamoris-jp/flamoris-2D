@@ -30,6 +30,9 @@ public sealed partial class ProductHostClient
     private ProductMcpHost? _mcpHost;
     private McpBoundary? _mcpBoundary;
     private Task? _mcpEndpointTask;
+    private CapabilityGrant? _mcpGrant;
+    public McpBoundary? LiveMcpBoundary => _mcpBoundary;
+    public CapabilityGrant? LiveMcpGrant => _mcpGrant;
     private McpPermission _mcpPermission;
     private long _mcpEpoch;
     public event Action? McpStatusChanged;
@@ -46,7 +49,7 @@ public sealed partial class ProductHostClient
         _mcpBoundary?.Disable();
         PublishMcpStatus();
     }
-    public async Task<McpConnection> EnableMcpAsync(McpPermission permission, CancellationToken cancellationToken = default)
+    public async Task<McpConnection> EnableMcpAsync(McpPermission permission, CancellationToken cancellationToken = default, bool startLocalEndpoint = true)
     {
         var epoch = Interlocked.Increment(ref _mcpEpoch);
         await _mcpLifecycle.WaitAsync(cancellationToken);
@@ -65,8 +68,12 @@ public sealed partial class ProductHostClient
             _mcpBoundary = boundary;
             boundary.Status.Changed += PublishMcpStatus;
             var grant = await boundary.EnableAsync(permission == McpPermission.Edit ? CorePermission.Edit : CorePermission.ReadOnly);
-            _mcpEndpointTask = new LocalMcpEndpoint(boundary).RunAsync(grant, _lifetime.Token);
-            if (!boundary.Status.Current.EndpointAvailable) throw new McpFault(McpErrors.TransportUnavailable);
+            _mcpGrant = grant;
+            if (startLocalEndpoint)
+            {
+                _mcpEndpointTask = new LocalMcpEndpoint(boundary).RunAsync(grant, _lifetime.Token);
+                if (!boundary.Status.Current.EndpointAvailable) throw new McpFault(McpErrors.TransportUnavailable);
+            }
             _logger?.Info("mcp.session", "Live MCP access enabled");
             return new McpConnection { Endpoint = options.PipeName, Token = grant.ExportCredential(),
                 DocumentToken = grant.Snapshot.DocumentToken, Permission = permission };
@@ -90,7 +97,7 @@ public sealed partial class ProductHostClient
             boundary.Status.Changed -= PublishMcpStatus;
             boundary.Dispose();
         }
-        _mcpBoundary = null; _mcpHost = null; _mcpEndpointTask = null;
+        _mcpBoundary = null; _mcpGrant = null; _mcpHost = null; _mcpEndpointTask = null;
         PublishMcpStatus();
     }
     public async Task<ProductHostResponse> DisableMcpAsync()
