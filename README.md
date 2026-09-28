@@ -21,7 +21,7 @@ FLAMORIS 2D focuses on short animated shots, rather than the full scope of a DAW
 
 The [Native Shell Boundary workflow](https://github.com/flamoris-jp/flamoris-2D/actions/workflows/native-shell-ci.yml) uploads `flamoris2d-native-production-candidate-win-x64` only for successful manual (`workflow_dispatch`) runs, with three-day artifact retention. PR checks build and test the candidate but do not publish a download. If an artifact is available, extract the whole directory and run `Flamoris2D.exe` on Windows x64; otherwise use the [Windows development build instructions](product/native/README.md#build-and-tests).
 
-The candidate bundles the self-contained .NET 10 runtime, Node 24.21.0, the reviewed Product Host graph, PSD decoder, and pinned LGPL shared FFmpeg. Keep the package directory intact. It does not install itself or replace the current Electron file association.
+On Windows x64 with the .NET 10 SDK and Node 24.21.0, run `./product/packaging/publish-windows.ps1` from the repository root to build the same candidate locally in `artifacts/package/Flamoris2D-win-x64/`. The candidate bundles the self-contained .NET 10 runtime, Node 24.21.0, the reviewed Product Host graph, PSD decoder, and pinned LGPL shared FFmpeg. Keep the package directory intact. It does not install itself or replace the current Electron file association.
 
 For development builds and the full native workflow, see [`product/native/README.md`](product/native/README.md) and [`docs/native-production-workflow.md`](docs/native-production-workflow.md).
 
