@@ -24,7 +24,7 @@ not register `.fl2d` or replace the installed Electron version.
 ## Build and tests
 
 Development prerequisites: Windows 10/11 x64, .NET 10 SDK, Node 24,
-CMake 3.21+ and Visual Studio 2022 or Build Tools with the Desktop development
+CMake 3.21+ and Visual Studio or Build Tools with the Desktop development
 with C++ workload and Windows SDK. The C++ library is built for x64 in both
 Debug and Release by the existing `dotnet build` solution command. Its native
 unit executable is run with CTest during that build.
