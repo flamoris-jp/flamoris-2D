@@ -14,8 +14,7 @@
     <VersionPrefix>0.4.0</VersionPrefix>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Flamoris.Mcp.Core" Version="1.2.0" Condition="'$(FlamorisMcpSourceRoot)' == ''" GeneratePathProperty="true"  />
-    <ProjectReference Include="$(FlamorisMcpSourceRoot)/src/Flamoris.Mcp.Core/Flamoris.Mcp.Core.csproj" Condition="'$(FlamorisMcpSourceRoot)' != ''" />
+    <PackageReference Include="Flamoris.Mcp.Core" Version="1.2.0" GeneratePathProperty="true" />
     <ProjectReference Include="..\Flamoris2D.Rendering\Flamoris2D.Rendering.csproj" />
     <ProjectReference Include="..\Flamoris2D.ProductHost.Client\Flamoris2D.ProductHost.Client.csproj" />
   </ItemGroup>
@@ -31,7 +30,6 @@
     <None Include="..\..\..\node_modules\pako\**\*" Link="node_modules\pako\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Flamoris.Mcp.Wpf" Version="1.2.0" Condition="'$(FlamorisMcpSourceRoot)' == ''" />
-    <ProjectReference Include="$(FlamorisMcpSourceRoot)/src/Flamoris.Mcp.Wpf/Flamoris.Mcp.Wpf.csproj" Condition="'$(FlamorisMcpSourceRoot)' != ''" />
+    <PackageReference Include="Flamoris.Mcp.Wpf" Version="1.2.0" />
   </ItemGroup>
 </Project>
