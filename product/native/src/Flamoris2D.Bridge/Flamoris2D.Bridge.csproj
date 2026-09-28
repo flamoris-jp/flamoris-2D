@@ -6,6 +6,5 @@
     <Nullable>enable</Nullable>
     <AssemblyName>Flamoris.Mcp.Bridge</AssemblyName>
   </PropertyGroup>
-  <ItemGroup><PackageReference Include="Flamoris.Mcp.Core" Version="1.2.0" Condition="'$(FlamorisMcpSourceRoot)' == ''"  />
-    <ProjectReference Include="$(FlamorisMcpSourceRoot)/src/Flamoris.Mcp.Core/Flamoris.Mcp.Core.csproj" Condition="'$(FlamorisMcpSourceRoot)' != ''" /></ItemGroup>
+  <ItemGroup><PackageReference Include="Flamoris.Mcp.Core" Version="1.2.0" /></ItemGroup>
 </Project>
