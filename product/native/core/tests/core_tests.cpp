@@ -1,5 +1,8 @@
 #include "flamoris2d_core.h"
 
+#ifdef NDEBUG
+#undef NDEBUG // Keep the conformance checks active in Release/CTest builds.
+#endif
 #include <cassert>
 #include <cstdint>
 

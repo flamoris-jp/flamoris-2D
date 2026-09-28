@@ -23,18 +23,44 @@ not register `.fl2d` or replace the installed Electron version.
 
 ## Build and tests
 
-Development prerequisites: Windows 10/11 x64, .NET 10 SDK and Node 24.
+Development prerequisites: Windows 10/11 x64, .NET 10 SDK, Node 24,
+CMake 3.21+ and Visual Studio 2022 or Build Tools with the Desktop development
+with C++ workload and Windows SDK. The C++ library is built for x64 in both
+Debug and Release by the existing `dotnet build` solution command. Its native
+unit executable is run with CTest during that build.
 `NuGet.config` uses public nuget.org packages without GitHub authentication. From the repository
 root, install the locked Product dependencies (including development dependencies),
 using the same command as the Native Shell Boundary workflow, then build and test:
 
 ```powershell
 npm ci --prefix product --workspaces=false --ignore-scripts
+node product/native/tests/check-temporal-conformance.mjs
 dotnet build product/native/Flamoris2D.Native.sln -c Release
 dotnet run --project product/native/tests/Flamoris2D.ProductHost.Client.Tests -c Release --no-build -- product/product-host/main.mjs
 dotnet run --project product/native/src/Flamoris2D.App -c Release --no-build -- --smoke-test
 dotnet run --project product/native/src/Flamoris2D.App -c Release
 ```
+
+Phase 1 of [#118](https://github.com/flamoris-jp/flamoris-2D/issues/118)
+adds `Flamoris2D.Core.Native.dll` and a managed adapter. The JS Product Host
+remains the only authoritative editing session. No WPF gesture or MCP command
+calls the C++ engine yet. The package carries the DLL beside the executable
+for future migrations; it needs the Windows x64 native runtime. The checked
+conformance fixtures are generated from current JS by
+`node product/native/tests/check-temporal-conformance.mjs --write` and checked
+against JS in CI. Native and managed tests compare exact integer results.
+
+The native ABI is declared in `core/include/flamoris2d_core.h` (version 1.0).
+It uses C calling convention, fixed-size integers, an opaque engine handle and
+explicit status codes. `fl2d_engine_create` transfers ownership of a handle to
+the caller; destroy it once with `fl2d_engine_destroy` (C# uses `SafeHandle`).
+Null output pointers and invalid arguments return `FL2D_INVALID_ARGUMENT`.
+No strings or allocated buffers cross the ABI. Do not reuse a pointer after
+destroying it. The first primitive reduces a positive rational frame rate using
+the same safe-integer limits and GCD behavior as Product JS; it is a stable
+timebase input with existing deterministic Product tests, and introduces no
+Project state or separate history. Extending this contract requires version
+negotiation before changing existing entry points.
 
 `ProductHost.files.props` is the explicit native source allowlist: main Host and both
 workers, closed over their relative import graph. Build dependencies include no tests,

@@ -9,7 +9,7 @@
   <ItemGroup>
     <Content Include="$(NativeCoreDll)" Link="Flamoris2D.Core.Native.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
-  <Target Name="BuildNativeCore" BeforeTargets="CoreCompile" Condition="'$(OS)' == 'Windows_NT'">
+  <Target Name="BuildNativeCore" BeforeTargets="CoreCompile;GetCopyToOutputDirectoryItems" Condition="'$(OS)' == 'Windows_NT'">
     <Exec Command='cmake -S &quot;$(MSBuildProjectDirectory)/../../core&quot; -B &quot;$(NativeCoreBuildDir)&quot; -G &quot;Visual Studio 17 2022&quot; -A x64 -DBUILD_TESTING=ON' />
     <Exec Command='cmake --build &quot;$(NativeCoreBuildDir)&quot; --config $(Configuration) --parallel' />
     <Exec Command='ctest --test-dir &quot;$(NativeCoreBuildDir)&quot; -C $(Configuration) --output-on-failure' />
