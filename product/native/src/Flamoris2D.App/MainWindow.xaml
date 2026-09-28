@@ -120,6 +120,13 @@
                                 Content="元に戻す" Click="Undo_Click" IsEnabled="False" />
                         <Button x:Name="RedoButton" Style="{StaticResource CommandButton}"
                                 Content="やり直し" Click="Redo_Click" IsEnabled="False" />
+                        <Separator />
+                        <TextBlock VerticalAlignment="Center" Margin="7,0,3,0"
+                                   Foreground="#555" Text="編集エンジン" ToolTip="Product Host" />
+                        <Ellipse x:Name="HostStatusIndicator" Width="9" Height="9"
+                                 Fill="#9A9A9A" Margin="4,0" />
+                        <TextBlock x:Name="HostStatusText" VerticalAlignment="Center"
+                                   Text="接続中…" Margin="2,0,8,0" />
                     </ToolBar>
                 </ToolBarTray>
 
