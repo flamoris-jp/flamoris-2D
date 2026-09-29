@@ -6,6 +6,8 @@
 #include <cassert>
 #include <cstdint>
 
+static_assert(sizeof(fl2d_status) == sizeof(int32_t), "ABI status must be 32-bit");
+
 int main() {
     int32_t major = 0, minor = -1;
     assert(fl2d_abi_version(&major, &minor) == FL2D_OK && major == 1 && minor == 0);
