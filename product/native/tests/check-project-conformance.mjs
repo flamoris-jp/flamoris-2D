@@ -314,6 +314,87 @@ variant("mesh_sample_interpolation", meshed, p => {
   ] });
 });
 
+// Binding and authored KeyArt state share cycle identity across the whole Project.
+const clippingProject = cloneProject(populated);
+clippingProject.transitions = [];
+clippingProject.sequences = [];
+clippingProject.temporalPrograms = [];
+clippingProject.keyArts[0].members.push(member("node_b", "appearance_b"));
+const binding = (id, targetNodeId, sourceNodeId, enabled = true) =>
+  ({ id, targetNodeId, sourceNodeId, enabled, mode: "inside" });
+variant("clipping_binding_member_cycle", clippingProject, p => {
+  p.keyArts[0].members[0].clipping.sourceNodeId = "node_b";
+  p.clippingBindings.push(binding("binding_b", "node_b", "node_a"));
+});
+variant("clipping_disabled_binding_suppresses_member", clippingProject, p => {
+  p.keyArts[0].members[0].clipping.sourceNodeId = "node_b";
+  p.keyArts[0].members[1].clipping.sourceNodeId = "node_a";
+  p.clippingBindings.push(binding("binding_a", "node_a", "node_b", false));
+});
+variant("clipping_binding_cycle_not_repeated", clippingProject, p => {
+  p.keyArts[0].members[0].clipping.sourceNodeId = "node_b";
+  p.keyArts[0].members[1].clipping.sourceNodeId = "node_a";
+  p.clippingBindings.push(binding("binding_a", "node_a", "node_b"), binding("binding_b", "node_b", "node_a"));
+});
+variant("clipping_cycle_shared_between_keyarts", clippingProject, p => {
+  p.keyArts[0].members[0].clipping.sourceNodeId = "node_b";
+  p.keyArts[0].members[1].clipping.sourceNodeId = "node_a";
+  p.keyArts[1].members = structuredClone(p.keyArts[0].members);
+});
+variant("clipping_duplicate_binding_order", clippingProject, p => {
+  p.clippingBindings.push(binding("z_binding_a", "node_a", "node_b"),
+    binding("a_binding_a", "node_a", "node_b"), binding("binding_b", "node_b", "node_a"));
+});
+variant("clipping_transition_default_reference", populated, p => {
+  p.temporalPrograms[0].tracks.push({ trackId: "clip_default", version: 1,
+    kind: "ClippingTrack", target: { transitionDefault: true }, channels: { clipping: { keyframes: [
+      { id: "clip_default_key", timeTicks: 50, value: { sourceNodeId: "node_a" },
+        interpolationToNext: { kind: "step" } },
+    ] } } });
+});
+
+const evaluatedClipping = cloneProject(populated);
+evaluatedClipping.sequences = [];
+evaluatedClipping.keyArts[0].members.push(member("node_b", "appearance_b"));
+evaluatedClipping.keyArts[1].members = structuredClone(evaluatedClipping.keyArts[0].members);
+evaluatedClipping.semanticSlots[0].mappings[1].nodeId = "node_a";
+evaluatedClipping.semanticSlots.push({ id: "slot_2", displayName: "Mask", role: "mask", metadata: {},
+  mappings: [{ keyArtId: "art_a", nodeId: "node_b" }, { keyArtId: "art_b", nodeId: "node_b" }] });
+evaluatedClipping.transitions[0].partTransitions[0].mode = "hold";
+evaluatedClipping.transitions[0].partTransitions.push({ id: "part_mask", semanticSlotId: "slot_2", mode: "hold",
+  topologyId: null, fromKeyformId: null, toKeyformId: null, configuration: {} });
+for (const art of evaluatedClipping.keyArts) art.members[0].clipping.sourceNodeId = "node_b";
+evaluatedClipping.temporalPrograms[0].tracks.push({ trackId: "mask_clipping", version: 1,
+  kind: "ClippingTrack", target: { semanticSlotId: "slot_2" }, channels: { clipping: { keyframes: [
+    { id: "mask_clip_before", timeTicks: 0, value: { sourceNodeId: null }, interpolationToNext: { kind: "step" } },
+    { id: "mask_clip_during", timeTicks: 50, value: { sourceNodeId: "node_a" }, interpolationToNext: { kind: "step" } },
+    { id: "mask_clip_after", timeTicks: 51, value: { sourceNodeId: null }, interpolationToNext: { kind: "step" } },
+  ] } } });
+cases.push(["evaluated_clipping_single_tick_cycle", evaluatedClipping]);
+for (const mode of ["replace", "appear", "disappear", "occlusion"]) {
+  variant("evaluated_clipping_" + mode, evaluatedClipping, p => {
+    for (const part of p.transitions[0].partTransitions) part.mode = mode;
+  });
+}
+variant("evaluated_clipping_disabled_binding", evaluatedClipping, p => {
+  p.clippingBindings.push(binding("disabled_mask", "node_b", "node_a", false));
+});
+variant("evaluated_clipping_presence_suppresses_cycle", evaluatedClipping, p => {
+  p.temporalPrograms[0].tracks.push({ trackId: "mask_presence", version: 1, kind: "PresenceTrack",
+    target: { semanticSlotId: "slot_2" }, channels: { presence: { keyframes: [
+      { id: "mask_absent", timeTicks: 0, value: "absent", interpolationToNext: { kind: "step" } },
+    ] } } });
+});
+variant("evaluated_clipping_track_precedence", evaluatedClipping, p => {
+  p.temporalPrograms[0].tracks.push({ trackId: "node_clipping", version: 1, kind: "ClippingTrack",
+    target: { nodeId: "node_b" }, channels: { clipping: { keyframes: [
+      { id: "node_unclipped", timeTicks: 0, value: { sourceNodeId: null }, interpolationToNext: { kind: "step" } },
+    ] } } });
+});
+variant("evaluated_clipping_repeated_transition_cycle", evaluatedClipping, p => {
+  p.transitions.push({ ...structuredClone(p.transitions[0]), id: "transition_z" });
+});
+
 const fixtures = cases.map(([name, project]) => ({ name, project,
   expected: validateProject(project)
     .map(({ code, path, entityId, severity }) => ({ code, path, entityId: entityId ?? "", severity }))

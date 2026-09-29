@@ -763,6 +763,275 @@ void validate_transition_domain(Snapshot& s, const Value& project, Register&& re
         }
     }
 }
+// Deterministic clipping relations shared by authored and evaluated cycle checks.
+using ClippingRelations = std::vector<std::pair<std::string, std::string>>;
+std::vector<std::vector<std::string>> clipping_cycles(ClippingRelations relations) {
+    std::sort(relations.begin(), relations.end());
+    std::map<std::string, std::string> sources;
+    for (const auto& relation : relations) sources.emplace(relation.first, relation.second);
+    std::set<std::string> visited;
+    std::vector<std::vector<std::string>> result;
+    for (const auto& [start, unused] : sources) {
+        (void)unused;
+        std::vector<std::string> stack;
+        std::map<std::string, size_t> positions;
+        std::string cursor = start;
+        while (sources.count(cursor) && !visited.count(cursor)) {
+            auto found = positions.find(cursor);
+            if (found != positions.end()) {
+                std::vector<std::string> cycle(stack.begin() + static_cast<std::ptrdiff_t>(found->second), stack.end());
+                std::rotate(cycle.begin(), std::min_element(cycle.begin(), cycle.end()), cycle.end());
+                result.push_back(std::move(cycle));
+                break;
+            }
+            positions.emplace(cursor, stack.size()); stack.push_back(cursor);
+            cursor = sources.at(cursor);
+        }
+        visited.insert(stack.begin(), stack.end());
+    }
+    std::sort(result.begin(), result.end());
+    return result;
+}
+std::string clipping_cycle_key(std::vector<std::string> nodes) {
+    std::sort(nodes.begin(), nodes.end());
+    std::string result;
+    for (const auto& node : nodes) { result += node; result.push_back('\0'); }
+    return result;
+}
+const Value& clipping_binding(const Value& project, const Value& target) {
+    static const Value missing;
+    const Value* result = &missing;
+    const Value& bindings = field(project, "clippingBindings");
+    if (bindings.is<Array>()) for (const auto& binding : bindings.get<Array>())
+        if (field(binding, "targetNodeId") == target &&
+            (result == &missing || str(field(binding, "id")) < str(field(*result, "id")))) result = &binding;
+    return *result;
+}
+bool enabled_clipping(const Value& binding) {
+    return field(binding, "enabled").is<bool>() && field(binding, "enabled").get<bool>();
+}
+// Validation only needs instance identity, presence and clipping edges. Geometry
+// cannot change these edges. Endpoint rendering bypasses temporal overrides.
+Value clipping_sample(const Value& keys, double ticks) {
+    if (!keys.is<Array>() || keys.get<Array>().empty()) return Value();
+    Array ordered = keys.get<Array>();
+    for (const auto& key : ordered) if (!finite(field(key, "timeTicks"))) return Value();
+    std::stable_sort(ordered.begin(), ordered.end(), [](const Value& a, const Value& b) {
+        const auto left = field(a, "timeTicks").get<double>(), right = field(b, "timeTicks").get<double>();
+        return left == right ? str(field(a, "id")) < str(field(b, "id")) : left < right;
+    });
+    if (ticks <= field(ordered.front(), "timeTicks").get<double>()) return field(ordered.front(), "value");
+    if (ticks >= field(ordered.back(), "timeTicks").get<double>()) return field(ordered.back(), "value");
+    for (size_t i = 1; i < ordered.size(); ++i) {
+        const auto end = field(ordered[i], "timeTicks").get<double>();
+        if (end < ticks) continue;
+        const Value& left = field(ordered[i - 1], "value"), &right = field(ordered[i], "value");
+        if (end == ticks) return right;
+        const Value& interpolation = field(ordered[i - 1], "interpolationToNext");
+        if (str(field(interpolation, "kind")) == "step") return left;
+        const double start = field(ordered[i - 1], "timeTicks").get<double>();
+        double progress = (ticks - start) / (end - start);
+        if (str(field(interpolation, "kind")) == "bezier") {
+            auto cubic = [](double t, double a, double b) {
+                const double inverse = 1 - t;
+                return 3 * inverse * inverse * t * a + 3 * inverse * t * t * b + t * t * t;
+            };
+            for (const char* key : {"x1", "x2", "y1", "y2"}) if (!finite(field(interpolation, key))) return Value();
+            double low = 0, high = 1;
+            for (int iteration = 0; iteration < 60; ++iteration) {
+                const double mid = (low + high) / 2;
+                if (cubic(mid, field(interpolation, "x1").get<double>(), field(interpolation, "x2").get<double>()) < progress) low = mid;
+                else high = mid;
+            }
+            progress = cubic((low + high) / 2, field(interpolation, "y1").get<double>(), field(interpolation, "y2").get<double>());
+        }
+        if (finite(left) && finite(right)) return Value(left.get<double>() + (right.get<double>() - left.get<double>()) * progress);
+        if (left.is<Object>() && right.is<Object>()) {
+            Object result;
+            std::set<std::string> keys_union;
+            for (const auto& [key, value] : left.get<Object>()) { (void)value; keys_union.insert(key); }
+            for (const auto& [key, value] : right.get<Object>()) { (void)value; keys_union.insert(key); }
+            for (const auto& key : keys_union) {
+                const Value a = field(left, key).is<picojson::null>() ? Value(0.0) : field(left, key);
+                const Value b = field(right, key).is<picojson::null>() ? Value(0.0) : field(right, key);
+                if (finite(a) && finite(b)) result[key] = Value(a.get<double>() + (b.get<double>() - a.get<double>()) * progress);
+                else if (a == b) result[key] = a;
+                else return left;
+            }
+            return Value(result);
+        }
+        return left;
+    }
+    return Value();
+}
+Value clipping_track_value(const Value& program, double ticks, const char* kind, const char* channel,
+    const Value& slot_id, const Value& node_id = Value()) {
+    const Value& tracks = field(program, "tracks");
+    Value result;
+    int priority = 0;
+    std::string selected_id;
+    if (tracks.is<Array>()) for (const auto& track : tracks.get<Array>()) {
+        if (str(field(track, "kind")) != kind) continue;
+        const Value sample = clipping_sample(field(field(field(track, "channels"), channel), "keyframes"), ticks);
+        if (sample.is<picojson::null>()) continue;
+        const Value& target = field(track, "target");
+        const int rank = field(target, "semanticSlotId") == slot_id ? 3 :
+            !node_id.is<picojson::null>() && field(target, "nodeId") == node_id ? 2 :
+            field(target, "transitionDefault") == Value(true) ? 1 : 0;
+        const std::string id = str(field(track, "trackId"));
+        if (rank > 0 && (rank > priority || (rank == priority && id < selected_id))) {
+            priority = rank; selected_id = id; result = sample;
+        }
+    }
+    return result;
+}
+const Value& clipping_member(const Value& project, const Value& art, const Value& slot) {
+    static const Value missing;
+    const Value& mappings = field(slot, "mappings"), &members = field(art, "members");
+    if (!mappings.is<Array>() || !members.is<Array>()) return missing;
+    for (const auto& mapping : mappings.get<Array>()) if (field(mapping, "keyArtId") == field(art, "id")) {
+        if (!has(field(field(project, "scene"), "nodes"), str(field(mapping, "nodeId")))) return missing;
+        for (const auto& member : members.get<Array>()) if (field(member, "nodeId") == field(mapping, "nodeId")) return member;
+        break;
+    }
+    return missing;
+}
+struct ClippingInstance { std::string id, slot, node, source; };
+std::vector<ClippingInstance> transition_clipping_instances(const Value& project, const Value& transition,
+    const Value& program, double ticks) {
+    std::vector<ClippingInstance> result;
+    const Value& from_art = find_id(field(project, "keyArts"), field(transition, "fromKeyArtId"));
+    const Value& to_art = find_id(field(project, "keyArts"), field(transition, "toKeyArtId"));
+    const Value& slots = field(project, "semanticSlots"), &parts = field(transition, "partTransitions");
+    if (!from_art.is<Object>() || !to_art.is<Object>() || !slots.is<Array>() || !parts.is<Array>()) return result;
+    const double duration = field(program, "durationTicks").get<double>(), u = ticks / duration;
+    for (const auto& slot : slots.get<Array>()) {
+        const Value& from = clipping_member(project, from_art, slot), &to = clipping_member(project, to_art, slot);
+        const Value* part = nullptr;
+        for (const auto& entry : parts.get<Array>()) if (field(entry, "semanticSlotId") == field(slot, "id")) part = &entry;
+        const std::string prefix = str(field(transition, "id")) + ":" + str(field(slot, "id")) + ":";
+        auto sample = [&](const char* kind, const char* channel, const Value& node = Value()) {
+            return clipping_track_value(program, ticks, kind, channel, field(slot, "id"), node);
+        };
+        auto emit = [&](const Value& state, const std::string& suffix, bool endpoint) {
+            if (!state.is<Object>()) return;
+            const Value& node = field(state, "nodeId"), &binding = clipping_binding(project, node);
+            std::string source;
+            if (!binding.is<Object>() || enabled_clipping(binding)) {
+                const Value authored = endpoint ? Value() : sample("ClippingTrack", "clipping", node);
+                if (!authored.is<picojson::null>()) source = str(field(authored, "sourceNodeId"));
+                else {
+                    source = str(field(field(state, "clipping"), "sourceNodeId"));
+                    if (source.empty() && enabled_clipping(binding)) source = str(field(binding, "sourceNodeId"));
+                }
+            }
+            result.push_back({prefix + suffix, str(field(slot, "id")), str(node), source});
+        };
+        if (ticks == 0 || ticks == duration) {
+            const Value& state = ticks == 0 ? from : to;
+            if (str(field(state, "presence")) == "present") emit(state, ticks == 0 ? "from" : "to", true);
+            continue;
+        }
+        if (!part) continue;
+        const std::string mode = str(field(*part, "mode"));
+        if (mode == "morph") {
+            if (!from.is<Object>() || !to.is<Object>()) return {};
+            const Value authored = sample("PresenceTrack", "presence");
+            const auto presence = authored.is<picojson::null>() ? field(u < 0.5 ? from : to, "presence") : authored;
+            if (str(presence) != "present") continue;
+            const Value weight = sample("GeometryBlendTrack", "geometryWeight");
+            const double geometry = finite(weight) ? std::clamp(weight.get<double>(), 0.0, 1.0) : u;
+            // Morph source identity follows geometry, authored clipping follows time.
+            const Value& selected = u < 0.5 ? from : to;
+            emit(selected, "morph", false);
+            result.back().node = str(field(geometry < 1 ? from : to, "nodeId"));
+        } else if (mode == "replace") {
+            const Value presence = sample("PresenceTrack", "presence");
+            if (!presence.is<picojson::null>() && str(presence) != "present") continue;
+            Value weights = sample("AppearanceTrack", "appearance");
+            if (weights.is<picojson::null>()) {
+                Object defaults;
+                if (from.is<Object>()) defaults[str(field(from, "appearanceId"))] = Value(1 - u);
+                if (to.is<Object>()) {
+                    auto& value = defaults[str(field(to, "appearanceId"))];
+                    value = Value((finite(value) ? value.get<double>() : 0) + u);
+                }
+                weights = Value(defaults);
+            }
+            for (const auto& endpoint : {std::make_pair(&from, "from"), std::make_pair(&to, "to")}) {
+                const Value& state = *endpoint.first;
+                const Value& weight = field(weights, str(field(state, "appearanceId")));
+                if (str(field(state, "presence")) == "present" && finite(weight) && weight.get<double>() > 0)
+                    emit(state, endpoint.second, false);
+            }
+        } else {
+            const Value* state = &from;
+            std::string presence;
+            if (mode == "hold") {
+                state = str(field(field(*part, "configuration"), "holdEndpoint")) == "to" ? &to : from.is<Object>() ? &from : &to;
+                presence = str(field(*state, "presence"));
+            } else if (mode == "appear") { state = &to; presence = "present"; }
+            else if (mode == "disappear") presence = "present";
+            else if (mode == "occlusion") presence = u < 0.5 ? str(field(from, "presence")) : "occluded";
+            else continue;
+            const Value authored = sample("PresenceTrack", "presence", field(*state, "nodeId"));
+            if (!authored.is<picojson::null>()) presence = str(authored);
+            if (presence == "present") emit(*state, mode, false);
+        }
+    }
+    return result;
+}
+void validate_evaluated_clipping(Snapshot& s, const Value& project, std::set<std::string>& seen_cycles) {
+    const Value& transitions = field(project, "transitions"), &slots = field(project, "semanticSlots");
+    if (!transitions.is<Array>()) return;
+    Array ordered = transitions.get<Array>();
+    std::stable_sort(ordered.begin(), ordered.end(), [](const Value& a, const Value& b) { return str(field(a, "id")) < str(field(b, "id")); });
+    for (const auto& transition : ordered) {
+        const Value& program = find_id(field(project, "temporalPrograms"), field(transition, "temporalProgramId"));
+        if (!positive_time(field(program, "durationTicks"))) continue;
+        const double duration = field(program, "durationTicks").get<double>();
+        std::set<double> times{0, duration};
+        if (duration > 1) times.insert(1);
+        if (duration > 2) times.insert(duration - 1);
+        const Value& tracks = field(program, "tracks");
+        if (tracks.is<Array>()) for (const auto& track : tracks.get<Array>()) {
+            const Value& keys = field(field(field(track, "channels"), "clipping"), "keyframes");
+            if (str(field(track, "kind")) != "ClippingTrack" || !keys.is<Array>()) continue;
+            for (const auto& key : keys.get<Array>()) if (valid_time(field(key, "timeTicks"))) {
+                const double time = field(key, "timeTicks").get<double>();
+                if (time > duration) continue;
+                times.insert(time);
+                if (time > 0) times.insert(time - 1);
+                if (time < duration) times.insert(time + 1);
+            }
+        }
+        for (const double time : times) {
+            const auto instances = transition_clipping_instances(project, transition, program, time);
+            ClippingRelations relations;
+            std::map<std::string, std::string> nodes;
+            for (const auto& instance : instances) nodes[instance.id] = instance.node;
+            for (const auto& target : instances) {
+                if (target.source.empty() || str(field(field(field(field(project, "scene"), "nodes"), target.source), "kind")) != "part") continue;
+                std::set<std::string> candidates;
+                for (const auto& source : instances) if (source.node == target.source) candidates.insert(source.id);
+                if (candidates.empty() && slots.is<Array>()) for (const auto& slot : slots.get<Array>()) {
+                    const Value& mappings = field(slot, "mappings");
+                    bool mapped = false;
+                    if (mappings.is<Array>()) for (const auto& mapping : mappings.get<Array>())
+                        if (str(field(mapping, "nodeId")) == target.source) mapped = true;
+                    if (mapped) for (const auto& source : instances) if (source.slot == str(field(slot, "id"))) candidates.insert(source.id);
+                }
+                if (candidates.size() == 1) relations.emplace_back(target.id, *candidates.begin());
+            }
+            for (const auto& cycle : clipping_cycles(relations)) {
+                std::set<std::string> node_set;
+                for (const auto& instance_id : cycle) if (!nodes[instance_id].empty()) node_set.insert(nodes[instance_id]);
+                if (!node_set.empty() && seen_cycles.insert(clipping_cycle_key({node_set.begin(), node_set.end()})).second)
+                    add(s, "CLIPPING_CYCLE", "transitions", str(field(transition, "id")));
+            }
+        }
+    }
+}
 void validate_transition_clipping(Snapshot& s, const Value& project) {
     const Value& nodes = field(field(project, "scene"), "nodes");
     const Value& arts = field(project, "keyArts");
@@ -770,7 +1039,15 @@ void validate_transition_clipping(Snapshot& s, const Value& project) {
     auto renderable = [&](const std::string& id) {
         return str(field(field(nodes, id), "kind")) == "part";
     };
-    std::set<std::string> seen;
+    std::set<std::string> seen, seen_cycles;
+    ClippingRelations binding_relations;
+    const Value& bindings = field(project, "clippingBindings");
+    if (bindings.is<Array>()) for (const auto& binding : bindings.get<Array>()) {
+        const auto target = str(field(binding, "targetNodeId")), source = str(field(binding, "sourceNodeId"));
+        if (enabled_clipping(binding) && target != source && renderable(target) && renderable(source))
+            binding_relations.emplace_back(target, source);
+    }
+    for (const auto& cycle : clipping_cycles(binding_relations)) seen_cycles.insert(clipping_cycle_key(cycle));
     auto unique_add = [&](const char* code, const std::string& path, const std::string& entity) {
         std::string key(code); key.push_back('\0'); key += path; key.push_back('\0'); key += entity;
         if (seen.insert(key).second) add(s, code, path, entity);
@@ -779,35 +1056,25 @@ void validate_transition_clipping(Snapshot& s, const Value& project) {
         const Value& art = arts.get<Array>()[i];
         const Value& members = field(art, "members");
         if (!members.is<Array>()) continue;
-        std::map<std::string, std::string> sources;
+        ClippingRelations relations;
         for (size_t j = 0; j < members.get<Array>().size(); ++j) {
             const Value& member = members.get<Array>()[j];
             const std::string source = str(field(field(member, "clipping"), "sourceNodeId"));
-            if (source.empty()) continue;
             const std::string target = str(field(member, "nodeId"));
+            const Value& binding = clipping_binding(project, field(member, "nodeId"));
+            if (!binding.is<Object>() || enabled_clipping(binding)) {
+                const auto effective = !source.empty() ? source : enabled_clipping(binding) ? str(field(binding, "sourceNodeId")) : "";
+                if (!effective.empty() && effective != target) relations.emplace_back(target, effective);
+            }
+            if (source.empty()) continue;
             const std::string path = "keyArts." + std::to_string(i) + ".members." + std::to_string(j) + ".clipping.sourceNodeId";
             if (source == target) unique_add("CLIPPING_SELF_REFERENCE", path, target);
             if (has(nodes, target) && !renderable(target)) unique_add("CLIPPING_TARGET_NOT_RENDERABLE", path, target);
             if (has(nodes, source) && !renderable(source)) unique_add("CLIPPING_SOURCE_NOT_RENDERABLE", path, source);
-            if (source != target) sources[target] = source;
         }
-        std::set<std::string> visited, reported;
-        for (const auto& [start, unused] : sources) {
-            (void)unused;
-            std::set<std::string> chain;
-            std::string cursor = start;
-            while (sources.count(cursor) && !visited.count(cursor)) {
-                if (!chain.insert(cursor).second) {
-                    if (!reported.count(cursor)) {
-                        unique_add("CLIPPING_CYCLE", "keyArts." + std::to_string(i) + ".members", str(field(art, "id")));
-                        reported.insert(cursor);
-                    }
-                    break;
-                }
-                cursor = sources.at(cursor);
-            }
-            visited.insert(chain.begin(), chain.end());
-        }
+        for (const auto& cycle : clipping_cycles(relations))
+            if (seen_cycles.insert(clipping_cycle_key(cycle)).second)
+                add(s, "CLIPPING_CYCLE", "keyArts." + std::to_string(i) + ".members", str(field(art, "id")));
     }
     if (programs.is<Array>()) for (size_t i = 0; i < programs.get<Array>().size(); ++i) {
         const Value& program = programs.get<Array>()[i];
@@ -825,6 +1092,23 @@ void validate_transition_clipping(Snapshot& s, const Value& project) {
                 const Value& mappings = field(slot, "mappings");
                 if (mappings.is<Array>()) for (const auto& mapping : mappings.get<Array>()) targets.insert(str(field(mapping, "nodeId")));
             }
+            if (targets.empty() && field(target, "transitionDefault") == Value(true)) {
+                const Value& transitions = field(project, "transitions");
+                if (transitions.is<Array>() && slots.is<Array>()) for (const auto& transition : transitions.get<Array>()) {
+                    if (field(transition, "temporalProgramId") != field(program, "id")) continue;
+                    const Value& parts = field(transition, "partTransitions");
+                    if (!parts.is<Array>()) continue;
+                    for (const auto& slot : slots.get<Array>()) {
+                        bool used = false;
+                        for (const auto& part : parts.get<Array>()) if (field(part, "semanticSlotId") == field(slot, "id")) used = true;
+                        const Value& mappings = field(slot, "mappings");
+                        if (!used || !mappings.is<Array>()) continue;
+                        for (const auto& mapping : mappings.get<Array>())
+                            if (field(mapping, "keyArtId") == field(transition, "fromKeyArtId") ||
+                                field(mapping, "keyArtId") == field(transition, "toKeyArtId")) targets.insert(str(field(mapping, "nodeId")));
+                    }
+                }
+            }
             const Value& keys = field(field(field(track, "channels"), "clipping"), "keyframes");
             if (!keys.is<Array>()) continue;
             for (size_t k = 0; k < keys.get<Array>().size(); ++k) {
@@ -841,6 +1125,7 @@ void validate_transition_clipping(Snapshot& s, const Value& project) {
             }
         }
     }
+    validate_evaluated_clipping(s, project, seen_cycles);
 }
 template <typename Register>
 void validate_temporal_ownership(Snapshot& s, const Value& project, Register&& register_id) {
@@ -1122,8 +1407,8 @@ void validate_clipping(Snapshot& s, const Value& project, Register&& register_id
         if (nonblank(field(binding, "id")) && nonblank(field(binding, "targetNodeId")) &&
             nonblank(field(binding, "sourceNodeId")) && str(field(binding, "mode")) == "inside" &&
             enabled.is<bool>() && enabled.get<bool>() && target != source && part_node(target) &&
-            part_node(source) && !dependencies.count(target))
-            dependencies.emplace(target, std::make_pair(source, id));
+            part_node(source) && (!dependencies.count(target) || id < dependencies.at(target).second))
+            dependencies[target] = std::make_pair(source, id);
     }
     std::set<std::string> visited, cycle_keys;
     for (const auto& [start, unused] : dependencies) {
