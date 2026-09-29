@@ -291,6 +291,82 @@ void validate_rigid_bindings(Snapshot& s, const Value& project, Register&& regis
         else by_target.emplace(target, id);
     }
 }
+void validate_mesh_form_corrections(Snapshot& s, const Value& project) {
+    const Value& values = field(project, "meshFormCorrectionKeyforms");
+    if (!values.is<Array>()) { add(s, "collection.invalid", "meshFormCorrectionKeyforms"); return; }
+    const Value& topologies = field(project, "meshTopologies");
+    const Value& key_arts = field(project, "keyArts");
+    const Value& slots = field(project, "semanticSlots");
+    const Value& keyforms = field(project, "meshKeyforms");
+    const Value& nodes = field(field(project, "scene"), "nodes");
+    std::set<std::string> contexts;
+    for (size_t i = 0; i < values.get<Array>().size(); ++i) {
+        const Value& value = values.get<Array>()[i];
+        const std::string path = "meshFormCorrectionKeyforms." + std::to_string(i);
+        if (!value.is<Object>()) { add(s, "MESH_FORM_CORRECTION_INVALID", path); continue; }
+        const std::string id = str(field(value, "id"));
+        if (!nonblank(field(value, "id"))) add(s, "identity.missing", path + ".id");
+        if (!exact(value, {"id", "topologyId", "keyArtId", "semanticSlotId", "vertexOffsets"}))
+            add(s, "MESH_FORM_CORRECTION_INVALID", path, id);
+        const Value& topology_id = field(value, "topologyId");
+        const Value& key_art_id = field(value, "keyArtId");
+        const Value& slot_id = field(value, "semanticSlotId");
+        const Value& topology = find_id(topologies, topology_id);
+        const Value& slot = find_id(slots, slot_id);
+        if (topology.is<picojson::null>())
+            add(s, "MESH_FORM_CORRECTION_TOPOLOGY_MISSING", path + ".topologyId", id);
+        if (!contains_id(key_arts, key_art_id))
+            add(s, "MESH_FORM_CORRECTION_KEY_ART_MISSING", path + ".keyArtId", id);
+        if (!contains_id(slots, slot_id))
+            add(s, "MESH_FORM_CORRECTION_SEMANTIC_SLOT_MISSING", path + ".semanticSlotId", id);
+        const std::string context = topology_id.serialize() + std::string(1, '\0') +
+            key_art_id.serialize() + std::string(1, '\0') + slot_id.serialize();
+        if (!contexts.insert(context).second)
+            add(s, "MESH_FORM_CORRECTION_CONTEXT_DUPLICATE", path, id);
+        bool compatible = false;
+        if (keyforms.is<Array>()) for (const auto& item : keyforms.get<Array>())
+            if (field(item, "topologyId") == topology_id && field(item, "keyArtId") == key_art_id &&
+                field(item, "semanticSlotId") == slot_id) compatible = true;
+        if (!compatible) add(s, "MESH_FORM_CORRECTION_CONTEXT_INCOMPATIBLE", path, id);
+        if (slot.is<Object>() && contains_id(key_arts, key_art_id)) {
+            bool mapped = false;
+            const Value& mappings = field(slot, "mappings");
+            if (mappings.is<Array>()) for (const auto& item : mappings.get<Array>())
+                if (field(item, "keyArtId") == key_art_id &&
+                    str(field(field(nodes, str(field(item, "nodeId"))), "kind")) == "part") mapped = true;
+            if (!mapped) add(s, "MESH_FORM_CORRECTION_MAPPING_INCOMPATIBLE", path, id);
+        }
+        const Value& offsets = field(value, "vertexOffsets");
+        if (!offsets.is<Array>()) { add(s, "MESH_FORM_CORRECTION_VERTEX_INVALID", path + ".vertexOffsets", id); continue; }
+        const Value& vertices = field(topology, "vertexIds");
+        std::set<std::string> seen;
+        std::string previous;
+        bool has_previous = false;
+        for (size_t j = 0; j < offsets.get<Array>().size(); ++j) {
+            const Value& item = offsets.get<Array>()[j];
+            const std::string item_path = path + ".vertexOffsets." + std::to_string(j);
+            if (!exact(item, {"vertexId", "x", "y"})) {
+                add(s, "MESH_FORM_CORRECTION_VERTEX_INVALID", item_path, id); continue;
+            }
+            const Value& vertex = field(item, "vertexId");
+            bool found = false;
+            if (vertices.is<Array>()) for (const auto& candidate : vertices.get<Array>())
+                if (candidate == vertex) found = true;
+            if (!found) add(s, "MESH_FORM_CORRECTION_VERTEX_MISSING", item_path + ".vertexId", id);
+            const std::string vertex_id = str(vertex);
+            if (!seen.insert(vertex_id).second)
+                add(s, "MESH_FORM_CORRECTION_VERTEX_DUPLICATE", item_path + ".vertexId", id);
+            if (has_previous && previous > vertex_id)
+                add(s, "MESH_FORM_CORRECTION_VERTEX_ORDER_INVALID", path + ".vertexOffsets", id);
+            previous = vertex_id;
+            has_previous = true;
+            const Value& x = field(item, "x"), &y = field(item, "y");
+            if (!finite(x) || !finite(y)) add(s, "MESH_FORM_CORRECTION_OFFSET_INVALID", item_path, id);
+            else if (x.get<double>() == 0 && y.get<double>() == 0)
+                add(s, "MESH_FORM_CORRECTION_ZERO_OFFSET", item_path, id);
+        }
+    }
+}
 bool utf8(const uint8_t* data, uint32_t length) {
     for (uint32_t i = 0; i < length;) {
         uint8_t c = data[i++];
@@ -424,6 +500,7 @@ void validate(Snapshot& s, const Value& project) {
     validate_rotation_constraints(s, project);
     validate_ik_constraints(s, project);
     validate_rigid_bindings(s, project, register_id);
+    validate_mesh_form_corrections(s, project);
     if (root != node_map.end()) {
         std::set<std::string> visiting, visited;
         auto walk = [&](auto&& self, const std::string& id) -> void {

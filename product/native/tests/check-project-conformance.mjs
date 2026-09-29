@@ -76,6 +76,14 @@ variant("rigid_bindings", hierarchy, p => {
     { id: "rigid_2", targetNodeId: "part_1", boneId: "missing", enabled: true });
   p.rig.skinBindings.push({ id: "skin_1", targetNodeId: "part_1", enabled: true });
 });
+variant("mesh_form_corrections", minimal, p => {
+  p.meshFormCorrectionKeyforms.push(
+    { id: "form_1", topologyId: "missing", keyArtId: "missing", semanticSlotId: "missing",
+      vertexOffsets: [{ vertexId: "v2", x: 0, y: 0 }, { vertexId: "v1", x: 1, y: 0 },
+        { vertexId: "v2", x: 1, y: 1 }] },
+    { id: "form_2", topologyId: "missing", keyArtId: "missing", semanticSlotId: "missing",
+      vertexOffsets: [] });
+});
 
 const subset = new Set([
   "project.invalid", "project.unsupported_schema", "ANIMATION_INVALID_TIMEBASE", "project.missing_id",
@@ -95,6 +103,13 @@ const subset = new Set([
   "TWO_BONE_IK_INVALID", "TWO_BONE_IK_BONES_INVALID", "TWO_BONE_IK_BONE_MISSING",
   "TWO_BONE_IK_HIERARCHY_INVALID", "TWO_BONE_IK_CHAIN_GEOMETRY_INVALID", "TWO_BONE_IK_END_CONFLICT",
   "RIGID_BINDING_TARGET_INVALID", "RIGID_BINDING_CONFLICT", "BONE_NODE_MISSING",
+  "MESH_FORM_CORRECTION_INVALID", "MESH_FORM_CORRECTION_TOPOLOGY_MISSING",
+  "MESH_FORM_CORRECTION_KEY_ART_MISSING", "MESH_FORM_CORRECTION_SEMANTIC_SLOT_MISSING",
+  "MESH_FORM_CORRECTION_CONTEXT_DUPLICATE", "MESH_FORM_CORRECTION_CONTEXT_INCOMPATIBLE",
+  "MESH_FORM_CORRECTION_MAPPING_INCOMPATIBLE", "MESH_FORM_CORRECTION_VERTEX_INVALID",
+  "MESH_FORM_CORRECTION_VERTEX_MISSING", "MESH_FORM_CORRECTION_VERTEX_DUPLICATE",
+  "MESH_FORM_CORRECTION_VERTEX_ORDER_INVALID", "MESH_FORM_CORRECTION_OFFSET_INVALID",
+  "MESH_FORM_CORRECTION_ZERO_OFFSET",
 ]);
 const fixtures = cases.map(([name, project]) => ({ name, project,
   expected: validateProject(project).filter(issue => subset.has(issue.code))

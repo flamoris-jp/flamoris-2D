@@ -2914,5 +2914,192 @@
         "entityId": "rigid_2"
       }
     ]
+  },
+  {
+    "name": "mesh_form_corrections",
+    "project": {
+      "schemaVersion": 15,
+      "timebaseTicksPerSecond": 120000,
+      "id": "project_あ",
+      "displayName": "夜明け",
+      "canvas": {
+        "width": 1920,
+        "height": 1080
+      },
+      "sourceAssets": [],
+      "semanticSlots": [],
+      "keyArts": [],
+      "scene": {
+        "rootId": "node_1",
+        "nodes": {
+          "node_1": {
+            "id": "node_1",
+            "kind": "group",
+            "displayName": "夜明け",
+            "sourceRef": null,
+            "parentId": null,
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          }
+        }
+      },
+      "meshes": [],
+      "meshTopologies": [],
+      "meshKeyforms": [],
+      "meshFormCorrectionKeyforms": [
+        {
+          "id": "form_1",
+          "topologyId": "missing",
+          "keyArtId": "missing",
+          "semanticSlotId": "missing",
+          "vertexOffsets": [
+            {
+              "vertexId": "v2",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "vertexId": "v1",
+              "x": 1,
+              "y": 0
+            },
+            {
+              "vertexId": "v2",
+              "x": 1,
+              "y": 1
+            }
+          ]
+        },
+        {
+          "id": "form_2",
+          "topologyId": "missing",
+          "keyArtId": "missing",
+          "semanticSlotId": "missing",
+          "vertexOffsets": []
+        }
+      ],
+      "clippingBindings": [],
+      "rig": {
+        "deformers": [],
+        "warpControlPoints": [],
+        "warpDeformerKeyforms": [],
+        "bones": [],
+        "bonePoseKeyforms": [],
+        "rigidBoneBindings": [],
+        "skinBindings": [],
+        "boneRotationConstraints": [],
+        "twoBoneIkConstraints": [],
+        "constraints": []
+      },
+      "transitions": [],
+      "temporalPrograms": [],
+      "animation": {
+        "clips": [],
+        "deformationSamples": []
+      },
+      "sequences": [],
+      "renderSettings": {
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "alpha": true
+      }
+    },
+    "expected": [
+      {
+        "code": "MESH_FORM_CORRECTION_CONTEXT_DUPLICATE",
+        "path": "meshFormCorrectionKeyforms.1",
+        "entityId": "form_2"
+      },
+      {
+        "code": "MESH_FORM_CORRECTION_CONTEXT_INCOMPATIBLE",
+        "path": "meshFormCorrectionKeyforms.0",
+        "entityId": "form_1"
+      },
+      {
+        "code": "MESH_FORM_CORRECTION_CONTEXT_INCOMPATIBLE",
+        "path": "meshFormCorrectionKeyforms.1",
+        "entityId": "form_2"
+      },
+      {
+        "code": "MESH_FORM_CORRECTION_KEY_ART_MISSING",
+        "path": "meshFormCorrectionKeyforms.0.keyArtId",
+        "entityId": "form_1"
+      },
+      {
+        "code": "MESH_FORM_CORRECTION_KEY_ART_MISSING",
+        "path": "meshFormCorrectionKeyforms.1.keyArtId",
+        "entityId": "form_2"
+      },
+      {
+        "code": "MESH_FORM_CORRECTION_SEMANTIC_SLOT_MISSING",
+        "path": "meshFormCorrectionKeyforms.0.semanticSlotId",
+        "entityId": "form_1"
+      },
+      {
+        "code": "MESH_FORM_CORRECTION_SEMANTIC_SLOT_MISSING",
+        "path": "meshFormCorrectionKeyforms.1.semanticSlotId",
+        "entityId": "form_2"
+      },
+      {
+        "code": "MESH_FORM_CORRECTION_TOPOLOGY_MISSING",
+        "path": "meshFormCorrectionKeyforms.0.topologyId",
+        "entityId": "form_1"
+      },
+      {
+        "code": "MESH_FORM_CORRECTION_TOPOLOGY_MISSING",
+        "path": "meshFormCorrectionKeyforms.1.topologyId",
+        "entityId": "form_2"
+      },
+      {
+        "code": "MESH_FORM_CORRECTION_VERTEX_DUPLICATE",
+        "path": "meshFormCorrectionKeyforms.0.vertexOffsets.2.vertexId",
+        "entityId": "form_1"
+      },
+      {
+        "code": "MESH_FORM_CORRECTION_VERTEX_MISSING",
+        "path": "meshFormCorrectionKeyforms.0.vertexOffsets.0.vertexId",
+        "entityId": "form_1"
+      },
+      {
+        "code": "MESH_FORM_CORRECTION_VERTEX_MISSING",
+        "path": "meshFormCorrectionKeyforms.0.vertexOffsets.1.vertexId",
+        "entityId": "form_1"
+      },
+      {
+        "code": "MESH_FORM_CORRECTION_VERTEX_MISSING",
+        "path": "meshFormCorrectionKeyforms.0.vertexOffsets.2.vertexId",
+        "entityId": "form_1"
+      },
+      {
+        "code": "MESH_FORM_CORRECTION_VERTEX_ORDER_INVALID",
+        "path": "meshFormCorrectionKeyforms.0.vertexOffsets",
+        "entityId": "form_1"
+      },
+      {
+        "code": "MESH_FORM_CORRECTION_ZERO_OFFSET",
+        "path": "meshFormCorrectionKeyforms.0.vertexOffsets.0",
+        "entityId": "form_1"
+      }
+    ]
   }
 ]
