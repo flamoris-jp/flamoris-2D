@@ -1,6 +1,7 @@
 #include "flamoris2d_core.h"
 #include "picojson.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <limits>
@@ -134,6 +135,33 @@ void validate_deformation_samples(Snapshot& s, const Value& project) {
         }
     }
 }
+void validate_animation_clips(Snapshot& s, const Value& project) {
+    const Value& clips = field(field(project, "animation"), "clips");
+    if (!clips.is<Array>()) { add(s, "collection.invalid", "animation.clips"); return; }
+    const Value& programs = field(project, "temporalPrograms");
+    Array sorted = clips.get<Array>();
+    std::stable_sort(sorted.begin(), sorted.end(), [](const Value& a, const Value& b) {
+        return str(field(a, "id")) < str(field(b, "id"));
+    });
+    for (size_t i = 0; i < sorted.size(); ++i) {
+        const Value& clip = sorted[i];
+        const std::string path = "animation.clips." + std::to_string(i);
+        if (!clip.is<Object>()) { add(s, "ANIMATION_CLIP_INVALID", path); continue; }
+        const std::string id = str(field(clip, "id"));
+        if (!exact(clip, {"id", "displayName", "temporalProgramId", "defaultLoopMode", "metadata"}))
+            add(s, "ANIMATION_CLIP_INVALID", path, id);
+        if (!nonblank(field(clip, "displayName")))
+            add(s, "ANIMATION_CLIP_INVALID", path + ".displayName", id);
+        const Value& program_id = field(clip, "temporalProgramId");
+        if (!program_id.is<std::string>() || !contains_id(programs, program_id))
+            add(s, "ANIMATION_CLIP_PROGRAM_REFERENCE_INVALID", path + ".temporalProgramId", id);
+        const std::string loop = str(field(clip, "defaultLoopMode"));
+        if (loop != "once" && loop != "loop")
+            add(s, "ANIMATION_CLIP_LOOP_MODE_INVALID", path + ".defaultLoopMode", id);
+        if (!field(clip, "metadata").is<Object>())
+            add(s, "ANIMATION_CLIP_INVALID", path + ".metadata", id);
+    }
+}
 bool utf8(const uint8_t* data, uint32_t length) {
     for (uint32_t i = 0; i < length;) {
         uint8_t c = data[i++];
@@ -262,6 +290,7 @@ void validate(Snapshot& s, const Value& project) {
     }
     for (const char* name : {"rig", "animation", "temporalPrograms", "clippingBindings", "renderSettings"})
         s.unsupported_sections[name] = has(project, name);
+    validate_animation_clips(s, project);
     validate_deformation_samples(s, project);
     if (root != node_map.end()) {
         std::set<std::string> visiting, visited;

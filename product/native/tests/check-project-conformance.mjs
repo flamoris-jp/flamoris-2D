@@ -56,6 +56,10 @@ variant("deformation_sample_offsets", minimal, p => {
     offsets: [{ vertexId: "b", dx: 1, dy: 0 }, { vertexId: "a", dx: 0, dy: 0 },
       { vertexId: "b", dx: 0.2, dy: 0 }, { vertexId: "ghost", dx: 1, dy: 2 }] });
 });
+variant("animation_clip", minimal, p => {
+  p.animation.clips.push({ id: "clip_1", displayName: "\u3000", temporalProgramId: "missing",
+    defaultLoopMode: "invalid", metadata: null, durationTicks: 2 });
+});
 
 const subset = new Set([
   "project.invalid", "project.unsupported_schema", "ANIMATION_INVALID_TIMEBASE", "project.missing_id",
@@ -69,6 +73,7 @@ const subset = new Set([
   "ANIMATION_DEFORMATION_SAMPLE_INVALID", "ANIMATION_DEFORMATION_OFFSET_INVALID",
   "ANIMATION_TRACK_TARGET_INVALID", "ANIMATION_TOPOLOGY_INCOMPATIBLE",
   "ANIMATION_DEFORMATION_VERTEX_DUPLICATE", "ANIMATION_DEFORMATION_VERTEX_ORDER_INVALID",
+  "ANIMATION_CLIP_INVALID", "ANIMATION_CLIP_PROGRAM_REFERENCE_INVALID", "ANIMATION_CLIP_LOOP_MODE_INVALID",
 ]);
 const fixtures = cases.map(([name, project]) => ({ name, project,
   expected: validateProject(project).filter(issue => subset.has(issue.code))
