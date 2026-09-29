@@ -181,6 +181,79 @@ void validate_clip_instances(Snapshot& s, const Value& project, const Value& seq
             add(s, "ANIMATION_CLIP_ONCE_OVERRUN", path, id);
     }
 }
+// Both JS endpointSignature paths call endpointPartState without animation.
+// For the same KeyArt, equal ordered slot/keyform/topology selections therefore
+// imply equal geometry, transforms, appearance, rig state and resolved clipping.
+// Render-instance IDs are explicitly removed by normalizedEvaluatedParts.
+// Compare the generating selections instead of duplicating the entire renderer.
+bool endpoint_selection_signature(const Value& project, const Value& item, bool ending, Value& signature) {
+    const bool hold = str(field(item, "kind")) == "KeyArtHold";
+    const Value& transition = find_id(field(project, "transitions"), field(item, "transitionId"));
+    const Value& art_id = hold ? field(item, "keyArtId") : field(transition, ending ? "toKeyArtId" : "fromKeyArtId");
+    const Value& art = find_id(field(project, "keyArts"), art_id);
+    const Value& parts = field(transition, "partTransitions"), &slots = field(project, "semanticSlots");
+    if (!art.is<Object>() || !slots.is<Array>()) return false;
+    if (!hold) {
+        const Value& program = find_id(field(project, "temporalPrograms"), field(transition, "temporalProgramId"));
+        if (!program.is<Object>() || !parts.is<Array>()) return false;
+    }
+    Array ordered = slots.get<Array>(), selections;
+    std::stable_sort(ordered.begin(), ordered.end(), [](const Value& a, const Value& b) { return str(field(a, "id")) < str(field(b, "id")); });
+    const Value& keyforms = field(project, "meshKeyforms");
+    for (const auto& slot : ordered) {
+        const Value* part = nullptr;
+        if (!hold) for (const auto& entry : parts.get<Array>()) if (field(entry, "semanticSlotId") == field(slot, "id")) { part = &entry; break; }
+        const Value& mappings = field(slot, "mappings");
+        const Value* mapping = nullptr;
+        if (mappings.is<Array>()) for (const auto& entry : mappings.get<Array>()) if (field(entry, "keyArtId") == art_id) { mapping = &entry; break; }
+        // Transition endpoints include slots present only at the opposite end.
+        bool opposite = false;
+        if (!hold && mappings.is<Array>()) for (const auto& entry : mappings.get<Array>())
+            if (field(entry, "keyArtId") == field(transition, ending ? "fromKeyArtId" : "toKeyArtId")) opposite = true;
+        if (!mapping && !part && !opposite) continue;
+        // JS selections exclude opposite-only slots, but evaluatedParts retains
+        // an absent entry. Include that distinction in the signature.
+        Value keyform;
+        Value requested;
+        if (hold) {
+            size_t count = 0;
+            if (keyforms.is<Array>()) for (const auto& form : keyforms.get<Array>())
+                if (field(form, "keyArtId") == art_id && field(form, "semanticSlotId") == field(slot, "id")) { keyform = form; ++count; }
+            if (count != 1) keyform = Value();
+            requested = field(keyform, "id");
+        } else if (part) {
+            requested = field(*part, ending ? "toKeyformId" : "fromKeyformId");
+            keyform = find_id(keyforms, requested);
+        }
+        if (mapping) {
+            const Value& nodes = field(field(project, "scene"), "nodes");
+            const Value& members = field(art, "members");
+            const Value* member = nullptr;
+            if (members.is<Array>()) for (const auto& entry : members.get<Array>())
+                if (field(entry, "nodeId") == field(*mapping, "nodeId")) { member = &entry; break; }
+            std::string node_id = str(field(*mapping, "nodeId"));
+            if (has(nodes, node_id) && member) {
+                // worldTransformMatrix is evaluated even for absent members.
+                std::set<std::string> ancestors;
+                while (!node_id.empty()) {
+                    if (!has(nodes, node_id) || !ancestors.insert(node_id).second) return false;
+                    const Value& node = field(nodes, node_id), &transform = field(node, "transform");
+                    for (const char* component : {"position", "scale", "pivot"})
+                        if (field(transform, component).is<picojson::null>()) return false;
+                    node_id = str(field(node, "parentId"));
+                }
+                if (str(field(*member, "presence")) == "present" && !requested.is<picojson::null>() && !str(requested).empty()) {
+                    const Value& topology = find_id(field(project, "meshTopologies"), field(keyform, "topologyId"));
+                    if (!keyform.is<Object>() || !field(keyform, "positions").is<Array>() ||
+                        !field(keyform, "uvs").is<Array>() || !field(topology, "indices").is<Array>()) return false;
+                }
+            }
+        }
+        selections.push_back(Value(Array{field(slot, "id"), field(keyform, "id"), field(keyform, "topologyId"), Value(mapping || part)}));
+    }
+    signature = Value(selections);
+    return true;
+}
 template <typename Register>
 void validate_sequences(Snapshot& s, const Value& project, Register&& register_id) {
     const Value& sequences = field(project, "sequences");
@@ -272,6 +345,12 @@ void validate_sequences(Snapshot& s, const Value& project, Register&& register_i
                     str(field(current, "kind")) == "TransitionInstance") ?
                     "SEQUENCE_TRANSITION_ENDPOINT_MISMATCH" : "SEQUENCE_VIEW_CONTINUITY_MISMATCH",
                     path + ".viewLaneItems", id);
+            else if (!outgoing.empty() && !incoming.empty()) {
+                Value left, right;
+                if (endpoint_selection_signature(project, previous, true, left) &&
+                    endpoint_selection_signature(project, current, false, right) && left != right)
+                    add(s, "SEQUENCE_VIEW_ENDPOINT_INCOMPATIBLE", path + ".viewLaneItems", id);
+            }
         }
         const Value& duration = field(program, "durationTicks");
         if (finite(duration) && ticks(items.back(), "endTicks") < duration.get<double>())

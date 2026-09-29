@@ -395,6 +395,40 @@ variant("evaluated_clipping_repeated_transition_cycle", evaluatedClipping, p => 
   p.transitions.push({ ...structuredClone(p.transitions[0]), id: "transition_z" });
 });
 
+variant("sequence_endpoint_keyform_mismatch", meshed, p => {
+  p.transitions[0].partTransitions[0].mode = "replace";
+  p.transitions[0].partTransitions[0].fromKeyformId = null;
+});
+variant("sequence_endpoint_ambiguous_hold", meshed, p => {
+  p.meshKeyforms.push({ ...structuredClone(p.meshKeyforms[0]), id: "another_keyform_a" });
+});
+variant("sequence_endpoint_ignored_temporal_tracks", populated, p => {
+  p.temporalPrograms[0].tracks.push({ trackId: "endpoint_opacity", version: 1, kind: "OpacityTrack",
+    target: { semanticSlotId: "slot_1" }, channels: { opacity: { keyframes: [
+      { id: "endpoint_opacity_key", timeTicks: 0, value: 0.2, interpolationToNext: { kind: "step" } },
+    ] } } });
+});
+variant("sequence_endpoint_extra_absent_slot", populated, p => {
+  p.semanticSlots.push({ id: "slot_extra", displayName: "Extra", role: "extra", mappings: [], metadata: {} });
+  p.transitions[0].partTransitions.push({ id: "part_extra", semanticSlotId: "slot_extra", mode: "hold",
+    topologyId: null, fromKeyformId: null, toKeyformId: null, configuration: {} });
+});
+variant("sequence_endpoint_unknown_keyform_skips_evaluation", meshed, p => {
+  p.transitions[0].partTransitions[0].fromKeyformId = "missing";
+});
+variant("sequence_endpoint_equal_geometry_different_selection", meshed, p => {
+  p.meshKeyforms.push({ ...structuredClone(p.meshKeyforms[0]), id: "keyform_a2" });
+  const transition = structuredClone(p.transitions[0]);
+  transition.id = "transition_aa"; transition.toKeyArtId = "art_a";
+  transition.partTransitions[0].id = "part_aa";
+  transition.partTransitions[0].toKeyformId = "keyform_a2";
+  p.transitions.push(transition);
+  p.sequences[0].viewLaneItems = [
+    { id: "first", kind: "TransitionInstance", transitionId: "transition_aa", startTicks: 0, endTicks: 100 },
+    { id: "second", kind: "TransitionInstance", transitionId: "transition_ab", startTicks: 100, endTicks: 300 },
+  ];
+});
+
 const fixtures = cases.map(([name, project]) => ({ name, project,
   expected: validateProject(project)
     .map(({ code, path, entityId, severity }) => ({ code, path, entityId: entityId ?? "", severity }))
