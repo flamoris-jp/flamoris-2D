@@ -80,6 +80,173 @@ bool contains_id(const Value& values, const Value& id) {
     for (const auto& value : values.get<Array>()) if (field(value, "id") == id) return true;
     return false;
 }
+bool safe_integer(const Value& value) {
+    return finite(value) && std::floor(value.get<double>()) == value.get<double>() &&
+        std::abs(value.get<double>()) <= 9007199254740991.0;
+}
+bool valid_time(const Value& value) { return safe_integer(value) && value.get<double>() >= 0; }
+template <typename Register>
+void validate_temporal_ownership(Snapshot& s, const Value& project, Register&& register_id) {
+    const Value& programs = field(project, "temporalPrograms");
+    if (!programs.is<Array>()) { add(s, "collection.invalid", "temporalPrograms"); return; }
+    struct Owner { std::string kind, id, path; };
+    std::map<std::string, std::vector<Owner>> owners;
+    auto collect = [&](const Value& values, const std::string& collection, const std::string& kind) {
+        if (!values.is<Array>()) return;
+        for (size_t i = 0; i < values.get<Array>().size(); ++i) {
+            const Value& item = values.get<Array>()[i];
+            const Value& program = field(item, "temporalProgramId");
+            if (program.is<std::string>() && !program.get<std::string>().empty())
+                owners[str(program)].push_back({kind, str(field(item, "id")),
+                    collection + "." + std::to_string(i) + ".temporalProgramId"});
+        }
+    };
+    collect(field(project, "transitions"), "transitions", "Transition");
+    collect(field(field(project, "animation"), "clips"), "animation.clips", "AnimationClip");
+    collect(field(project, "sequences"), "sequences", "Sequence");
+    for (auto& [unused, entries] : owners) {
+        (void)unused;
+        if (entries.size() < 2) continue;
+        std::sort(entries.begin(), entries.end(), [](const Owner& a, const Owner& b) {
+            return a.kind == b.kind ? a.id < b.id : a.kind < b.kind;
+        });
+        for (const auto& entry : entries)
+            add(s, "TEMPORAL_PROGRAM_OWNERSHIP_CONFLICT", entry.path, entry.id);
+    }
+    for (size_t i = 0; i < programs.get<Array>().size(); ++i) {
+        const Value& program = programs.get<Array>()[i];
+        const std::string path = "temporalPrograms." + std::to_string(i);
+        const Value& id = field(program, "id");
+        if (!program.is<Object>() || !id.is<std::string>() || str(id).empty()) {
+            add(s, "identity.missing", path + ".id");
+            continue;
+        }
+        register_id(id, path + ".id");
+        if (!exact(program, {"id", "durationTicks", "tracks", "events", "regions"}))
+            add(s, "ANIMATION_INVALID_PROGRAM", path, str(id));
+        const Value& duration = field(program, "durationTicks");
+        if (!valid_time(duration) || duration.get<double>() == 0)
+            add(s, "ANIMATION_INVALID_DURATION", path + ".durationTicks", str(id));
+        const Value& tracks = field(program, "tracks");
+        const Value& events = field(program, "events");
+        const Value& regions = field(program, "regions");
+        if (!tracks.is<Array>() || !events.is<Array>() || !regions.is<Array>()) {
+            add(s, "ANIMATION_INVALID_PROGRAM", path, str(id));
+            continue;
+        }
+        const auto found = owners.find(str(id));
+        const std::vector<Owner> empty;
+        const auto& entries = found == owners.end() ? empty : found->second;
+        const Owner* sole = entries.size() == 1 ? &entries[0] : nullptr;
+        size_t camera_count = 0;
+        for (size_t j = 0; j < tracks.get<Array>().size(); ++j) {
+            const Value& track = tracks.get<Array>()[j];
+            const std::string track_path = path + ".tracks." + std::to_string(j);
+            const Value& track_id = field(track, "trackId");
+            if (!track.is<Object>() || !track_id.is<std::string>() || str(track_id).empty()) {
+                add(s, "identity.missing", track_path + ".trackId");
+                continue;
+            }
+            register_id(track_id, track_path + ".trackId");
+            if (!exact(track, {"trackId", "version", "kind", "target", "channels"}))
+                add(s, "ANIMATION_INVALID_TRACK", track_path, str(track_id));
+            const std::string kind = str(field(track, "kind"));
+            const std::set<std::string> transition_kinds = {"GeometryBlendTrack", "AppearanceTrack", "OpacityTrack", "PresenceTrack", "DrawOrderTrack", "ClippingTrack"};
+            const std::set<std::string> clip_kinds = {"TransformTrack", "BoneTrack", "DeformerTrack", "MeshDeformationTrack", "OpacityTrack", "PresenceTrack", "DrawOrderTrack", "ClippingTrack"};
+            if (kind == "CameraTrack") ++camera_count;
+            if ((kind == "CameraTrack" && (!sole || sole->kind != "Sequence")) ||
+                (sole && sole->kind == "Sequence" && kind != "CameraTrack") ||
+                (sole && sole->kind == "Transition" && !transition_kinds.count(kind)) ||
+                (sole && sole->kind == "AnimationClip" && !clip_kinds.count(kind)))
+                add(s, "ANIMATION_TRACK_OWNER_INVALID", track_path + ".kind", str(track_id).empty() ? str(id) : str(track_id));
+        }
+        if (sole && sole->kind == "Sequence" && camera_count > 1)
+            add(s, "SEQUENCE_CAMERA_TRACK_MULTIPLE", path + ".tracks", sole->id);
+        auto entries_validation = [&](const Value& values, const std::string& collection) {
+            for (size_t j = 0; j < values.get<Array>().size(); ++j) {
+                const Value& item = values.get<Array>()[j];
+                const std::string item_path = path + "." + collection + "." + std::to_string(j);
+                const Value& item_id = field(item, "id");
+                if (!item.is<Object>() || !item_id.is<std::string>() || str(item_id).empty())
+                    add(s, "identity.missing", item_path + ".id");
+                else register_id(item_id, item_path + ".id");
+            }
+        };
+        entries_validation(events, "events");
+        entries_validation(regions, "regions");
+    }
+}
+template <typename Register>
+void validate_clipping(Snapshot& s, const Value& project, Register&& register_id) {
+    const Value& values = field(project, "clippingBindings");
+    if (!values.is<Array>()) { add(s, "collection.invalid", "clippingBindings"); return; }
+    const Value& nodes = field(field(project, "scene"), "nodes");
+    std::map<std::string, std::string> targets;
+    std::map<std::string, std::pair<std::string, std::string>> dependencies;
+    for (size_t i = 0; i < values.get<Array>().size(); ++i) {
+        const Value& binding = values.get<Array>()[i];
+        const std::string path = "clippingBindings." + std::to_string(i);
+        if (!binding.is<Object>()) { add(s, "CLIPPING_BINDING_INVALID", path); continue; }
+        const std::string id = str(field(binding, "id"));
+        const std::string target = str(field(binding, "targetNodeId"));
+        const std::string source = str(field(binding, "sourceNodeId"));
+        if (nonblank(field(binding, "id"))) register_id(field(binding, "id"), path + ".id");
+        else add(s, "identity.missing", path + ".id");
+        if (!exact(binding, {"enabled", "id", "mode", "sourceNodeId", "targetNodeId"}))
+            add(s, "CLIPPING_BINDING_INVALID", path, id);
+        auto found_node = [&](const std::string& node) {
+            return nodes.is<Object>() && nodes.get<Object>().find(node) != nodes.get<Object>().end();
+        };
+        auto part_node = [&](const std::string& node) {
+            return found_node(node) && str(field(field(nodes, node), "kind")) == "part";
+        };
+        if (!nonblank(field(binding, "targetNodeId")) || !found_node(target))
+            add(s, "CLIPPING_TARGET_MISSING", path + ".targetNodeId", id);
+        else if (!part_node(target)) add(s, "CLIPPING_TARGET_NOT_RENDERABLE", path + ".targetNodeId", id);
+        if (!nonblank(field(binding, "sourceNodeId")) || !found_node(source))
+            add(s, "CLIPPING_SOURCE_MISSING", path + ".sourceNodeId", id);
+        else if (!part_node(source)) add(s, "CLIPPING_SOURCE_NOT_RENDERABLE", path + ".sourceNodeId", id);
+        if (nonblank(field(binding, "targetNodeId")) && target == source)
+            add(s, "CLIPPING_SELF_REFERENCE", path, id);
+        if (str(field(binding, "mode")) != "inside") add(s, "CLIPPING_MODE_UNSUPPORTED", path + ".mode", id);
+        const Value& enabled = field(binding, "enabled");
+        if (!enabled.is<bool>()) add(s, "CLIPPING_BINDING_INVALID", path + ".enabled", id);
+        if (nonblank(field(binding, "targetNodeId")) && !targets.emplace(target, id).second)
+            add(s, "CLIPPING_TARGET_ALREADY_BOUND", path + ".targetNodeId", id);
+        if (nonblank(field(binding, "id")) && nonblank(field(binding, "targetNodeId")) &&
+            nonblank(field(binding, "sourceNodeId")) && str(field(binding, "mode")) == "inside" &&
+            enabled.is<bool>() && enabled.get<bool>() && target != source && part_node(target) &&
+            part_node(source) && !dependencies.count(target))
+            dependencies.emplace(target, std::make_pair(source, id));
+    }
+    std::set<std::string> visited, cycle_keys;
+    for (const auto& [start, unused] : dependencies) {
+        (void)unused;
+        std::vector<std::string> stack;
+        std::map<std::string, size_t> position;
+        std::string current = start;
+        while (dependencies.count(current) && !visited.count(current)) {
+            if (position.count(current)) {
+                auto first = stack.begin() + static_cast<std::ptrdiff_t>(position[current]);
+                std::string least;
+                for (auto it = first; it != stack.end(); ++it) {
+                    const auto& id = dependencies.at(*it).second;
+                    if (least.empty() || id < least) least = id;
+                }
+                std::vector<std::string> nodes_in_cycle(first, stack.end());
+                std::sort(nodes_in_cycle.begin(), nodes_in_cycle.end());
+                std::string key;
+                for (const auto& node : nodes_in_cycle) { key += node; key.push_back('\0'); }
+                if (cycle_keys.insert(key).second) add(s, "CLIPPING_CYCLE", "clippingBindings", least);
+                break;
+            }
+            position.emplace(current, stack.size());
+            stack.push_back(current);
+            current = dependencies.at(current).first;
+        }
+        visited.insert(stack.begin(), stack.end());
+    }
+}
 const Value& find_id(const Value& values, const Value& id) {
     static const Value missing;
     if (values.is<Array>()) for (const auto& value : values.get<Array>())
@@ -862,6 +1029,8 @@ void validate(Snapshot& s, const Value& project) {
     }
     for (const char* name : {"rig", "animation", "temporalPrograms", "clippingBindings", "renderSettings"})
         s.unsupported_sections[name] = has(project, name);
+    validate_temporal_ownership(s, project, register_id);
+    validate_clipping(s, project, register_id);
     validate_animation_clips(s, project);
     validate_deformation_samples(s, project);
     validate_rotation_constraints(s, project);

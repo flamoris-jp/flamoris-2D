@@ -105,6 +105,35 @@ variant("skin_binding", hierarchy, p => {
       { boneId: "missing", weight: 0.3 }, { boneId: "missing", weight: 0.3 }] },
     { vertexId: "b", influences: [{ boneId: "missing", weight: 1 }] }] });
 });
+variant("temporal_program_shape", minimal, p => {
+  p.temporalPrograms.push({ id: "program_1", durationTicks: 0, tracks: [], events: [], regions: [], extra: true });
+});
+variant("temporal_ownership", minimal, p => {
+  p.temporalPrograms.push({ id: "program_1", durationTicks: 120000, tracks: [], events: [], regions: [] });
+  p.animation.clips.push({ id: "clip_1", displayName: "Clip", temporalProgramId: "program_1",
+    defaultLoopMode: "once", metadata: {} });
+  p.sequences.push({ id: "sequence_1", displayName: "Sequence", temporalProgramId: "program_1",
+    viewLaneItems: [], clipInstances: [], metadata: {} });
+});
+variant("temporal_track_owner", minimal, p => {
+  p.temporalPrograms.push({ id: "program_1", durationTicks: 120000,
+    tracks: [{ trackId: "track_1", version: 1, kind: "CameraTrack", target: { cameraId: "main" }, channels: {} }],
+    events: [], regions: [] });
+});
+variant("clipping_shape_references", hierarchy, p => {
+  p.clippingBindings.push({ id: "binding_1", targetNodeId: "part_1", sourceNodeId: "missing",
+    mode: "outside", enabled: "yes", extra: 1 });
+  p.clippingBindings.push({ id: "binding_2", targetNodeId: "part_1", sourceNodeId: "part_1",
+    mode: "inside", enabled: true });
+});
+variant("clipping_cycle", hierarchy, p => {
+  const rootId = p.scene.rootId;
+  const other = createSceneNode({ id: "part_2", displayName: "後髪", parentId: rootId });
+  p.scene.nodes[rootId].children.push(other.id);
+  p.scene.nodes[other.id] = other;
+  p.clippingBindings.push({ id: "binding_1", targetNodeId: "part_1", sourceNodeId: "part_2", mode: "inside", enabled: true });
+  p.clippingBindings.push({ id: "binding_2", targetNodeId: "part_2", sourceNodeId: "part_1", mode: "inside", enabled: true });
+});
 
 const subset = new Set([
   "project.invalid", "project.unsupported_schema", "ANIMATION_INVALID_TIMEBASE", "project.missing_id",
@@ -144,6 +173,11 @@ const subset = new Set([
   "SKIN_BINDING_INFLUENCE_ORDER_INVALID", "SKIN_BINDING_WEIGHT_INVALID",
   "SKIN_BINDING_WEIGHT_NOT_NORMALIZED", "SKIN_BINDING_WEIGHT_NOT_CANONICAL",
   "SKIN_BINDING_BONE_HIERARCHY_INCOMPATIBLE",
+  "ANIMATION_INVALID_PROGRAM", "ANIMATION_INVALID_DURATION", "TEMPORAL_PROGRAM_OWNERSHIP_CONFLICT",
+  "ANIMATION_TRACK_OWNER_INVALID", "SEQUENCE_CAMERA_TRACK_MULTIPLE",
+  "CLIPPING_BINDING_INVALID", "CLIPPING_TARGET_MISSING", "CLIPPING_TARGET_NOT_RENDERABLE",
+  "CLIPPING_SOURCE_MISSING", "CLIPPING_SOURCE_NOT_RENDERABLE", "CLIPPING_SELF_REFERENCE",
+  "CLIPPING_MODE_UNSUPPORTED", "CLIPPING_TARGET_ALREADY_BOUND", "CLIPPING_CYCLE",
 ]);
 const fixtures = cases.map(([name, project]) => ({ name, project,
   expected: validateProject(project).filter(issue => subset.has(issue.code))
