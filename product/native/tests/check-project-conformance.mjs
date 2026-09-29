@@ -465,6 +465,15 @@ variant("evaluated_clipping_invalid_mesh_skips_evaluation", evaluatedClipping, p
   p.transitions[0].partTransitions[0].fromKeyformId = "missing";
 });
 
+for (const value of [null, false, [], "bad", {}]) {
+  variant("temporal_malformed_duration_" + JSON.stringify(value), evaluatedClipping, p => { p.temporalPrograms[0].durationTicks = value; });
+  variant("temporal_unknown_owned_kind_" + JSON.stringify(value), evaluatedClipping, p => { p.temporalPrograms[0].tracks[0].kind = value; });
+}
+for (const field of ["events", "regions"]) {
+  variant("clipping_unevaluable_" + field, evaluatedClipping, p => { p.temporalPrograms[0][field] = null; });
+}
+variant("clipping_unevaluable_overrides", evaluatedClipping, p => { p.transitions[0].diagnosticOverrides = {}; });
+
 // Synthetic populated and rejection Projects retained from the existing Product
 // domain tests. Expected diagnostics are always recomputed from current JS.
 for (const { name, project } of JSON.parse(await readFile(

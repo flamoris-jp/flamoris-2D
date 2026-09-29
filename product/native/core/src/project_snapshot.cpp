@@ -1167,6 +1167,11 @@ void validate_evaluated_clipping(Snapshot& s, const Value& project, std::set<std
     for (const auto& transition : ordered) {
         const Value& program = find_id(field(project, "temporalPrograms"), field(transition, "temporalProgramId"));
         if (!positive_time(field(program, "durationTicks"))) continue;
+        // evaluateTransition first samples the whole TemporalProgram and finally
+        // attaches overrides. Their iteration errors suppress derived cycles.
+        if ((!field(program, "events").is<Array>() && !field(program, "events").is<std::string>()) ||
+            (!field(program, "regions").is<Array>() && !field(program, "regions").is<std::string>()) ||
+            (js_truthy(field(transition, "diagnosticOverrides")) && !field(transition, "diagnosticOverrides").is<Array>())) continue;
         const double duration = field(program, "durationTicks").get<double>();
         std::set<double> times{0, duration};
         if (duration > 1) times.insert(1);
@@ -1333,6 +1338,33 @@ void validate_temporal_ownership(Snapshot& s, const Value& project, Register&& r
         for (const auto& entry : entries)
             add(s, "TEMPORAL_PROGRAM_OWNERSHIP_CONFLICT", entry.path, entry.id);
     }
+    // Owner-track validation is independent of structural program/track errors
+    // in JS; do not let a malformed kind/ID/collection bypass it.
+    for (size_t i = 0; i < programs.get<Array>().size(); ++i) {
+        const Value& program = programs.get<Array>()[i], &tracks = field(program, "tracks");
+        if (!tracks.is<Array>()) continue;
+        const std::string path = "temporalPrograms." + std::to_string(i);
+        const auto found = owners.find(str(field(program, "id")));
+        const Owner* sole = found != owners.end() && found->second.size() == 1 ? &found->second[0] : nullptr;
+        size_t cameras = 0;
+        const std::set<std::string> transition_kinds = {"GeometryBlendTrack", "AppearanceTrack", "OpacityTrack", "PresenceTrack", "DrawOrderTrack", "ClippingTrack"};
+        const std::set<std::string> clip_kinds = {"TransformTrack", "BoneTrack", "DeformerTrack", "MeshDeformationTrack", "OpacityTrack", "PresenceTrack", "DrawOrderTrack", "ClippingTrack"};
+        for (size_t j = 0; j < tracks.get<Array>().size(); ++j) {
+            const Value& track = tracks.get<Array>()[j];
+            const std::string kind = str(field(track, "kind"));
+            if (kind == "CameraTrack") ++cameras;
+            if ((kind == "CameraTrack" && (!sole || sole->kind != "Sequence")) ||
+                (sole && sole->kind == "Sequence" && kind != "CameraTrack") ||
+                (sole && sole->kind == "Transition" && !transition_kinds.count(kind)) ||
+                (sole && sole->kind == "AnimationClip" && !clip_kinds.count(kind))) {
+                const std::string id = str(field(track, "trackId"));
+                add(s, "ANIMATION_TRACK_OWNER_INVALID", path + ".tracks." + std::to_string(j) + ".kind",
+                    id.empty() ? str(field(program, "id")) : id);
+            }
+        }
+        if (sole && sole->kind == "Sequence" && cameras > 1)
+            add(s, "SEQUENCE_CAMERA_TRACK_MULTIPLE", path + ".tracks", sole->id);
+    }
     for (size_t i = 0; i < programs.get<Array>().size(); ++i) {
         const Value& program = programs.get<Array>()[i];
         const std::string path = "temporalPrograms." + std::to_string(i);
@@ -1354,11 +1386,6 @@ void validate_temporal_ownership(Snapshot& s, const Value& project, Register&& r
             add(s, "ANIMATION_INVALID_PROGRAM", path, str(id));
             continue;
         }
-        const auto found = owners.find(str(id));
-        const std::vector<Owner> empty;
-        const auto& entries = found == owners.end() ? empty : found->second;
-        const Owner* sole = entries.size() == 1 ? &entries[0] : nullptr;
-        size_t camera_count = 0;
         for (size_t j = 0; j < tracks.get<Array>().size(); ++j) {
             const Value& track = tracks.get<Array>()[j];
             const std::string track_path = path + ".tracks." + std::to_string(j);
@@ -1406,7 +1433,7 @@ void validate_temporal_ownership(Snapshot& s, const Value& project, Register&& r
                     const Value& tick = field(key, "timeTicks");
                     if (!valid_time(tick)) add(s, "ANIMATION_INVALID_TIME", key_path + ".timeTicks", str(key_id));
                     else {
-                        if (finite(duration) && tick.get<double>() > duration.get<double>())
+                        if (tick.get<double>() > js_number(duration))
                             add(s, "ANIMATION_KEY_OUTSIDE_PROGRAM", key_path + ".timeTicks", str(key_id));
                         if (!times.insert(tick.get<double>()).second)
                             add(s, "ANIMATION_DUPLICATE_KEY_TIME", key_path + ".timeTicks", str(key_id));
@@ -1433,14 +1460,7 @@ void validate_temporal_ownership(Snapshot& s, const Value& project, Register&& r
                     }
                 }
             }
-            const std::set<std::string> transition_kinds = {"GeometryBlendTrack", "AppearanceTrack", "OpacityTrack", "PresenceTrack", "DrawOrderTrack", "ClippingTrack"};
-            const std::set<std::string> clip_kinds = {"TransformTrack", "BoneTrack", "DeformerTrack", "MeshDeformationTrack", "OpacityTrack", "PresenceTrack", "DrawOrderTrack", "ClippingTrack"};
-            if (kind == "CameraTrack") ++camera_count;
-            if ((kind == "CameraTrack" && (!sole || sole->kind != "Sequence")) ||
-                (sole && sole->kind == "Sequence" && kind != "CameraTrack") ||
-                (sole && sole->kind == "Transition" && !transition_kinds.count(kind)) ||
-                (sole && sole->kind == "AnimationClip" && !clip_kinds.count(kind)))
-                add(s, "ANIMATION_TRACK_OWNER_INVALID", track_path + ".kind", str(track_id).empty() ? str(id) : str(track_id));
+
         }
         std::set<std::string> channel_owners;
         for (const auto& track : tracks.get<Array>()) {
@@ -1490,8 +1510,6 @@ void validate_temporal_ownership(Snapshot& s, const Value& project, Register&& r
                 if (count > 1) add(s, "ANIMATION_TRACK_CONFLICT", path + ".tracks", str(id));
             }
         }
-        if (sole && sole->kind == "Sequence" && camera_count > 1)
-            add(s, "SEQUENCE_CAMERA_TRACK_MULTIPLE", path + ".tracks", sole->id);
         const std::set<std::string> event_types = {"contact", "release", "blink", "occlusion_change",
             "depth_crossing", "pose_switch", "marker"};
         const std::set<std::string> region_types = {"idle", "anticipation", "action", "contact", "settle", "hold"};
