@@ -16,7 +16,6 @@
   <ItemGroup>
     <PackageReference Include="Flamoris.Mcp.Core" Version="1.2.0" GeneratePathProperty="true" />
     <ProjectReference Include="..\Flamoris2D.Rendering\Flamoris2D.Rendering.csproj" />
-    <ProjectReference Include="..\Flamoris2D.Core.Interop\Flamoris2D.Core.Interop.csproj" />
     <ProjectReference Include="..\Flamoris2D.ProductHost.Client\Flamoris2D.ProductHost.Client.csproj" />
   </ItemGroup>
   <Import Project="..\..\ProductHost.files.props" />
