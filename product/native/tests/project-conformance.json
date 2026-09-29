@@ -2617,5 +2617,148 @@
         "entityId": "rotation_1"
       }
     ]
+  },
+  {
+    "name": "ik_constraints",
+    "project": {
+      "schemaVersion": 15,
+      "timebaseTicksPerSecond": 120000,
+      "id": "project_あ",
+      "displayName": "夜明け",
+      "canvas": {
+        "width": 1920,
+        "height": 1080
+      },
+      "sourceAssets": [],
+      "semanticSlots": [],
+      "keyArts": [],
+      "scene": {
+        "rootId": "node_1",
+        "nodes": {
+          "node_1": {
+            "id": "node_1",
+            "kind": "group",
+            "displayName": "夜明け",
+            "sourceRef": null,
+            "parentId": null,
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          }
+        }
+      },
+      "meshes": [],
+      "meshTopologies": [],
+      "meshKeyforms": [],
+      "meshFormCorrectionKeyforms": [],
+      "clippingBindings": [],
+      "rig": {
+        "deformers": [],
+        "warpControlPoints": [],
+        "warpDeformerKeyforms": [],
+        "bones": [],
+        "bonePoseKeyforms": [],
+        "rigidBoneBindings": [],
+        "skinBindings": [],
+        "boneRotationConstraints": [],
+        "twoBoneIkConstraints": [
+          {
+            "id": "ik_1",
+            "rootBoneId": "r",
+            "midBoneId": "r",
+            "endBoneId": "e",
+            "enabled": true,
+            "bendDirection": "none"
+          },
+          {
+            "id": "ik_2",
+            "rootBoneId": "r",
+            "midBoneId": "m",
+            "endBoneId": "e",
+            "enabled": true,
+            "bendDirection": "clockwise"
+          }
+        ],
+        "constraints": []
+      },
+      "transitions": [],
+      "temporalPrograms": [],
+      "animation": {
+        "clips": [],
+        "deformationSamples": []
+      },
+      "sequences": [],
+      "renderSettings": {
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "alpha": true
+      }
+    },
+    "expected": [
+      {
+        "code": "TWO_BONE_IK_BONE_MISSING",
+        "path": "rig.twoBoneIkConstraints.0.endBoneId",
+        "entityId": "ik_1"
+      },
+      {
+        "code": "TWO_BONE_IK_BONE_MISSING",
+        "path": "rig.twoBoneIkConstraints.0.midBoneId",
+        "entityId": "ik_1"
+      },
+      {
+        "code": "TWO_BONE_IK_BONE_MISSING",
+        "path": "rig.twoBoneIkConstraints.0.rootBoneId",
+        "entityId": "ik_1"
+      },
+      {
+        "code": "TWO_BONE_IK_BONE_MISSING",
+        "path": "rig.twoBoneIkConstraints.1.endBoneId",
+        "entityId": "ik_2"
+      },
+      {
+        "code": "TWO_BONE_IK_BONE_MISSING",
+        "path": "rig.twoBoneIkConstraints.1.midBoneId",
+        "entityId": "ik_2"
+      },
+      {
+        "code": "TWO_BONE_IK_BONE_MISSING",
+        "path": "rig.twoBoneIkConstraints.1.rootBoneId",
+        "entityId": "ik_2"
+      },
+      {
+        "code": "TWO_BONE_IK_BONES_INVALID",
+        "path": "rig.twoBoneIkConstraints.0",
+        "entityId": "ik_1"
+      },
+      {
+        "code": "TWO_BONE_IK_END_CONFLICT",
+        "path": "rig.twoBoneIkConstraints.1.endBoneId",
+        "entityId": "ik_2"
+      },
+      {
+        "code": "TWO_BONE_IK_INVALID",
+        "path": "rig.twoBoneIkConstraints.0",
+        "entityId": "ik_1"
+      }
+    ]
   }
 ]

@@ -65,6 +65,11 @@ variant("rotation_constraints", minimal, p => {
     { id: "rotation_1", boneId: "missing", enabled: true, minRotation: 2, maxRotation: 1 },
     { id: "rotation_2", boneId: "missing", enabled: true, minRotation: -1, maxRotation: 1 });
 });
+variant("ik_constraints", minimal, p => {
+  p.rig.twoBoneIkConstraints.push(
+    { id: "ik_1", rootBoneId: "r", midBoneId: "r", endBoneId: "e", enabled: true, bendDirection: "none" },
+    { id: "ik_2", rootBoneId: "r", midBoneId: "m", endBoneId: "e", enabled: true, bendDirection: "clockwise" });
+});
 
 const subset = new Set([
   "project.invalid", "project.unsupported_schema", "ANIMATION_INVALID_TIMEBASE", "project.missing_id",
@@ -81,6 +86,8 @@ const subset = new Set([
   "ANIMATION_CLIP_INVALID", "ANIMATION_CLIP_PROGRAM_REFERENCE_INVALID", "ANIMATION_CLIP_LOOP_MODE_INVALID",
   "BONE_ROTATION_CONSTRAINT_INVALID", "BONE_ROTATION_CONSTRAINT_BONE_MISSING",
   "BONE_ROTATION_CONSTRAINT_CONFLICT",
+  "TWO_BONE_IK_INVALID", "TWO_BONE_IK_BONES_INVALID", "TWO_BONE_IK_BONE_MISSING",
+  "TWO_BONE_IK_HIERARCHY_INVALID", "TWO_BONE_IK_CHAIN_GEOMETRY_INVALID", "TWO_BONE_IK_END_CONFLICT",
 ]);
 const fixtures = cases.map(([name, project]) => ({ name, project,
   expected: validateProject(project).filter(issue => subset.has(issue.code))

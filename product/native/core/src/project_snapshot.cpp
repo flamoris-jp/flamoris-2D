@@ -190,6 +190,59 @@ void validate_rotation_constraints(Snapshot& s, const Value& project) {
         }
     }
 }
+void validate_ik_constraints(Snapshot& s, const Value& project) {
+    const Value& rig = field(project, "rig");
+    const Value& constraints = field(rig, "twoBoneIkConstraints");
+    if (!constraints.is<Array>()) { add(s, "collection.invalid", "rig.twoBoneIkConstraints"); return; }
+    const Value& bones = field(rig, "bones");
+    const Value& nodes = field(field(project, "scene"), "nodes");
+    std::map<std::string, std::string> enabled_end;
+    auto contiguous = [](const Value& parent, const Value& child) {
+        const Value& length = field(parent, "length");
+        const Value& rest = field(child, "restLocalTransform");
+        const Value& x = field(rest, "x"), &y = field(rest, "y");
+        return finite(length) && finite(x) && finite(y) &&
+            std::abs(x.get<double>() - length.get<double>()) <= 1e-9 && std::abs(y.get<double>()) <= 1e-9;
+    };
+    for (size_t i = 0; i < constraints.get<Array>().size(); ++i) {
+        const Value& item = constraints.get<Array>()[i];
+        const std::string path = "rig.twoBoneIkConstraints." + std::to_string(i);
+        const std::string id = str(field(item, "id"));
+        if (!exact(item, {"id", "rootBoneId", "midBoneId", "endBoneId", "enabled", "bendDirection"}))
+            add(s, "TWO_BONE_IK_INVALID", path, id);
+        if (!nonblank(field(item, "id"))) add(s, "identity.missing", path + ".id");
+        const char* roles[] = {"root", "mid", "end"};
+        const char* names[] = {"rootBoneId", "midBoneId", "endBoneId"};
+        const Value* references[] = {&field(item, names[0]), &field(item, names[1]), &field(item, names[2])};
+        std::set<std::string> unique;
+        bool distinct = true, all_present = true;
+        for (size_t j = 0; j < 3; ++j) {
+            if (!nonblank(*references[j]) || !unique.insert(str(*references[j])).second) distinct = false;
+            if (!contains_id(bones, *references[j])) {
+                add(s, "TWO_BONE_IK_BONE_MISSING", path + "." + roles[j] + "BoneId", id);
+                all_present = false;
+            }
+        }
+        if (!distinct) add(s, "TWO_BONE_IK_BONES_INVALID", path, id);
+        if (all_present) {
+            const auto& mid_node = field(nodes, str(*references[1]));
+            const auto& end_node = field(nodes, str(*references[2]));
+            if (field(mid_node, "parentId") != *references[0] || field(end_node, "parentId") != *references[1])
+                add(s, "TWO_BONE_IK_HIERARCHY_INVALID", path, id);
+            if (!contiguous(find_id(bones, *references[0]), find_id(bones, *references[1])) ||
+                !contiguous(find_id(bones, *references[1]), find_id(bones, *references[2])))
+                add(s, "TWO_BONE_IK_CHAIN_GEOMETRY_INVALID", path, id);
+        }
+        const Value& enabled = field(item, "enabled");
+        const std::string bend = str(field(item, "bendDirection"));
+        if (!enabled.is<bool>() || (bend != "clockwise" && bend != "counterclockwise"))
+            add(s, "TWO_BONE_IK_INVALID", path, id);
+        if (enabled.is<bool>() && enabled.get<bool>() && nonblank(*references[2])) {
+            if (!enabled_end.emplace(str(*references[2]), id).second)
+                add(s, "TWO_BONE_IK_END_CONFLICT", path + ".endBoneId", id);
+        }
+    }
+}
 bool utf8(const uint8_t* data, uint32_t length) {
     for (uint32_t i = 0; i < length;) {
         uint8_t c = data[i++];
@@ -321,6 +374,7 @@ void validate(Snapshot& s, const Value& project) {
     validate_animation_clips(s, project);
     validate_deformation_samples(s, project);
     validate_rotation_constraints(s, project);
+    validate_ik_constraints(s, project);
     if (root != node_map.end()) {
         std::set<std::string> visiting, visited;
         auto walk = [&](auto&& self, const std::string& id) -> void {
