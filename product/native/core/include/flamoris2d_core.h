@@ -4,7 +4,11 @@
 #include <stdint.h>
 
 #ifdef _WIN32
+#ifdef FL2D_CORE_BUILD
 #define FL2D_API __declspec(dllexport)
+#else
+#define FL2D_API __declspec(dllimport)
+#endif
 #define FL2D_CALL __cdecl
 #else
 #define FL2D_API __attribute__((visibility("default")))
@@ -17,12 +21,14 @@ extern "C" {
 
 typedef struct fl2d_engine fl2d_engine;
 
-typedef enum fl2d_status {
+typedef int32_t fl2d_status;
+
+enum {
     FL2D_OK = 0,
     FL2D_INVALID_ARGUMENT = 1,
     FL2D_OUT_OF_MEMORY = 2,
     FL2D_INTERNAL_ERROR = 3
-} fl2d_status;
+};
 
 typedef struct fl2d_frame_rate {
     int64_t numerator;
