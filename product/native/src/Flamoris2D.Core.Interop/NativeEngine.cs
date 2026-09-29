@@ -21,6 +21,15 @@ public struct NativeFrameRate
     public long Denominator;
 }
 
+[StructLayout(LayoutKind.Sequential)]
+public struct NativeNodeState
+{
+    public double PositionX, PositionY, Rotation;
+    public double ScaleX, ScaleY, PivotX, PivotY;
+    public double Opacity;
+    public int Visible;
+}
+
 internal static class NativeMethods
 {
     private const string Library = "Flamoris2D.Core.Native";
@@ -56,6 +65,10 @@ internal static class NativeMethods
     internal static extern NativeStatus SnapshotNodeString(NativeSnapshot snapshot,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string id, [MarshalAs(UnmanagedType.LPUTF8Str)] string field,
         byte[]? buffer, uint capacity, out uint required);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_snapshot_node_state")]
+    internal static extern NativeStatus SnapshotNodeState(NativeSnapshot snapshot,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string id, out NativeNodeState state);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_snapshot_issue_string")]
     internal static extern NativeStatus SnapshotIssueString(NativeSnapshot snapshot,
@@ -125,6 +138,13 @@ public sealed class NativeSnapshot : SafeHandle
         EnsureOpen();
         return Read((byte[]? buffer, uint capacity, out uint required) =>
             NativeMethods.SnapshotNodeString(this, nodeId, field, buffer, capacity, out required));
+    }
+    public NativeNodeState NodeState(string nodeId)
+    {
+        EnsureOpen();
+        var status = NativeMethods.SnapshotNodeState(this, nodeId, out var state);
+        if (status != NativeStatus.Ok) throw new InvalidOperationException($"Native node state: {status}");
+        return state;
     }
     public NativeProjectIssue Issue(uint index)
     {

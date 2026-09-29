@@ -46,6 +46,30 @@ static void check_project_snapshots() {
         std::string root(length, '\0');
         assert(fl2d_snapshot_string(snapshot, "rootId", root.data(), length, &length) == FL2D_OK);
         assert(fl2d_snapshot_node_string(snapshot, root.c_str(), "kind", nullptr, 0, &length) == FL2D_BUFFER_TOO_SMALL);
+        const auto& project = fixture.at("project").get<picojson::object>();
+        for (const auto& [key, value] : project.at("scene").get<picojson::object>().at("nodes").get<picojson::object>()) {
+            const auto& node = value.get<picojson::object>();
+            const auto& id = node.at("id").get<std::string>();
+            assert(fl2d_snapshot_node_string(snapshot, id.c_str(), "id", nullptr, 0, &length) == FL2D_BUFFER_TOO_SMALL);
+            std::string found(length, '\0');
+            assert(fl2d_snapshot_node_string(snapshot, id.c_str(), "id", found.data(), length, &length) == FL2D_OK);
+            assert(found.c_str() == id);
+            if (key != id) assert(fl2d_snapshot_node_string(snapshot, key.c_str(), "id", nullptr, 0, &length) == FL2D_INVALID_ARGUMENT);
+            fl2d_node_state state{};
+            assert(fl2d_snapshot_node_state(snapshot, id.c_str(), &state) == FL2D_OK);
+            auto number = [](const picojson::value& v) { return v.is<double>() ? v.get<double>() : 0.0; };
+            const auto& transform = node.at("transform").get<picojson::object>();
+            const auto& position = transform.at("position").get<picojson::object>();
+            const auto& scale = transform.at("scale").get<picojson::object>();
+            const auto& pivot = transform.at("pivot").get<picojson::object>();
+            assert(state.position_x == number(position.at("x")));
+            if (position.find("y") != position.end()) assert(state.position_y == number(position.at("y")));
+            assert(state.rotation == number(transform.at("rotation")));
+            assert(state.scale_x == number(scale.at("x")) && state.scale_y == number(scale.at("y")));
+            assert(state.pivot_x == number(pivot.at("x")) && state.pivot_y == number(pivot.at("y")));
+            assert(state.visible == static_cast<int32_t>(node.at("visible").get<bool>()));
+            assert(state.opacity == number(node.at("opacity")));
+        }
         fl2d_snapshot_destroy(snapshot);
     }
     fl2d_snapshot* result = reinterpret_cast<fl2d_snapshot*>(1);
@@ -62,7 +86,7 @@ static_assert(sizeof(fl2d_status) == sizeof(int32_t), "ABI status must be 32-bit
 
 int main() {
     int32_t major = 0, minor = -1;
-    assert(fl2d_abi_version(&major, &minor) == FL2D_OK && major == 1 && minor == 1);
+    assert(fl2d_abi_version(&major, &minor) == FL2D_OK && major == 1 && minor == 2);
     assert(fl2d_abi_version(nullptr, &minor) == FL2D_INVALID_ARGUMENT);
     fl2d_engine* engine = nullptr;
     assert(fl2d_engine_create(&engine) == FL2D_OK && engine);

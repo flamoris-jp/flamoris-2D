@@ -1190,5 +1190,229 @@
         "entityId": "project_あ"
       }
     ]
+  },
+  {
+    "name": "node_state",
+    "project": {
+      "schemaVersion": 15,
+      "timebaseTicksPerSecond": 120000,
+      "id": "project_あ",
+      "displayName": "夜明け",
+      "canvas": {
+        "width": 1920,
+        "height": 1080
+      },
+      "sourceAssets": [],
+      "semanticSlots": [],
+      "keyArts": [],
+      "scene": {
+        "rootId": "node_1",
+        "nodes": {
+          "node_1": {
+            "id": "node_1",
+            "kind": "group",
+            "displayName": "夜明け",
+            "sourceRef": null,
+            "parentId": null,
+            "children": [
+              "part_1"
+            ],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          },
+          "part_1": {
+            "id": "part_1",
+            "kind": "part",
+            "displayName": "前髪",
+            "sourceRef": null,
+            "parentId": "node_1",
+            "children": [],
+            "visible": false,
+            "locked": false,
+            "opacity": 0.375,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 12.5,
+                "y": -3
+              },
+              "rotation": 0.75,
+              "scale": {
+                "x": 1.25,
+                "y": -2
+              },
+              "pivot": {
+                "x": 4,
+                "y": 6.5
+              }
+            }
+          }
+        }
+      },
+      "meshes": [],
+      "meshTopologies": [],
+      "meshKeyforms": [],
+      "meshFormCorrectionKeyforms": [],
+      "clippingBindings": [],
+      "rig": {
+        "deformers": [],
+        "warpControlPoints": [],
+        "warpDeformerKeyforms": [],
+        "bones": [],
+        "bonePoseKeyforms": [],
+        "rigidBoneBindings": [],
+        "skinBindings": [],
+        "boneRotationConstraints": [],
+        "twoBoneIkConstraints": [],
+        "constraints": []
+      },
+      "transitions": [],
+      "temporalPrograms": [],
+      "animation": {
+        "clips": [],
+        "deformationSamples": []
+      },
+      "sequences": [],
+      "renderSettings": {
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "alpha": true
+      }
+    },
+    "expected": []
+  },
+  {
+    "name": "key_id_mismatch",
+    "project": {
+      "schemaVersion": 15,
+      "timebaseTicksPerSecond": 120000,
+      "id": "project_あ",
+      "displayName": "夜明け",
+      "canvas": {
+        "width": 1920,
+        "height": 1080
+      },
+      "sourceAssets": [],
+      "semanticSlots": [],
+      "keyArts": [],
+      "scene": {
+        "rootId": "node_1",
+        "nodes": {
+          "node_1": {
+            "id": "node_1",
+            "kind": "group",
+            "displayName": "夜明け",
+            "sourceRef": null,
+            "parentId": null,
+            "children": [
+              "part_1"
+            ],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          },
+          "part_1": {
+            "id": "actual_part_id",
+            "kind": "part",
+            "displayName": "前髪",
+            "sourceRef": null,
+            "parentId": "node_1",
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          }
+        }
+      },
+      "meshes": [],
+      "meshTopologies": [],
+      "meshKeyforms": [],
+      "meshFormCorrectionKeyforms": [],
+      "clippingBindings": [],
+      "rig": {
+        "deformers": [],
+        "warpControlPoints": [],
+        "warpDeformerKeyforms": [],
+        "bones": [],
+        "bonePoseKeyforms": [],
+        "rigidBoneBindings": [],
+        "skinBindings": [],
+        "boneRotationConstraints": [],
+        "twoBoneIkConstraints": [],
+        "constraints": []
+      },
+      "transitions": [],
+      "temporalPrograms": [],
+      "animation": {
+        "clips": [],
+        "deformationSamples": []
+      },
+      "sequences": [],
+      "renderSettings": {
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "alpha": true
+      }
+    },
+    "expected": [
+      {
+        "code": "scene.key_id_mismatch",
+        "path": "scene.nodes.part_1.id",
+        "entityId": "actual_part_id"
+      }
+    ]
   }
 ]

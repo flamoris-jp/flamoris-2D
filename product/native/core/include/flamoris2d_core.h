@@ -35,6 +35,13 @@ enum {
 };
 
 typedef struct fl2d_snapshot fl2d_snapshot;
+/* ABI 1.2: numeric scene state, with a fixed field order and 32-bit visibility. */
+typedef struct fl2d_node_state {
+    double position_x, position_y, rotation;
+    double scale_x, scale_y, pivot_x, pivot_y;
+    double opacity;
+    int32_t visible;
+} fl2d_node_state;
 /* Up to 1 MiB of UTF-8 JSON. The input is copied; caller retains its bytes.
  * Validation issues are retained even for invalid Product data. Only malformed
  * interchange input fails creation. Returned strings are UTF-8 caller buffers. */
@@ -49,6 +56,9 @@ FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_string(const fl2d_snapshot* snapsho
     const char* field, char* buffer, uint32_t capacity, uint32_t* required);
 FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_node_string(const fl2d_snapshot* snapshot,
     const char* node_id, const char* field, char* buffer, uint32_t capacity, uint32_t* required);
+/* node_id is the node's stable id, not its scene.nodes object key. */
+FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_node_state(const fl2d_snapshot* snapshot,
+    const char* node_id, fl2d_node_state* result);
 /* Issue fields: code, path, entityId. Missing entityId is an empty string. */
 FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_issue_string(const fl2d_snapshot* snapshot,
     uint32_t index, const char* field, char* buffer, uint32_t capacity, uint32_t* required);

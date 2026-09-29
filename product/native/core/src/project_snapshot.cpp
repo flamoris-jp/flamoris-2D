@@ -17,7 +17,12 @@ using Array = picojson::array;
 
 namespace {
 struct Issue { std::string code, path, entity; };
-struct Node { std::string id, kind, parent, name; bool null_parent = false; };
+struct Node {
+    std::string id, kind, parent, name;
+    bool null_parent = false, visible = false;
+    std::vector<std::string> children;
+    fl2d_node_state state{};
+};
 struct Snapshot {
     int32_t schema = 0;
     double width = 0, height = 0;
@@ -107,15 +112,22 @@ void validate(Snapshot& s, const Value& project) {
         const std::string path = "scene.nodes." + key;
         const Value& id = field(value, "id");
         register_id(id, path + ".id");
-        Node node{str(id), str(field(value, "kind")), str(field(value, "parentId")), str(field(value, "displayName")),
-            has(value, "parentId") && field(value, "parentId").is<picojson::null>()};
-        s.nodes.emplace(key, node);
+        Node node{};
+        node.id = str(id);
+        node.kind = str(field(value, "kind"));
+        node.parent = str(field(value, "parentId"));
+        node.name = str(field(value, "displayName"));
+        node.null_parent = has(value, "parentId") && field(value, "parentId").is<picojson::null>();
         if (node.id != key) add(s, "scene.key_id_mismatch", path + ".id", node.id);
         if (node.kind != "group" && node.kind != "part" && node.kind != "deformer" && node.kind != "bone") add(s, "scene.invalid_kind", path + ".kind", key);
         const Value& opacity = field(value, "opacity");
         if (!finite(opacity) || opacity.get<double>() < 0 || opacity.get<double>() > 1) add(s, "scene.invalid_opacity", path + ".opacity", key);
         const Value& children = field(value, "children");
         if (!children.is<Array>()) add(s, "scene.invalid_children", path + ".children", key);
+        if (children.is<Array>()) for (const auto& child : children.get<Array>()) node.children.push_back(str(child));
+        node.visible = field(value, "visible").is<bool>() && field(value, "visible").get<bool>();
+        node.state.visible = node.visible ? 1 : 0;
+        if (finite(opacity)) node.state.opacity = opacity.get<double>();
         if (node.null_parent && key != s.root) add(s, "scene.orphan", path + ".parentId", key);
         if (!node.parent.empty() && node_map.find(node.parent) == node_map.end()) add(s, "scene.missing_parent", path + ".parentId", key);
         if (children.is<Array>()) for (const auto& child : children.get<Array>()) {
@@ -128,6 +140,15 @@ void validate(Snapshot& s, const Value& project) {
         const Value& position = field(transform, "position");
         const Value& scale = field(transform, "scale");
         const Value& pivot = field(transform, "pivot");
+        auto number = [](const Value& value) { return finite(value) ? value.get<double>() : 0.0; };
+        node.state.position_x = number(field(position, "x"));
+        node.state.position_y = number(field(position, "y"));
+        node.state.rotation = number(field(transform, "rotation"));
+        node.state.scale_x = number(field(scale, "x"));
+        node.state.scale_y = number(field(scale, "y"));
+        node.state.pivot_x = number(field(pivot, "x"));
+        node.state.pivot_y = number(field(pivot, "y"));
+        s.nodes.emplace(key, std::move(node));
         if (!finite(field(position, "x")) || !finite(field(position, "y")) || !finite(field(transform, "rotation")) ||
             !finite(field(scale, "x")) || !finite(field(scale, "y")) || !finite(field(pivot, "x")) || !finite(field(pivot, "y")))
             add(s, "transform.non_finite", path + ".transform", key);
@@ -198,13 +219,22 @@ extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_string(const fl2d_snapsh
 extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_node_string(const fl2d_snapshot* s,
     const char* node_id, const char* field_name, char* buffer, uint32_t capacity, uint32_t* required) {
     if (!s || !node_id || !field_name) return FL2D_INVALID_ARGUMENT;
-    auto it = s->nodes.find(node_id);
-    if (it == s->nodes.end()) return FL2D_INVALID_ARGUMENT;
-    const Node& n = it->second;
-    if (!std::strcmp(field_name, "id")) return copy(n.id, buffer, capacity, required);
-    if (!std::strcmp(field_name, "kind")) return copy(n.kind, buffer, capacity, required);
-    if (!std::strcmp(field_name, "parentId")) return copy(n.parent, buffer, capacity, required);
-    if (!std::strcmp(field_name, "displayName")) return copy(n.name, buffer, capacity, required);
+    const Node* n = nullptr;
+    for (const auto& entry : s->nodes) if (entry.second.id == node_id) { n = &entry.second; break; }
+    if (!n) return FL2D_INVALID_ARGUMENT;
+    if (!std::strcmp(field_name, "id")) return copy(n->id, buffer, capacity, required);
+    if (!std::strcmp(field_name, "kind")) return copy(n->kind, buffer, capacity, required);
+    if (!std::strcmp(field_name, "parentId")) return copy(n->parent, buffer, capacity, required);
+    if (!std::strcmp(field_name, "displayName")) return copy(n->name, buffer, capacity, required);
+    return FL2D_INVALID_ARGUMENT;
+}
+extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_node_state(const fl2d_snapshot* s,
+    const char* node_id, fl2d_node_state* result) {
+    if (!s || !node_id || !result) return FL2D_INVALID_ARGUMENT;
+    for (const auto& entry : s->nodes) if (entry.second.id == node_id) {
+        *result = entry.second.state;
+        return FL2D_OK;
+    }
     return FL2D_INVALID_ARGUMENT;
 }
 extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_issue_string(const fl2d_snapshot* s,

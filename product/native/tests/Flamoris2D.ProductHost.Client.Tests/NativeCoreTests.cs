@@ -6,7 +6,7 @@ internal static class NativeCoreTests
     public static void Run(string hostPath)
     {
         if (!OperatingSystem.IsWindows()) return;
-        if (NativeEngine.Version() != (1, 1)) throw new Exception("Unexpected native ABI version.");
+        if (NativeEngine.Version() != (1, 2)) throw new Exception("Unexpected native ABI version.");
         var path = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(hostPath)!,
             "../native/tests/temporal-conformance.json"));
         using var document = JsonDocument.Parse(File.ReadAllText(path));
@@ -56,6 +56,31 @@ internal static class NativeCoreTests
                 var root = snapshot.Field("rootId");
                 if (snapshot.NodeField(root, "id") != root)
                     throw new Exception("Root lookup changed.");
+                var sceneNodes = fixture.GetProperty("project").GetProperty("scene").GetProperty("nodes");
+                foreach (var keyedNode in sceneNodes.EnumerateObject())
+                {
+                    var node = keyedNode.Value;
+                    var id = node.GetProperty("id").GetString()!;
+                    if (snapshot.NodeField(id, "id") != id) throw new Exception("Stable node lookup changed.");
+                    var state = snapshot.NodeState(id);
+                    var transform = node.GetProperty("transform");
+                    var position = transform.GetProperty("position");
+                    var scale = transform.GetProperty("scale");
+                    var pivot = transform.GetProperty("pivot");
+                    if (state.PositionX != position.GetProperty("x").GetDouble() ||
+                        (position.TryGetProperty("y", out var y) && state.PositionY != y.GetDouble()) ||
+                        state.Rotation != transform.GetProperty("rotation").GetDouble() ||
+                        state.ScaleX != scale.GetProperty("x").GetDouble() || state.ScaleY != scale.GetProperty("y").GetDouble() ||
+                        state.PivotX != pivot.GetProperty("x").GetDouble() || state.PivotY != pivot.GetProperty("y").GetDouble() ||
+                        state.Visible != (node.GetProperty("visible").GetBoolean() ? 1 : 0) ||
+                        state.Opacity != node.GetProperty("opacity").GetDouble())
+                        throw new Exception($"Native node state changed: {id}");
+                    if (keyedNode.Name != id)
+                    {
+                        try { snapshot.NodeField(keyedNode.Name, "id"); throw new Exception("Object key resolved as stable ID."); }
+                        catch (InvalidOperationException) { }
+                    }
+                }
                 var actual = Enumerable.Range(0, checked((int)summary.IssueCount)).Select(i => snapshot.Issue((uint)i))
                     .Select(x => (x.Code, x.Path, x.EntityId)).Order().ToArray();
                 var expected = fixture.GetProperty("expected").EnumerateArray()

@@ -50,7 +50,7 @@ this phase. The checked conformance fixtures are generated from current JS by
 `node product/native/tests/check-temporal-conformance.mjs --write` and checked
 against JS in CI. Native and managed tests compare exact integer results.
 
-The native ABI is declared in `core/include/flamoris2d_core.h` (version 1.1).
+The native ABI is declared in `core/include/flamoris2d_core.h` (version 1.2).
 It uses C calling convention, fixed-size integers, an opaque engine handle and
 32-bit status codes. The DLL build exports its functions; native consumers import
 them through the same header. `fl2d_engine_create` transfers ownership of a handle to
@@ -69,11 +69,15 @@ bytes; the caller destroys its returned handle once. Malformed JSON, invalid
 UTF-8 and oversized data have distinct status codes. Native snapshot strings
 are copied into caller-owned buffers: query `required` (including the NUL byte),
 then provide that capacity. C# uses `SafeHandle`. The C++ representation retains
-project identity, canvas, scene node IDs/hierarchy and focused validation issues;
+project identity, canvas, scene node IDs/hierarchy, transform, visibility, opacity and focused validation issues;
 it records presence of unsupported mesh/rig/animation and other domain sections
 without treating those payloads as native authority. JSON is only an interchange
 format, not the native internal model. The read-only validation subset follows
 `product/src/model/validation.js` and is tested against JS-generated fixtures;
+it does not cover the full base validator. In particular, IDs inside
+`animation.clips` and `animation.deformationSamples` are not entered into the
+native duplicate-ID registry yet. Native node queries use stable `node.id`
+even when a mismatched `scene.nodes` key produces a validation issue.
 it is currently authoritative for conformance testing only. JS `EditorSession`
 remains the sole editing authority, including WPF/MCP mutations, Undo/Redo and
 save. The DLL still is not in the portable WPF package. The next migration step

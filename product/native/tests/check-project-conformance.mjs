@@ -28,6 +28,14 @@ variant("root", minimal, p => { p.scene.nodes[p.scene.rootId].kind = "part"; p.s
 variant("root_missing_parent", minimal, p => { delete p.scene.nodes[p.scene.rootId].parentId; });
 variant("opacity", hierarchy, p => { p.scene.nodes.part_1.opacity = 2; });
 variant("collection_id", minimal, p => { p.keyArts.push({ id: p.id }); });
+variant("node_state", hierarchy, p => {
+  const node = p.scene.nodes.part_1;
+  node.transform = { position: { x: 12.5, y: -3 }, rotation: 0.75,
+    scale: { x: 1.25, y: -2 }, pivot: { x: 4, y: 6.5 } };
+  node.visible = false;
+  node.opacity = 0.375;
+});
+variant("key_id_mismatch", hierarchy, p => { p.scene.nodes.part_1.id = "actual_part_id"; });
 
 const subset = new Set([
   "project.invalid", "project.unsupported_schema", "ANIMATION_INVALID_TIMEBASE", "project.missing_id",
