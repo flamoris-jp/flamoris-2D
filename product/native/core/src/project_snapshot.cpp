@@ -367,6 +367,104 @@ void validate_mesh_form_corrections(Snapshot& s, const Value& project) {
         }
     }
 }
+void validate_bones(Snapshot& s, const Value& project) {
+    const Value& rig = field(project, "rig");
+    if (!rig.is<Object>()) { add(s, "collection.invalid", "rig"); return; }
+    const Value& bones = field(rig, "bones"), &poses = field(rig, "bonePoseKeyforms");
+    if (!bones.is<Array>()) add(s, "collection.invalid", "rig.bones");
+    if (!poses.is<Array>()) add(s, "collection.invalid", "rig.bonePoseKeyforms");
+    if (!bones.is<Array>() || !poses.is<Array>()) return;
+    const Value& nodes = field(field(project, "scene"), "nodes");
+    const Value& key_arts = field(project, "keyArts");
+    std::map<std::string, const Value*> by_id;
+    auto local_transform = [](const Value& value) {
+        return exact(value, {"x", "y", "rotation"}) && finite(field(value, "x")) &&
+            finite(field(value, "y")) && finite(field(value, "rotation"));
+    };
+    for (size_t i = 0; i < bones.get<Array>().size(); ++i) {
+        const Value& bone = bones.get<Array>()[i];
+        const std::string path = "rig.bones." + std::to_string(i);
+        if (!bone.is<Object>()) { add(s, "BONE_REST_INVALID", path); continue; }
+        const Value& bone_id = field(bone, "id");
+        const std::string id = str(bone_id);
+        if (!exact(bone, {"id", "parentNodeId", "restLocalTransform", "length", "enabled"}))
+            add(s, "BONE_REST_INVALID", path, id);
+        if (!nonblank(bone_id)) add(s, "identity.missing", path + ".id");
+        else if (!by_id.emplace(id, &bone).second) add(s, "identity.duplicate", path + ".id", id);
+        const Value& node = field(nodes, id);
+        if (node.is<picojson::null>()) add(s, "BONE_NODE_MISSING", path + ".id", id);
+        else if (str(field(node, "kind")) != "bone") add(s, "BONE_SCENE_IDENTITY_MISMATCH", path + ".id", id);
+        const Value& parent_id = field(bone, "parentNodeId");
+        const Value& parent = field(nodes, str(parent_id));
+        if (!nonblank(parent_id) || parent.is<picojson::null>())
+            add(s, "BONE_PARENT_INVALID", path + ".parentNodeId", id);
+        else {
+            const std::string kind = str(field(parent, "kind"));
+            if (kind != "group" && kind != "deformer" && kind != "bone")
+                add(s, "BONE_PARENT_INVALID", path + ".parentNodeId", id);
+        }
+        if (!node.is<picojson::null>() && field(node, "parentId") != parent_id)
+            add(s, "BONE_SCENE_IDENTITY_MISMATCH", path + ".parentNodeId", id);
+        const Value& rest = field(bone, "restLocalTransform");
+        if (str(field(node, "kind")) == "bone") {
+            const Value& transform = field(node, "transform");
+            const Value& position = field(transform, "position");
+            const Value& scale = field(transform, "scale"), &pivot = field(transform, "pivot");
+            auto eq_one = [](const Value& v) { return finite(v) && v.get<double>() == 1; };
+            auto eq_zero = [](const Value& v) { return finite(v) && v.get<double>() == 0; };
+            if (field(position, "x") != field(rest, "x") || field(position, "y") != field(rest, "y") ||
+                field(transform, "rotation") != field(rest, "rotation") ||
+                !eq_one(field(scale, "x")) || !eq_one(field(scale, "y")) ||
+                !eq_zero(field(pivot, "x")) || !eq_zero(field(pivot, "y")))
+                add(s, "BONE_SCENE_IDENTITY_MISMATCH", path + ".restLocalTransform", id);
+        }
+        if (!local_transform(rest)) add(s, "BONE_REST_INVALID", path + ".restLocalTransform", id);
+        const Value& length = field(bone, "length");
+        if (!finite(length) || length.get<double>() <= 0) add(s, "BONE_LENGTH_INVALID", path + ".length", id);
+        if (!field(bone, "enabled").is<bool>()) add(s, "BONE_REST_INVALID", path + ".enabled", id);
+    }
+    for (const auto& bone : bones.get<Array>()) {
+        const Value& parent = field(nodes, str(field(bone, "parentNodeId")));
+        if (str(field(parent, "kind")) == "bone" && !by_id.count(str(field(parent, "id"))))
+            add(s, "BONE_PARENT_INVALID", "rig.bones." + str(field(bone, "id")) + ".parentNodeId", str(field(bone, "id")));
+    }
+    if (nodes.is<Object>()) for (const auto& [key, node] : nodes.get<Object>()) {
+        (void)key;
+        if (str(field(node, "kind")) != "bone") continue;
+        const std::string id = str(field(node, "id"));
+        if (!by_id.count(id)) add(s, "BONE_NODE_MISSING", "scene.nodes." + id, id);
+        const Value& children = field(node, "children");
+        if (children.is<Array>()) for (const auto& child : children.get<Array>())
+            if (str(field(field(nodes, str(child)), "kind")) != "bone")
+                add(s, "BONE_PARENT_INVALID", "scene.nodes." + id + ".children", id);
+    }
+    for (const auto& bone : bones.get<Array>()) {
+        std::set<std::string> visited;
+        const std::string bone_id = str(field(bone, "id"));
+        const Value* current = &field(nodes, bone_id);
+        while (str(field(*current, "kind")) == "bone") {
+            const std::string id = str(field(*current, "id"));
+            if (!visited.insert(id).second) {
+                add(s, "BONE_HIERARCHY_CYCLE", "scene.nodes." + id, bone_id); break;
+            }
+            current = &field(nodes, str(field(*current, "parentId")));
+        }
+    }
+    std::set<std::string> pose_keys;
+    for (size_t i = 0; i < poses.get<Array>().size(); ++i) {
+        const Value& pose = poses.get<Array>()[i];
+        const std::string path = "rig.bonePoseKeyforms." + std::to_string(i);
+        const std::string id = str(field(pose, "boneId"));
+        if (!exact(pose, {"boneId", "keyArtId", "localDelta"})) add(s, "BONE_POSE_INVALID", path, id);
+        const std::string key = id + std::string(1, '\0') + str(field(pose, "keyArtId"));
+        if (!pose_keys.insert(key).second) add(s, "BONE_POSE_INVALID", path, id);
+        if (!by_id.count(id)) add(s, "BONE_NODE_MISSING", path + ".boneId", id);
+        if (!contains_id(key_arts, field(pose, "keyArtId")))
+            add(s, "BONE_KEYART_REFERENCE_INVALID", path + ".keyArtId", id);
+        if (!local_transform(field(pose, "localDelta")))
+            add(s, "BONE_POSE_INVALID", path + ".localDelta", id);
+    }
+}
 bool utf8(const uint8_t* data, uint32_t length) {
     for (uint32_t i = 0; i < length;) {
         uint8_t c = data[i++];
@@ -501,6 +599,7 @@ void validate(Snapshot& s, const Value& project) {
     validate_ik_constraints(s, project);
     validate_rigid_bindings(s, project, register_id);
     validate_mesh_form_corrections(s, project);
+    validate_bones(s, project);
     if (root != node_map.end()) {
         std::set<std::string> visiting, visited;
         auto walk = [&](auto&& self, const std::string& id) -> void {

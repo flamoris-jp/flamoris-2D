@@ -84,6 +84,12 @@ variant("mesh_form_corrections", minimal, p => {
     { id: "form_2", topologyId: "missing", keyArtId: "missing", semanticSlotId: "missing",
       vertexOffsets: [] });
 });
+variant("bone_and_pose", minimal, p => {
+  p.rig.bones.push({ id: "bone_1", parentNodeId: "missing", restLocalTransform: {
+    x: 0, y: 0, rotation: 0 }, length: -2, enabled: "yes" });
+  p.rig.bonePoseKeyforms.push({ boneId: "bone_1", keyArtId: "missing",
+    localDelta: { x: 0, y: 0, rotation: null } });
+});
 
 const subset = new Set([
   "project.invalid", "project.unsupported_schema", "ANIMATION_INVALID_TIMEBASE", "project.missing_id",
@@ -110,6 +116,9 @@ const subset = new Set([
   "MESH_FORM_CORRECTION_VERTEX_MISSING", "MESH_FORM_CORRECTION_VERTEX_DUPLICATE",
   "MESH_FORM_CORRECTION_VERTEX_ORDER_INVALID", "MESH_FORM_CORRECTION_OFFSET_INVALID",
   "MESH_FORM_CORRECTION_ZERO_OFFSET",
+  "BONE_REST_INVALID", "BONE_NODE_MISSING", "BONE_SCENE_IDENTITY_MISMATCH",
+  "BONE_PARENT_INVALID", "BONE_LENGTH_INVALID", "BONE_HIERARCHY_CYCLE",
+  "BONE_POSE_INVALID", "BONE_KEYART_REFERENCE_INVALID",
 ]);
 const fixtures = cases.map(([name, project]) => ({ name, project,
   expected: validateProject(project).filter(issue => subset.has(issue.code))
