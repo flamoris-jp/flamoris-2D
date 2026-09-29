@@ -46,6 +46,11 @@ bool has(const Value& value, const std::string& key) {
 }
 std::string str(const Value& value) { return value.is<std::string>() ? value.get<std::string>() : ""; }
 bool finite(const Value& value) { return value.is<double>() && std::isfinite(value.get<double>()); }
+bool exact(const Value& value, std::initializer_list<const char*> names) {
+    if (!value.is<Object>() || value.get<Object>().size() != names.size()) return false;
+    for (const auto name : names) if (!has(value, name)) return false;
+    return true;
+}
 bool trim_space(uint32_t cp) {
     return (cp >= 9 && cp <= 13) || cp == 0x20 || cp == 0xA0 || cp == 0x1680 ||
         (cp >= 0x2000 && cp <= 0x200A) || cp == 0x2028 || cp == 0x2029 ||
@@ -68,6 +73,66 @@ bool nonblank(const Value& value) {
 }
 void add(Snapshot& s, const char* code, std::string path, std::string entity = {}) {
     s.issues.push_back({code, std::move(path), std::move(entity)});
+}
+bool contains_id(const Value& values, const Value& id) {
+    if (!values.is<Array>()) return false;
+    for (const auto& value : values.get<Array>()) if (field(value, "id") == id) return true;
+    return false;
+}
+const Value& find_id(const Value& values, const Value& id) {
+    static const Value missing;
+    if (values.is<Array>()) for (const auto& value : values.get<Array>())
+        if (field(value, "id") == id) return value;
+    return missing;
+}
+void validate_deformation_samples(Snapshot& s, const Value& project) {
+    const Value& samples = field(field(project, "animation"), "deformationSamples");
+    if (!samples.is<Array>()) { add(s, "collection.invalid", "animation.deformationSamples"); return; }
+    const Value& meshes = field(project, "meshes");
+    const Value& topologies = field(project, "meshTopologies");
+    for (size_t i = 0; i < samples.get<Array>().size(); ++i) {
+        const Value& sample = samples.get<Array>()[i];
+        const std::string path = "animation.deformationSamples." + std::to_string(i);
+        if (!sample.is<Object>()) { add(s, "ANIMATION_DEFORMATION_SAMPLE_INVALID", path); continue; }
+        const std::string id = str(field(sample, "id"));
+        if (!exact(sample, {"id", "meshId", "topologyId", "offsets"}))
+            add(s, "ANIMATION_DEFORMATION_SAMPLE_INVALID", path, id);
+        if (!nonblank(field(sample, "id"))) add(s, "identity.missing", path + ".id");
+        if (!contains_id(meshes, field(sample, "meshId")))
+            add(s, "ANIMATION_TRACK_TARGET_INVALID", path + ".meshId", id);
+        const Value& topology = find_id(topologies, field(sample, "topologyId"));
+        if (topology.is<picojson::null>())
+            add(s, "ANIMATION_TOPOLOGY_INCOMPATIBLE", path + ".topologyId", id);
+        const Value& offsets = field(sample, "offsets");
+        if (!offsets.is<Array>()) { add(s, "ANIMATION_DEFORMATION_OFFSET_INVALID", path + ".offsets", id); continue; }
+        std::set<std::string> seen;
+        std::string previous;
+        bool has_previous = false;
+        const Value& vertices = field(topology, "vertexIds");
+        for (size_t j = 0; j < offsets.get<Array>().size(); ++j) {
+            const Value& offset = offsets.get<Array>()[j];
+            const std::string offset_path = path + ".offsets." + std::to_string(j);
+            const Value& vertex = field(offset, "vertexId");
+            if (!exact(offset, {"vertexId", "dx", "dy"}) || !nonblank(vertex)) {
+                add(s, "ANIMATION_DEFORMATION_OFFSET_INVALID", offset_path, id);
+                continue;
+            }
+            const std::string vertex_id = str(vertex);
+            bool found = false;
+            if (vertices.is<Array>()) for (const auto& candidate : vertices.get<Array>()) if (candidate == vertex) found = true;
+            if (!found) add(s, "ANIMATION_TOPOLOGY_INCOMPATIBLE", offset_path + ".vertexId", id);
+            if (!seen.insert(vertex_id).second)
+                add(s, "ANIMATION_DEFORMATION_VERTEX_DUPLICATE", offset_path + ".vertexId", id);
+            if (has_previous && previous > vertex_id)
+                add(s, "ANIMATION_DEFORMATION_VERTEX_ORDER_INVALID", path + ".offsets", id);
+            previous = vertex_id;
+            has_previous = true;
+            const Value& dx = field(offset, "dx");
+            const Value& dy = field(offset, "dy");
+            if (!finite(dx) || !finite(dy) || (dx.get<double>() == 0 && dy.get<double>() == 0))
+                add(s, "ANIMATION_DEFORMATION_OFFSET_INVALID", offset_path, id);
+        }
+    }
 }
 bool utf8(const uint8_t* data, uint32_t length) {
     for (uint32_t i = 0; i < length;) {
@@ -197,6 +262,7 @@ void validate(Snapshot& s, const Value& project) {
     }
     for (const char* name : {"rig", "animation", "temporalPrograms", "clippingBindings", "renderSettings"})
         s.unsupported_sections[name] = has(project, name);
+    validate_deformation_samples(s, project);
     if (root != node_map.end()) {
         std::set<std::string> visiting, visited;
         auto walk = [&](auto&& self, const std::string& id) -> void {

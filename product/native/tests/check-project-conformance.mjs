@@ -46,6 +46,16 @@ variant("clip_sequence_duplicate", minimal, p => {
   p.sequences.push({ id: "shared" });
 });
 variant("node_key_art_duplicate", hierarchy, p => { p.keyArts.push({ id: "part_1" }); });
+variant("deformation_sample_references", minimal, p => {
+  p.animation.deformationSamples.push({ id: "sample_1", meshId: "missing", topologyId: "missing", offsets: [] });
+});
+variant("deformation_sample_offsets", minimal, p => {
+  p.meshes.push({ id: "mesh_1" });
+  p.meshTopologies.push({ id: "topo_1", vertexIds: ["a", "b"] });
+  p.animation.deformationSamples.push({ id: "sample_1", meshId: "mesh_1", topologyId: "topo_1",
+    offsets: [{ vertexId: "b", dx: 1, dy: 0 }, { vertexId: "a", dx: 0, dy: 0 },
+      { vertexId: "b", dx: 0.2, dy: 0 }, { vertexId: "ghost", dx: 1, dy: 2 }] });
+});
 
 const subset = new Set([
   "project.invalid", "project.unsupported_schema", "ANIMATION_INVALID_TIMEBASE", "project.missing_id",
@@ -56,6 +66,9 @@ const subset = new Set([
   "scene.parent_child_mismatch", "transform.non_finite", "transform.zero_scale", "collection.invalid",
   "ANIMATION_SECOND_DURATION_AUTHORITY", "ANIMATION_SCHEMA_INVALID", "scene.invalid_display_name",
   "scene.cycle", "scene.unreachable",
+  "ANIMATION_DEFORMATION_SAMPLE_INVALID", "ANIMATION_DEFORMATION_OFFSET_INVALID",
+  "ANIMATION_TRACK_TARGET_INVALID", "ANIMATION_TOPOLOGY_INCOMPATIBLE",
+  "ANIMATION_DEFORMATION_VERTEX_DUPLICATE", "ANIMATION_DEFORMATION_VERTEX_ORDER_INVALID",
 ]);
 const fixtures = cases.map(([name, project]) => ({ name, project,
   expected: validateProject(project).filter(issue => subset.has(issue.code))

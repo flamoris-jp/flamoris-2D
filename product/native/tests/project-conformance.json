@@ -2122,5 +2122,244 @@
         "entityId": "part_1"
       }
     ]
+  },
+  {
+    "name": "deformation_sample_references",
+    "project": {
+      "schemaVersion": 15,
+      "timebaseTicksPerSecond": 120000,
+      "id": "project_あ",
+      "displayName": "夜明け",
+      "canvas": {
+        "width": 1920,
+        "height": 1080
+      },
+      "sourceAssets": [],
+      "semanticSlots": [],
+      "keyArts": [],
+      "scene": {
+        "rootId": "node_1",
+        "nodes": {
+          "node_1": {
+            "id": "node_1",
+            "kind": "group",
+            "displayName": "夜明け",
+            "sourceRef": null,
+            "parentId": null,
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          }
+        }
+      },
+      "meshes": [],
+      "meshTopologies": [],
+      "meshKeyforms": [],
+      "meshFormCorrectionKeyforms": [],
+      "clippingBindings": [],
+      "rig": {
+        "deformers": [],
+        "warpControlPoints": [],
+        "warpDeformerKeyforms": [],
+        "bones": [],
+        "bonePoseKeyforms": [],
+        "rigidBoneBindings": [],
+        "skinBindings": [],
+        "boneRotationConstraints": [],
+        "twoBoneIkConstraints": [],
+        "constraints": []
+      },
+      "transitions": [],
+      "temporalPrograms": [],
+      "animation": {
+        "clips": [],
+        "deformationSamples": [
+          {
+            "id": "sample_1",
+            "meshId": "missing",
+            "topologyId": "missing",
+            "offsets": []
+          }
+        ]
+      },
+      "sequences": [],
+      "renderSettings": {
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "alpha": true
+      }
+    },
+    "expected": [
+      {
+        "code": "ANIMATION_TOPOLOGY_INCOMPATIBLE",
+        "path": "animation.deformationSamples.0.topologyId",
+        "entityId": "sample_1"
+      },
+      {
+        "code": "ANIMATION_TRACK_TARGET_INVALID",
+        "path": "animation.deformationSamples.0.meshId",
+        "entityId": "sample_1"
+      }
+    ]
+  },
+  {
+    "name": "deformation_sample_offsets",
+    "project": {
+      "schemaVersion": 15,
+      "timebaseTicksPerSecond": 120000,
+      "id": "project_あ",
+      "displayName": "夜明け",
+      "canvas": {
+        "width": 1920,
+        "height": 1080
+      },
+      "sourceAssets": [],
+      "semanticSlots": [],
+      "keyArts": [],
+      "scene": {
+        "rootId": "node_1",
+        "nodes": {
+          "node_1": {
+            "id": "node_1",
+            "kind": "group",
+            "displayName": "夜明け",
+            "sourceRef": null,
+            "parentId": null,
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          }
+        }
+      },
+      "meshes": [
+        {
+          "id": "mesh_1"
+        }
+      ],
+      "meshTopologies": [
+        {
+          "id": "topo_1",
+          "vertexIds": [
+            "a",
+            "b"
+          ]
+        }
+      ],
+      "meshKeyforms": [],
+      "meshFormCorrectionKeyforms": [],
+      "clippingBindings": [],
+      "rig": {
+        "deformers": [],
+        "warpControlPoints": [],
+        "warpDeformerKeyforms": [],
+        "bones": [],
+        "bonePoseKeyforms": [],
+        "rigidBoneBindings": [],
+        "skinBindings": [],
+        "boneRotationConstraints": [],
+        "twoBoneIkConstraints": [],
+        "constraints": []
+      },
+      "transitions": [],
+      "temporalPrograms": [],
+      "animation": {
+        "clips": [],
+        "deformationSamples": [
+          {
+            "id": "sample_1",
+            "meshId": "mesh_1",
+            "topologyId": "topo_1",
+            "offsets": [
+              {
+                "vertexId": "b",
+                "dx": 1,
+                "dy": 0
+              },
+              {
+                "vertexId": "a",
+                "dx": 0,
+                "dy": 0
+              },
+              {
+                "vertexId": "b",
+                "dx": 0.2,
+                "dy": 0
+              },
+              {
+                "vertexId": "ghost",
+                "dx": 1,
+                "dy": 2
+              }
+            ]
+          }
+        ]
+      },
+      "sequences": [],
+      "renderSettings": {
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "alpha": true
+      }
+    },
+    "expected": [
+      {
+        "code": "ANIMATION_DEFORMATION_OFFSET_INVALID",
+        "path": "animation.deformationSamples.0.offsets.1",
+        "entityId": "sample_1"
+      },
+      {
+        "code": "ANIMATION_DEFORMATION_VERTEX_DUPLICATE",
+        "path": "animation.deformationSamples.0.offsets.2.vertexId",
+        "entityId": "sample_1"
+      },
+      {
+        "code": "ANIMATION_DEFORMATION_VERTEX_ORDER_INVALID",
+        "path": "animation.deformationSamples.0.offsets",
+        "entityId": "sample_1"
+      },
+      {
+        "code": "ANIMATION_TOPOLOGY_INCOMPATIBLE",
+        "path": "animation.deformationSamples.0.offsets.3.vertexId",
+        "entityId": "sample_1"
+      }
+    ]
   }
 ]
