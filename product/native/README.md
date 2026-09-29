@@ -222,3 +222,15 @@ suite. The existing Windows gate exercises official-client transport and the
 packaged WPF smoke verifies visible Mesh changes, automatic refresh and shared
 Undo/Redo before continuing Source→Export→Save/reopen. Node MCP HTTP dependencies
 are absent from the Native package. The private binary artwork channel is unchanged.
+
+## Native command migration (#127)
+
+The [current handler/query inventory](../../docs/native-command-migration.md)
+tracks the remaining migration. The native session now supports scene lock,
+group creation/removal and reparenting, plus clipping create/source/enabled/removal
+and index-preserving history restoration. Commands report all affected IDs in
+first-seen order. Public transactions reject history-only types and preflight the
+whole batch before applying a domain handler. The JS-derived session fixture
+compares full Project, history, revision/dirty state and error after every operation,
+including cycles, invalid payloads, internal-command rejection, Undo/Redo and
+stale prepared hierarchy edits. WPF/MCP and portable packaging are unchanged.
