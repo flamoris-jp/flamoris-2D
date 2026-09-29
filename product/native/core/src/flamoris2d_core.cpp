@@ -8,7 +8,7 @@ struct fl2d_engine {};
 extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_abi_version(int32_t* major, int32_t* minor) {
     if (!major || !minor) return FL2D_INVALID_ARGUMENT;
     *major = 1;
-    *minor = 2;
+    *minor = 3;
     return FL2D_OK;
 }
 

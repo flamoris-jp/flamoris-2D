@@ -31,7 +31,16 @@ enum {
     FL2D_MALFORMED_JSON = 4,
     FL2D_INVALID_UTF8 = 5,
     FL2D_INPUT_TOO_LARGE = 6,
-    FL2D_BUFFER_TOO_SMALL = 7
+    FL2D_BUFFER_TOO_SMALL = 7,
+    FL2D_PROJECT_INVALID = 8,
+    FL2D_COMMAND_INVALID = 9,
+    FL2D_COMMAND_UNSUPPORTED = 10,
+    FL2D_TARGET_NOT_FOUND = 11,
+    FL2D_TRANSACTION_EMPTY = 12,
+    FL2D_REVISION_CONFLICT = 13,
+    FL2D_SAVED_REVISION_INVALID = 14,
+    FL2D_HISTORY_EMPTY = 15,
+    FL2D_REVISION_EXHAUSTED = 16
 };
 
 typedef struct fl2d_snapshot fl2d_snapshot;
@@ -62,6 +71,37 @@ FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_node_state(const fl2d_snapshot* sna
 /* Issue fields: code, path, entityId. Missing entityId is an empty string. */
 FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_issue_string(const fl2d_snapshot* snapshot,
     uint32_t index, const char* field, char* buffer, uint32_t capacity, uint32_t* required);
+
+/* ABI 1.3: experimental session. UTF-8 input is copied (maximum 1 MiB).
+ * The command document is a JSON array of existing Product command envelopes.
+ * Session calls must be serialized by the caller. A prepared handle is one-shot;
+ * destroy it even after commit. Destroying its session invalidates it safely.
+ * Error names are stable Product codes, not human messages. */
+typedef struct fl2d_session fl2d_session;
+typedef struct fl2d_prepared fl2d_prepared;
+typedef struct fl2d_session_state {
+    int64_t revision_counter, current_revision, saved_revision;
+    uint32_t undo_depth, redo_depth, history_depth, dirty;
+} fl2d_session_state;
+FL2D_API fl2d_status FL2D_CALL fl2d_session_create(const uint8_t* project, uint32_t length, fl2d_session** result);
+FL2D_API void FL2D_CALL fl2d_session_destroy(fl2d_session* session);
+FL2D_API fl2d_status FL2D_CALL fl2d_session_replace(fl2d_session* session, const uint8_t* project, uint32_t length, int32_t saved);
+FL2D_API fl2d_status FL2D_CALL fl2d_session_state_get(const fl2d_session* session, fl2d_session_state* result);
+FL2D_API fl2d_status FL2D_CALL fl2d_session_mark_saved(fl2d_session* session, int64_t revision);
+FL2D_API fl2d_status FL2D_CALL fl2d_session_node_string(const fl2d_session* session, const char* node_id,
+    const char* field, char* buffer, uint32_t capacity, uint32_t* required);
+FL2D_API fl2d_status FL2D_CALL fl2d_session_node_state(const fl2d_session* session, const char* node_id, fl2d_node_state* result);
+FL2D_API fl2d_status FL2D_CALL fl2d_session_project_json(const fl2d_session* session, char* buffer, uint32_t capacity, uint32_t* required);
+FL2D_API fl2d_status FL2D_CALL fl2d_session_history_json(const fl2d_session* session, char* buffer, uint32_t capacity, uint32_t* required);
+FL2D_API fl2d_status FL2D_CALL fl2d_session_prepare(fl2d_session* session, const uint8_t* commands,
+    uint32_t length, const char* label, fl2d_prepared** result);
+FL2D_API fl2d_status FL2D_CALL fl2d_session_prepare_undo(fl2d_session* session, fl2d_prepared** result);
+FL2D_API fl2d_status FL2D_CALL fl2d_session_prepare_redo(fl2d_session* session, fl2d_prepared** result);
+FL2D_API fl2d_status FL2D_CALL fl2d_prepared_commit(fl2d_prepared* prepared);
+FL2D_API void FL2D_CALL fl2d_prepared_destroy(fl2d_prepared* prepared);
+/* Last error code on this session, set by failed session operations; empty on success.
+ * Caller-owned buffer rules match snapshot_string. */
+FL2D_API fl2d_status FL2D_CALL fl2d_session_error(const fl2d_session* session, char* buffer, uint32_t capacity, uint32_t* required);
 
 typedef struct fl2d_frame_rate {
     int64_t numerator;
