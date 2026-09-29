@@ -120,7 +120,10 @@ internal static class NativeMethods
 }
 
 public readonly record struct NativeProjectSummary(int Schema, double Width, double Height, uint NodeCount, uint IssueCount);
-public readonly record struct NativeProjectIssue(string Code, string Path, string EntityId);
+public readonly record struct NativeProjectIssue(string Code, string Path, string EntityId)
+{
+    public string Severity { get; init; } = "error";
+}
 
 public sealed class NativeSnapshot : SafeHandle
 {
@@ -195,7 +198,7 @@ public sealed class NativeSnapshot : SafeHandle
         EnsureOpen();
         string Item(string field) => Read((byte[]? buffer, uint capacity, out uint required) =>
             NativeMethods.SnapshotIssueString(this, index, field, buffer, capacity, out required));
-        return new(Item("code"), Item("path"), Item("entityId"));
+        return new(Item("code"), Item("path"), Item("entityId")) { Severity = Item("severity") };
     }
 }
 
