@@ -2501,5 +2501,121 @@
         "entityId": "clip_1"
       }
     ]
+  },
+  {
+    "name": "rotation_constraints",
+    "project": {
+      "schemaVersion": 15,
+      "timebaseTicksPerSecond": 120000,
+      "id": "project_あ",
+      "displayName": "夜明け",
+      "canvas": {
+        "width": 1920,
+        "height": 1080
+      },
+      "sourceAssets": [],
+      "semanticSlots": [],
+      "keyArts": [],
+      "scene": {
+        "rootId": "node_1",
+        "nodes": {
+          "node_1": {
+            "id": "node_1",
+            "kind": "group",
+            "displayName": "夜明け",
+            "sourceRef": null,
+            "parentId": null,
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          }
+        }
+      },
+      "meshes": [],
+      "meshTopologies": [],
+      "meshKeyforms": [],
+      "meshFormCorrectionKeyforms": [],
+      "clippingBindings": [],
+      "rig": {
+        "deformers": [],
+        "warpControlPoints": [],
+        "warpDeformerKeyforms": [],
+        "bones": [],
+        "bonePoseKeyforms": [],
+        "rigidBoneBindings": [],
+        "skinBindings": [],
+        "boneRotationConstraints": [
+          {
+            "id": "rotation_1",
+            "boneId": "missing",
+            "enabled": true,
+            "minRotation": 2,
+            "maxRotation": 1
+          },
+          {
+            "id": "rotation_2",
+            "boneId": "missing",
+            "enabled": true,
+            "minRotation": -1,
+            "maxRotation": 1
+          }
+        ],
+        "twoBoneIkConstraints": [],
+        "constraints": []
+      },
+      "transitions": [],
+      "temporalPrograms": [],
+      "animation": {
+        "clips": [],
+        "deformationSamples": []
+      },
+      "sequences": [],
+      "renderSettings": {
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "alpha": true
+      }
+    },
+    "expected": [
+      {
+        "code": "BONE_ROTATION_CONSTRAINT_BONE_MISSING",
+        "path": "rig.boneRotationConstraints.0.boneId",
+        "entityId": "rotation_1"
+      },
+      {
+        "code": "BONE_ROTATION_CONSTRAINT_BONE_MISSING",
+        "path": "rig.boneRotationConstraints.1.boneId",
+        "entityId": "rotation_2"
+      },
+      {
+        "code": "BONE_ROTATION_CONSTRAINT_CONFLICT",
+        "path": "rig.boneRotationConstraints.1.boneId",
+        "entityId": "rotation_2"
+      },
+      {
+        "code": "BONE_ROTATION_CONSTRAINT_INVALID",
+        "path": "rig.boneRotationConstraints.0",
+        "entityId": "rotation_1"
+      }
+    ]
   }
 ]

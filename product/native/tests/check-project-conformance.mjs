@@ -60,6 +60,11 @@ variant("animation_clip", minimal, p => {
   p.animation.clips.push({ id: "clip_1", displayName: "\u3000", temporalProgramId: "missing",
     defaultLoopMode: "invalid", metadata: null, durationTicks: 2 });
 });
+variant("rotation_constraints", minimal, p => {
+  p.rig.boneRotationConstraints.push(
+    { id: "rotation_1", boneId: "missing", enabled: true, minRotation: 2, maxRotation: 1 },
+    { id: "rotation_2", boneId: "missing", enabled: true, minRotation: -1, maxRotation: 1 });
+});
 
 const subset = new Set([
   "project.invalid", "project.unsupported_schema", "ANIMATION_INVALID_TIMEBASE", "project.missing_id",
@@ -74,6 +79,8 @@ const subset = new Set([
   "ANIMATION_TRACK_TARGET_INVALID", "ANIMATION_TOPOLOGY_INCOMPATIBLE",
   "ANIMATION_DEFORMATION_VERTEX_DUPLICATE", "ANIMATION_DEFORMATION_VERTEX_ORDER_INVALID",
   "ANIMATION_CLIP_INVALID", "ANIMATION_CLIP_PROGRAM_REFERENCE_INVALID", "ANIMATION_CLIP_LOOP_MODE_INVALID",
+  "BONE_ROTATION_CONSTRAINT_INVALID", "BONE_ROTATION_CONSTRAINT_BONE_MISSING",
+  "BONE_ROTATION_CONSTRAINT_CONFLICT",
 ]);
 const fixtures = cases.map(([name, project]) => ({ name, project,
   expected: validateProject(project).filter(issue => subset.has(issue.code))

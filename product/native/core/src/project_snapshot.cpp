@@ -162,6 +162,34 @@ void validate_animation_clips(Snapshot& s, const Value& project) {
             add(s, "ANIMATION_CLIP_INVALID", path + ".metadata", id);
     }
 }
+void validate_rotation_constraints(Snapshot& s, const Value& project) {
+    const Value& rig = field(project, "rig");
+    const Value& constraints = field(rig, "boneRotationConstraints");
+    if (!constraints.is<Array>()) { add(s, "collection.invalid", "rig.boneRotationConstraints"); return; }
+    const Value& bones = field(rig, "bones");
+    std::map<std::string, std::string> enabled_by_bone;
+    for (size_t i = 0; i < constraints.get<Array>().size(); ++i) {
+        const Value& item = constraints.get<Array>()[i];
+        const std::string path = "rig.boneRotationConstraints." + std::to_string(i);
+        const std::string id = str(field(item, "id"));
+        if (!exact(item, {"id", "boneId", "enabled", "minRotation", "maxRotation"}))
+            add(s, "BONE_ROTATION_CONSTRAINT_INVALID", path, id);
+        if (!nonblank(field(item, "id"))) add(s, "identity.missing", path + ".id");
+        const Value& bone_id = field(item, "boneId");
+        if (!nonblank(bone_id) || !contains_id(bones, bone_id))
+            add(s, "BONE_ROTATION_CONSTRAINT_BONE_MISSING", path + ".boneId", id);
+        const Value& enabled = field(item, "enabled");
+        const Value& minimum = field(item, "minRotation");
+        const Value& maximum = field(item, "maxRotation");
+        if (!enabled.is<bool>() || !finite(minimum) || !finite(maximum) ||
+            (finite(minimum) && finite(maximum) && minimum.get<double>() > maximum.get<double>()))
+            add(s, "BONE_ROTATION_CONSTRAINT_INVALID", path, id);
+        if (enabled.is<bool>() && enabled.get<bool>() && nonblank(bone_id)) {
+            if (!enabled_by_bone.emplace(str(bone_id), id).second)
+                add(s, "BONE_ROTATION_CONSTRAINT_CONFLICT", path + ".boneId", id);
+        }
+    }
+}
 bool utf8(const uint8_t* data, uint32_t length) {
     for (uint32_t i = 0; i < length;) {
         uint8_t c = data[i++];
@@ -292,6 +320,7 @@ void validate(Snapshot& s, const Value& project) {
         s.unsupported_sections[name] = has(project, name);
     validate_animation_clips(s, project);
     validate_deformation_samples(s, project);
+    validate_rotation_constraints(s, project);
     if (root != node_map.end()) {
         std::set<std::string> visiting, visited;
         auto walk = [&](auto&& self, const std::string& id) -> void {
