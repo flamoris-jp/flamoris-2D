@@ -113,7 +113,7 @@ const subset = new Set([
 ]);
 const fixtures = cases.map(([name, project]) => ({ name, project,
   expected: validateProject(project).filter(issue => subset.has(issue.code))
-    .map(({ code, path, entityId }) => ({ code, path, entityId: entityId ?? "" }))
+    .map(({ code, path, entityId, severity }) => ({ code, path, entityId: entityId ?? "", severity }))
     .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b), "en")),
 }));
 const serialized = JSON.stringify(fixtures, null, 2) + "\n";

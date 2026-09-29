@@ -270,7 +270,8 @@
       {
         "code": "project.unsupported_schema",
         "path": "schemaVersion",
-        "entityId": ""
+        "entityId": "",
+        "severity": "error"
       }
     ]
   },
@@ -356,7 +357,8 @@
       {
         "code": "ANIMATION_INVALID_TIMEBASE",
         "path": "timebaseTicksPerSecond",
-        "entityId": ""
+        "entityId": "",
+        "severity": "error"
       }
     ]
   },
@@ -442,7 +444,8 @@
       {
         "code": "ANIMATION_INVALID_FRAME_RATE",
         "path": "renderSettings.frameRate",
-        "entityId": ""
+        "entityId": "",
+        "severity": "error"
       }
     ]
   },
@@ -557,12 +560,14 @@
       {
         "code": "identity.duplicate",
         "path": "scene.nodes.part_1.id",
-        "entityId": "project_あ"
+        "entityId": "project_あ",
+        "severity": "error"
       },
       {
         "code": "scene.key_id_mismatch",
         "path": "scene.nodes.part_1.id",
-        "entityId": "project_あ"
+        "entityId": "project_あ",
+        "severity": "error"
       }
     ]
   },
@@ -677,12 +682,14 @@
       {
         "code": "scene.missing_parent",
         "path": "scene.nodes.part_1.parentId",
-        "entityId": "part_1"
+        "entityId": "part_1",
+        "severity": "error"
       },
       {
         "code": "scene.parent_child_mismatch",
         "path": "scene.nodes.node_1.children",
-        "entityId": "part_1"
+        "entityId": "part_1",
+        "severity": "error"
       }
     ]
   },
@@ -796,12 +803,14 @@
       {
         "code": "transform.non_finite",
         "path": "scene.nodes.part_1.transform",
-        "entityId": "part_1"
+        "entityId": "part_1",
+        "severity": "error"
       },
       {
         "code": "transform.zero_scale",
         "path": "scene.nodes.part_1.transform.scale",
-        "entityId": "part_1"
+        "entityId": "part_1",
+        "severity": "error"
       }
     ]
   },
@@ -887,17 +896,20 @@
       {
         "code": "scene.missing_parent",
         "path": "scene.nodes.node_1.parentId",
-        "entityId": "node_1"
+        "entityId": "node_1",
+        "severity": "error"
       },
       {
         "code": "scene.root_not_group",
         "path": "scene.nodes.node_1.kind",
-        "entityId": "node_1"
+        "entityId": "node_1",
+        "severity": "error"
       },
       {
         "code": "scene.root_parent_not_null",
         "path": "scene.nodes.node_1.parentId",
-        "entityId": "node_1"
+        "entityId": "node_1",
+        "severity": "error"
       }
     ]
   },
@@ -982,7 +994,8 @@
       {
         "code": "scene.root_parent_not_null",
         "path": "scene.nodes.node_1.parentId",
-        "entityId": "node_1"
+        "entityId": "node_1",
+        "severity": "error"
       }
     ]
   },
@@ -1097,7 +1110,8 @@
       {
         "code": "scene.invalid_opacity",
         "path": "scene.nodes.part_1.opacity",
-        "entityId": "part_1"
+        "entityId": "part_1",
+        "severity": "error"
       }
     ]
   },
@@ -1187,7 +1201,8 @@
       {
         "code": "identity.duplicate",
         "path": "keyArts.0.id",
-        "entityId": "project_あ"
+        "entityId": "project_あ",
+        "severity": "error"
       }
     ]
   },
@@ -1411,7 +1426,8 @@
       {
         "code": "scene.key_id_mismatch",
         "path": "scene.nodes.part_1.id",
-        "entityId": "actual_part_id"
+        "entityId": "actual_part_id",
+        "severity": "error"
       }
     ]
   },
@@ -1498,7 +1514,8 @@
       {
         "code": "ANIMATION_SECOND_DURATION_AUTHORITY",
         "path": "renderSettings.durationTicks",
-        "entityId": ""
+        "entityId": "",
+        "severity": "error"
       }
     ]
   },
@@ -1585,7 +1602,8 @@
       {
         "code": "ANIMATION_SCHEMA_INVALID",
         "path": "animation",
-        "entityId": ""
+        "entityId": "",
+        "severity": "error"
       }
     ]
   },
@@ -1700,7 +1718,8 @@
       {
         "code": "scene.invalid_display_name",
         "path": "scene.nodes.part_1.displayName",
-        "entityId": "part_1"
+        "entityId": "part_1",
+        "severity": "error"
       }
     ]
   },
@@ -1788,12 +1807,14 @@
       {
         "code": "scene.cycle",
         "path": "scene.nodes.node_1",
-        "entityId": "node_1"
+        "entityId": "node_1",
+        "severity": "error"
       },
       {
         "code": "scene.parent_child_mismatch",
         "path": "scene.nodes.node_1.children",
-        "entityId": "node_1"
+        "entityId": "node_1",
+        "severity": "error"
       }
     ]
   },
@@ -1906,7 +1927,8 @@
       {
         "code": "scene.unreachable",
         "path": "scene.nodes.part_1",
-        "entityId": "part_1"
+        "entityId": "part_1",
+        "severity": "error"
       }
     ]
   },
@@ -2000,32 +2022,38 @@
       {
         "code": "ANIMATION_CLIP_INVALID",
         "path": "animation.clips.0.displayName",
-        "entityId": "shared"
+        "entityId": "shared",
+        "severity": "error"
       },
       {
         "code": "ANIMATION_CLIP_INVALID",
         "path": "animation.clips.0.metadata",
-        "entityId": "shared"
+        "entityId": "shared",
+        "severity": "error"
       },
       {
         "code": "ANIMATION_CLIP_INVALID",
         "path": "animation.clips.0",
-        "entityId": "shared"
+        "entityId": "shared",
+        "severity": "error"
       },
       {
         "code": "ANIMATION_CLIP_LOOP_MODE_INVALID",
         "path": "animation.clips.0.defaultLoopMode",
-        "entityId": "shared"
+        "entityId": "shared",
+        "severity": "error"
       },
       {
         "code": "ANIMATION_CLIP_PROGRAM_REFERENCE_INVALID",
         "path": "animation.clips.0.temporalProgramId",
-        "entityId": "shared"
+        "entityId": "shared",
+        "severity": "error"
       },
       {
         "code": "identity.duplicate",
         "path": "sequences.0.id",
-        "entityId": "shared"
+        "entityId": "shared",
+        "severity": "error"
       }
     ]
   },
@@ -2144,7 +2172,8 @@
       {
         "code": "identity.duplicate",
         "path": "keyArts.0.id",
-        "entityId": "part_1"
+        "entityId": "part_1",
+        "severity": "error"
       }
     ]
   },
@@ -2237,12 +2266,14 @@
       {
         "code": "ANIMATION_TOPOLOGY_INCOMPATIBLE",
         "path": "animation.deformationSamples.0.topologyId",
-        "entityId": "sample_1"
+        "entityId": "sample_1",
+        "severity": "error"
       },
       {
         "code": "ANIMATION_TRACK_TARGET_INVALID",
         "path": "animation.deformationSamples.0.meshId",
-        "entityId": "sample_1"
+        "entityId": "sample_1",
+        "severity": "error"
       }
     ]
   },
@@ -2368,22 +2399,26 @@
       {
         "code": "ANIMATION_DEFORMATION_OFFSET_INVALID",
         "path": "animation.deformationSamples.0.offsets.1",
-        "entityId": "sample_1"
+        "entityId": "sample_1",
+        "severity": "error"
       },
       {
         "code": "ANIMATION_DEFORMATION_VERTEX_DUPLICATE",
         "path": "animation.deformationSamples.0.offsets.2.vertexId",
-        "entityId": "sample_1"
+        "entityId": "sample_1",
+        "severity": "error"
       },
       {
         "code": "ANIMATION_DEFORMATION_VERTEX_ORDER_INVALID",
         "path": "animation.deformationSamples.0.offsets",
-        "entityId": "sample_1"
+        "entityId": "sample_1",
+        "severity": "error"
       },
       {
         "code": "ANIMATION_TOPOLOGY_INCOMPATIBLE",
         "path": "animation.deformationSamples.0.offsets.3.vertexId",
-        "entityId": "sample_1"
+        "entityId": "sample_1",
+        "severity": "error"
       }
     ]
   },
@@ -2478,27 +2513,32 @@
       {
         "code": "ANIMATION_CLIP_INVALID",
         "path": "animation.clips.0.displayName",
-        "entityId": "clip_1"
+        "entityId": "clip_1",
+        "severity": "error"
       },
       {
         "code": "ANIMATION_CLIP_INVALID",
         "path": "animation.clips.0.metadata",
-        "entityId": "clip_1"
+        "entityId": "clip_1",
+        "severity": "error"
       },
       {
         "code": "ANIMATION_CLIP_INVALID",
         "path": "animation.clips.0",
-        "entityId": "clip_1"
+        "entityId": "clip_1",
+        "severity": "error"
       },
       {
         "code": "ANIMATION_CLIP_LOOP_MODE_INVALID",
         "path": "animation.clips.0.defaultLoopMode",
-        "entityId": "clip_1"
+        "entityId": "clip_1",
+        "severity": "error"
       },
       {
         "code": "ANIMATION_CLIP_PROGRAM_REFERENCE_INVALID",
         "path": "animation.clips.0.temporalProgramId",
-        "entityId": "clip_1"
+        "entityId": "clip_1",
+        "severity": "error"
       }
     ]
   },
@@ -2599,22 +2639,26 @@
       {
         "code": "BONE_ROTATION_CONSTRAINT_BONE_MISSING",
         "path": "rig.boneRotationConstraints.0.boneId",
-        "entityId": "rotation_1"
+        "entityId": "rotation_1",
+        "severity": "error"
       },
       {
         "code": "BONE_ROTATION_CONSTRAINT_BONE_MISSING",
         "path": "rig.boneRotationConstraints.1.boneId",
-        "entityId": "rotation_2"
+        "entityId": "rotation_2",
+        "severity": "error"
       },
       {
         "code": "BONE_ROTATION_CONSTRAINT_CONFLICT",
         "path": "rig.boneRotationConstraints.1.boneId",
-        "entityId": "rotation_2"
+        "entityId": "rotation_2",
+        "severity": "error"
       },
       {
         "code": "BONE_ROTATION_CONSTRAINT_INVALID",
         "path": "rig.boneRotationConstraints.0",
-        "entityId": "rotation_1"
+        "entityId": "rotation_1",
+        "severity": "error"
       }
     ]
   },
@@ -2717,47 +2761,56 @@
       {
         "code": "TWO_BONE_IK_BONE_MISSING",
         "path": "rig.twoBoneIkConstraints.0.endBoneId",
-        "entityId": "ik_1"
+        "entityId": "ik_1",
+        "severity": "error"
       },
       {
         "code": "TWO_BONE_IK_BONE_MISSING",
         "path": "rig.twoBoneIkConstraints.0.midBoneId",
-        "entityId": "ik_1"
+        "entityId": "ik_1",
+        "severity": "error"
       },
       {
         "code": "TWO_BONE_IK_BONE_MISSING",
         "path": "rig.twoBoneIkConstraints.0.rootBoneId",
-        "entityId": "ik_1"
+        "entityId": "ik_1",
+        "severity": "error"
       },
       {
         "code": "TWO_BONE_IK_BONE_MISSING",
         "path": "rig.twoBoneIkConstraints.1.endBoneId",
-        "entityId": "ik_2"
+        "entityId": "ik_2",
+        "severity": "error"
       },
       {
         "code": "TWO_BONE_IK_BONE_MISSING",
         "path": "rig.twoBoneIkConstraints.1.midBoneId",
-        "entityId": "ik_2"
+        "entityId": "ik_2",
+        "severity": "error"
       },
       {
         "code": "TWO_BONE_IK_BONE_MISSING",
         "path": "rig.twoBoneIkConstraints.1.rootBoneId",
-        "entityId": "ik_2"
+        "entityId": "ik_2",
+        "severity": "error"
       },
       {
         "code": "TWO_BONE_IK_BONES_INVALID",
         "path": "rig.twoBoneIkConstraints.0",
-        "entityId": "ik_1"
+        "entityId": "ik_1",
+        "severity": "error"
       },
       {
         "code": "TWO_BONE_IK_END_CONFLICT",
         "path": "rig.twoBoneIkConstraints.1.endBoneId",
-        "entityId": "ik_2"
+        "entityId": "ik_2",
+        "severity": "error"
       },
       {
         "code": "TWO_BONE_IK_INVALID",
         "path": "rig.twoBoneIkConstraints.0",
-        "entityId": "ik_1"
+        "entityId": "ik_1",
+        "severity": "error"
       }
     ]
   },
@@ -2891,27 +2944,32 @@
       {
         "code": "BONE_NODE_MISSING",
         "path": "rig.rigidBoneBindings.0.boneId",
-        "entityId": "part_1"
+        "entityId": "part_1",
+        "severity": "error"
       },
       {
         "code": "BONE_NODE_MISSING",
         "path": "rig.rigidBoneBindings.1.boneId",
-        "entityId": "rigid_2"
+        "entityId": "rigid_2",
+        "severity": "error"
       },
       {
         "code": "identity.duplicate",
         "path": "rig.rigidBoneBindings.0.id",
-        "entityId": "part_1"
+        "entityId": "part_1",
+        "severity": "error"
       },
       {
         "code": "RIGID_BINDING_CONFLICT",
         "path": "rig.rigidBoneBindings",
-        "entityId": "part_1"
+        "entityId": "part_1",
+        "severity": "error"
       },
       {
         "code": "RIGID_BINDING_CONFLICT",
         "path": "rig.rigidBoneBindings",
-        "entityId": "rigid_2"
+        "entityId": "rigid_2",
+        "severity": "error"
       }
     ]
   },
@@ -3028,77 +3086,92 @@
       {
         "code": "MESH_FORM_CORRECTION_CONTEXT_DUPLICATE",
         "path": "meshFormCorrectionKeyforms.1",
-        "entityId": "form_2"
+        "entityId": "form_2",
+        "severity": "error"
       },
       {
         "code": "MESH_FORM_CORRECTION_CONTEXT_INCOMPATIBLE",
         "path": "meshFormCorrectionKeyforms.0",
-        "entityId": "form_1"
+        "entityId": "form_1",
+        "severity": "error"
       },
       {
         "code": "MESH_FORM_CORRECTION_CONTEXT_INCOMPATIBLE",
         "path": "meshFormCorrectionKeyforms.1",
-        "entityId": "form_2"
+        "entityId": "form_2",
+        "severity": "error"
       },
       {
         "code": "MESH_FORM_CORRECTION_KEY_ART_MISSING",
         "path": "meshFormCorrectionKeyforms.0.keyArtId",
-        "entityId": "form_1"
+        "entityId": "form_1",
+        "severity": "error"
       },
       {
         "code": "MESH_FORM_CORRECTION_KEY_ART_MISSING",
         "path": "meshFormCorrectionKeyforms.1.keyArtId",
-        "entityId": "form_2"
+        "entityId": "form_2",
+        "severity": "error"
       },
       {
         "code": "MESH_FORM_CORRECTION_SEMANTIC_SLOT_MISSING",
         "path": "meshFormCorrectionKeyforms.0.semanticSlotId",
-        "entityId": "form_1"
+        "entityId": "form_1",
+        "severity": "error"
       },
       {
         "code": "MESH_FORM_CORRECTION_SEMANTIC_SLOT_MISSING",
         "path": "meshFormCorrectionKeyforms.1.semanticSlotId",
-        "entityId": "form_2"
+        "entityId": "form_2",
+        "severity": "error"
       },
       {
         "code": "MESH_FORM_CORRECTION_TOPOLOGY_MISSING",
         "path": "meshFormCorrectionKeyforms.0.topologyId",
-        "entityId": "form_1"
+        "entityId": "form_1",
+        "severity": "error"
       },
       {
         "code": "MESH_FORM_CORRECTION_TOPOLOGY_MISSING",
         "path": "meshFormCorrectionKeyforms.1.topologyId",
-        "entityId": "form_2"
+        "entityId": "form_2",
+        "severity": "error"
       },
       {
         "code": "MESH_FORM_CORRECTION_VERTEX_DUPLICATE",
         "path": "meshFormCorrectionKeyforms.0.vertexOffsets.2.vertexId",
-        "entityId": "form_1"
+        "entityId": "form_1",
+        "severity": "error"
       },
       {
         "code": "MESH_FORM_CORRECTION_VERTEX_MISSING",
         "path": "meshFormCorrectionKeyforms.0.vertexOffsets.0.vertexId",
-        "entityId": "form_1"
+        "entityId": "form_1",
+        "severity": "error"
       },
       {
         "code": "MESH_FORM_CORRECTION_VERTEX_MISSING",
         "path": "meshFormCorrectionKeyforms.0.vertexOffsets.1.vertexId",
-        "entityId": "form_1"
+        "entityId": "form_1",
+        "severity": "error"
       },
       {
         "code": "MESH_FORM_CORRECTION_VERTEX_MISSING",
         "path": "meshFormCorrectionKeyforms.0.vertexOffsets.2.vertexId",
-        "entityId": "form_1"
+        "entityId": "form_1",
+        "severity": "error"
       },
       {
         "code": "MESH_FORM_CORRECTION_VERTEX_ORDER_INVALID",
         "path": "meshFormCorrectionKeyforms.0.vertexOffsets",
-        "entityId": "form_1"
+        "entityId": "form_1",
+        "severity": "error"
       },
       {
         "code": "MESH_FORM_CORRECTION_ZERO_OFFSET",
         "path": "meshFormCorrectionKeyforms.0.vertexOffsets.0",
-        "entityId": "form_1"
+        "entityId": "form_1",
+        "severity": "error"
       }
     ]
   }

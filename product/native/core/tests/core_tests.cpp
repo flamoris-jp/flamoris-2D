@@ -37,10 +37,15 @@ static void check_project_snapshots() {
         assert(fl2d_snapshot_summary(snapshot, &schema, &width, &height, &nodes, &issues) == FL2D_OK);
         assert(schema == static_cast<int32_t>(fixture.at("project").get<picojson::object>().at("schemaVersion").get<double>()));
         std::multiset<std::string> actual, expected;
-        for (uint32_t i = 0; i < issues; ++i) actual.insert(read_string(snapshot, i, "code") + "|" + read_string(snapshot, i, "path") + "|" + read_string(snapshot, i, "entityId"));
+        for (uint32_t i = 0; i < issues; ++i) {
+            assert(read_string(snapshot, i, "severity") == "error");
+            actual.insert(read_string(snapshot, i, "code") + "|" + read_string(snapshot, i, "path") + "|" +
+                read_string(snapshot, i, "entityId") + "|" + read_string(snapshot, i, "severity"));
+        }
         for (const auto& issue : fixture.at("expected").get<picojson::array>()) {
             const auto& object = issue.get<picojson::object>();
-            expected.insert(object.at("code").get<std::string>() + "|" + object.at("path").get<std::string>() + "|" + object.at("entityId").get<std::string>());
+            expected.insert(object.at("code").get<std::string>() + "|" + object.at("path").get<std::string>() + "|" +
+                object.at("entityId").get<std::string>() + "|" + object.at("severity").get<std::string>());
         }
         if (actual != expected) {
             fprintf(stderr, "Project fixture %s disagrees with JS validation\n", fixture.at("name").get<std::string>().c_str());
