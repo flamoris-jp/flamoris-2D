@@ -191,6 +191,32 @@ static void check_session() {
     }
     {
         auto invalid = root.at("initial");
+        auto& samples = invalid.get<picojson::object>().at("animation").get<picojson::object>()
+            .at("deformationSamples").get<picojson::array>();
+        samples.emplace_back(picojson::object{
+            {"id", picojson::value("sample_invalid")},
+            {"meshId", picojson::value("missing_mesh")},
+            {"topologyId", picojson::value("missing_topology")},
+            {"offsets", picojson::value(picojson::array{})},
+        });
+        const std::string text = invalid.serialize();
+        fl2d_session* rejected = reinterpret_cast<fl2d_session*>(1);
+        assert(fl2d_session_create(reinterpret_cast<const uint8_t*>(text.data()),
+            static_cast<uint32_t>(text.size()), &rejected) == FL2D_PROJECT_INVALID && rejected == nullptr);
+        const auto before_project = session_text(session);
+        const auto before_history = session_text(session, true);
+        fl2d_session_state before{}, after{};
+        assert(fl2d_session_state_get(session, &before) == FL2D_OK);
+        assert(fl2d_session_replace(session, reinterpret_cast<const uint8_t*>(text.data()),
+            static_cast<uint32_t>(text.size()), 1) == FL2D_PROJECT_INVALID);
+        assert(fl2d_session_state_get(session, &after) == FL2D_OK);
+        assert(before_project == session_text(session) && before_history == session_text(session, true));
+        assert(before.revision_counter == after.revision_counter && before.current_revision == after.current_revision &&
+            before.saved_revision == after.saved_revision && before.undo_depth == after.undo_depth &&
+            before.redo_depth == after.redo_depth && before.history_depth == after.history_depth && before.dirty == after.dirty);
+    }
+    {
+        auto invalid = root.at("initial");
         auto& scene = invalid.get<picojson::object>().at("scene").get<picojson::object>();
         auto& nodes = scene.at("nodes").get<picojson::object>();
         // Keep parent/child links individually consistent but make a detached cycle.

@@ -75,10 +75,14 @@ project identity, canvas, scene node IDs/hierarchy, transform, visibility, opaci
 it records presence of unsupported mesh/rig/animation and other domain sections
 without treating those payloads as native authority. JSON is only an interchange
 format, not the native internal model. The read-only validation subset follows
-`product/src/model/validation.js` and is tested against JS-generated fixtures;
-it does not cover the full base validator. In particular, IDs inside
-`animation.clips` and `animation.deformationSamples` are not entered into the
-native duplicate-ID registry yet. Native node queries use stable `node.id`
+`product/src/model/validation.js` and is tested against JS-generated fixtures.
+The base schema-15 checks now include animation shape, global IDs in both
+animation collections, display names, and scene reachability/cycles. Native
+validation also covers the basic AnimationClip checks, mesh deformation sample
+references/offsets, and bone rotation constraint checks. The remaining imported
+domain validators and loop endpoint warnings are still pending under #125;
+the fixture generator projects the currently covered issue codes only. Native
+node queries use stable `node.id`
 even when a mismatched `scene.nodes` key produces a validation issue.
 it is currently authoritative for conformance testing only. JS `EditorSession`
 remains the sole editing authority, including WPF/MCP mutations, Undo/Redo and
@@ -103,7 +107,11 @@ UTF-8 project/history/error buffers, and deterministic statuses. Project and
 history JSON are inspection projections; the session's native parsed state is
 owned exclusively by its handle. The snapshot validator is still a focused
 subset of full Product validation; the session additionally checks the node
-fields it needs. Unsupported domains and commands remain JS-only. The
+fields it needs. Both creation/replacement and transaction candidates invoke
+the snapshot validation path. Native before/after transaction validation has a
+dedicated seam: the migrated scene commands cannot modify temporal ownership,
+so the JS cross-state ownership rule is not triggered yet. Port that rule when
+the first applicable command moves. Unsupported domains and commands remain JS-only. The
 conformance fixture is generated from the current JS `EditorSession` and covers
 transactions, atomic failure, Undo/Redo, stale and one-shot prepared edits,
 save/dirty lineage, and replacement. Check it with

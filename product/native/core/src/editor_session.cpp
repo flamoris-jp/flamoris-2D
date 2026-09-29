@@ -147,6 +147,14 @@ fl2d_status validate_candidate(const Value& project) {
     Value ignored;
     return parse_project(reinterpret_cast<const uint8_t*>(text.data()), static_cast<uint32_t>(text.size()), ignored);
 }
+fl2d_status validate_transaction_candidate(const Value& before, const Value& after) {
+    // Product JS additionally validates temporal ownership across before/after.
+    // The current native command set changes only scene node name, visibility,
+    // and transform, so it cannot alter a program owner, track, or binding.
+    // Keep this two-state seam when those command families migrate.
+    (void)before;
+    return validate_candidate(after);
+}
 fl2d_status parse_commands(const uint8_t* bytes, uint32_t length, Array& commands) {
     if (!bytes || !length) return FL2D_COMMAND_INVALID;
     if (length > FL2D_SNAPSHOT_MAX_BYTES) return FL2D_INPUT_TOO_LARGE;
@@ -370,7 +378,7 @@ fl2d_status prepare(fl2d_session* session, const Array& commands, const char* la
             inverses.insert(inverses.begin(), std::move(inverse));
             if (seen.insert(id).second) affected.push_back(id);
         }
-        auto validation = validate_candidate(draft->project);
+        auto validation = validate_transaction_candidate(current.project, draft->project);
         if (validation != FL2D_OK) {
             current.error = validation == FL2D_PROJECT_INVALID ? "transaction.validation_failed" : error_name(validation);
             return validation;
