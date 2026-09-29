@@ -2,7 +2,6 @@
 #include "picojson.h"
 
 #include <cmath>
-#include <cctype>
 #include <cstring>
 #include <limits>
 #include <memory>
@@ -46,16 +45,37 @@ bool exact(const Value& value, std::initializer_list<const char*> required) {
     return true;
 }
 bool number(const Value& v) { return v.is<double>() && std::isfinite(v.get<double>()); }
-bool nonblank(const Value& v) {
-    if (!v.is<std::string>() || v.get<std::string>().empty()) return false;
-    for (unsigned char c : v.get<std::string>()) if (!std::isspace(c)) return true;
-    return false;
+// Both Product's nonBlank schema and rename handler use ECMAScript trim().
+bool trim_space(uint32_t code_point) {
+    return (code_point >= 0x09 && code_point <= 0x0D) || code_point == 0x20 ||
+        code_point == 0xA0 || code_point == 0x1680 ||
+        (code_point >= 0x2000 && code_point <= 0x200A) ||
+        code_point == 0x2028 || code_point == 0x2029 || code_point == 0x202F ||
+        code_point == 0x205F || code_point == 0x3000 || code_point == 0xFEFF;
+}
+uint32_t next_code_point(const std::string& text, size_t& pos) {
+    const auto lead = static_cast<unsigned char>(text[pos++]);
+    if (lead < 0x80) return lead;
+    uint32_t code_point = lead < 0xE0 ? lead & 0x1F : lead < 0xF0 ? lead & 0x0F : lead & 0x07;
+    const int continuation = lead < 0xE0 ? 1 : lead < 0xF0 ? 2 : 3;
+    for (int i = 0; i < continuation; ++i)
+        code_point = (code_point << 6) | (static_cast<unsigned char>(text[pos++]) & 0x3F);
+    return code_point;
 }
 std::string trimmed(const std::string& text) {
-    size_t begin = 0, end = text.size();
-    while (begin < end && std::isspace(static_cast<unsigned char>(text[begin]))) ++begin;
-    while (end > begin && std::isspace(static_cast<unsigned char>(text[end - 1]))) --end;
-    return text.substr(begin, end - begin);
+    size_t begin = text.size(), end = 0;
+    for (size_t pos = 0; pos < text.size();) {
+        const size_t start = pos;
+        const bool space = trim_space(next_code_point(text, pos));
+        if (!space) {
+            if (begin == text.size()) begin = start;
+            end = pos;
+        }
+    }
+    return begin == text.size() ? "" : text.substr(begin, end - begin);
+}
+bool nonblank(const Value& v) {
+    return v.is<std::string>() && !trimmed(v.get<std::string>()).empty();
 }
 bool point(const Value& value) {
     return exact(value, {"x", "y"}) && number(field(value, "x")) && number(field(value, "y"));
