@@ -255,6 +255,28 @@ variant("mesh_triangle_warnings", meshed, p => {
   p.meshKeyforms[0].positions = [0, 0, 1, 0, 2, 0];
   p.meshKeyforms[1].positions = [0, 0, 0.01, 0, 0, 0.01];
 });
+variant("authored_clipping_references", populated, p => {
+  p.keyArts[0].members[0].clipping.sourceNodeId = "node_a";
+  p.temporalPrograms[0].tracks.push({ trackId: "clipping_track", version: 1,
+    kind: "ClippingTrack", target: { nodeId: p.scene.rootId }, channels: { clipping: { keyframes: [
+      { id: "clip_key", timeTicks: 0, value: { sourceNodeId: p.scene.rootId },
+        interpolationToNext: { kind: "step" } },
+    ] } } });
+});
+variant("temporal_track_conflicts", populated, p => {
+  p.temporalPrograms[0].tracks.push(
+    { trackId: "draw_1", version: 1, kind: "DrawOrderTrack", target: { semanticSlotId: "slot_1" },
+      channels: { drawOrder: { keyframes: [
+        { id: "draw_key_1", timeTicks: 0, value: 0, interpolationToNext: { kind: "step" } },
+      ] } } },
+    { trackId: "draw_2", version: 1, kind: "DrawOrderTrack", target: { transitionDefault: true },
+      channels: { drawOrder: { keyframes: [
+        { id: "draw_key_2", timeTicks: 0, value: 0, interpolationToNext: { kind: "step" } },
+      ] } } },
+    { trackId: "draw_3", version: 1, kind: "DrawOrderTrack", target: { semanticSlotId: "slot_1" },
+      channels: { drawOrder: { keyframes: [] } } },
+  );
+});
 
 const fixtures = cases.map(([name, project]) => ({ name, project,
   expected: validateProject(project)

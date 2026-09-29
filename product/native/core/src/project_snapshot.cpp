@@ -714,6 +714,102 @@ void validate_transition_domain(Snapshot& s, const Value& project, Register&& re
         }
     }
 }
+void validate_transition_clipping(Snapshot& s, const Value& project) {
+    const Value& nodes = field(field(project, "scene"), "nodes");
+    const Value& arts = field(project, "keyArts");
+    const Value& programs = field(project, "temporalPrograms");
+    const Value& transitions = field(project, "transitions");
+    auto renderable = [&](const std::string& id) {
+        return str(field(field(nodes, id), "kind")) == "part";
+    };
+    std::set<std::string> seen;
+    auto unique_add = [&](const char* code, const std::string& path, const std::string& entity) {
+        std::string key(code); key.push_back('\0'); key += path; key.push_back('\0'); key += entity;
+        if (seen.insert(key).second) add(s, code, path, entity);
+    };
+    if (arts.is<Array>()) for (size_t i = 0; i < arts.get<Array>().size(); ++i) {
+        const Value& art = arts.get<Array>()[i];
+        const Value& members = field(art, "members");
+        if (!members.is<Array>()) continue;
+        std::map<std::string, std::string> sources;
+        for (size_t j = 0; j < members.get<Array>().size(); ++j) {
+            const Value& member = members.get<Array>()[j];
+            const std::string source = str(field(field(member, "clipping"), "sourceNodeId"));
+            if (source.empty()) continue;
+            const std::string target = str(field(member, "nodeId"));
+            const std::string path = "keyArts." + std::to_string(i) + ".members." + std::to_string(j) + ".clipping.sourceNodeId";
+            if (source == target) unique_add("CLIPPING_SELF_REFERENCE", path, target);
+            if (has(nodes, target) && !renderable(target)) unique_add("CLIPPING_TARGET_NOT_RENDERABLE", path, target);
+            if (has(nodes, source) && !renderable(source)) unique_add("CLIPPING_SOURCE_NOT_RENDERABLE", path, source);
+            if (source != target) sources[target] = source;
+        }
+        std::set<std::string> visited, reported;
+        for (const auto& [start, unused] : sources) {
+            (void)unused;
+            std::set<std::string> chain;
+            std::string cursor = start;
+            while (sources.count(cursor) && !visited.count(cursor)) {
+                if (!chain.insert(cursor).second) {
+                    if (!reported.count(cursor)) {
+                        unique_add("CLIPPING_CYCLE", "keyArts." + std::to_string(i) + ".members", str(field(art, "id")));
+                        reported.insert(cursor);
+                    }
+                    break;
+                }
+                cursor = sources.at(cursor);
+            }
+            visited.insert(chain.begin(), chain.end());
+        }
+    }
+    if (programs.is<Array>()) for (size_t i = 0; i < programs.get<Array>().size(); ++i) {
+        const Value& program = programs.get<Array>()[i];
+        const Value& tracks = field(program, "tracks");
+        if (!tracks.is<Array>()) continue;
+        for (size_t j = 0; j < tracks.get<Array>().size(); ++j) {
+            const Value& track = tracks.get<Array>()[j];
+            if (str(field(track, "kind")) != "ClippingTrack") continue;
+            const Value& target = field(track, "target");
+            std::set<std::string> targets;
+            if (!str(field(target, "nodeId")).empty()) targets.insert(str(field(target, "nodeId")));
+            const Value& slots = field(project, "semanticSlots");
+            if (!str(field(target, "semanticSlotId")).empty()) {
+                const Value& slot = find_id(slots, field(target, "semanticSlotId"));
+                const Value& mappings = field(slot, "mappings");
+                if (mappings.is<Array>()) for (const auto& mapping : mappings.get<Array>()) targets.insert(str(field(mapping, "nodeId")));
+            }
+            const Value& keys = field(field(field(track, "channels"), "clipping"), "keyframes");
+            if (!keys.is<Array>()) continue;
+            for (size_t k = 0; k < keys.get<Array>().size(); ++k) {
+                const std::string source = str(field(field(keys.get<Array>()[k], "value"), "sourceNodeId"));
+                if (source.empty()) continue;
+                const std::string path = "temporalPrograms." + std::to_string(i) + ".tracks." +
+                    std::to_string(j) + ".channels.clipping.keyframes." + std::to_string(k) + ".value.sourceNodeId";
+                if (has(nodes, source) && !renderable(source)) unique_add("CLIPPING_SOURCE_NOT_RENDERABLE", path, source);
+                for (const auto& node : targets) {
+                    if (has(nodes, node) && !renderable(node))
+                        unique_add("CLIPPING_TARGET_NOT_RENDERABLE", path, str(field(track, "trackId")));
+                    if (source == node) unique_add("CLIPPING_SELF_REFERENCE", path, str(field(track, "trackId")));
+                }
+            }
+        }
+    }
+    if (transitions.is<Array>()) for (const auto& transition : transitions.get<Array>()) {
+        for (const char* endpoint : {"fromKeyArtId", "toKeyArtId"}) {
+            const Value& art = find_id(arts, field(transition, endpoint));
+            const Value& members = field(art, "members");
+            if (!members.is<Array>()) continue;
+            bool self_cycle = false;
+            for (const auto& member : members.get<Array>()) {
+                const std::string source = str(field(field(member, "clipping"), "sourceNodeId"));
+                if (!source.empty() && source == str(field(member, "nodeId"))) self_cycle = true;
+            }
+            if (self_cycle) {
+                unique_add("CLIPPING_CYCLE", "transitions", str(field(transition, "id")));
+                break;
+            }
+        }
+    }
+}
 template <typename Register>
 void validate_temporal_ownership(Snapshot& s, const Value& project, Register&& register_id) {
     const Value& programs = field(project, "temporalPrograms");
@@ -836,6 +932,54 @@ void validate_temporal_ownership(Snapshot& s, const Value& project, Register&& r
                 (sole && sole->kind == "Transition" && !transition_kinds.count(kind)) ||
                 (sole && sole->kind == "AnimationClip" && !clip_kinds.count(kind)))
                 add(s, "ANIMATION_TRACK_OWNER_INVALID", track_path + ".kind", str(track_id).empty() ? str(id) : str(track_id));
+        }
+        std::set<std::string> channel_owners;
+        for (const auto& track : tracks.get<Array>()) {
+            const std::string kind = str(field(track, "kind"));
+            const Value& target = field(track, "target"), &channels = field(track, "channels");
+            if (kind.empty() || !target.is<Object>() || !channels.is<Object>()) continue;
+            for (const auto& [name, unused] : channels.get<Object>()) {
+                (void)unused;
+                const std::string key = kind + "\n" + target.serialize() + "\n" + name;
+                if (!channel_owners.insert(key).second)
+                    add(s, "ANIMATION_TRACK_CONFLICT", path + ".tracks", str(id));
+            }
+        }
+        std::vector<const Value*> draw_tracks;
+        std::set<double> sample_times = {0};
+        if (finite(duration)) sample_times.insert(duration.get<double>());
+        for (const auto& track : tracks.get<Array>()) {
+            if (str(field(track, "kind")) != "DrawOrderTrack") continue;
+            const Value& keys = field(field(field(track, "channels"), "drawOrder"), "keyframes");
+            if (!keys.is<Array>()) continue;
+            bool valid = true;
+            for (const auto& key : keys.get<Array>()) {
+                if (!field(key, "id").is<std::string>() || !valid_time(field(key, "timeTicks")) ||
+                    !safe_integer(field(key, "value")) || str(field(field(key, "interpolationToNext"), "kind")) != "step") valid = false;
+                else if (finite(duration) && field(key, "timeTicks").get<double>() <= duration.get<double>())
+                    sample_times.insert(field(key, "timeTicks").get<double>());
+            }
+            if (valid) draw_tracks.push_back(&track);
+        }
+        if (draw_tracks.size() > 1) for (const double tick : sample_times) {
+            std::map<double, size_t> orders;
+            for (const auto* track : draw_tracks) {
+                const Value& keys = field(field(field(*track, "channels"), "drawOrder"), "keyframes");
+                std::vector<const Value*> ordered;
+                for (const auto& key : keys.get<Array>()) ordered.push_back(&key);
+                std::sort(ordered.begin(), ordered.end(), [](const Value* a, const Value* b) {
+                    const double at = field(*a, "timeTicks").get<double>();
+                    const double bt = field(*b, "timeTicks").get<double>();
+                    return at == bt ? str(field(*a, "id")) < str(field(*b, "id")) : at < bt;
+                });
+                const Value* selected = ordered.empty() ? nullptr : ordered.front();
+                for (const auto* key : ordered) if (field(*key, "timeTicks").get<double>() <= tick) selected = key;
+                if (selected) ++orders[field(*selected, "value").get<double>()];
+            }
+            for (const auto& [unused, count] : orders) {
+                (void)unused;
+                if (count > 1) add(s, "ANIMATION_TRACK_CONFLICT", path + ".tracks", str(id));
+            }
         }
         if (sole && sole->kind == "Sequence" && camera_count > 1)
             add(s, "SEQUENCE_CAMERA_TRACK_MULTIPLE", path + ".tracks", sole->id);
@@ -1808,6 +1952,7 @@ void validate(Snapshot& s, const Value& project) {
     validate_temporal_ownership(s, project, register_id);
     validate_transition_domain(s, project, register_id);
     validate_clipping(s, project, register_id);
+    validate_transition_clipping(s, project);
     validate_animation_clips(s, project);
     validate_deformation_samples(s, project);
     validate_sequences(s, project, register_id);
