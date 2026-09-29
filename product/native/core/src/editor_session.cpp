@@ -78,17 +78,35 @@ fl2d_status copy(const std::string& value, char* buffer, uint32_t capacity, uint
 bool session_shape(const Value& project) {
     const Value& scene = field(project, "scene");
     const Value& nodes = field(scene, "nodes");
-    if (!nodes.is<Object>()) return false;
-    for (const auto& [key, node] : nodes.get<Object>()) {
+    const Value& root = field(scene, "rootId");
+    if (!nodes.is<Object>() || !root.is<std::string>()) return false;
+    const auto& map = nodes.get<Object>();
+    for (const auto& [key, node] : map) {
         if (!node.is<Object>() || !field(node, "id").is<std::string>() ||
-            field(node, "id").get<std::string>() != key || !field(node, "displayName").is<std::string>() ||
+            field(node, "id").get<std::string>() != key || !nonblank(field(node, "displayName")) ||
             !field(node, "visible").is<bool>() || !number(field(node, "opacity"))) return false;
         const Value& t = field(node, "transform");
         if (!point(field(t, "position")) || !number(field(t, "rotation")) ||
             !point(field(t, "scale")) || !point(field(t, "pivot"))) return false;
     }
-    return true;
+    // The focused snapshot validator checks each parent/child link, but not
+    // whether every node is reachable or whether a child cycle exists.
+    std::set<std::string> visiting, visited;
+    auto walk = [&](auto&& self, const std::string& id) -> bool {
+        auto it = map.find(id);
+        if (it == map.end() || visiting.count(id)) return false;
+        if (visited.count(id)) return true;
+        visiting.insert(id);
+        for (const auto& child : field(it->second, "children").get<Array>()) {
+            if (!child.is<std::string>() || !self(self, child.get<std::string>())) return false;
+        }
+        visiting.erase(id);
+        visited.insert(id);
+        return true;
+    };
+    return walk(walk, root.get<std::string>()) && visited.size() == map.size();
 }
+
 fl2d_status parse_project(const uint8_t* bytes, uint32_t length, Value& project) {
     fl2d_snapshot* snapshot = nullptr;
     auto status = fl2d_snapshot_load(bytes, length, &snapshot);

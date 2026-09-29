@@ -173,6 +173,37 @@ static void check_session() {
             state.history_depth == static_cast<uint32_t>(n("historyDepth")) &&
             state.dirty == static_cast<uint32_t>(expectation.at("dirty").get<bool>()));
     }
+    // The legacy snapshot validator omits display-name and reachability checks;
+    // session admission must reject both before commands can touch the graph.
+    {
+        auto invalid = root.at("initial");
+        auto& nodes = invalid.get<picojson::object>().at("scene").get<picojson::object>().at("nodes").get<picojson::object>();
+        nodes.at("part_1").get<picojson::object>()["displayName"] = picojson::value("  ");
+        std::string text = invalid.serialize();
+        fl2d_session* rejected = reinterpret_cast<fl2d_session*>(1);
+        assert(fl2d_session_create(reinterpret_cast<const uint8_t*>(text.data()),
+            static_cast<uint32_t>(text.size()), &rejected) == FL2D_PROJECT_INVALID && rejected == nullptr);
+    }
+    {
+        auto invalid = root.at("initial");
+        auto& scene = invalid.get<picojson::object>().at("scene").get<picojson::object>();
+        auto& nodes = scene.at("nodes").get<picojson::object>();
+        // Keep parent/child links individually consistent but make a detached cycle.
+        picojson::object a = nodes.at("part_1").get<picojson::object>();
+        a["id"] = picojson::value("detached_a");
+        a["parentId"] = picojson::value("detached_b");
+        a["children"] = picojson::value(picojson::array{picojson::value("detached_b")});
+        picojson::object b = a;
+        b["id"] = picojson::value("detached_b");
+        b["parentId"] = picojson::value("detached_a");
+        b["children"] = picojson::value(picojson::array{picojson::value("detached_a")});
+        nodes["detached_a"] = picojson::value(a);
+        nodes["detached_b"] = picojson::value(b);
+        std::string text = invalid.serialize();
+        fl2d_session* rejected = reinterpret_cast<fl2d_session*>(1);
+        assert(fl2d_session_create(reinterpret_cast<const uint8_t*>(text.data()),
+            static_cast<uint32_t>(text.size()), &rejected) == FL2D_PROJECT_INVALID && rejected == nullptr);
+    }
     for (auto& [key, p] : prepared) { (void)key; fl2d_prepared_destroy(p); }
     fl2d_session_destroy(session);
 }
