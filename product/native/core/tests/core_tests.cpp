@@ -42,7 +42,12 @@ static void check_project_snapshots() {
             const auto& object = issue.get<picojson::object>();
             expected.insert(object.at("code").get<std::string>() + "|" + object.at("path").get<std::string>() + "|" + object.at("entityId").get<std::string>());
         }
-        assert(actual == expected);
+        if (actual != expected) {
+            fprintf(stderr, "Project fixture %s disagrees with JS validation\n", fixture.at("name").get<std::string>().c_str());
+            for (const auto& value : actual) fprintf(stderr, " native: %s\n", value.c_str());
+            for (const auto& value : expected) fprintf(stderr, " JS:     %s\n", value.c_str());
+            assert(false);
+        }
         uint32_t length = 0;
         assert(fl2d_snapshot_string(snapshot, "rootId", nullptr, 0, &length) == FL2D_BUFFER_TOO_SMALL);
         std::string root(length, '\0');

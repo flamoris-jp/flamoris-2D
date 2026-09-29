@@ -7,6 +7,7 @@
 #include <map>
 #include <new>
 #include <numeric>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -45,6 +46,26 @@ bool has(const Value& value, const std::string& key) {
 }
 std::string str(const Value& value) { return value.is<std::string>() ? value.get<std::string>() : ""; }
 bool finite(const Value& value) { return value.is<double>() && std::isfinite(value.get<double>()); }
+bool trim_space(uint32_t cp) {
+    return (cp >= 9 && cp <= 13) || cp == 0x20 || cp == 0xA0 || cp == 0x1680 ||
+        (cp >= 0x2000 && cp <= 0x200A) || cp == 0x2028 || cp == 0x2029 ||
+        cp == 0x202F || cp == 0x205F || cp == 0x3000 || cp == 0xFEFF;
+}
+bool nonblank(const Value& value) {
+    if (!value.is<std::string>()) return false;
+    const auto& name = value.get<std::string>();
+    for (size_t i = 0; i < name.size();) {
+        const auto lead = static_cast<uint8_t>(name[i++]);
+        uint32_t cp = lead;
+        if (lead >= 0x80) {
+            cp = lead < 0xE0 ? lead & 0x1F : lead < 0xF0 ? lead & 0x0F : lead & 0x07;
+            const int following = lead < 0xE0 ? 1 : lead < 0xF0 ? 2 : 3;
+            for (int j = 0; j < following; ++j) cp = (cp << 6) | (static_cast<uint8_t>(name[i++]) & 0x3F);
+        }
+        if (!trim_space(cp)) return true;
+    }
+    return false;
+}
 void add(Snapshot& s, const char* code, std::string path, std::string entity = {}) {
     s.issues.push_back({code, std::move(path), std::move(entity)});
 }
@@ -88,6 +109,12 @@ void validate(Snapshot& s, const Value& project) {
         std::floor(n.get<double>()) == n.get<double>() && std::floor(d.get<double>()) == d.get<double>();
     if (rate_ok) rate_ok = std::gcd(static_cast<int64_t>(n.get<double>()), static_cast<int64_t>(d.get<double>())) == 1;
     if (!rate_ok) add(s, "ANIMATION_INVALID_FRAME_RATE", "renderSettings.frameRate");
+    if (has(field(project, "renderSettings"), "durationTicks"))
+        add(s, "ANIMATION_SECOND_DURATION_AUTHORITY", "renderSettings.durationTicks");
+    const Value& animation = field(project, "animation");
+    if (!animation.is<Object>() || animation.get<Object>().size() != 2 ||
+        !has(animation, "clips") || !has(animation, "deformationSamples"))
+        add(s, "ANIMATION_SCHEMA_INVALID", "animation");
 
     const Value& scene = field(project, "scene");
     s.root = str(field(scene, "rootId"));
@@ -120,6 +147,7 @@ void validate(Snapshot& s, const Value& project) {
         node.null_parent = has(value, "parentId") && field(value, "parentId").is<picojson::null>();
         if (node.id != key) add(s, "scene.key_id_mismatch", path + ".id", node.id);
         if (node.kind != "group" && node.kind != "part" && node.kind != "deformer" && node.kind != "bone") add(s, "scene.invalid_kind", path + ".kind", key);
+        if (!nonblank(field(value, "displayName"))) add(s, "scene.invalid_display_name", path + ".displayName", key);
         const Value& opacity = field(value, "opacity");
         if (!finite(opacity) || opacity.get<double>() < 0 || opacity.get<double>() > 1) add(s, "scene.invalid_opacity", path + ".opacity", key);
         const Value& children = field(value, "children");
@@ -158,15 +186,37 @@ void validate(Snapshot& s, const Value& project) {
     }
     // Register IDs from collections supported by the JS base validator. The
     // remaining payload stays opaque and is never projected as native truth.
-    const char* collections[] = {"sourceAssets", "semanticSlots", "keyArts", "meshes", "meshTopologies", "meshKeyforms", "meshFormCorrectionKeyforms", "transitions", "sequences"};
+    const char* collections[] = {"sourceAssets", "semanticSlots", "keyArts", "meshes", "meshTopologies", "meshKeyforms", "meshFormCorrectionKeyforms", "transitions", "animation.clips", "animation.deformationSamples", "sequences"};
     for (const char* name : collections) {
-        const Value& values = field(project, name);
-        s.unsupported_sections[name] = has(project, name);
+        const std::string path(name);
+        const auto dot = path.find('.');
+        const Value& values = dot == std::string::npos ? field(project, path) : field(animation, path.substr(dot + 1));
+        s.unsupported_sections[name] = dot == std::string::npos ? has(project, name) : has(animation, path.substr(dot + 1));
         if (!values.is<Array>()) add(s, "collection.invalid", name);
         else { size_t i = 0; for (const auto& value : values.get<Array>()) register_id(field(value, "id"), std::string(name) + "." + std::to_string(i++) + ".id"); }
     }
     for (const char* name : {"rig", "animation", "temporalPrograms", "clippingBindings", "renderSettings"})
         s.unsupported_sections[name] = has(project, name);
+    if (root != node_map.end()) {
+        std::set<std::string> visiting, visited;
+        auto walk = [&](auto&& self, const std::string& id) -> void {
+            if (visiting.count(id)) { add(s, "scene.cycle", "scene.nodes." + id, id); return; }
+            if (visited.count(id)) return;
+            auto it = node_map.find(id);
+            if (it == node_map.end()) return;
+            visiting.insert(id);
+            const Value& children = field(it->second, "children");
+            if (children.is<Array>()) for (const auto& child : children.get<Array>())
+                if (child.is<std::string>()) self(self, child.get<std::string>());
+            visiting.erase(id);
+            visited.insert(id);
+        };
+        walk(walk, s.root);
+        for (const auto& [id, unused] : node_map) {
+            (void)unused;
+            if (!visited.count(id)) add(s, "scene.unreachable", "scene.nodes." + id, id);
+        }
+    }
 }
 fl2d_status copy(const std::string& value, char* buffer, uint32_t capacity, uint32_t* required) {
     if (!required) return FL2D_INVALID_ARGUMENT;
@@ -244,5 +294,6 @@ extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_issue_string(const fl2d_
     if (!std::strcmp(field_name, "code")) return copy(issue.code, buffer, capacity, required);
     if (!std::strcmp(field_name, "path")) return copy(issue.path, buffer, capacity, required);
     if (!std::strcmp(field_name, "entityId")) return copy(issue.entity, buffer, capacity, required);
+    if (!std::strcmp(field_name, "severity")) return copy("error", buffer, capacity, required);
     return FL2D_INVALID_ARGUMENT;
 }

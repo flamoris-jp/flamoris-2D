@@ -36,6 +36,16 @@ variant("node_state", hierarchy, p => {
   node.opacity = 0.375;
 });
 variant("key_id_mismatch", hierarchy, p => { p.scene.nodes.part_1.id = "actual_part_id"; });
+variant("duration_authority", minimal, p => { p.renderSettings.durationTicks = 120000; });
+variant("animation_shape", minimal, p => { p.animation.extra = []; });
+variant("unicode_blank_name", hierarchy, p => { p.scene.nodes.part_1.displayName = "\u3000\u00a0"; });
+variant("cycle", minimal, p => { p.scene.nodes[p.scene.rootId].children.push(p.scene.rootId); });
+variant("unreachable", hierarchy, p => { p.scene.nodes[p.scene.rootId].children = []; });
+variant("clip_sequence_duplicate", minimal, p => {
+  p.animation.clips.push({ id: "shared" });
+  p.sequences.push({ id: "shared" });
+});
+variant("node_key_art_duplicate", hierarchy, p => { p.keyArts.push({ id: "part_1" }); });
 
 const subset = new Set([
   "project.invalid", "project.unsupported_schema", "ANIMATION_INVALID_TIMEBASE", "project.missing_id",
@@ -44,6 +54,8 @@ const subset = new Set([
   "identity.duplicate", "scene.key_id_mismatch", "scene.invalid_kind", "scene.invalid_opacity",
   "scene.invalid_children", "scene.orphan", "scene.missing_parent", "scene.missing_child",
   "scene.parent_child_mismatch", "transform.non_finite", "transform.zero_scale", "collection.invalid",
+  "ANIMATION_SECOND_DURATION_AUTHORITY", "ANIMATION_SCHEMA_INVALID", "scene.invalid_display_name",
+  "scene.cycle", "scene.unreachable",
 ]);
 const fixtures = cases.map(([name, project]) => ({ name, project,
   expected: validateProject(project).filter(issue => subset.has(issue.code))
