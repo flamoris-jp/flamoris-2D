@@ -144,6 +144,23 @@ variant("loop_endpoint_warning", hierarchy, p => {
   p.animation.clips.push({ id: "clip_loop", displayName: "Loop", temporalProgramId: "program_loop",
     defaultLoopMode: "loop", metadata: {} });
 });
+variant("sequence_items", hierarchy, p => {
+  p.temporalPrograms.push({ id: "program_sequence", durationTicks: 120000, tracks: [], events: [], regions: [] });
+  p.sequences.push({ id: "sequence_1", displayName: "Sequence", temporalProgramId: "program_sequence",
+    clipInstances: [], metadata: {}, viewLaneItems: [
+      { id: "hold_1", kind: "KeyArtHold", keyArtId: "missing", startTicks: 1000, endTicks: 30000 },
+      { id: "hold_2", kind: "KeyArtHold", keyArtId: "also_missing", startTicks: 25000, endTicks: 90000 },
+    ] });
+});
+variant("clip_instance_invalid", minimal, p => {
+  p.temporalPrograms.push({ id: "program_sequence", durationTicks: 120000, tracks: [], events: [], regions: [] });
+  p.sequences.push({ id: "sequence_1", displayName: "Sequence", temporalProgramId: "program_sequence",
+    viewLaneItems: [], metadata: {}, clipInstances: [
+      { id: "instance_1", clipId: "missing", startTicks: 10, endTicks: 9, sourceOffsetTicks: -1,
+        playbackRate: { numerator: 4, denominator: 2 }, loopMode: "invalid", weight: 2,
+        layer: 0.5, enabled: "yes" },
+    ] });
+});
 
 const subset = new Set([
   "project.invalid", "project.unsupported_schema", "ANIMATION_INVALID_TIMEBASE", "project.missing_id",
@@ -189,6 +206,16 @@ const subset = new Set([
   "CLIPPING_SOURCE_MISSING", "CLIPPING_SOURCE_NOT_RENDERABLE", "CLIPPING_SELF_REFERENCE",
   "CLIPPING_MODE_UNSUPPORTED", "CLIPPING_TARGET_ALREADY_BOUND", "CLIPPING_CYCLE",
   "ANIMATION_LOOP_ENDPOINT_MISMATCH",
+  "SEQUENCE_INVALID", "SEQUENCE_PROGRAM_REFERENCE_INVALID", "SEQUENCE_VIEW_ITEM_INVALID",
+  "SEQUENCE_INVALID_TIME", "SEQUENCE_KEYART_REFERENCE_INVALID", "SEQUENCE_TRANSITION_REFERENCE_INVALID",
+  "SEQUENCE_VIEW_GAP", "SEQUENCE_VIEW_OVERLAP", "SEQUENCE_VIEW_CONTINUITY_MISMATCH",
+  "SEQUENCE_TRANSITION_ENDPOINT_MISMATCH", "ANIMATION_CLIP_INSTANCE_INVALID",
+  "ANIMATION_CLIP_REFERENCE_INVALID", "ANIMATION_CLIP_INSTANCE_PLACEMENT_INVALID",
+  "ANIMATION_CLIP_SOURCE_OFFSET_INVALID", "ANIMATION_CLIP_PLAYBACK_RATE_INVALID",
+  "ANIMATION_CLIP_PLAYBACK_RATE_NONCANONICAL", "ANIMATION_CLIP_LOOP_MODE_INVALID",
+  "ANIMATION_CLIP_WEIGHT_INVALID", "ANIMATION_CLIP_LAYER_INVALID",
+  "ANIMATION_DISCRETE_WEIGHT_INVALID", "ANIMATION_CLIP_ONCE_OVERRUN",
+  "ANIMATION_CLIP_LOOP_OFFSET_INVALID", "ANIMATION_CLIP_LOCAL_TIME_OVERFLOW",
 ]);
 const fixtures = cases.map(([name, project]) => ({ name, project,
   expected: validateProject(project).filter(issue => subset.has(issue.code))

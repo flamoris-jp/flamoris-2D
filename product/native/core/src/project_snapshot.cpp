@@ -85,6 +85,184 @@ bool safe_integer(const Value& value) {
         std::abs(value.get<double>()) <= 9007199254740991.0;
 }
 bool valid_time(const Value& value) { return safe_integer(value) && value.get<double>() >= 0; }
+bool positive_time(const Value& value) { return valid_time(value) && value.get<double>() > 0; }
+const Value& find_id(const Value& values, const Value& id);
+template <typename Register>
+void validate_clip_instances(Snapshot& s, const Value& project, const Value& sequence,
+    const Value& sequence_program, const std::string& sequence_path, Register&& register_id) {
+    const Value& instances = field(sequence, "clipInstances");
+    const std::string sequence_id = str(field(sequence, "id"));
+    if (!instances.is<Array>()) {
+        add(s, "SEQUENCE_INVALID", sequence_path + ".clipInstances", sequence_id);
+        return;
+    }
+    Array ordered = instances.get<Array>();
+    auto rank = [](const Value& item, const char* name) {
+        const Value& value = field(item, name);
+        return safe_integer(value) ? value.get<double>() : 9007199254740991.0;
+    };
+    std::stable_sort(ordered.begin(), ordered.end(), [&](const Value& a, const Value& b) {
+        for (const char* field_name : {"startTicks", "endTicks", "layer"}) {
+            if (rank(a, field_name) != rank(b, field_name)) return rank(a, field_name) < rank(b, field_name);
+        }
+        return str(field(a, "id")) < str(field(b, "id"));
+    });
+    const Value& clips = field(field(project, "animation"), "clips");
+    const Value& programs = field(project, "temporalPrograms");
+    for (size_t i = 0; i < ordered.size(); ++i) {
+        const Value& item = ordered[i];
+        const std::string path = sequence_path + ".clipInstances." + std::to_string(i);
+        if (!item.is<Object>()) { add(s, "ANIMATION_CLIP_INSTANCE_INVALID", path, sequence_id); continue; }
+        const Value& id_value = field(item, "id");
+        const std::string id = str(id_value);
+        register_id(id_value, path + ".id");
+        if (!exact(item, {"id", "clipId", "startTicks", "endTicks", "sourceOffsetTicks", "playbackRate",
+            "loopMode", "weight", "layer", "enabled"})) add(s, "ANIMATION_CLIP_INSTANCE_INVALID", path, id);
+        const Value& clip = find_id(clips, field(item, "clipId"));
+        const Value& clip_program = find_id(programs, field(clip, "temporalProgramId"));
+        if (!clip.is<Object>()) add(s, "ANIMATION_CLIP_REFERENCE_INVALID", path + ".clipId", id);
+        const Value& start = field(item, "startTicks"), &end = field(item, "endTicks");
+        const Value& duration = field(sequence_program, "durationTicks");
+        const bool placement = valid_time(start) && valid_time(end) && start.get<double>() < end.get<double>() &&
+            (!sequence_program.is<Object>() || (finite(duration) && end.get<double>() <= duration.get<double>()));
+        if (!placement) add(s, "ANIMATION_CLIP_INSTANCE_PLACEMENT_INVALID", path, id);
+        const Value& offset = field(item, "sourceOffsetTicks");
+        if (!valid_time(offset)) add(s, "ANIMATION_CLIP_SOURCE_OFFSET_INVALID", path + ".sourceOffsetTicks", id);
+        const Value& rate = field(item, "playbackRate");
+        const Value& n = field(rate, "numerator"), &d = field(rate, "denominator");
+        const bool rate_ok = exact(rate, {"numerator", "denominator"}) && positive_time(n) && positive_time(d);
+        if (!rate_ok) add(s, "ANIMATION_CLIP_PLAYBACK_RATE_INVALID", path + ".playbackRate", id);
+        else if (std::gcd(static_cast<int64_t>(n.get<double>()), static_cast<int64_t>(d.get<double>())) != 1)
+            add(s, "ANIMATION_CLIP_PLAYBACK_RATE_NONCANONICAL", path + ".playbackRate", id);
+        const std::string loop = str(field(item, "loopMode"));
+        if (loop != "once" && loop != "loop") add(s, "ANIMATION_CLIP_LOOP_MODE_INVALID", path + ".loopMode", id);
+        const Value& weight = field(item, "weight");
+        if (!finite(weight) || weight.get<double>() < 0 || weight.get<double>() > 1)
+            add(s, "ANIMATION_CLIP_WEIGHT_INVALID", path + ".weight", id);
+        if (!safe_integer(field(item, "layer"))) add(s, "ANIMATION_CLIP_LAYER_INVALID", path + ".layer", id);
+        const Value& enabled = field(item, "enabled");
+        if (!enabled.is<bool>()) add(s, "ANIMATION_CLIP_INSTANCE_INVALID", path + ".enabled", id);
+        // A positive partial blend cannot interpolate authored discrete channels.
+        bool discrete = false;
+        const Value& tracks = field(clip_program, "tracks");
+        if (tracks.is<Array>()) for (const auto& track : tracks.get<Array>()) {
+            const std::string kind = str(field(track, "kind"));
+            const Value& channels = field(track, "channels");
+            if (!channels.is<Object>()) continue;
+            for (const auto& [name, channel] : channels.get<Object>()) {
+                if ((kind == "PresenceTrack" && name == "presence") || (kind == "DrawOrderTrack" && name == "drawOrder") ||
+                    (kind == "ClippingTrack" && name == "clipping")) {
+                    const Value& keys = field(channel, "keyframes");
+                    if (keys.is<Array>() && !keys.get<Array>().empty()) discrete = true;
+                }
+            }
+        }
+        if (enabled.is<bool>() && enabled.get<bool>() && finite(weight) && weight.get<double>() > 0 &&
+            weight.get<double>() != 1 && discrete) add(s, "ANIMATION_DISCRETE_WEIGHT_INVALID", path + ".weight", id);
+        if (!clip_program.is<Object>() || !placement || !rate_ok || !valid_time(offset) ||
+            (loop != "once" && loop != "loop")) continue;
+        const Value& clip_duration = field(clip_program, "durationTicks");
+        if (loop == "once" && finite(clip_duration) && offset.get<double>() > clip_duration.get<double>()) {
+            add(s, "ANIMATION_CLIP_SOURCE_OFFSET_INVALID", path + ".sourceOffsetTicks", id);
+            continue;
+        }
+        if (loop == "loop" && (!finite(clip_duration) || clip_duration.get<double>() <= 0 ||
+            offset.get<double>() >= clip_duration.get<double>())) {
+            add(s, "ANIMATION_CLIP_LOOP_OFFSET_INVALID", path + ".sourceOffsetTicks", id);
+            continue;
+        }
+        // Compute the last active local tick without overflowing a JS safe integer.
+        const long double elapsed = static_cast<long double>(end.get<double>() - 1 - start.get<double>());
+        const long double raw = static_cast<long double>(offset.get<double>()) +
+            std::floor((elapsed * n.get<double>() / d.get<double>()) + 0.5L);
+        if (raw > 9007199254740991.0L) add(s, "ANIMATION_CLIP_LOCAL_TIME_OVERFLOW", path, id);
+        else if (loop == "once" && finite(clip_duration) && raw > clip_duration.get<double>())
+            add(s, "ANIMATION_CLIP_ONCE_OVERRUN", path, id);
+    }
+}
+template <typename Register>
+void validate_sequences(Snapshot& s, const Value& project, Register&& register_id) {
+    const Value& sequences = field(project, "sequences");
+    if (!sequences.is<Array>()) { add(s, "collection.invalid", "sequences"); return; }
+    const Value& programs = field(project, "temporalPrograms");
+    const Value& key_arts = field(project, "keyArts");
+    const Value& transitions = field(project, "transitions");
+    for (size_t i = 0; i < sequences.get<Array>().size(); ++i) {
+        const Value& sequence = sequences.get<Array>()[i];
+        const std::string path = "sequences." + std::to_string(i);
+        if (!sequence.is<Object>()) { add(s, "SEQUENCE_INVALID", path); continue; }
+        const std::string id = str(field(sequence, "id"));
+        if (!exact(sequence, {"id", "displayName", "temporalProgramId", "viewLaneItems", "clipInstances", "metadata"}))
+            add(s, "SEQUENCE_INVALID", path, id);
+        if (!nonblank(field(sequence, "displayName"))) add(s, "SEQUENCE_INVALID", path + ".displayName", id);
+        const Value& program = find_id(programs, field(sequence, "temporalProgramId"));
+        if (!program.is<Object>()) add(s, "SEQUENCE_PROGRAM_REFERENCE_INVALID", path + ".temporalProgramId", id);
+        if (!field(sequence, "metadata").is<Object>()) add(s, "SEQUENCE_INVALID", path + ".metadata", id);
+        validate_clip_instances(s, project, sequence, program, path, register_id);
+        const Value& lane = field(sequence, "viewLaneItems");
+        if (!lane.is<Array>()) { add(s, "SEQUENCE_INVALID", path + ".viewLaneItems", id); continue; }
+        Array items = lane.get<Array>();
+        auto ticks = [](const Value& item, const char* key) {
+            const Value& value = field(item, key);
+            return finite(value) ? value.get<double>() : 0.0;
+        };
+        std::stable_sort(items.begin(), items.end(), [&](const Value& a, const Value& b) {
+            if (ticks(a, "startTicks") != ticks(b, "startTicks")) return ticks(a, "startTicks") < ticks(b, "startTicks");
+            if (ticks(a, "endTicks") != ticks(b, "endTicks")) return ticks(a, "endTicks") < ticks(b, "endTicks");
+            return str(field(a, "id")) < str(field(b, "id"));
+        });
+        for (size_t j = 0; j < items.size(); ++j) {
+            const Value& item = items[j];
+            const std::string item_path = path + ".viewLaneItems." + std::to_string(j);
+            if (!item.is<Object>()) { add(s, "SEQUENCE_VIEW_ITEM_INVALID", item_path, id); continue; }
+            const Value& item_id = field(item, "id");
+            register_id(item_id, item_path + ".id");
+            const std::string kind = str(field(item, "kind"));
+            const bool hold = kind == "KeyArtHold", instance = kind == "TransitionInstance";
+            if (!hold && !instance) { add(s, "SEQUENCE_VIEW_ITEM_INVALID", item_path + ".kind", str(item_id)); continue; }
+            if (hold ? !exact(item, {"id", "kind", "keyArtId", "startTicks", "endTicks"}) :
+                !exact(item, {"id", "kind", "transitionId", "startTicks", "endTicks"}))
+                add(s, "SEQUENCE_VIEW_ITEM_INVALID", item_path, str(item_id));
+            const Value& start = field(item, "startTicks"), &end = field(item, "endTicks");
+            const Value& duration = field(program, "durationTicks");
+            if (!valid_time(start) || !valid_time(end) || start.get<double>() >= end.get<double>() ||
+                (program.is<Object>() && (!finite(duration) || end.get<double>() > duration.get<double>())))
+                add(s, "SEQUENCE_INVALID_TIME", item_path, str(item_id));
+            if (hold && !contains_id(key_arts, field(item, "keyArtId")))
+                add(s, "SEQUENCE_KEYART_REFERENCE_INVALID", item_path + ".keyArtId", str(item_id));
+            if (instance && !contains_id(transitions, field(item, "transitionId")))
+                add(s, "SEQUENCE_TRANSITION_REFERENCE_INVALID", item_path + ".transitionId", str(item_id));
+        }
+        if (!program.is<Object>()) continue;
+        if (items.empty()) { add(s, "SEQUENCE_VIEW_GAP", path + ".viewLaneItems", id); continue; }
+        if (!finite(field(items.front(), "startTicks")) || ticks(items.front(), "startTicks") != 0)
+            add(s, "SEQUENCE_VIEW_GAP", path + ".viewLaneItems", id);
+        auto endpoint = [&](const Value& item, bool ending) {
+            if (str(field(item, "kind")) == "KeyArtHold") return str(field(item, "keyArtId"));
+            const Value& transition = find_id(transitions, field(item, "transitionId"));
+            return str(field(transition, ending ? "toKeyArtId" : "fromKeyArtId"));
+        };
+        for (size_t j = 1; j < items.size(); ++j) {
+            const Value& previous = items[j - 1], &current = items[j];
+            if (!previous.is<Object>() || !current.is<Object>()) continue;
+            if (ticks(previous, "endTicks") < ticks(current, "startTicks"))
+                add(s, "SEQUENCE_VIEW_GAP", path + ".viewLaneItems", id);
+            else if (ticks(previous, "endTicks") > ticks(current, "startTicks"))
+                add(s, "SEQUENCE_VIEW_OVERLAP", path + ".viewLaneItems", id);
+            const std::string outgoing = endpoint(previous, true), incoming = endpoint(current, false);
+            if (!outgoing.empty() && !incoming.empty() && outgoing != incoming)
+                add(s, (str(field(previous, "kind")) == "TransitionInstance" ||
+                    str(field(current, "kind")) == "TransitionInstance") ?
+                    "SEQUENCE_TRANSITION_ENDPOINT_MISMATCH" : "SEQUENCE_VIEW_CONTINUITY_MISMATCH",
+                    path + ".viewLaneItems", id);
+        }
+        const Value& duration = field(program, "durationTicks");
+        if (finite(duration) && ticks(items.back(), "endTicks") < duration.get<double>())
+            add(s, "SEQUENCE_VIEW_GAP", path + ".viewLaneItems", id);
+        else if (finite(duration) && ticks(items.back(), "endTicks") > duration.get<double>())
+            add(s, "SEQUENCE_VIEW_OVERLAP", path + ".viewLaneItems", id);
+    }
+}
 template <typename Register>
 void validate_temporal_ownership(Snapshot& s, const Value& project, Register&& register_id) {
     const Value& programs = field(project, "temporalPrograms");
@@ -1093,6 +1271,7 @@ void validate(Snapshot& s, const Value& project) {
     validate_clipping(s, project, register_id);
     validate_animation_clips(s, project);
     validate_deformation_samples(s, project);
+    validate_sequences(s, project, register_id);
     validate_rotation_constraints(s, project);
     validate_ik_constraints(s, project);
     validate_rigid_bindings(s, project, register_id);

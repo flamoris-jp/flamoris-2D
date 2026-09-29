@@ -2054,6 +2054,42 @@
         "path": "sequences.0.id",
         "entityId": "shared",
         "severity": "error"
+      },
+      {
+        "code": "SEQUENCE_INVALID",
+        "path": "sequences.0.clipInstances",
+        "entityId": "shared",
+        "severity": "error"
+      },
+      {
+        "code": "SEQUENCE_INVALID",
+        "path": "sequences.0.displayName",
+        "entityId": "shared",
+        "severity": "error"
+      },
+      {
+        "code": "SEQUENCE_INVALID",
+        "path": "sequences.0.metadata",
+        "entityId": "shared",
+        "severity": "error"
+      },
+      {
+        "code": "SEQUENCE_INVALID",
+        "path": "sequences.0.viewLaneItems",
+        "entityId": "shared",
+        "severity": "error"
+      },
+      {
+        "code": "SEQUENCE_INVALID",
+        "path": "sequences.0",
+        "entityId": "shared",
+        "severity": "error"
+      },
+      {
+        "code": "SEQUENCE_PROGRAM_REFERENCE_INVALID",
+        "path": "sequences.0.temporalProgramId",
+        "entityId": "shared",
+        "severity": "error"
       }
     ]
   },
@@ -3915,6 +3951,12 @@
     },
     "expected": [
       {
+        "code": "SEQUENCE_VIEW_GAP",
+        "path": "sequences.0.viewLaneItems",
+        "entityId": "sequence_1",
+        "severity": "error"
+      },
+      {
         "code": "TEMPORAL_PROGRAM_OWNERSHIP_CONFLICT",
         "path": "animation.clips.0.temporalProgramId",
         "entityId": "clip_1",
@@ -4514,6 +4556,352 @@
         "path": "animation.clips.0.temporalProgramId",
         "entityId": "clip_loop",
         "severity": "warning"
+      }
+    ]
+  },
+  {
+    "name": "sequence_items",
+    "project": {
+      "schemaVersion": 15,
+      "timebaseTicksPerSecond": 120000,
+      "id": "project_あ",
+      "displayName": "夜明け",
+      "canvas": {
+        "width": 1920,
+        "height": 1080
+      },
+      "sourceAssets": [],
+      "semanticSlots": [],
+      "keyArts": [],
+      "scene": {
+        "rootId": "node_1",
+        "nodes": {
+          "node_1": {
+            "id": "node_1",
+            "kind": "group",
+            "displayName": "夜明け",
+            "sourceRef": null,
+            "parentId": null,
+            "children": [
+              "part_1"
+            ],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          },
+          "part_1": {
+            "id": "part_1",
+            "kind": "part",
+            "displayName": "前髪",
+            "sourceRef": null,
+            "parentId": "node_1",
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          }
+        }
+      },
+      "meshes": [],
+      "meshTopologies": [],
+      "meshKeyforms": [],
+      "meshFormCorrectionKeyforms": [],
+      "clippingBindings": [],
+      "rig": {
+        "deformers": [],
+        "warpControlPoints": [],
+        "warpDeformerKeyforms": [],
+        "bones": [],
+        "bonePoseKeyforms": [],
+        "rigidBoneBindings": [],
+        "skinBindings": [],
+        "boneRotationConstraints": [],
+        "twoBoneIkConstraints": [],
+        "constraints": []
+      },
+      "transitions": [],
+      "temporalPrograms": [
+        {
+          "id": "program_sequence",
+          "durationTicks": 120000,
+          "tracks": [],
+          "events": [],
+          "regions": []
+        }
+      ],
+      "animation": {
+        "clips": [],
+        "deformationSamples": []
+      },
+      "sequences": [
+        {
+          "id": "sequence_1",
+          "displayName": "Sequence",
+          "temporalProgramId": "program_sequence",
+          "clipInstances": [],
+          "metadata": {},
+          "viewLaneItems": [
+            {
+              "id": "hold_1",
+              "kind": "KeyArtHold",
+              "keyArtId": "missing",
+              "startTicks": 1000,
+              "endTicks": 30000
+            },
+            {
+              "id": "hold_2",
+              "kind": "KeyArtHold",
+              "keyArtId": "also_missing",
+              "startTicks": 25000,
+              "endTicks": 90000
+            }
+          ]
+        }
+      ],
+      "renderSettings": {
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "alpha": true
+      }
+    },
+    "expected": [
+      {
+        "code": "SEQUENCE_KEYART_REFERENCE_INVALID",
+        "path": "sequences.0.viewLaneItems.0.keyArtId",
+        "entityId": "hold_1",
+        "severity": "error"
+      },
+      {
+        "code": "SEQUENCE_KEYART_REFERENCE_INVALID",
+        "path": "sequences.0.viewLaneItems.1.keyArtId",
+        "entityId": "hold_2",
+        "severity": "error"
+      },
+      {
+        "code": "SEQUENCE_VIEW_CONTINUITY_MISMATCH",
+        "path": "sequences.0.viewLaneItems",
+        "entityId": "sequence_1",
+        "severity": "error"
+      },
+      {
+        "code": "SEQUENCE_VIEW_GAP",
+        "path": "sequences.0.viewLaneItems",
+        "entityId": "sequence_1",
+        "severity": "error"
+      },
+      {
+        "code": "SEQUENCE_VIEW_GAP",
+        "path": "sequences.0.viewLaneItems",
+        "entityId": "sequence_1",
+        "severity": "error"
+      },
+      {
+        "code": "SEQUENCE_VIEW_OVERLAP",
+        "path": "sequences.0.viewLaneItems",
+        "entityId": "sequence_1",
+        "severity": "error"
+      }
+    ]
+  },
+  {
+    "name": "clip_instance_invalid",
+    "project": {
+      "schemaVersion": 15,
+      "timebaseTicksPerSecond": 120000,
+      "id": "project_あ",
+      "displayName": "夜明け",
+      "canvas": {
+        "width": 1920,
+        "height": 1080
+      },
+      "sourceAssets": [],
+      "semanticSlots": [],
+      "keyArts": [],
+      "scene": {
+        "rootId": "node_1",
+        "nodes": {
+          "node_1": {
+            "id": "node_1",
+            "kind": "group",
+            "displayName": "夜明け",
+            "sourceRef": null,
+            "parentId": null,
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          }
+        }
+      },
+      "meshes": [],
+      "meshTopologies": [],
+      "meshKeyforms": [],
+      "meshFormCorrectionKeyforms": [],
+      "clippingBindings": [],
+      "rig": {
+        "deformers": [],
+        "warpControlPoints": [],
+        "warpDeformerKeyforms": [],
+        "bones": [],
+        "bonePoseKeyforms": [],
+        "rigidBoneBindings": [],
+        "skinBindings": [],
+        "boneRotationConstraints": [],
+        "twoBoneIkConstraints": [],
+        "constraints": []
+      },
+      "transitions": [],
+      "temporalPrograms": [
+        {
+          "id": "program_sequence",
+          "durationTicks": 120000,
+          "tracks": [],
+          "events": [],
+          "regions": []
+        }
+      ],
+      "animation": {
+        "clips": [],
+        "deformationSamples": []
+      },
+      "sequences": [
+        {
+          "id": "sequence_1",
+          "displayName": "Sequence",
+          "temporalProgramId": "program_sequence",
+          "viewLaneItems": [],
+          "metadata": {},
+          "clipInstances": [
+            {
+              "id": "instance_1",
+              "clipId": "missing",
+              "startTicks": 10,
+              "endTicks": 9,
+              "sourceOffsetTicks": -1,
+              "playbackRate": {
+                "numerator": 4,
+                "denominator": 2
+              },
+              "loopMode": "invalid",
+              "weight": 2,
+              "layer": 0.5,
+              "enabled": "yes"
+            }
+          ]
+        }
+      ],
+      "renderSettings": {
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "alpha": true
+      }
+    },
+    "expected": [
+      {
+        "code": "ANIMATION_CLIP_INSTANCE_INVALID",
+        "path": "sequences.0.clipInstances.0.enabled",
+        "entityId": "instance_1",
+        "severity": "error"
+      },
+      {
+        "code": "ANIMATION_CLIP_INSTANCE_PLACEMENT_INVALID",
+        "path": "sequences.0.clipInstances.0",
+        "entityId": "instance_1",
+        "severity": "error"
+      },
+      {
+        "code": "ANIMATION_CLIP_LAYER_INVALID",
+        "path": "sequences.0.clipInstances.0.layer",
+        "entityId": "instance_1",
+        "severity": "error"
+      },
+      {
+        "code": "ANIMATION_CLIP_LOOP_MODE_INVALID",
+        "path": "sequences.0.clipInstances.0.loopMode",
+        "entityId": "instance_1",
+        "severity": "error"
+      },
+      {
+        "code": "ANIMATION_CLIP_PLAYBACK_RATE_NONCANONICAL",
+        "path": "sequences.0.clipInstances.0.playbackRate",
+        "entityId": "instance_1",
+        "severity": "error"
+      },
+      {
+        "code": "ANIMATION_CLIP_REFERENCE_INVALID",
+        "path": "sequences.0.clipInstances.0.clipId",
+        "entityId": "instance_1",
+        "severity": "error"
+      },
+      {
+        "code": "ANIMATION_CLIP_SOURCE_OFFSET_INVALID",
+        "path": "sequences.0.clipInstances.0.sourceOffsetTicks",
+        "entityId": "instance_1",
+        "severity": "error"
+      },
+      {
+        "code": "ANIMATION_CLIP_WEIGHT_INVALID",
+        "path": "sequences.0.clipInstances.0.weight",
+        "entityId": "instance_1",
+        "severity": "error"
+      },
+      {
+        "code": "SEQUENCE_VIEW_GAP",
+        "path": "sequences.0.viewLaneItems",
+        "entityId": "sequence_1",
+        "severity": "error"
       }
     ]
   }
