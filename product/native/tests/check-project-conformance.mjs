@@ -161,6 +161,17 @@ variant("clip_instance_invalid", minimal, p => {
         layer: 0.5, enabled: "yes" },
     ] });
 });
+variant("temporal_keys_events_regions", hierarchy, p => {
+  p.temporalPrograms.push({ id: "program_1", durationTicks: 120000,
+    tracks: [{ trackId: "track_1", version: 2, kind: "OpacityTrack", target: { nodeId: "part_1" },
+      channels: { opacity: { keyframes: [
+        { id: "key_1", timeTicks: 130000, value: 2, interpolationToNext: { kind: "wrong" } },
+        { id: "key_2", timeTicks: 130000, value: -1, interpolationToNext: { kind: "step" } },
+      ] } } }],
+    events: [{ id: "event_1", timeTicks: 130000, type: "wrong", participants: ["ghost"], payload: null }],
+    regions: [{ id: "region_1", startTicks: 130000, endTicks: 10, type: "wrong", metadata: null }],
+  });
+});
 
 const subset = new Set([
   "project.invalid", "project.unsupported_schema", "ANIMATION_INVALID_TIMEBASE", "project.missing_id",
@@ -216,6 +227,11 @@ const subset = new Set([
   "ANIMATION_CLIP_WEIGHT_INVALID", "ANIMATION_CLIP_LAYER_INVALID",
   "ANIMATION_DISCRETE_WEIGHT_INVALID", "ANIMATION_CLIP_ONCE_OVERRUN",
   "ANIMATION_CLIP_LOOP_OFFSET_INVALID", "ANIMATION_CLIP_LOCAL_TIME_OVERFLOW",
+  "ANIMATION_INVALID_TRACK", "ANIMATION_UNKNOWN_TRACK_KIND", "ANIMATION_TRACK_VERSION_UNSUPPORTED",
+  "ANIMATION_INVALID_CHANNEL", "ANIMATION_INVALID_KEYFRAME", "ANIMATION_INVALID_TIME",
+  "ANIMATION_KEY_OUTSIDE_PROGRAM", "ANIMATION_DUPLICATE_KEY_TIME", "ANIMATION_INVALID_VALUE",
+  "ANIMATION_INVALID_DRAW_ORDER", "ANIMATION_INVALID_PRESENCE_VALUE", "ANIMATION_UNKNOWN_TARGET",
+  "ANIMATION_INVALID_CURVE", "ANIMATION_INVALID_EVENT", "ANIMATION_INVALID_REGION",
 ]);
 const fixtures = cases.map(([name, project]) => ({ name, project,
   expected: validateProject(project).filter(issue => subset.has(issue.code))

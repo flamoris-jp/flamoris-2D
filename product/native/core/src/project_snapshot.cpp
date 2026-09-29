@@ -10,6 +10,7 @@
 #include <numeric>
 #include <set>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -263,6 +264,136 @@ void validate_sequences(Snapshot& s, const Value& project, Register&& register_i
             add(s, "SEQUENCE_VIEW_OVERLAP", path + ".viewLaneItems", id);
     }
 }
+struct TrackDefinition {
+    const char* target;
+    std::set<std::string> channels;
+    const char* value;
+    bool discrete;
+};
+TrackDefinition track_definition(const std::string& kind) {
+    if (kind == "GeometryBlendTrack") return {"transition", {"geometryWeight"}, "unit-number", false};
+    if (kind == "AppearanceTrack") return {"transition", {"appearance"}, "weights", false};
+    if (kind == "OpacityTrack") return {"node-semantic-or-transition", {"opacity"}, "unit-number", false};
+    if (kind == "PresenceTrack") return {"node-semantic-or-transition", {"presence"}, "presence", true};
+    if (kind == "DrawOrderTrack") return {"node-semantic-or-transition", {"drawOrder"}, "integer", true};
+    if (kind == "ClippingTrack") return {"node-semantic-or-transition", {"clipping"}, "clipping", true};
+    if (kind == "TransformTrack") return {"node-or-semantic-local", {"positionX", "positionY", "rotation", "scaleX", "scaleY"}, "number", false};
+    if (kind == "BoneTrack") return {"bone", {"x", "y", "rotation"}, "number", false};
+    if (kind == "DeformerTrack") return {"deformer-control-point", {"deltaX", "deltaY"}, "number", false};
+    if (kind == "CameraTrack") return {"camera", {"positionX", "positionY", "rotation", "scale"}, "number", false};
+    if (kind == "MeshDeformationTrack") return {"mesh", {"deformation"}, "deformation", false};
+    return {nullptr, {}, nullptr, false};
+}
+void validate_track_target(Snapshot& s, const Value& project, const Value& program,
+    const Value& track, const TrackDefinition& definition, const std::string& path) {
+    const Value& target = field(track, "target");
+    const std::string id = str(field(track, "trackId"));
+    if (!target.is<Object>()) { add(s, "ANIMATION_TRACK_TARGET_INVALID", path, id); return; }
+    const bool node = field(target, "nodeId").is<std::string>() && !str(field(target, "nodeId")).empty();
+    const bool semantic = field(target, "semanticSlotId").is<std::string>() && !str(field(target, "semanticSlotId")).empty();
+    const bool transition = field(target, "transitionDefault").is<bool>() && field(target, "transitionDefault").get<bool>();
+    const size_t fields = target.get<Object>().size();
+    const std::string shape = definition.target;
+    bool valid = false;
+    if (shape == "transition") valid = (semantic != transition) && fields == 1;
+    else if (shape == "node-semantic-or-transition") valid = static_cast<int>(node) + semantic + transition == 1 && fields == 1;
+    else if (shape == "node-or-semantic-local") valid = node != semantic &&
+        str(field(target, "coordinateSpace")) == "node-local" && fields == 2;
+    else if (shape == "bone") valid = !str(field(target, "boneId")).empty() && fields == 1;
+    else if (shape == "deformer-control-point") valid = !str(field(target, "deformerId")).empty() &&
+        !str(field(target, "controlPointId")).empty() && fields == 2;
+    else if (shape == "mesh") valid = !str(field(target, "meshId")).empty() && fields == 1;
+    else if (shape == "camera") valid = str(field(target, "cameraId")) == "main" && fields == 1;
+    if (!valid) { add(s, "ANIMATION_TRACK_TARGET_INVALID", path, id); return; }
+    const Value& nodes = field(field(project, "scene"), "nodes");
+    if (node && (!nodes.is<Object>() || !has(nodes, str(field(target, "nodeId")))))
+        add(s, "ANIMATION_TRACK_TARGET_INVALID", path + ".nodeId", str(field(target, "nodeId")));
+    if (semantic && !contains_id(field(project, "semanticSlots"), field(target, "semanticSlotId")))
+        add(s, "ANIMATION_TRACK_TARGET_INVALID", path + ".semanticSlotId", str(field(target, "semanticSlotId")));
+    if (transition) {
+        bool owned = false;
+        const Value& transitions = field(project, "transitions");
+        if (transitions.is<Array>()) for (const auto& item : transitions.get<Array>())
+            if (field(item, "temporalProgramId") == field(program, "id")) owned = true;
+        if (!owned) add(s, "ANIMATION_TRACK_TARGET_INVALID", path + ".transitionDefault", id);
+    }
+    for (const auto& [key, collection, suffix] : {
+        std::tuple<const char*, const char*, const char*>{"meshId", "meshes", ".meshId"},
+        {"boneId", "bones", ".boneId"}}) {
+        const Value& target_id = field(target, key);
+        const Value& values = std::strcmp(collection, "bones") == 0 ? field(field(project, "rig"), "bones") : field(project, "meshes");
+        if (target_id.is<std::string>() && !str(target_id).empty() && !contains_id(values, target_id))
+            add(s, "ANIMATION_TRACK_TARGET_INVALID", path + suffix, str(target_id));
+    }
+    if (field(target, "deformerId").is<std::string>() && !str(field(target, "deformerId")).empty()) {
+        const Value& rig = field(project, "rig");
+        const Value& deformer = find_id(field(rig, "deformers"), field(target, "deformerId"));
+        const Value& point = find_id(field(rig, "warpControlPoints"), field(target, "controlPointId"));
+        if (!deformer.is<Object>()) add(s, "ANIMATION_TRACK_TARGET_INVALID", path + ".deformerId", str(field(target, "deformerId")));
+        const Value& ids = field(deformer, "controlPointIds");
+        bool linked = false;
+        if (ids.is<Array>()) for (const auto& candidate : ids.get<Array>())
+            if (candidate == field(target, "controlPointId")) linked = true;
+        if (!point.is<Object>() || field(point, "deformerId") != field(target, "deformerId") || !linked)
+            add(s, "ANIMATION_TRACK_TARGET_INVALID", path + ".controlPointId", str(field(target, "controlPointId")));
+    }
+}
+void validate_track_value(Snapshot& s, const Value& project, const Value& track,
+    const std::string& type, const Value& value, const std::string& path) {
+    if (type == "number" && !finite(value)) add(s, "ANIMATION_INVALID_VALUE", path);
+    else if (type == "positive-number" && (!finite(value) || value.get<double>() <= 0)) add(s, "ANIMATION_INVALID_VALUE", path);
+    else if (type == "unit-number" && (!finite(value) || value.get<double>() < 0 || value.get<double>() > 1))
+        add(s, "ANIMATION_INVALID_VALUE", path);
+    else if (type == "integer" && !safe_integer(value)) add(s, "ANIMATION_INVALID_DRAW_ORDER", path);
+    else if (type == "presence" && str(value) != "present" && str(value) != "occluded" && str(value) != "absent")
+        add(s, "ANIMATION_INVALID_PRESENCE_VALUE", path);
+    else if (type == "weights") {
+        bool valid = value.is<Object>() && !value.get<Object>().empty();
+        double sum = 0;
+        if (valid) for (const auto& [key, weight] : value.get<Object>()) {
+            (void)key;
+            if (!finite(weight) || weight.get<double>() < 0) valid = false;
+            else sum += weight.get<double>();
+        }
+        if (!valid || std::abs(sum - 1) > 1e-9) add(s, "ANIMATION_INVALID_VALUE", path);
+    } else if (type == "clipping") {
+        const Value& source = field(value, "sourceNodeId");
+        if (!value.is<Object>() || !has(value, "sourceNodeId") ||
+            (!source.is<picojson::null>() && (!source.is<std::string>() || str(source).empty())))
+            add(s, "ANIMATION_INVALID_VALUE", path);
+        else if (source.is<std::string>() && !has(field(field(project, "scene"), "nodes"), str(source)))
+            add(s, "ANIMATION_UNKNOWN_TARGET", path + ".sourceNodeId", str(source));
+    } else if (type == "deformation") {
+        if (!exact(value, {"deformationSampleId", "weight"}) || !nonblank(field(value, "deformationSampleId")) ||
+            !finite(field(value, "weight"))) { add(s, "ANIMATION_INVALID_VALUE", path); return; }
+        const Value& sample = find_id(field(field(project, "animation"), "deformationSamples"), field(value, "deformationSampleId"));
+        if (!sample.is<Object>() || field(sample, "meshId") != field(field(track, "target"), "meshId") ||
+            !contains_id(field(project, "meshTopologies"), field(sample, "topologyId")))
+            add(s, "ANIMATION_TOPOLOGY_INCOMPATIBLE", sample.is<Object>() ? path : path + ".deformationSampleId",
+                str(field(track, "trackId")));
+    }
+}
+void validate_curve(Snapshot& s, const Value& value, const std::string& path,
+    bool discrete, bool positive) {
+    const std::string kind = str(field(value, "kind"));
+    if (!value.is<Object>() || (kind != "step" && kind != "linear" && kind != "bezier")) {
+        add(s, "ANIMATION_INVALID_CURVE", path); return;
+    }
+    if (discrete && kind != "step") add(s, "ANIMATION_INVALID_CURVE", path);
+    if (kind == "bezier" ? !exact(value, {"kind", "x1", "x2", "y1", "y2"}) : !exact(value, {"kind"})) {
+        add(s, "ANIMATION_INVALID_CURVE", path); return;
+    }
+    if (kind != "bezier") return;
+    const Value& x1 = field(value, "x1"), &x2 = field(value, "x2");
+    const Value& y1 = field(value, "y1"), &y2 = field(value, "y2");
+    if (!finite(x1) || !finite(x2) || !finite(y1) || !finite(y2) ||
+        (finite(x1) && (x1.get<double>() < 0 || x1.get<double>() > 1)) ||
+        (finite(x2) && (x2.get<double>() < 0 || x2.get<double>() > 1)))
+        add(s, "ANIMATION_INVALID_CURVE", path);
+    if (positive && ((!finite(y1) || y1.get<double>() < 0 || y1.get<double>() > 1) ||
+        (!finite(y2) || y2.get<double>() < 0 || y2.get<double>() > 1)))
+        add(s, "ANIMATION_INVALID_CURVE", path);
+}
 template <typename Register>
 void validate_temporal_ownership(Snapshot& s, const Value& project, Register&& register_id) {
     const Value& programs = field(project, "temporalPrograms");
@@ -329,6 +460,54 @@ void validate_temporal_ownership(Snapshot& s, const Value& project, Register&& r
             if (!exact(track, {"trackId", "version", "kind", "target", "channels"}))
                 add(s, "ANIMATION_INVALID_TRACK", track_path, str(track_id));
             const std::string kind = str(field(track, "kind"));
+            const TrackDefinition definition = track_definition(kind);
+            if (!definition.target) {
+                add(s, "ANIMATION_UNKNOWN_TRACK_KIND", track_path + ".kind", str(track_id));
+                continue;
+            }
+            if (!finite(field(track, "version")) || field(track, "version").get<double>() != 1)
+                add(s, "ANIMATION_TRACK_VERSION_UNSUPPORTED", track_path + ".version", str(track_id));
+            validate_track_target(s, project, program, track, definition, track_path + ".target");
+            const Value& channels = field(track, "channels");
+            if (!channels.is<Object>() || channels.get<Object>().empty())
+                add(s, "ANIMATION_INVALID_CHANNEL", track_path + ".channels", str(track_id));
+            else for (const auto& [channel_name, channel] : channels.get<Object>()) {
+                const std::string channel_path = track_path + ".channels." + channel_name;
+                if (!definition.channels.count(channel_name)) {
+                    add(s, "ANIMATION_INVALID_CHANNEL", channel_path, str(track_id)); continue;
+                }
+                const Value& keyframes = field(channel, "keyframes");
+                if (!channel.is<Object>() || !keyframes.is<Array>()) {
+                    add(s, "ANIMATION_INVALID_CHANNEL", channel_path, str(track_id)); continue;
+                }
+                if (!exact(channel, {"keyframes"})) add(s, "ANIMATION_INVALID_CHANNEL", channel_path, str(track_id));
+                std::set<double> times;
+                for (size_t k = 0; k < keyframes.get<Array>().size(); ++k) {
+                    const Value& key = keyframes.get<Array>()[k];
+                    const std::string key_path = channel_path + ".keyframes." + std::to_string(k);
+                    const Value& key_id = field(key, "id");
+                    if (!key.is<Object>() || !key_id.is<std::string>() || str(key_id).empty()) {
+                        add(s, "identity.missing", key_path + ".id"); continue;
+                    }
+                    register_id(key_id, key_path + ".id");
+                    if (!exact(key, {"id", "timeTicks", "value", "interpolationToNext"}))
+                        add(s, "ANIMATION_INVALID_KEYFRAME", key_path, str(key_id));
+                    const Value& tick = field(key, "timeTicks");
+                    if (!valid_time(tick)) add(s, "ANIMATION_INVALID_TIME", key_path + ".timeTicks", str(key_id));
+                    else {
+                        if (finite(duration) && tick.get<double>() > duration.get<double>())
+                            add(s, "ANIMATION_KEY_OUTSIDE_PROGRAM", key_path + ".timeTicks", str(key_id));
+                        if (!times.insert(tick.get<double>()).second)
+                            add(s, "ANIMATION_DUPLICATE_KEY_TIME", key_path + ".timeTicks", str(key_id));
+                    }
+                    std::string value_type = definition.value;
+                    if ((kind == "TransformTrack" && (channel_name == "scaleX" || channel_name == "scaleY")) ||
+                        (kind == "CameraTrack" && channel_name == "scale")) value_type = "positive-number";
+                    validate_track_value(s, project, track, value_type, field(key, "value"), key_path + ".value");
+                    validate_curve(s, field(key, "interpolationToNext"), key_path + ".interpolationToNext",
+                        definition.discrete, value_type == "positive-number");
+                }
+            }
             const std::set<std::string> transition_kinds = {"GeometryBlendTrack", "AppearanceTrack", "OpacityTrack", "PresenceTrack", "DrawOrderTrack", "ClippingTrack"};
             const std::set<std::string> clip_kinds = {"TransformTrack", "BoneTrack", "DeformerTrack", "MeshDeformationTrack", "OpacityTrack", "PresenceTrack", "DrawOrderTrack", "ClippingTrack"};
             if (kind == "CameraTrack") ++camera_count;
@@ -340,18 +519,57 @@ void validate_temporal_ownership(Snapshot& s, const Value& project, Register&& r
         }
         if (sole && sole->kind == "Sequence" && camera_count > 1)
             add(s, "SEQUENCE_CAMERA_TRACK_MULTIPLE", path + ".tracks", sole->id);
-        auto entries_validation = [&](const Value& values, const std::string& collection) {
-            for (size_t j = 0; j < values.get<Array>().size(); ++j) {
-                const Value& item = values.get<Array>()[j];
-                const std::string item_path = path + "." + collection + "." + std::to_string(j);
-                const Value& item_id = field(item, "id");
-                if (!item.is<Object>() || !item_id.is<std::string>() || str(item_id).empty())
-                    add(s, "identity.missing", item_path + ".id");
-                else register_id(item_id, item_path + ".id");
+        const std::set<std::string> event_types = {"contact", "release", "blink", "occlusion_change",
+            "depth_crossing", "pose_switch", "marker"};
+        const std::set<std::string> region_types = {"idle", "anticipation", "action", "contact", "settle", "hold"};
+        for (size_t j = 0; j < events.get<Array>().size(); ++j) {
+            const Value& event = events.get<Array>()[j];
+            const std::string item_path = path + ".events." + std::to_string(j);
+            const Value& event_id = field(event, "id");
+            if (!event.is<Object>() || !event_id.is<std::string>() || str(event_id).empty()) {
+                add(s, "identity.missing", item_path + ".id"); continue;
             }
-        };
-        entries_validation(events, "events");
-        entries_validation(regions, "regions");
+            register_id(event_id, item_path + ".id");
+            if (!exact(event, {"id", "timeTicks", "type", "participants", "payload"}))
+                add(s, "ANIMATION_INVALID_EVENT", item_path, str(event_id));
+            const Value& tick = field(event, "timeTicks");
+            if (!valid_time(tick) || (finite(duration) && valid_time(tick) && tick.get<double>() > duration.get<double>()))
+                add(s, "ANIMATION_INVALID_TIME", item_path + ".timeTicks", str(event_id));
+            if (!event_types.count(str(field(event, "type"))))
+                add(s, "ANIMATION_INVALID_EVENT", item_path + ".type", str(event_id));
+            const Value& participants = field(event, "participants");
+            bool participants_valid = participants.is<Array>();
+            if (participants_valid) for (const auto& member : participants.get<Array>())
+                if (!member.is<std::string>() || str(member).empty()) participants_valid = false;
+            if (!participants_valid) add(s, "ANIMATION_INVALID_EVENT", item_path + ".participants", str(event_id));
+            if (participants.is<Array>()) for (const auto& member : participants.get<Array>()) {
+                const Value& nodes = field(field(project, "scene"), "nodes");
+                if ((!nodes.is<Object>() || !has(nodes, str(member))) &&
+                    !contains_id(field(project, "semanticSlots"), member))
+                    add(s, "ANIMATION_UNKNOWN_TARGET", item_path + ".participants", str(member));
+            }
+            if (!field(event, "payload").is<Object>())
+                add(s, "ANIMATION_INVALID_EVENT", item_path + ".payload", str(event_id));
+        }
+        for (size_t j = 0; j < regions.get<Array>().size(); ++j) {
+            const Value& region = regions.get<Array>()[j];
+            const std::string item_path = path + ".regions." + std::to_string(j);
+            const Value& region_id = field(region, "id");
+            if (!region.is<Object>() || !region_id.is<std::string>() || str(region_id).empty()) {
+                add(s, "identity.missing", item_path + ".id"); continue;
+            }
+            register_id(region_id, item_path + ".id");
+            if (!exact(region, {"id", "startTicks", "endTicks", "type", "metadata"}))
+                add(s, "ANIMATION_INVALID_REGION", item_path, str(region_id));
+            const Value& start = field(region, "startTicks"), &end = field(region, "endTicks");
+            if (!valid_time(start) || !valid_time(end) || (valid_time(start) && valid_time(end) &&
+                start.get<double>() > end.get<double>()) || (valid_time(end) && finite(duration) &&
+                end.get<double>() > duration.get<double>())) add(s, "ANIMATION_INVALID_TIME", item_path, str(region_id));
+            if (!region_types.count(str(field(region, "type"))))
+                add(s, "ANIMATION_INVALID_REGION", item_path + ".type", str(region_id));
+            if (!field(region, "metadata").is<Object>())
+                add(s, "ANIMATION_INVALID_REGION", item_path + ".metadata", str(region_id));
+        }
     }
 }
 template <typename Register>

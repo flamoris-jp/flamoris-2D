@@ -4068,6 +4068,12 @@
     },
     "expected": [
       {
+        "code": "ANIMATION_INVALID_CHANNEL",
+        "path": "temporalPrograms.0.tracks.0.channels",
+        "entityId": "track_1",
+        "severity": "error"
+      },
+      {
         "code": "ANIMATION_TRACK_OWNER_INVALID",
         "path": "temporalPrograms.0.tracks.0.kind",
         "entityId": "track_1",
@@ -4901,6 +4907,257 @@
         "code": "SEQUENCE_VIEW_GAP",
         "path": "sequences.0.viewLaneItems",
         "entityId": "sequence_1",
+        "severity": "error"
+      }
+    ]
+  },
+  {
+    "name": "temporal_keys_events_regions",
+    "project": {
+      "schemaVersion": 15,
+      "timebaseTicksPerSecond": 120000,
+      "id": "project_あ",
+      "displayName": "夜明け",
+      "canvas": {
+        "width": 1920,
+        "height": 1080
+      },
+      "sourceAssets": [],
+      "semanticSlots": [],
+      "keyArts": [],
+      "scene": {
+        "rootId": "node_1",
+        "nodes": {
+          "node_1": {
+            "id": "node_1",
+            "kind": "group",
+            "displayName": "夜明け",
+            "sourceRef": null,
+            "parentId": null,
+            "children": [
+              "part_1"
+            ],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          },
+          "part_1": {
+            "id": "part_1",
+            "kind": "part",
+            "displayName": "前髪",
+            "sourceRef": null,
+            "parentId": "node_1",
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          }
+        }
+      },
+      "meshes": [],
+      "meshTopologies": [],
+      "meshKeyforms": [],
+      "meshFormCorrectionKeyforms": [],
+      "clippingBindings": [],
+      "rig": {
+        "deformers": [],
+        "warpControlPoints": [],
+        "warpDeformerKeyforms": [],
+        "bones": [],
+        "bonePoseKeyforms": [],
+        "rigidBoneBindings": [],
+        "skinBindings": [],
+        "boneRotationConstraints": [],
+        "twoBoneIkConstraints": [],
+        "constraints": []
+      },
+      "transitions": [],
+      "temporalPrograms": [
+        {
+          "id": "program_1",
+          "durationTicks": 120000,
+          "tracks": [
+            {
+              "trackId": "track_1",
+              "version": 2,
+              "kind": "OpacityTrack",
+              "target": {
+                "nodeId": "part_1"
+              },
+              "channels": {
+                "opacity": {
+                  "keyframes": [
+                    {
+                      "id": "key_1",
+                      "timeTicks": 130000,
+                      "value": 2,
+                      "interpolationToNext": {
+                        "kind": "wrong"
+                      }
+                    },
+                    {
+                      "id": "key_2",
+                      "timeTicks": 130000,
+                      "value": -1,
+                      "interpolationToNext": {
+                        "kind": "step"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "events": [
+            {
+              "id": "event_1",
+              "timeTicks": 130000,
+              "type": "wrong",
+              "participants": [
+                "ghost"
+              ],
+              "payload": null
+            }
+          ],
+          "regions": [
+            {
+              "id": "region_1",
+              "startTicks": 130000,
+              "endTicks": 10,
+              "type": "wrong",
+              "metadata": null
+            }
+          ]
+        }
+      ],
+      "animation": {
+        "clips": [],
+        "deformationSamples": []
+      },
+      "sequences": [],
+      "renderSettings": {
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "alpha": true
+      }
+    },
+    "expected": [
+      {
+        "code": "ANIMATION_DUPLICATE_KEY_TIME",
+        "path": "temporalPrograms.0.tracks.0.channels.opacity.keyframes.1.timeTicks",
+        "entityId": "key_2",
+        "severity": "error"
+      },
+      {
+        "code": "ANIMATION_INVALID_CURVE",
+        "path": "temporalPrograms.0.tracks.0.channels.opacity.keyframes.0.interpolationToNext",
+        "entityId": "",
+        "severity": "error"
+      },
+      {
+        "code": "ANIMATION_INVALID_EVENT",
+        "path": "temporalPrograms.0.events.0.payload",
+        "entityId": "event_1",
+        "severity": "error"
+      },
+      {
+        "code": "ANIMATION_INVALID_EVENT",
+        "path": "temporalPrograms.0.events.0.type",
+        "entityId": "event_1",
+        "severity": "error"
+      },
+      {
+        "code": "ANIMATION_INVALID_REGION",
+        "path": "temporalPrograms.0.regions.0.metadata",
+        "entityId": "region_1",
+        "severity": "error"
+      },
+      {
+        "code": "ANIMATION_INVALID_REGION",
+        "path": "temporalPrograms.0.regions.0.type",
+        "entityId": "region_1",
+        "severity": "error"
+      },
+      {
+        "code": "ANIMATION_INVALID_TIME",
+        "path": "temporalPrograms.0.events.0.timeTicks",
+        "entityId": "event_1",
+        "severity": "error"
+      },
+      {
+        "code": "ANIMATION_INVALID_TIME",
+        "path": "temporalPrograms.0.regions.0",
+        "entityId": "region_1",
+        "severity": "error"
+      },
+      {
+        "code": "ANIMATION_INVALID_VALUE",
+        "path": "temporalPrograms.0.tracks.0.channels.opacity.keyframes.0.value",
+        "entityId": "",
+        "severity": "error"
+      },
+      {
+        "code": "ANIMATION_INVALID_VALUE",
+        "path": "temporalPrograms.0.tracks.0.channels.opacity.keyframes.1.value",
+        "entityId": "",
+        "severity": "error"
+      },
+      {
+        "code": "ANIMATION_KEY_OUTSIDE_PROGRAM",
+        "path": "temporalPrograms.0.tracks.0.channels.opacity.keyframes.0.timeTicks",
+        "entityId": "key_1",
+        "severity": "error"
+      },
+      {
+        "code": "ANIMATION_KEY_OUTSIDE_PROGRAM",
+        "path": "temporalPrograms.0.tracks.0.channels.opacity.keyframes.1.timeTicks",
+        "entityId": "key_2",
+        "severity": "error"
+      },
+      {
+        "code": "ANIMATION_TRACK_VERSION_UNSUPPORTED",
+        "path": "temporalPrograms.0.tracks.0.version",
+        "entityId": "track_1",
+        "severity": "error"
+      },
+      {
+        "code": "ANIMATION_UNKNOWN_TARGET",
+        "path": "temporalPrograms.0.events.0.participants",
+        "entityId": "ghost",
         "severity": "error"
       }
     ]
