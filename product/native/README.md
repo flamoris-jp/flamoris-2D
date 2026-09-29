@@ -82,14 +82,38 @@ validation also covers the basic AnimationClip checks, mesh deformation sample
 references/offsets, bone rotation and two-bone IK constraints, and rigid bone
 binding references/conflicts, mesh form corrections, Bone rest/pose checks, and
 WarpDeformer grids/control points, and SkinBinding influence/weight checks.
-The #125 draft adds temporal tracks/ownership, transition foundations,
-clipping bindings, Sequence/ClipInstance structure, topology metadata,
-cross-domain ID checks and loop endpoint warnings. The fixture generator now
-compares complete issue sets (code, path, entity ID, severity) for every
-checked case, including populated and multi-error Projects. This is not yet
-proof of complete `validateProject` parity: transition clipping evaluation,
-Sequence evaluated endpoint signatures and remaining validator branches need
-conformance cases and implementation. Native node queries use stable `node.id`
+The #125 implementation covers the current schema-15 `validateProject` call
+path, including temporal tracks/ownership, transition and topology constraints,
+clipping bindings and evaluated cycles, Sequence/ClipInstance endpoint compatibility,
+rig/deformer/skin/correction constraints, global IDs and loop endpoint warnings.
+The fixture generator compares the complete diagnostic multiset of code, path,
+entity ID and severity; only message text and diagnostic details are outside this
+ABI contract. All 134 checked Projects are generated or re-evaluated by current JS,
+including populated rigs/animation, cross-domain collisions, multi-error inputs,
+one-tick clipping cycles, disabled bindings, semantic source resolution and
+incompatible endpoint selections. Synthetic domain Projects retained from the
+existing Product tests live in `tests/validation-domain-projects.json`; they are
+regression inputs, never a second source of expected diagnostics.
+
+For a common KeyArt, both JS endpoint paths invoke the same `endpointPartState`
+with the selected MeshKeyform and no animation override. Native endpoint comparison
+uses these generating selections (including opposite-only absent slots), since
+render instance IDs are removed from the JS signature. Clipping validation projects
+render-instance identity, presence and source dependencies at the same sampled ticks;
+it resolves exact node references before semantic fallback and suppresses ambiguous
+sources. This validation projection is not a production renderer. Later renderer
+migration must reuse or replace this logic with the native evaluated-frame path.
+
+JSON property insertion order is preserved during validation (with ECMAScript's
+integer-key ordering), because it affects which occurrence is reported as a duplicate
+ID or semantic label. `projectJson` in the fixture preserves that interchange order
+for C++ tests; the adjacent parsed `project` supports managed queries and inspection.
+Issue ordering itself is normalized only by tests. The existing 1 MiB UTF-8 input
+limit remains in force. Parity evidence concerns JSON schema-15 Projects with string
+stable IDs; malformed inputs for which JS throws are not represented as an invented
+JS diagnostic set. Native parsing remains bounded and rejects malformed interchange.
+
+Native node queries use stable `node.id`
 even when a mismatched `scene.nodes` key produces a validation issue. JS `EditorSession`
 remains the sole editing authority, including WPF/MCP mutations, Undo/Redo and
 save. The DLL still is not in the portable WPF package.
@@ -111,9 +135,12 @@ UTF-8 project/history/error buffers, and deterministic statuses. Project and
 history JSON are inspection projections; the session's native parsed state is
 owned exclusively by its handle. Snapshot validation is the shared native path
 for session creation, replacement and transaction candidates. Warning-only
-diagnostics do not reject a session; errors do. The session still has supplementary
-node-shape checks pending removal after #125 completes. Native before/after
-transaction validation has a
+diagnostics do not reject a session; errors do. The supplementary `session_shape`
+validator has been removed. Every Project fixture also checks session admission;
+every rejected fixture verifies atomic replacement against the existing session,
+history and revision state. Existing transaction/Undo/Redo/prepared-commit scenarios
+remain protected by the JS-generated session fixture. Managed diagnostics expose
+severity alongside code/path/entity ID. Native before/after transaction validation has a
 dedicated seam: the migrated scene commands cannot modify temporal ownership,
 so the JS cross-state ownership rule is not triggered yet. Port that rule when
 the first applicable command moves. Unsupported domains and commands remain JS-only. The
@@ -125,7 +152,7 @@ intentionally with `--write`.
 
 **The WPF/MCP Product Host remains the only production editing authority.** The
 native DLL is excluded from the portable package. The next step is to extend
-native Project validation and command coverage, prove save/load parity, then
+native command/query coverage, evaluation and rendering, prove save/load parity, then
 explicitly switch WPF/MCP to the one native session before retiring JS/Node.
 
 The bounded JSON parser is the vendored BSD-2-Clause `picojson` header
