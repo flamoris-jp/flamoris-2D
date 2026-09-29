@@ -69,8 +69,7 @@ FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_node_string(const fl2d_snapshot* sn
 FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_node_state(const fl2d_snapshot* snapshot,
     const char* node_id, fl2d_node_state* result);
 /* Issue fields: code, path, entityId, severity. Missing entityId is an empty
- * string. Covered diagnostics currently have severity "error"; future warning
- * diagnostics must retain their JS severity instead of failing session entry. */
+ * string. Warning diagnostics retain their JS severity and do not reject a session. */
 FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_issue_string(const fl2d_snapshot* snapshot,
     uint32_t index, const char* field, char* buffer, uint32_t capacity, uint32_t* required);
 
