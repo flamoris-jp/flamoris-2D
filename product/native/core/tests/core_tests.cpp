@@ -59,6 +59,13 @@ static void check_project_snapshots() {
             assert(session);
             fl2d_session_destroy(session);
         }
+        if (fixture.at("name").get<std::string>() == "temporal_keys_events_regions" ||
+            fixture.at("name").get<std::string>() == "populated_sequence_multi_error") {
+            fl2d_session* session = nullptr;
+            assert(fl2d_session_create(reinterpret_cast<const uint8_t*>(json.data()),
+                static_cast<uint32_t>(json.size()), &session) == FL2D_PROJECT_INVALID);
+            assert(!session);
+        }
         uint32_t length = 0;
         assert(fl2d_snapshot_string(snapshot, "rootId", nullptr, 0, &length) == FL2D_BUFFER_TOO_SMALL);
         std::string root(length, '\0');

@@ -1951,18 +1951,18 @@ void validate(Snapshot& s, const Value& project) {
         s.unsupported_sections[name] = has(project, name);
     validate_temporal_ownership(s, project, register_id);
     validate_transition_domain(s, project, register_id);
-    validate_clipping(s, project, register_id);
-    validate_transition_clipping(s, project);
     validate_animation_clips(s, project);
     validate_deformation_samples(s, project);
     validate_sequences(s, project, register_id);
+    validate_clipping(s, project, register_id);
+    validate_transition_clipping(s, project);
+    validate_warp(s, project, register_id);
+    validate_bones(s, project);
     validate_rotation_constraints(s, project);
     validate_ik_constraints(s, project);
-    validate_rigid_bindings(s, project, register_id);
-    validate_mesh_form_corrections(s, project);
-    validate_bones(s, project);
-    validate_warp(s, project, register_id);
     validate_skin(s, project, register_id);
+    validate_mesh_form_corrections(s, project);
+    validate_rigid_bindings(s, project, register_id);
     if (root != node_map.end()) {
         std::set<std::string> visiting, visited;
         auto walk = [&](auto&& self, const std::string& id) -> void {

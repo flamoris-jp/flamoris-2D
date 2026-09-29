@@ -277,6 +277,13 @@ variant("temporal_track_conflicts", populated, p => {
       channels: { drawOrder: { keyframes: [] } } },
   );
 });
+variant("cross_domain_sequence_clipping_id", populated, p => {
+  p.clippingBindings.push({ id: "hold_a", targetNodeId: "node_a", sourceNodeId: "missing",
+    mode: "inside", enabled: true });
+});
+variant("cross_domain_vertex_transition_id", meshed, p => {
+  p.transitions[0].partTransitions[0].id = "vertex_a";
+});
 
 const fixtures = cases.map(([name, project]) => ({ name, project,
   expected: validateProject(project)
