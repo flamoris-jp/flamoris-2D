@@ -55,6 +55,7 @@ jobs:
         run: |
           node product/native/tests/check-temporal-conformance.mjs
           node product/native/tests/check-project-conformance.mjs
+          node product/native/tests/check-session-conformance.mjs
 
       - name: Build native solution
         run: dotnet build product/native/Flamoris2D.Native.sln -c Release

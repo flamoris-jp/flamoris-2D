@@ -12,6 +12,15 @@ public enum NativeStatus : int
     InvalidUtf8 = 5,
     InputTooLarge = 6,
     BufferTooSmall = 7,
+    ProjectInvalid = 8,
+    CommandInvalid = 9,
+    CommandUnsupported = 10,
+    TargetNotFound = 11,
+    TransactionEmpty = 12,
+    RevisionConflict = 13,
+    SavedRevisionInvalid = 14,
+    HistoryEmpty = 15,
+    RevisionExhausted = 16,
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -46,6 +55,41 @@ internal static class NativeMethods
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_normalize_frame_rate")]
     internal static extern NativeStatus Normalize(NativeEngine handle, long numerator, long denominator,
         out NativeFrameRate result);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_session_create")]
+    internal static extern NativeStatus SessionCreate(byte[] project, uint length, out IntPtr result);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_session_destroy")]
+    internal static extern void SessionDestroy(IntPtr handle);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_session_replace")]
+    internal static extern NativeStatus SessionReplace(NativeSession session, byte[] project, uint length, int saved);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_session_state_get")]
+    internal static extern NativeStatus SessionState(NativeSession session, out NativeSessionState result);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_session_mark_saved")]
+    internal static extern NativeStatus SessionMarkSaved(NativeSession session, long revision);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_session_node_string")]
+    internal static extern NativeStatus SessionNodeString(NativeSession session,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string id, [MarshalAs(UnmanagedType.LPUTF8Str)] string field,
+        byte[]? buffer, uint capacity, out uint required);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_session_node_state")]
+    internal static extern NativeStatus SessionNodeState(NativeSession session,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string id, out NativeNodeState state);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_session_project_json")]
+    internal static extern NativeStatus SessionProject(NativeSession session, byte[]? buffer, uint capacity, out uint required);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_session_history_json")]
+    internal static extern NativeStatus SessionHistory(NativeSession session, byte[]? buffer, uint capacity, out uint required);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_session_error")]
+    internal static extern NativeStatus SessionError(NativeSession session, byte[]? buffer, uint capacity, out uint required);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_session_prepare")]
+    internal static extern NativeStatus SessionPrepare(NativeSession session, byte[] commands, uint length,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string label, out IntPtr result);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_session_prepare_undo")]
+    internal static extern NativeStatus SessionPrepareUndo(NativeSession session, out IntPtr result);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_session_prepare_redo")]
+    internal static extern NativeStatus SessionPrepareRedo(NativeSession session, out IntPtr result);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_prepared_commit")]
+    internal static extern NativeStatus PreparedCommit(NativePrepared prepared);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_prepared_destroy")]
+    internal static extern void PreparedDestroy(IntPtr handle);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_snapshot_load")]
     internal static extern NativeStatus SnapshotLoad(byte[] bytes, uint length, out IntPtr result);
