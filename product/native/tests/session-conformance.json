@@ -1,0 +1,4673 @@
+{
+  "initial": {
+    "schemaVersion": 15,
+    "timebaseTicksPerSecond": 120000,
+    "id": "project_あ",
+    "displayName": "夜明け",
+    "canvas": {
+      "width": 1920,
+      "height": 1080
+    },
+    "sourceAssets": [],
+    "semanticSlots": [],
+    "keyArts": [],
+    "scene": {
+      "rootId": "node_1",
+      "nodes": {
+        "node_1": {
+          "id": "node_1",
+          "kind": "group",
+          "displayName": "夜明け",
+          "sourceRef": null,
+          "parentId": null,
+          "children": [
+            "part_1"
+          ],
+          "visible": true,
+          "locked": false,
+          "opacity": 1,
+          "blendMode": "normal",
+          "transform": {
+            "position": {
+              "x": 0,
+              "y": 0
+            },
+            "rotation": 0,
+            "scale": {
+              "x": 1,
+              "y": 1
+            },
+            "pivot": {
+              "x": 0,
+              "y": 0
+            }
+          }
+        },
+        "part_1": {
+          "id": "part_1",
+          "kind": "part",
+          "displayName": "前髪",
+          "sourceRef": null,
+          "parentId": "node_1",
+          "children": [],
+          "visible": true,
+          "locked": false,
+          "opacity": 1,
+          "blendMode": "normal",
+          "transform": {
+            "position": {
+              "x": 0,
+              "y": 0
+            },
+            "rotation": 0,
+            "scale": {
+              "x": 1,
+              "y": 1
+            },
+            "pivot": {
+              "x": 0,
+              "y": 0
+            }
+          }
+        }
+      }
+    },
+    "meshes": [],
+    "meshTopologies": [],
+    "meshKeyforms": [],
+    "meshFormCorrectionKeyforms": [],
+    "clippingBindings": [],
+    "rig": {
+      "deformers": [],
+      "warpControlPoints": [],
+      "warpDeformerKeyforms": [],
+      "bones": [],
+      "bonePoseKeyforms": [],
+      "rigidBoneBindings": [],
+      "skinBindings": [],
+      "boneRotationConstraints": [],
+      "twoBoneIkConstraints": [],
+      "constraints": []
+    },
+    "transitions": [],
+    "temporalPrograms": [],
+    "animation": {
+      "clips": [],
+      "deformationSamples": []
+    },
+    "sequences": [],
+    "renderSettings": {
+      "frameRate": {
+        "numerator": 30,
+        "denominator": 1
+      },
+      "alpha": true
+    }
+  },
+  "steps": [
+    {
+      "op": "transaction",
+      "commands": [
+        {
+          "type": "scene.rename_node",
+          "payload": {
+            "nodeId": "part_1",
+            "displayName": "夕暮れ"
+          }
+        }
+      ],
+      "label": "rename"
+    },
+    {
+      "op": "transaction",
+      "commands": [
+        {
+          "type": "scene.set_transform",
+          "payload": {
+            "nodeId": "part_1",
+            "coordinateSpace": "node-local",
+            "transform": {
+              "position": {
+                "x": 12.5,
+                "y": -3
+              },
+              "rotation": 0.75,
+              "scale": {
+                "x": 1.25,
+                "y": -2
+              },
+              "pivot": {
+                "x": 4,
+                "y": 6.5
+              }
+            }
+          }
+        },
+        {
+          "type": "scene.set_visibility",
+          "payload": {
+            "nodeId": "part_1",
+            "visible": false
+          }
+        },
+        {
+          "type": "scene.rename_node",
+          "payload": {
+            "nodeId": "part_1",
+            "displayName": "髪"
+          }
+        }
+      ],
+      "label": "three"
+    },
+    {
+      "op": "transaction",
+      "commands": [
+        {
+          "type": "scene.rename_node",
+          "payload": {
+            "nodeId": "part_1",
+            "displayName": "do not commit"
+          }
+        },
+        {
+          "type": "scene.set_visibility",
+          "payload": {
+            "nodeId": "part_1",
+            "visible": "invalid"
+          }
+        }
+      ],
+      "label": "invalid"
+    },
+    {
+      "op": "transaction",
+      "commands": [
+        {
+          "type": "scene.set_visibility",
+          "payload": {
+            "nodeId": "part_1",
+            "visible": true
+          }
+        },
+        {
+          "type": "scene.rename_node",
+          "payload": {
+            "nodeId": "part_1",
+            "displayName": "  "
+          }
+        }
+      ],
+      "label": "blank"
+    },
+    {
+      "op": "transaction",
+      "commands": [],
+      "label": "empty"
+    },
+    {
+      "op": "undo"
+    },
+    {
+      "op": "undo"
+    },
+    {
+      "op": "redo"
+    },
+    {
+      "op": "transaction",
+      "commands": [
+        {
+          "type": "scene.rename_node",
+          "payload": {
+            "nodeId": "part_1",
+            "displayName": "新規"
+          }
+        }
+      ],
+      "label": "new"
+    },
+    {
+      "op": "redo"
+    },
+    {
+      "op": "markSaved"
+    },
+    {
+      "op": "transaction",
+      "commands": [
+        {
+          "type": "scene.set_visibility",
+          "payload": {
+            "nodeId": "part_1",
+            "visible": true
+          }
+        }
+      ],
+      "label": "visible"
+    },
+    {
+      "op": "undo"
+    },
+    {
+      "op": "redo"
+    },
+    {
+      "op": "markSaved",
+      "revision": 999
+    },
+    {
+      "op": "prepare",
+      "key": "A",
+      "commands": [
+        {
+          "type": "scene.rename_node",
+          "payload": {
+            "nodeId": "part_1",
+            "displayName": "古い"
+          }
+        }
+      ],
+      "label": "old"
+    },
+    {
+      "op": "transaction",
+      "commands": [
+        {
+          "type": "scene.rename_node",
+          "payload": {
+            "nodeId": "part_1",
+            "displayName": "新しい"
+          }
+        }
+      ],
+      "label": "newer"
+    },
+    {
+      "op": "commit",
+      "key": "A"
+    },
+    {
+      "op": "prepare",
+      "key": "B",
+      "commands": [
+        {
+          "type": "scene.rename_node",
+          "payload": {
+            "nodeId": "part_1",
+            "displayName": "準備"
+          }
+        }
+      ],
+      "label": "prepared"
+    },
+    {
+      "op": "commit",
+      "key": "B"
+    },
+    {
+      "op": "commit",
+      "key": "B"
+    },
+    {
+      "op": "replace",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_next",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "前髪",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "saved": false
+    },
+    {
+      "op": "markSaved"
+    },
+    {
+      "op": "undo"
+    },
+    {
+      "op": "redo"
+    }
+  ],
+  "expected": [
+    {
+      "error": "",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "夕暮れ",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 1,
+        "currentRevision": 1,
+        "savedRevision": 0,
+        "undoDepth": 1,
+        "redoDepth": 0,
+        "historyDepth": 1,
+        "dirty": true
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "髪",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": false,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 12.5,
+                  "y": -3
+                },
+                "rotation": 0.75,
+                "scale": {
+                  "x": 1.25,
+                  "y": -2
+                },
+                "pivot": {
+                  "x": 4,
+                  "y": 6.5
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 2,
+        "currentRevision": 2,
+        "savedRevision": 0,
+        "undoDepth": 2,
+        "redoDepth": 0,
+        "historyDepth": 2,
+        "dirty": true
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "three",
+          "commandTypes": [
+            "scene.set_transform",
+            "scene.set_visibility",
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "command.payload_invalid",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "髪",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": false,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 12.5,
+                  "y": -3
+                },
+                "rotation": 0.75,
+                "scale": {
+                  "x": 1.25,
+                  "y": -2
+                },
+                "pivot": {
+                  "x": 4,
+                  "y": 6.5
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 2,
+        "currentRevision": 2,
+        "savedRevision": 0,
+        "undoDepth": 2,
+        "redoDepth": 0,
+        "historyDepth": 2,
+        "dirty": true
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "three",
+          "commandTypes": [
+            "scene.set_transform",
+            "scene.set_visibility",
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "command.payload_invalid",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "髪",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": false,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 12.5,
+                  "y": -3
+                },
+                "rotation": 0.75,
+                "scale": {
+                  "x": 1.25,
+                  "y": -2
+                },
+                "pivot": {
+                  "x": 4,
+                  "y": 6.5
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 2,
+        "currentRevision": 2,
+        "savedRevision": 0,
+        "undoDepth": 2,
+        "redoDepth": 0,
+        "historyDepth": 2,
+        "dirty": true
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "three",
+          "commandTypes": [
+            "scene.set_transform",
+            "scene.set_visibility",
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "transaction.empty",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "髪",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": false,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 12.5,
+                  "y": -3
+                },
+                "rotation": 0.75,
+                "scale": {
+                  "x": 1.25,
+                  "y": -2
+                },
+                "pivot": {
+                  "x": 4,
+                  "y": 6.5
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 2,
+        "currentRevision": 2,
+        "savedRevision": 0,
+        "undoDepth": 2,
+        "redoDepth": 0,
+        "historyDepth": 2,
+        "dirty": true
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "three",
+          "commandTypes": [
+            "scene.set_transform",
+            "scene.set_visibility",
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "夕暮れ",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 2,
+        "currentRevision": 1,
+        "savedRevision": 0,
+        "undoDepth": 1,
+        "redoDepth": 1,
+        "historyDepth": 3,
+        "dirty": true
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "three",
+          "commandTypes": [
+            "scene.set_transform",
+            "scene.set_visibility",
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: three",
+          "commandTypes": [
+            "scene.rename_node",
+            "scene.set_visibility",
+            "scene.set_transform"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "前髪",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 2,
+        "currentRevision": 0,
+        "savedRevision": 0,
+        "undoDepth": 0,
+        "redoDepth": 2,
+        "historyDepth": 4,
+        "dirty": false
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "three",
+          "commandTypes": [
+            "scene.set_transform",
+            "scene.set_visibility",
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: three",
+          "commandTypes": [
+            "scene.rename_node",
+            "scene.set_visibility",
+            "scene.set_transform"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "夕暮れ",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 2,
+        "currentRevision": 1,
+        "savedRevision": 0,
+        "undoDepth": 1,
+        "redoDepth": 1,
+        "historyDepth": 5,
+        "dirty": true
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "three",
+          "commandTypes": [
+            "scene.set_transform",
+            "scene.set_visibility",
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: three",
+          "commandTypes": [
+            "scene.rename_node",
+            "scene.set_visibility",
+            "scene.set_transform"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "新規",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 3,
+        "currentRevision": 3,
+        "savedRevision": 0,
+        "undoDepth": 2,
+        "redoDepth": 0,
+        "historyDepth": 6,
+        "dirty": true
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "three",
+          "commandTypes": [
+            "scene.set_transform",
+            "scene.set_visibility",
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: three",
+          "commandTypes": [
+            "scene.rename_node",
+            "scene.set_visibility",
+            "scene.set_transform"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "new",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "新規",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 3,
+        "currentRevision": 3,
+        "savedRevision": 0,
+        "undoDepth": 2,
+        "redoDepth": 0,
+        "historyDepth": 6,
+        "dirty": true
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "three",
+          "commandTypes": [
+            "scene.set_transform",
+            "scene.set_visibility",
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: three",
+          "commandTypes": [
+            "scene.rename_node",
+            "scene.set_visibility",
+            "scene.set_transform"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "new",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "新規",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 3,
+        "currentRevision": 3,
+        "savedRevision": 3,
+        "undoDepth": 2,
+        "redoDepth": 0,
+        "historyDepth": 6,
+        "dirty": false
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "three",
+          "commandTypes": [
+            "scene.set_transform",
+            "scene.set_visibility",
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: three",
+          "commandTypes": [
+            "scene.rename_node",
+            "scene.set_visibility",
+            "scene.set_transform"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "new",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "新規",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 4,
+        "currentRevision": 4,
+        "savedRevision": 3,
+        "undoDepth": 3,
+        "redoDepth": 0,
+        "historyDepth": 7,
+        "dirty": true
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "three",
+          "commandTypes": [
+            "scene.set_transform",
+            "scene.set_visibility",
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: three",
+          "commandTypes": [
+            "scene.rename_node",
+            "scene.set_visibility",
+            "scene.set_transform"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "new",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "新規",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 4,
+        "currentRevision": 3,
+        "savedRevision": 3,
+        "undoDepth": 2,
+        "redoDepth": 1,
+        "historyDepth": 8,
+        "dirty": false
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "three",
+          "commandTypes": [
+            "scene.set_transform",
+            "scene.set_visibility",
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: three",
+          "commandTypes": [
+            "scene.rename_node",
+            "scene.set_visibility",
+            "scene.set_transform"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "new",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "新規",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 4,
+        "currentRevision": 4,
+        "savedRevision": 3,
+        "undoDepth": 3,
+        "redoDepth": 0,
+        "historyDepth": 9,
+        "dirty": true
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "three",
+          "commandTypes": [
+            "scene.set_transform",
+            "scene.set_visibility",
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: three",
+          "commandTypes": [
+            "scene.rename_node",
+            "scene.set_visibility",
+            "scene.set_transform"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "new",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "history.saved_revision_invalid",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "新規",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 4,
+        "currentRevision": 4,
+        "savedRevision": 3,
+        "undoDepth": 3,
+        "redoDepth": 0,
+        "historyDepth": 9,
+        "dirty": true
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "three",
+          "commandTypes": [
+            "scene.set_transform",
+            "scene.set_visibility",
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: three",
+          "commandTypes": [
+            "scene.rename_node",
+            "scene.set_visibility",
+            "scene.set_transform"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "new",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "新規",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 4,
+        "currentRevision": 4,
+        "savedRevision": 3,
+        "undoDepth": 3,
+        "redoDepth": 0,
+        "historyDepth": 9,
+        "dirty": true
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "three",
+          "commandTypes": [
+            "scene.set_transform",
+            "scene.set_visibility",
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: three",
+          "commandTypes": [
+            "scene.rename_node",
+            "scene.set_visibility",
+            "scene.set_transform"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "new",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "新しい",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 5,
+        "currentRevision": 5,
+        "savedRevision": 3,
+        "undoDepth": 4,
+        "redoDepth": 0,
+        "historyDepth": 10,
+        "dirty": true
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "three",
+          "commandTypes": [
+            "scene.set_transform",
+            "scene.set_visibility",
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: three",
+          "commandTypes": [
+            "scene.rename_node",
+            "scene.set_visibility",
+            "scene.set_transform"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "new",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "newer",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "revision.conflict",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "新しい",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 5,
+        "currentRevision": 5,
+        "savedRevision": 3,
+        "undoDepth": 4,
+        "redoDepth": 0,
+        "historyDepth": 10,
+        "dirty": true
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "three",
+          "commandTypes": [
+            "scene.set_transform",
+            "scene.set_visibility",
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: three",
+          "commandTypes": [
+            "scene.rename_node",
+            "scene.set_visibility",
+            "scene.set_transform"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "new",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "newer",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "新しい",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 5,
+        "currentRevision": 5,
+        "savedRevision": 3,
+        "undoDepth": 4,
+        "redoDepth": 0,
+        "historyDepth": 10,
+        "dirty": true
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "three",
+          "commandTypes": [
+            "scene.set_transform",
+            "scene.set_visibility",
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: three",
+          "commandTypes": [
+            "scene.rename_node",
+            "scene.set_visibility",
+            "scene.set_transform"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "new",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "newer",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "準備",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 6,
+        "currentRevision": 6,
+        "savedRevision": 3,
+        "undoDepth": 5,
+        "redoDepth": 0,
+        "historyDepth": 11,
+        "dirty": true
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "three",
+          "commandTypes": [
+            "scene.set_transform",
+            "scene.set_visibility",
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: three",
+          "commandTypes": [
+            "scene.rename_node",
+            "scene.set_visibility",
+            "scene.set_transform"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "new",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "newer",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "prepared",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "revision.conflict",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_あ",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "準備",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 6,
+        "currentRevision": 6,
+        "savedRevision": 3,
+        "undoDepth": 5,
+        "redoDepth": 0,
+        "historyDepth": 11,
+        "dirty": true
+      },
+      "history": [
+        {
+          "label": "rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "three",
+          "commandTypes": [
+            "scene.set_transform",
+            "scene.set_visibility",
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: three",
+          "commandTypes": [
+            "scene.rename_node",
+            "scene.set_visibility",
+            "scene.set_transform"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: rename",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "new",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Undo: visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "Redo: visible",
+          "commandTypes": [
+            "scene.set_visibility"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "newer",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        },
+        {
+          "label": "prepared",
+          "commandTypes": [
+            "scene.rename_node"
+          ],
+          "affectedIds": [
+            "part_1"
+          ]
+        }
+      ]
+    },
+    {
+      "error": "",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_next",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "前髪",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 0,
+        "currentRevision": 0,
+        "savedRevision": -1,
+        "undoDepth": 0,
+        "redoDepth": 0,
+        "historyDepth": 0,
+        "dirty": true
+      },
+      "history": []
+    },
+    {
+      "error": "",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_next",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "前髪",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 0,
+        "currentRevision": 0,
+        "savedRevision": 0,
+        "undoDepth": 0,
+        "redoDepth": 0,
+        "historyDepth": 0,
+        "dirty": false
+      },
+      "history": []
+    },
+    {
+      "error": "",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_next",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "前髪",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 0,
+        "currentRevision": 0,
+        "savedRevision": 0,
+        "undoDepth": 0,
+        "redoDepth": 0,
+        "historyDepth": 0,
+        "dirty": false
+      },
+      "history": []
+    },
+    {
+      "error": "",
+      "project": {
+        "schemaVersion": 15,
+        "timebaseTicksPerSecond": 120000,
+        "id": "project_next",
+        "displayName": "夜明け",
+        "canvas": {
+          "width": 1920,
+          "height": 1080
+        },
+        "sourceAssets": [],
+        "semanticSlots": [],
+        "keyArts": [],
+        "scene": {
+          "rootId": "node_1",
+          "nodes": {
+            "node_1": {
+              "id": "node_1",
+              "kind": "group",
+              "displayName": "夜明け",
+              "sourceRef": null,
+              "parentId": null,
+              "children": [
+                "part_1"
+              ],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            },
+            "part_1": {
+              "id": "part_1",
+              "kind": "part",
+              "displayName": "前髪",
+              "sourceRef": null,
+              "parentId": "node_1",
+              "children": [],
+              "visible": true,
+              "locked": false,
+              "opacity": 1,
+              "blendMode": "normal",
+              "transform": {
+                "position": {
+                  "x": 0,
+                  "y": 0
+                },
+                "rotation": 0,
+                "scale": {
+                  "x": 1,
+                  "y": 1
+                },
+                "pivot": {
+                  "x": 0,
+                  "y": 0
+                }
+              }
+            }
+          }
+        },
+        "meshes": [],
+        "meshTopologies": [],
+        "meshKeyforms": [],
+        "meshFormCorrectionKeyforms": [],
+        "clippingBindings": [],
+        "rig": {
+          "deformers": [],
+          "warpControlPoints": [],
+          "warpDeformerKeyforms": [],
+          "bones": [],
+          "bonePoseKeyforms": [],
+          "rigidBoneBindings": [],
+          "skinBindings": [],
+          "boneRotationConstraints": [],
+          "twoBoneIkConstraints": [],
+          "constraints": []
+        },
+        "transitions": [],
+        "temporalPrograms": [],
+        "animation": {
+          "clips": [],
+          "deformationSamples": []
+        },
+        "sequences": [],
+        "renderSettings": {
+          "frameRate": {
+            "numerator": 30,
+            "denominator": 1
+          },
+          "alpha": true
+        }
+      },
+      "state": {
+        "revisionCounter": 0,
+        "currentRevision": 0,
+        "savedRevision": 0,
+        "undoDepth": 0,
+        "redoDepth": 0,
+        "historyDepth": 0,
+        "dirty": false
+      },
+      "history": []
+    }
+  ]
+}

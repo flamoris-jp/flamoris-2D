@@ -6,7 +6,7 @@ internal static class NativeCoreTests
     public static void Run(string hostPath)
     {
         if (!OperatingSystem.IsWindows()) return;
-        if (NativeEngine.Version() != (1, 2)) throw new Exception("Unexpected native ABI version.");
+        if (NativeEngine.Version() != (1, 3)) throw new Exception("Unexpected native ABI version.");
         var path = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(hostPath)!,
             "../native/tests/temporal-conformance.json"));
         using var document = JsonDocument.Parse(File.ReadAllText(path));
@@ -28,6 +28,7 @@ internal static class NativeCoreTests
                 throw new Exception($"Native frame rate differs from Product JS: {numerator}/{denominator}");
         }
         TestSnapshots(path);
+        TestSessions(path);
         engine.Dispose();
         try
         {
@@ -100,4 +101,42 @@ internal static class NativeCoreTests
         if (NativeSnapshot.TryLoad(new byte[NativeSnapshot.MaxBytes + 1], out invalid) != NativeStatus.InputTooLarge || invalid is not null)
             throw new Exception("Oversized snapshot was accepted.");
     }
+    private static void TestSessions(string temporalFixturePath)
+    {
+        var path = Path.Combine(Path.GetDirectoryName(temporalFixturePath)!, "session-conformance.json");
+        using var fixtures = JsonDocument.Parse(File.ReadAllBytes(path));
+        var root = fixtures.RootElement;
+        var initial = System.Text.Encoding.UTF8.GetBytes(root.GetProperty("initial").GetRawText());
+        if (NativeSession.TryCreate(initial, out var session) != NativeStatus.Ok || session is null)
+            throw new Exception("Native session rejected JS fixture.");
+        using (session)
+        {
+            if (session.NodeField("part_1", "displayName") != "前髪") throw new Exception("Session node query failed.");
+            var edit = root.GetProperty("steps")[0];
+            var bytes = System.Text.Encoding.UTF8.GetBytes(edit.GetProperty("commands").GetRawText());
+            if (session.TryPrepare(bytes, edit.GetProperty("label").GetString()!, out var prepared) != NativeStatus.Ok || prepared is null)
+                throw new Exception("Native prepare failed.");
+            using (prepared)
+            {
+                if (prepared.Commit() != NativeStatus.Ok || prepared.Commit() != NativeStatus.RevisionConflict)
+                    throw new Exception("Prepared commit was not one-shot.");
+            }
+            var state = session.State();
+            if (state.CurrentRevision != 1 || state.UndoDepth != 1 || state.Dirty != 1)
+                throw new Exception("Session revision changed.");
+            if (session.NodeField("part_1", "displayName") != "夕暮れ") throw new Exception("Session edit failed.");
+            if (session.TryPrepareUndo(out var undo) != NativeStatus.Ok || undo is null)
+                throw new Exception("Undo prepare failed.");
+            using (undo) if (undo.Commit() != NativeStatus.Ok) throw new Exception("Undo failed.");
+            if (session.NodeField("part_1", "displayName") != "前髪" || session.State().RedoDepth != 1)
+                throw new Exception("Undo did not restore state.");
+            if (session.TryPrepareRedo(out var redo) != NativeStatus.Ok || redo is null)
+                throw new Exception("Redo prepare failed.");
+            using (redo) if (redo.Commit() != NativeStatus.Ok) throw new Exception("Redo failed.");
+            if (session.NodeField("part_1", "displayName") != "夕暮れ") throw new Exception("Redo did not restore state.");
+        }
+        try { session.State(); throw new Exception("Disposed session was accepted."); }
+        catch (ObjectDisposedException) { }
+    }
+
 }
