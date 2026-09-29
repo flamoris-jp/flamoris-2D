@@ -11,6 +11,12 @@ const root = initial.scene.nodes[initial.scene.rootId];
 const part = createSceneNode({ id: 'part_1', displayName: '前髪', parentId: root.id });
 root.children.push(part.id);
 initial.scene.nodes[part.id] = part;
+const mask = createSceneNode({ id: 'mask_1', displayName: 'Mask', parentId: root.id });
+root.children.push(mask.id);
+initial.scene.nodes[mask.id] = mask;
+const alternate = createSceneNode({ id: 'mask_2', displayName: 'Alternate', parentId: root.id });
+root.children.push(alternate.id);
+initial.scene.nodes[alternate.id] = alternate;
 const replacement = cloneProject(initial);
 replacement.id = 'project_next';
 const rename = name => ({ type: 'scene.rename_node', payload: { nodeId: 'part_1', displayName: name } });
@@ -18,8 +24,51 @@ const visibility = visible => ({ type: 'scene.set_visibility', payload: { nodeId
 const transform = { type: 'scene.set_transform', payload: { nodeId: 'part_1', coordinateSpace: 'node-local', transform: {
   position: { x: 12.5, y: -3 }, rotation: 0.75, scale: { x: 1.25, y: -2 }, pivot: { x: 4, y: 6.5 },
 } } };
+const command = (type, payload) => ({ type, payload });
+const tx = (label, ...commands) => ({ op: 'transaction', commands, label });
+const group = (id, parentId = root.id, index) => command('scene.create_group', { id, parentId, displayName: '　Group ' + id + '　', ...(index === undefined ? {} : { index }) });
+const reparent = (nodeId, parentId, index) => command('scene.reparent_node', { nodeId, parentId, ...(index === undefined ? {} : { index }) });
+const binding = (id, targetNodeId = part.id, sourceNodeId = mask.id) => ({ id, targetNodeId, sourceNodeId, mode: 'inside', enabled: true });
+const sceneClippingSteps = [
+  tx('locked', command('scene.set_locked', { nodeId: part.id, locked: true })), { op: 'undo' }, { op: 'redo' },
+  tx('groups', group('group_z', root.id, 0), group('group_a')),
+  { op: 'undo' }, { op: 'redo' },
+  tx('move node', reparent(part.id, 'group_z', 9007199254740992)), { op: 'undo' }, { op: 'redo' },
+  tx('same-parent reorder', reparent(mask.id, root.id, 0)), { op: 'undo' }, { op: 'redo' },
+  tx('nested groups', reparent('group_a', 'group_z', 0)), { op: 'undo' }, { op: 'redo' },
+  tx('reject cycle', reparent('group_z', 'group_a')),
+  tx('reject root move', reparent(root.id, 'group_z')),
+  tx('reject part parent', group('group_bad', mask.id)),
+  tx('reject duplicate group', group('group_z')),
+  tx('reject missing parent', reparent(part.id, 'missing')),
+  tx('reject negative index', group('group_negative', root.id, -1)),
+  tx('reject fractional index', reparent(part.id, root.id, 0.5)),
+  tx('reject unknown field', command('scene.set_locked', { nodeId: part.id, locked: true, unknown: 1 })),
+  tx('reject public history command', command('scene.remove_empty_group', { nodeId: 'group_a' })),
+  tx('batch envelope precedence', command('scene.rename_node', { nodeId: 'missing', displayName: 'x' }), command('scene.set_locked', { nodeId: part.id, locked: 'yes' })),
+  tx('create binding', command('clipping.create', { binding: binding('clip_1') })), { op: 'undo' }, { op: 'redo' },
+  tx('disable binding', command('clipping.set_enabled', { bindingId: 'clip_1', enabled: false })), { op: 'undo' }, { op: 'redo' },
+  tx('enable binding', command('clipping.set_enabled', { bindingId: 'clip_1', enabled: true })),
+  tx('reject self clipping', command('clipping.set_source', { bindingId: 'clip_1', sourceNodeId: part.id })),
+  tx('reject clipping cycle', command('clipping.create', { binding: binding('clip_2', mask.id, part.id) })),
+  tx('reject duplicate binding', command('clipping.create', { binding: binding('clip_1') })),
+  tx('reject clipping missing source', command('clipping.set_source', { bindingId: 'clip_1', sourceNodeId: 'missing' })),
+  tx('reject clipping absent binding', command('clipping.remove', { bindingId: 'missing' })),
+  tx('reject clipping bad mode', command('clipping.create', { binding: { ...binding('bad'), mode: 'outside' } })),
+  tx('reject public clipping history', command('clipping.remove_internal', { bindingId: 'clip_1' })),
+  tx('reject public clipping restore', command('clipping.restore', { binding: binding('clip_3'), index: 0 })),
+  tx('remove binding', command('clipping.remove', { bindingId: 'clip_1' })), { op: 'undo' }, { op: 'redo' },
+  tx('binding and toggle atomically', command('clipping.create', { binding: binding('clip_1') }), command('clipping.set_enabled', { bindingId: 'clip_1', enabled: false })),
+  { op: 'undo' }, { op: 'redo' },
+  tx('clipping source affected ordering', command('clipping.set_source', { bindingId: 'clip_1', sourceNodeId: alternate.id })),
+  { op: 'undo' }, { op: 'redo' },
+  { op: 'prepare', key: 'scene_stale', commands: [group('stale_group')], label: 'stale group' },
+  tx('advance scene', command('scene.set_locked', { nodeId: part.id, locked: false })),
+  { op: 'commit', key: 'scene_stale' },
+];
 const steps = [
   { op: 'transaction', commands: [rename('夕暮れ')], label: 'rename' },
+  ...sceneClippingSteps,
   { op: 'transaction', commands: [transform, visibility(false), rename('髪')], label: 'three' },
   { op: 'transaction', commands: [rename('do not commit'), visibility('invalid')], label: 'invalid' },
   { op: 'transaction', commands: [visibility(true), rename('  ')], label: 'blank' },
@@ -66,7 +115,9 @@ const expected = steps.map(step => {
     dirty: session.isDirty,
   }, history: cloneProject(session.history) };
 });
-const serialized = JSON.stringify({ initial, steps, expected }, null, 2) + '\n';
+// Keep full state evidence while avoiding tens of thousands of repetitive lines.
+const rows = values => values.map(value => '    ' + JSON.stringify(value)).join(',\n');
+const serialized = `{\n  "initial": ${JSON.stringify(initial)},\n  "steps": [\n${rows(steps)}\n  ],\n  "expected": [\n${rows(expected)}\n  ]\n}\n`;
 if (process.argv.includes('--write')) await writeFile(path, serialized);
 else assert.equal((await readFile(path, 'utf8')).replaceAll('\r\n', '\n'), serialized,
   'Session fixtures differ from current JS; regenerate deliberately with --write');
