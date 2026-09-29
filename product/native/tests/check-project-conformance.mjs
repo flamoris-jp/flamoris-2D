@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { createProject, createSceneNode, cloneProject } from "../../src/model/project.js";
+import { createIdFactory, createProject, createSceneNode, cloneProject } from "../../src/model/project.js";
 import { validateProject } from "../../src/model/validation.js";
 
 const fixturePath = fileURLToPath(new URL("./project-conformance.json", import.meta.url));
@@ -192,6 +192,68 @@ variant("transition_parts", minimal, p => {
     ], partTransitions: [{ id: "part_transition_1", semanticSlotId: "missing", mode: "morph",
       topologyId: "missing", fromKeyformId: "missing", toKeyformId: "missing",
       configuration: { holdEndpoint: "to" } }] });
+});
+const populated = createProject({ name: "Populated", width: 100, height: 100,
+  idFactory: createIdFactory("native_parity") });
+for (const [id, name] of [["node_a", "A"], ["node_b", "B"]]) {
+  populated.scene.nodes[id] = createSceneNode({ id, displayName: name,
+    parentId: populated.scene.rootId, bounds: { left: 0, top: 0, right: 10, bottom: 10 } });
+  populated.scene.nodes[populated.scene.rootId].children.push(id);
+}
+const member = (nodeId, appearanceId) => ({ nodeId, appearanceId, opacity: 1,
+  presence: "present", drawOrder: 0, clipping: { sourceNodeId: null } });
+populated.keyArts.push(
+  { id: "art_a", displayName: "A", rootNodeId: populated.scene.rootId,
+    members: [member("node_a", "appearance_a")], metadata: {} },
+  { id: "art_b", displayName: "B", rootNodeId: populated.scene.rootId,
+    members: [member("node_b", "appearance_b")], metadata: {} },
+);
+populated.semanticSlots.push({ id: "slot_1", displayName: "Subject", role: "subject",
+  mappings: [{ keyArtId: "art_a", nodeId: "node_a" }, { keyArtId: "art_b", nodeId: "node_b" }], metadata: {} });
+populated.temporalPrograms.push(
+  { id: "program_transition", durationTicks: 100, tracks: [], events: [], regions: [] },
+  { id: "program_sequence", durationTicks: 300, tracks: [], events: [], regions: [] },
+);
+populated.transitions.push({ id: "transition_ab", displayName: "A to B",
+  fromKeyArtId: "art_a", toKeyArtId: "art_b", temporalProgramId: "program_transition",
+  partTransitions: [{ id: "part_ab", semanticSlotId: "slot_1", mode: "replace", topologyId: null,
+    fromKeyformId: null, toKeyformId: null, configuration: { compositeGroupId: "group_1" } }],
+  diagnosticOverrides: [] });
+populated.sequences.push({ id: "sequence_1", displayName: "Shot", temporalProgramId: "program_sequence",
+  viewLaneItems: [
+    { id: "hold_b", kind: "KeyArtHold", keyArtId: "art_b", startTicks: 200, endTicks: 300 },
+    { id: "instance_ab", kind: "TransitionInstance", transitionId: "transition_ab", startTicks: 100, endTicks: 200 },
+    { id: "hold_a", kind: "KeyArtHold", keyArtId: "art_a", startTicks: 0, endTicks: 100 },
+  ], clipInstances: [], metadata: {} });
+cases.push(["populated_sequence_transition", populated]);
+variant("populated_sequence_multi_error", populated, p => {
+  p.sequences[0].viewLaneItems.find(item => item.id === "hold_b").startTicks = 190;
+  p.transitions[0].partTransitions[0].semanticSlotId = "missing";
+  p.keyArts[0].members[0].clipping.sourceNodeId = "missing";
+  p.temporalPrograms[0].events.push({ id: "event_1", timeTicks: 200, type: "wrong",
+    participants: ["missing"], payload: null });
+});
+const meshed = cloneProject(populated);
+meshed.meshTopologies.push({ id: "topology_1", vertexIds: ["vertex_a", "vertex_b", "vertex_c"],
+  indices: [0, 1, 2], nextVertexSequence: 1, vertexMetadata: {} });
+meshed.meshKeyforms.push(
+  { id: "keyform_a", topologyId: "topology_1", keyArtId: "art_a", semanticSlotId: "slot_1",
+    positions: [0, 0, 10, 0, 0, 10], uvs: [0, 0, 1, 0, 0, 1] },
+  { id: "keyform_b", topologyId: "topology_1", keyArtId: "art_b", semanticSlotId: "slot_1",
+    positions: [1, 1, 11, 1, 1, 11], uvs: [0, 0, 1, 0, 0, 1] },
+);
+meshed.transitions[0].partTransitions[0] = { id: "part_ab", semanticSlotId: "slot_1", mode: "morph",
+  topologyId: "topology_1", fromKeyformId: "keyform_a", toKeyformId: "keyform_b", configuration: {} };
+cases.push(["populated_mesh_transition", meshed]);
+variant("mesh_multi_error", meshed, p => {
+  p.meshTopologies[0].vertexIds.push("vertex_a");
+  p.meshTopologies[0].indices = [0, 0, 5];
+  p.meshKeyforms[0].positions = [0, 0];
+  p.meshKeyforms[1].uvs = [0, null, 1, 0, 0, 1];
+});
+variant("mesh_triangle_warnings", meshed, p => {
+  p.meshKeyforms[0].positions = [0, 0, 1, 0, 2, 0];
+  p.meshKeyforms[1].positions = [0, 0, 0.01, 0, 0, 0.01];
 });
 
 const fixtures = cases.map(([name, project]) => ({ name, project,

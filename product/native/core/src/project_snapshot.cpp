@@ -554,6 +554,71 @@ void validate_transition_domain(Snapshot& s, const Value& project, Register&& re
         }
         if (indices.get<Array>().empty() || indices.get<Array>().size() % 3)
             add(s, "MESH_TOPOLOGY_INVALID_TRIANGLES", path + ".indices", id);
+        for (size_t offset = 0; offset < indices.get<Array>().size(); offset += 3) {
+            bool references_valid = offset + 2 < indices.get<Array>().size();
+            std::set<double> triangle;
+            for (size_t j = offset; j < indices.get<Array>().size() && j < offset + 3; ++j) {
+                const Value& vertex = indices.get<Array>()[j];
+                if (!valid_time(vertex) || vertex.get<double>() >= vertices.get<Array>().size()) references_valid = false;
+                else triangle.insert(vertex.get<double>());
+            }
+            if (!references_valid) add(s, "MESH_TOPOLOGY_INVALID_VERTEX_REFERENCE", path + ".indices." + std::to_string(offset), id);
+            else if (triangle.size() != 3) add(s, "MESH_TOPOLOGY_TRIANGLE_REPEATED_VERTEX", path + ".indices." + std::to_string(offset), id);
+        }
+    }
+    std::set<std::string> keyform_keys;
+    if (keyforms.is<Array>()) for (size_t i = 0; i < keyforms.get<Array>().size(); ++i) {
+        const Value& keyform = keyforms.get<Array>()[i];
+        const std::string path = "meshKeyforms." + std::to_string(i);
+        if (!keyform.is<Object>()) { add(s, "MESH_KEYFORM_INVALID", path); continue; }
+        const std::string id = str(field(keyform, "id"));
+        if (!only_keys(keyform, {"id", "topologyId", "keyArtId", "semanticSlotId", "positions", "uvs"}))
+            add(s, "MESH_KEYFORM_INVALID", path, id);
+        const Value& topology = find_id(topologies, field(keyform, "topologyId"));
+        if (!topology.is<Object>()) add(s, "MESH_KEYFORM_UNKNOWN_TOPOLOGY", path + ".topologyId", id);
+        if (!contains_id(key_arts, field(keyform, "keyArtId"))) add(s, "MESH_KEYFORM_UNKNOWN_KEYART", path + ".keyArtId", id);
+        if (!contains_id(slots, field(keyform, "semanticSlotId"))) add(s, "MESH_KEYFORM_UNKNOWN_SLOT", path + ".semanticSlotId", id);
+        const Value& vertices = field(topology, "vertexIds");
+        const size_t expected = vertices.is<Array>() ? vertices.get<Array>().size() * 2 : 0;
+        for (const char* name : {"positions", "uvs"}) {
+            const Value& coordinates = field(keyform, name);
+            bool valid = coordinates.is<Array>();
+            if (valid) for (const auto& coordinate : coordinates.get<Array>()) if (!finite(coordinate)) valid = false;
+            const std::string field_path = path + "." + name;
+            if (!valid) add(s, std::strcmp(name, "positions") == 0 ? "MESH_KEYFORM_POSITIONS_INVALID" :
+                "MESH_KEYFORM_UVS_INVALID", field_path, id);
+            else if (topology.is<Object>() && vertices.is<Array>() && coordinates.get<Array>().size() != expected)
+                add(s, std::strcmp(name, "positions") == 0 ? "MESH_KEYFORM_POSITION_COUNT_MISMATCH" :
+                    "MESH_KEYFORM_UV_COUNT_MISMATCH", field_path, id);
+        }
+        const Value& positions = field(keyform, "positions");
+        const Value& indices = field(topology, "indices");
+        if (topology.is<Object>() && vertices.is<Array>() && positions.is<Array>() &&
+            positions.get<Array>().size() == expected && indices.is<Array>() && indices.get<Array>().size() % 3 == 0) {
+            for (size_t offset = 0; offset < indices.get<Array>().size(); offset += 3) {
+                int vertex_indices[3]{}; bool valid_triangle = true;
+                for (size_t j = 0; j < 3; ++j) {
+                    const Value& value = indices.get<Array>()[offset + j];
+                    if (!valid_time(value) || value.get<double>() >= vertices.get<Array>().size()) valid_triangle = false;
+                    else vertex_indices[j] = static_cast<int>(value.get<double>());
+                }
+                if (!valid_triangle) continue;
+                auto coordinate = [&](int index, int dimension) {
+                    const Value& value = positions.get<Array>()[static_cast<size_t>(index * 2 + dimension)];
+                    return finite(value) ? value.get<double>() : std::numeric_limits<double>::quiet_NaN();
+                };
+                const int a = vertex_indices[0], b = vertex_indices[1], c = vertex_indices[2];
+                const double area = std::abs((coordinate(b, 0) - coordinate(a, 0)) *
+                    (coordinate(c, 1) - coordinate(a, 1)) - (coordinate(b, 1) - coordinate(a, 1)) *
+                    (coordinate(c, 0) - coordinate(a, 0))) / 2;
+                if (area <= 1e-8) add(s, "MESH_TOPOLOGY_TRIANGLE_ZERO_AREA", path + ".positions", id, "warning");
+                else if (area < 1e-4) add(s, "MESH_TOPOLOGY_TRIANGLE_NEAR_DEGENERATE", path + ".positions", id, "warning");
+            }
+        }
+        std::string context = str(field(keyform, "topologyId")); context.push_back('\0');
+        context += str(field(keyform, "keyArtId")); context.push_back('\0');
+        context += str(field(keyform, "semanticSlotId"));
+        if (!keyform_keys.insert(context).second) add(s, "MESH_KEYFORM_DUPLICATE", path, id);
     }
     if (transitions.is<Array>()) for (size_t i = 0; i < transitions.get<Array>().size(); ++i) {
         const Value& transition = transitions.get<Array>()[i];
