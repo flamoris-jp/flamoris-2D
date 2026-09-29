@@ -25,6 +25,7 @@ variant("duplicate", hierarchy, p => { p.scene.nodes.part_1.id = p.id; });
 variant("hierarchy_link", hierarchy, p => { p.scene.nodes.part_1.parentId = "missing"; });
 variant("transform", hierarchy, p => { p.scene.nodes.part_1.transform.scale.x = 0; delete p.scene.nodes.part_1.transform.position.y; });
 variant("root", minimal, p => { p.scene.nodes[p.scene.rootId].kind = "part"; p.scene.nodes[p.scene.rootId].parentId = "ghost"; });
+variant("root_missing_parent", minimal, p => { delete p.scene.nodes[p.scene.rootId].parentId; });
 variant("opacity", hierarchy, p => { p.scene.nodes.part_1.opacity = 2; });
 variant("collection_id", minimal, p => { p.keyArts.push({ id: p.id }); });
 

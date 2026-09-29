@@ -35,6 +35,9 @@ const Value& field(const Value& value, const std::string& key) {
     auto it = object.find(key);
     return it == object.end() ? missing : it->second;
 }
+bool has(const Value& value, const std::string& key) {
+    return value.is<Object>() && value.get<Object>().find(key) != value.get<Object>().end();
+}
 std::string str(const Value& value) { return value.is<std::string>() ? value.get<std::string>() : ""; }
 bool finite(const Value& value) { return value.is<double>() && std::isfinite(value.get<double>()); }
 void add(Snapshot& s, const char* code, std::string path, std::string entity = {}) {
@@ -89,7 +92,8 @@ void validate(Snapshot& s, const Value& project) {
     auto root = node_map.find(s.root);
     if (root == node_map.end()) add(s, "scene.missing_root", "scene.rootId", s.root);
     else {
-        if (!field(root->second, "parentId").is<picojson::null>()) add(s, "scene.root_parent_not_null", "scene.nodes." + s.root + ".parentId", s.root);
+        if (!has(root->second, "parentId") || !field(root->second, "parentId").is<picojson::null>())
+            add(s, "scene.root_parent_not_null", "scene.nodes." + s.root + ".parentId", s.root);
         if (str(field(root->second, "kind")) != "group") add(s, "scene.root_not_group", "scene.nodes." + s.root + ".kind", s.root);
     }
     std::map<std::string, std::string> ids;
@@ -103,7 +107,8 @@ void validate(Snapshot& s, const Value& project) {
         const std::string path = "scene.nodes." + key;
         const Value& id = field(value, "id");
         register_id(id, path + ".id");
-        Node node{str(id), str(field(value, "kind")), str(field(value, "parentId")), str(field(value, "displayName")), field(value, "parentId").is<picojson::null>()};
+        Node node{str(id), str(field(value, "kind")), str(field(value, "parentId")), str(field(value, "displayName")),
+            has(value, "parentId") && field(value, "parentId").is<picojson::null>()};
         s.nodes.emplace(key, node);
         if (node.id != key) add(s, "scene.key_id_mismatch", path + ".id", node.id);
         if (node.kind != "group" && node.kind != "part" && node.kind != "deformer" && node.kind != "bone") add(s, "scene.invalid_kind", path + ".kind", key);
@@ -135,12 +140,12 @@ void validate(Snapshot& s, const Value& project) {
     const char* collections[] = {"sourceAssets", "semanticSlots", "keyArts", "meshes", "meshTopologies", "meshKeyforms", "meshFormCorrectionKeyforms", "transitions", "sequences"};
     for (const char* name : collections) {
         const Value& values = field(project, name);
-        s.unsupported_sections[name] = !values.is<picojson::null>();
+        s.unsupported_sections[name] = has(project, name);
         if (!values.is<Array>()) add(s, "collection.invalid", name);
         else { size_t i = 0; for (const auto& value : values.get<Array>()) register_id(field(value, "id"), std::string(name) + "." + std::to_string(i++) + ".id"); }
     }
     for (const char* name : {"rig", "animation", "temporalPrograms", "clippingBindings", "renderSettings"})
-        s.unsupported_sections[name] = !field(project, name).is<picojson::null>();
+        s.unsupported_sections[name] = has(project, name);
 }
 fl2d_status copy(const std::string& value, char* buffer, uint32_t capacity, uint32_t* required) {
     if (!required) return FL2D_INVALID_ARGUMENT;
