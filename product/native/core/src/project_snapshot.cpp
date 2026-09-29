@@ -767,7 +767,6 @@ void validate_transition_clipping(Snapshot& s, const Value& project) {
     const Value& nodes = field(field(project, "scene"), "nodes");
     const Value& arts = field(project, "keyArts");
     const Value& programs = field(project, "temporalPrograms");
-    const Value& transitions = field(project, "transitions");
     auto renderable = [&](const std::string& id) {
         return str(field(field(nodes, id), "kind")) == "part";
     };
@@ -839,22 +838,6 @@ void validate_transition_clipping(Snapshot& s, const Value& project) {
                         unique_add("CLIPPING_TARGET_NOT_RENDERABLE", path, str(field(track, "trackId")));
                     if (source == node) unique_add("CLIPPING_SELF_REFERENCE", path, str(field(track, "trackId")));
                 }
-            }
-        }
-    }
-    if (transitions.is<Array>()) for (const auto& transition : transitions.get<Array>()) {
-        for (const char* endpoint : {"fromKeyArtId", "toKeyArtId"}) {
-            const Value& art = find_id(arts, field(transition, endpoint));
-            const Value& members = field(art, "members");
-            if (!members.is<Array>()) continue;
-            bool self_cycle = false;
-            for (const auto& member : members.get<Array>()) {
-                const std::string source = str(field(field(member, "clipping"), "sourceNodeId"));
-                if (!source.empty() && source == str(field(member, "nodeId"))) self_cycle = true;
-            }
-            if (self_cycle) {
-                unique_add("CLIPPING_CYCLE", "transitions", str(field(transition, "id")));
-                break;
             }
         }
     }
@@ -971,6 +954,20 @@ void validate_temporal_ownership(Snapshot& s, const Value& project, Register&& r
                     validate_track_value(s, project, track, value_type, field(key, "value"), key_path + ".value");
                     validate_curve(s, field(key, "interpolationToNext"), key_path + ".interpolationToNext",
                         definition.discrete, value_type == "positive-number");
+                }
+                if (kind == "MeshDeformationTrack" && channel_name == "deformation") {
+                    Array ordered = keyframes.get<Array>();
+                    std::stable_sort(ordered.begin(), ordered.end(), [](const Value& a, const Value& b) {
+                        const Value& at = field(a, "timeTicks"), &bt = field(b, "timeTicks");
+                        return (finite(at) ? at.get<double>() : 0) < (finite(bt) ? bt.get<double>() : 0);
+                    });
+                    for (size_t k = 1; k < ordered.size(); ++k) {
+                        const Value& previous = ordered[k - 1], &next = ordered[k];
+                        if (str(field(field(previous, "interpolationToNext"), "kind")) != "step" &&
+                            field(field(previous, "value"), "deformationSampleId") !=
+                                field(field(next, "value"), "deformationSampleId"))
+                            add(s, "ANIMATION_MESH_SAMPLE_INCOMPATIBLE", channel_path, str(track_id));
+                    }
                 }
             }
             const std::set<std::string> transition_kinds = {"GeometryBlendTrack", "AppearanceTrack", "OpacityTrack", "PresenceTrack", "DrawOrderTrack", "ClippingTrack"};

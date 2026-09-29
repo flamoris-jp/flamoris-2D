@@ -71,26 +71,28 @@ bytes; the caller destroys its returned handle once. Malformed JSON, invalid
 UTF-8 and oversized data have distinct status codes. Native snapshot strings
 are copied into caller-owned buffers: query `required` (including the NUL byte),
 then provide that capacity. C# uses `SafeHandle`. The C++ representation retains
-project identity, canvas, scene node IDs/hierarchy, transform, visibility, opacity and focused validation issues;
+project identity, canvas, scene node IDs/hierarchy, transform, visibility, opacity and validation issues;
 it records presence of unsupported mesh/rig/animation and other domain sections
 without treating those payloads as native authority. JSON is only an interchange
-format, not the native internal model. The read-only validation subset follows
+format, not the native internal model. Native validation follows
 `product/src/model/validation.js` and is tested against JS-generated fixtures.
 The base schema-15 checks now include animation shape, global IDs in both
 animation collections, display names, and scene reachability/cycles. Native
 validation also covers the basic AnimationClip checks, mesh deformation sample
 references/offsets, bone rotation and two-bone IK constraints, and rigid bone
 binding references/conflicts, mesh form corrections, Bone rest/pose checks, and
-WarpDeformer grids/control points, and SkinBinding influence/weight checks. The remaining imported
-domain validators and loop endpoint warnings are still pending under #125;
-the fixture generator projects the currently covered issue codes only. Native
-node queries use stable `node.id`
-even when a mismatched `scene.nodes` key produces a validation issue.
-it is currently authoritative for conformance testing only. JS `EditorSession`
+WarpDeformer grids/control points, and SkinBinding influence/weight checks.
+The #125 draft adds temporal tracks/ownership, transition foundations,
+clipping bindings, Sequence/ClipInstance structure, topology metadata,
+cross-domain ID checks and loop endpoint warnings. The fixture generator now
+compares complete issue sets (code, path, entity ID, severity) for every
+checked case, including populated and multi-error Projects. This is not yet
+proof of complete `validateProject` parity: transition clipping evaluation,
+Sequence evaluated endpoint signatures and remaining validator branches need
+conformance cases and implementation. Native node queries use stable `node.id`
+even when a mismatched `scene.nodes` key produces a validation issue. JS `EditorSession`
 remains the sole editing authority, including WPF/MCP mutations, Undo/Redo and
-save. The DLL still is not in the portable WPF package. The next migration step
-will establish native session, Command, revision and Undo/Redo semantics before
-any authority switch.
+save. The DLL still is not in the portable WPF package.
 
 Phase 1C (#123) adds a test-only native EditorSession owning its own Project
 state. It accepts the existing Product command envelope for `scene.rename_node`,
@@ -107,10 +109,11 @@ both handles. Callers serialize access to one session. C# uses `SafeHandle`.
 The ABI exposes fixed-width session state, stable-ID node queries, caller-owned
 UTF-8 project/history/error buffers, and deterministic statuses. Project and
 history JSON are inspection projections; the session's native parsed state is
-owned exclusively by its handle. The snapshot validator is still a focused
-subset of full Product validation; the session additionally checks the node
-fields it needs. Both creation/replacement and transaction candidates invoke
-the snapshot validation path. Native before/after transaction validation has a
+owned exclusively by its handle. Snapshot validation is the shared native path
+for session creation, replacement and transaction candidates. Warning-only
+diagnostics do not reject a session; errors do. The session still has supplementary
+node-shape checks pending removal after #125 completes. Native before/after
+transaction validation has a
 dedicated seam: the migrated scene commands cannot modify temporal ownership,
 so the JS cross-state ownership rule is not triggered yet. Port that rule when
 the first applicable command moves. Unsupported domains and commands remain JS-only. The

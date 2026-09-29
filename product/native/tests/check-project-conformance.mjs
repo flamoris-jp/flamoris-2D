@@ -256,7 +256,7 @@ variant("mesh_triangle_warnings", meshed, p => {
   p.meshKeyforms[1].positions = [0, 0, 0.01, 0, 0, 0.01];
 });
 variant("authored_clipping_references", populated, p => {
-  p.keyArts[0].members[0].clipping.sourceNodeId = "node_a";
+  p.keyArts[0].members[0].clipping.sourceNodeId = p.scene.rootId;
   p.temporalPrograms[0].tracks.push({ trackId: "clipping_track", version: 1,
     kind: "ClippingTrack", target: { nodeId: p.scene.rootId }, channels: { clipping: { keyframes: [
       { id: "clip_key", timeTicks: 0, value: { sourceNodeId: p.scene.rootId },
@@ -296,6 +296,22 @@ variant("sequence_ambiguous_keyform", meshed, p => {
   p.meshKeyforms.push({ ...structuredClone(p.meshKeyforms[0]), id: "keyform_a2" });
   p.sequences[0].viewLaneItems = [{ id: "hold_a", kind: "KeyArtHold", keyArtId: "art_a",
     startTicks: 0, endTicks: 300 }];
+});
+variant("mesh_sample_interpolation", meshed, p => {
+  p.meshes.push({ id: "mesh_1" });
+  p.animation.deformationSamples.push(
+    { id: "sample_a", meshId: "mesh_1", topologyId: "topology_1", offsets: [] },
+    { id: "sample_b", meshId: "mesh_1", topologyId: "topology_1", offsets: [] },
+  );
+  p.temporalPrograms.push({ id: "program_deform", durationTicks: 100, events: [], regions: [], tracks: [
+    { trackId: "track_deform", version: 1, kind: "MeshDeformationTrack", target: { meshId: "mesh_1" },
+      channels: { deformation: { keyframes: [
+        { id: "deform_key_a", timeTicks: 0, value: { deformationSampleId: "sample_a", weight: 1 },
+          interpolationToNext: { kind: "linear" } },
+        { id: "deform_key_b", timeTicks: 100, value: { deformationSampleId: "sample_b", weight: 1 },
+          interpolationToNext: { kind: "step" } },
+      ] } } },
+  ] });
 });
 
 const fixtures = cases.map(([name, project]) => ({ name, project,
