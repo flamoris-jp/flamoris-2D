@@ -601,6 +601,139 @@ void validate_warp(Snapshot& s, const Value& project, Register&& register_id) {
         }
     }
 }
+template <class Register>
+void validate_skin(Snapshot& s, const Value& project, Register&& register_id) {
+    const Value& rig = field(project, "rig"), &bindings = field(rig, "skinBindings");
+    if (!bindings.is<Array>()) { add(s, "collection.invalid", "rig.skinBindings"); return; }
+    const Value& nodes = field(field(project, "scene"), "nodes");
+    const Value& topologies = field(project, "meshTopologies"), &bones = field(rig, "bones");
+    const Value& slots = field(project, "semanticSlots"), &keyforms = field(project, "meshKeyforms");
+    std::map<std::string, std::string> enabled_targets;
+    for (size_t i = 0; i < bindings.get<Array>().size(); ++i) {
+        const Value& binding = bindings.get<Array>()[i];
+        const std::string path = "rig.skinBindings." + std::to_string(i);
+        if (!binding.is<Object>()) { add(s, "SKIN_BINDING_TARGET_INVALID", path); continue; }
+        const Value& id_value = field(binding, "id");
+        const std::string id = str(id_value);
+        if (nonblank(id_value)) register_id(id_value, path + ".id");
+        else add(s, "identity.missing", path + ".id");
+        if (!exact(binding, {"id", "targetNodeId", "topologyId", "enabled", "vertexWeights"}))
+            add(s, "SKIN_BINDING_TARGET_INVALID", path, id);
+        const Value& target_id = field(binding, "targetNodeId");
+        const Value& target = field(nodes, str(target_id));
+        if (!nonblank(target_id) || target.is<picojson::null>())
+            add(s, "SKIN_BINDING_TARGET_MISSING", path + ".targetNodeId", id);
+        else if (str(field(target, "kind")) != "part")
+            add(s, "SKIN_BINDING_TARGET_INVALID", path + ".targetNodeId", id);
+        const Value& topology_id = field(binding, "topologyId");
+        const Value& topology = find_id(topologies, topology_id);
+        if (!nonblank(topology_id) || topology.is<picojson::null>())
+            add(s, "SKIN_BINDING_TOPOLOGY_MISSING", path + ".topologyId", id);
+        else if (str(field(target, "kind")) == "part") {
+            std::set<std::string> related_art;
+            if (slots.is<Array>()) for (const auto& slot : slots.get<Array>()) {
+                const Value& mappings = field(slot, "mappings");
+                if (mappings.is<Array>()) for (const auto& mapping : mappings.get<Array>())
+                    if (field(mapping, "nodeId") == target_id)
+                        related_art.insert(str(field(slot, "id")) + std::string(1, '\0') + str(field(mapping, "keyArtId")));
+            }
+            std::set<std::string> evaluated;
+            if (keyforms.is<Array>()) for (const auto& item : keyforms.get<Array>())
+                if (related_art.count(str(field(item, "semanticSlotId")) + std::string(1, '\0') +
+                    str(field(item, "keyArtId")))) evaluated.insert(str(field(item, "topologyId")));
+            if (evaluated.empty() || evaluated.size() != 1 || !evaluated.count(str(topology_id)))
+                add(s, "SKIN_BINDING_TOPOLOGY_TARGET_MISMATCH", path + ".topologyId", id);
+        }
+        const Value& active = field(binding, "enabled");
+        if (!active.is<bool>()) add(s, "SKIN_BINDING_TARGET_INVALID", path + ".enabled", id);
+        if (active.is<bool>() && active.get<bool>() && nonblank(target_id) &&
+            !enabled_targets.emplace(str(target_id), id).second)
+            add(s, "SKIN_BINDING_TARGET_CONFLICT", "rig.skinBindings", id);
+        const Value& weights = field(binding, "vertexWeights");
+        if (!weights.is<Array>()) { add(s, "SKIN_BINDING_VERTEX_INVALID", path + ".vertexWeights", id); continue; }
+        const Value& vertices = field(topology, "vertexIds");
+        std::set<std::string> vertex_ids;
+        if (vertices.is<Array>()) for (const auto& vertex : vertices.get<Array>()) vertex_ids.insert(str(vertex));
+        std::set<std::string> weighted;
+        std::string previous_vertex;
+        bool has_previous_vertex = false;
+        for (size_t j = 0; j < weights.get<Array>().size(); ++j) {
+            const Value& weight = weights.get<Array>()[j];
+            const std::string weight_path = path + ".vertexWeights." + std::to_string(j);
+            if (!exact(weight, {"vertexId", "influences"})) {
+                add(s, "SKIN_BINDING_VERTEX_INVALID", weight_path, id); continue;
+            }
+            const Value& vertex_value = field(weight, "vertexId");
+            const std::string vertex = str(vertex_value);
+            if (!nonblank(vertex_value) || !vertex_ids.count(vertex))
+                add(s, "SKIN_BINDING_VERTEX_MISSING", weight_path + ".vertexId", id);
+            if (!weighted.insert(vertex).second)
+                add(s, "SKIN_BINDING_VERTEX_DUPLICATE", weight_path + ".vertexId", id);
+            if (has_previous_vertex && previous_vertex > vertex)
+                add(s, "SKIN_BINDING_VERTEX_ORDER_INVALID", path + ".vertexWeights", id);
+            previous_vertex = vertex; has_previous_vertex = true;
+            const Value& influences = field(weight, "influences");
+            if (!influences.is<Array>() || influences.get<Array>().empty() || influences.get<Array>().size() > 4) {
+                add(s, "SKIN_BINDING_INFLUENCE_COUNT_INVALID", weight_path + ".influences", id); continue;
+            }
+            std::set<std::string> seen_bones, roots;
+            std::string previous_bone;
+            bool has_previous_bone = false, weights_valid = true;
+            double sum = 0;
+            for (size_t k = 0; k < influences.get<Array>().size(); ++k) {
+                const Value& influence = influences.get<Array>()[k];
+                const std::string influence_path = weight_path + ".influences." + std::to_string(k);
+                if (!exact(influence, {"boneId", "weight"})) {
+                    add(s, "SKIN_BINDING_INFLUENCE_INVALID", influence_path, id); continue;
+                }
+                const Value& bone_value = field(influence, "boneId");
+                const std::string bone_id = str(bone_value);
+                if (!seen_bones.insert(bone_id).second)
+                    add(s, "SKIN_BINDING_INFLUENCE_DUPLICATE", influence_path + ".boneId", id);
+                if (has_previous_bone && previous_bone > bone_id)
+                    add(s, "SKIN_BINDING_INFLUENCE_ORDER_INVALID", weight_path + ".influences", id);
+                previous_bone = bone_id; has_previous_bone = true;
+                if (!nonblank(bone_value) || !contains_id(bones, bone_value) ||
+                    str(field(field(nodes, bone_id), "kind")) != "bone")
+                    add(s, "BONE_NODE_MISSING", influence_path + ".boneId", id);
+                else {
+                    std::set<std::string> visited;
+                    const Value* current = &field(nodes, bone_id);
+                    while (str(field(*current, "kind")) == "bone") {
+                        const std::string current_id = str(field(*current, "id"));
+                        if (!visited.insert(current_id).second) { current = nullptr; break; }
+                        current = &field(nodes, str(field(*current, "parentId")));
+                    }
+                    if (current && nonblank(field(*current, "id"))) roots.insert(str(field(*current, "id")));
+                }
+                const Value& numeric = field(influence, "weight");
+                if (!finite(numeric) || numeric.get<double>() <= 0 || numeric.get<double>() > 1) {
+                    weights_valid = false;
+                    add(s, "SKIN_BINDING_WEIGHT_INVALID", influence_path + ".weight", id);
+                } else sum += numeric.get<double>();
+            }
+            if (std::isfinite(sum) && std::abs(sum - 1) > 1e-6)
+                add(s, "SKIN_BINDING_WEIGHT_NOT_NORMALIZED", weight_path + ".influences", id);
+            else if (weights_valid && std::isfinite(sum)) {
+                double normalized = 0;
+                bool canonical = false;
+                for (size_t k = 0; k < influences.get<Array>().size(); ++k) {
+                    const Value& original = field(influences.get<Array>()[k], "weight");
+                    if (!finite(original)) continue;
+                    const double value = k + 1 == influences.get<Array>().size() ? 1 - normalized : original.get<double>() / sum;
+                    normalized += value;
+                    if (original.get<double>() != value) canonical = true;
+                }
+                if (canonical) add(s, "SKIN_BINDING_WEIGHT_NOT_CANONICAL", weight_path + ".influences", id);
+            }
+            if (roots.size() > 1)
+                add(s, "SKIN_BINDING_BONE_HIERARCHY_INCOMPATIBLE", weight_path + ".influences", id);
+        }
+        if (active.is<bool>() && active.get<bool>() && !topology.is<picojson::null>())
+            for (const auto& vertex : vertex_ids) if (!weighted.count(vertex))
+                add(s, "SKIN_BINDING_VERTEX_MISSING", path + ".vertexWeights", id);
+    }
+}
 bool utf8(const uint8_t* data, uint32_t length) {
     for (uint32_t i = 0; i < length;) {
         uint8_t c = data[i++];
@@ -737,6 +870,7 @@ void validate(Snapshot& s, const Value& project) {
     validate_mesh_form_corrections(s, project);
     validate_bones(s, project);
     validate_warp(s, project, register_id);
+    validate_skin(s, project, register_id);
     if (root != node_map.end()) {
         std::set<std::string> visiting, visited;
         auto walk = [&](auto&& self, const std::string& id) -> void {

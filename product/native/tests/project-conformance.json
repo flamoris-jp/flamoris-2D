@@ -2970,6 +2970,24 @@
         "path": "rig.rigidBoneBindings",
         "entityId": "rigid_2",
         "severity": "error"
+      },
+      {
+        "code": "SKIN_BINDING_TARGET_INVALID",
+        "path": "rig.skinBindings.0",
+        "entityId": "skin_1",
+        "severity": "error"
+      },
+      {
+        "code": "SKIN_BINDING_TOPOLOGY_MISSING",
+        "path": "rig.skinBindings.0.topologyId",
+        "entityId": "skin_1",
+        "severity": "error"
+      },
+      {
+        "code": "SKIN_BINDING_VERTEX_INVALID",
+        "path": "rig.skinBindings.0.vertexWeights",
+        "entityId": "skin_1",
+        "severity": "error"
       }
     ]
   },
@@ -3489,6 +3507,203 @@
         "code": "DEFORMER_TYPE_INVALID",
         "path": "rig.deformers.0.type",
         "entityId": "warp_1",
+        "severity": "error"
+      }
+    ]
+  },
+  {
+    "name": "skin_binding",
+    "project": {
+      "schemaVersion": 15,
+      "timebaseTicksPerSecond": 120000,
+      "id": "project_あ",
+      "displayName": "夜明け",
+      "canvas": {
+        "width": 1920,
+        "height": 1080
+      },
+      "sourceAssets": [],
+      "semanticSlots": [],
+      "keyArts": [],
+      "scene": {
+        "rootId": "node_1",
+        "nodes": {
+          "node_1": {
+            "id": "node_1",
+            "kind": "group",
+            "displayName": "夜明け",
+            "sourceRef": null,
+            "parentId": null,
+            "children": [
+              "part_1"
+            ],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          },
+          "part_1": {
+            "id": "part_1",
+            "kind": "part",
+            "displayName": "前髪",
+            "sourceRef": null,
+            "parentId": "node_1",
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          }
+        }
+      },
+      "meshes": [],
+      "meshTopologies": [
+        {
+          "id": "topology_1",
+          "vertexIds": [
+            "a",
+            "b"
+          ]
+        }
+      ],
+      "meshKeyforms": [],
+      "meshFormCorrectionKeyforms": [],
+      "clippingBindings": [],
+      "rig": {
+        "deformers": [],
+        "warpControlPoints": [],
+        "warpDeformerKeyforms": [],
+        "bones": [],
+        "bonePoseKeyforms": [],
+        "rigidBoneBindings": [],
+        "skinBindings": [
+          {
+            "id": "skin_1",
+            "targetNodeId": "part_1",
+            "topologyId": "topology_1",
+            "enabled": true,
+            "vertexWeights": [
+              {
+                "vertexId": "b",
+                "influences": [
+                  {
+                    "boneId": "missing",
+                    "weight": 0.3
+                  },
+                  {
+                    "boneId": "missing",
+                    "weight": 0.3
+                  }
+                ]
+              },
+              {
+                "vertexId": "b",
+                "influences": [
+                  {
+                    "boneId": "missing",
+                    "weight": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "boneRotationConstraints": [],
+        "twoBoneIkConstraints": [],
+        "constraints": []
+      },
+      "transitions": [],
+      "temporalPrograms": [],
+      "animation": {
+        "clips": [],
+        "deformationSamples": []
+      },
+      "sequences": [],
+      "renderSettings": {
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "alpha": true
+      }
+    },
+    "expected": [
+      {
+        "code": "BONE_NODE_MISSING",
+        "path": "rig.skinBindings.0.vertexWeights.0.influences.0.boneId",
+        "entityId": "skin_1",
+        "severity": "error"
+      },
+      {
+        "code": "BONE_NODE_MISSING",
+        "path": "rig.skinBindings.0.vertexWeights.0.influences.1.boneId",
+        "entityId": "skin_1",
+        "severity": "error"
+      },
+      {
+        "code": "BONE_NODE_MISSING",
+        "path": "rig.skinBindings.0.vertexWeights.1.influences.0.boneId",
+        "entityId": "skin_1",
+        "severity": "error"
+      },
+      {
+        "code": "SKIN_BINDING_INFLUENCE_DUPLICATE",
+        "path": "rig.skinBindings.0.vertexWeights.0.influences.1.boneId",
+        "entityId": "skin_1",
+        "severity": "error"
+      },
+      {
+        "code": "SKIN_BINDING_TOPOLOGY_TARGET_MISMATCH",
+        "path": "rig.skinBindings.0.topologyId",
+        "entityId": "skin_1",
+        "severity": "error"
+      },
+      {
+        "code": "SKIN_BINDING_VERTEX_DUPLICATE",
+        "path": "rig.skinBindings.0.vertexWeights.1.vertexId",
+        "entityId": "skin_1",
+        "severity": "error"
+      },
+      {
+        "code": "SKIN_BINDING_VERTEX_MISSING",
+        "path": "rig.skinBindings.0.vertexWeights",
+        "entityId": "skin_1",
+        "severity": "error"
+      },
+      {
+        "code": "SKIN_BINDING_WEIGHT_NOT_NORMALIZED",
+        "path": "rig.skinBindings.0.vertexWeights.0.influences",
+        "entityId": "skin_1",
         "severity": "error"
       }
     ]

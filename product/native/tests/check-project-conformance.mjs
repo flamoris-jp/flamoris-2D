@@ -98,6 +98,13 @@ variant("warp_deformer", minimal, p => {
   p.rig.warpDeformerKeyforms.push({ deformerId: "warp_1", keyArtId: "missing",
     controlPoints: [{ controlPointId: "point_1", x: null, y: 0 }] });
 });
+variant("skin_binding", hierarchy, p => {
+  p.meshTopologies.push({ id: "topology_1", vertexIds: ["a", "b"] });
+  p.rig.skinBindings.push({ id: "skin_1", targetNodeId: "part_1", topologyId: "topology_1", enabled: true,
+    vertexWeights: [{ vertexId: "b", influences: [
+      { boneId: "missing", weight: 0.3 }, { boneId: "missing", weight: 0.3 }] },
+    { vertexId: "b", influences: [{ boneId: "missing", weight: 1 }] }] });
+});
 
 const subset = new Set([
   "project.invalid", "project.unsupported_schema", "ANIMATION_INVALID_TIMEBASE", "project.missing_id",
@@ -129,6 +136,14 @@ const subset = new Set([
   "BONE_POSE_INVALID", "BONE_KEYART_REFERENCE_INVALID",
   "DEFORMER_CHILD_REFERENCE_INVALID", "DEFORMER_PARENT_MISSING", "DEFORMER_TYPE_INVALID",
   "DEFORMER_CONTROL_POINT_INVALID", "DEFORMER_KEYFORM_INCOMPATIBLE", "DEFORMER_CYCLE",
+  "SKIN_BINDING_TARGET_INVALID", "SKIN_BINDING_TARGET_MISSING", "SKIN_BINDING_TOPOLOGY_MISSING",
+  "SKIN_BINDING_TOPOLOGY_TARGET_MISMATCH", "SKIN_BINDING_TARGET_CONFLICT",
+  "SKIN_BINDING_VERTEX_INVALID", "SKIN_BINDING_VERTEX_MISSING", "SKIN_BINDING_VERTEX_DUPLICATE",
+  "SKIN_BINDING_VERTEX_ORDER_INVALID", "SKIN_BINDING_INFLUENCE_COUNT_INVALID",
+  "SKIN_BINDING_INFLUENCE_INVALID", "SKIN_BINDING_INFLUENCE_DUPLICATE",
+  "SKIN_BINDING_INFLUENCE_ORDER_INVALID", "SKIN_BINDING_WEIGHT_INVALID",
+  "SKIN_BINDING_WEIGHT_NOT_NORMALIZED", "SKIN_BINDING_WEIGHT_NOT_CANONICAL",
+  "SKIN_BINDING_BONE_HIERARCHY_INCOMPATIBLE",
 ]);
 const fixtures = cases.map(([name, project]) => ({ name, project,
   expected: validateProject(project).filter(issue => subset.has(issue.code))
