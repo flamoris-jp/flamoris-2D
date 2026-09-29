@@ -79,7 +79,8 @@ format, not the native internal model. The read-only validation subset follows
 The base schema-15 checks now include animation shape, global IDs in both
 animation collections, display names, and scene reachability/cycles. Native
 validation also covers the basic AnimationClip checks, mesh deformation sample
-references/offsets, and bone rotation and two-bone IK constraint checks. The remaining imported
+references/offsets, bone rotation and two-bone IK constraints, and rigid bone
+binding references/conflicts. The remaining imported
 domain validators and loop endpoint warnings are still pending under #125;
 the fixture generator projects the currently covered issue codes only. Native
 node queries use stable `node.id`

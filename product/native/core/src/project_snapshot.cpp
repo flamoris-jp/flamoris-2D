@@ -243,6 +243,54 @@ void validate_ik_constraints(Snapshot& s, const Value& project) {
         }
     }
 }
+template <class Register>
+void validate_rigid_bindings(Snapshot& s, const Value& project, Register&& register_id) {
+    const Value& rig = field(project, "rig");
+    const Value& bindings = field(rig, "rigidBoneBindings");
+    if (!bindings.is<Array>()) { add(s, "collection.invalid", "rig.rigidBoneBindings"); return; }
+    const Value& nodes = field(field(project, "scene"), "nodes");
+    const Value& bones = field(rig, "bones");
+    std::set<std::string> skin_targets;
+    const Value& skin = field(rig, "skinBindings");
+    if (skin.is<Array>()) for (const auto& item : skin.get<Array>())
+        if (field(item, "enabled").is<bool>() && field(item, "enabled").get<bool>() &&
+            nonblank(field(item, "targetNodeId"))) skin_targets.insert(str(field(item, "targetNodeId")));
+    // JS reports conflicts in target-ID order after validating individual bindings.
+    std::vector<const Value*> enabled;
+    for (size_t i = 0; i < bindings.get<Array>().size(); ++i) {
+        const Value& item = bindings.get<Array>()[i];
+        const std::string path = "rig.rigidBoneBindings." + std::to_string(i);
+        if (!item.is<Object>()) { add(s, "RIGID_BINDING_TARGET_INVALID", path); continue; }
+        const std::string id = str(field(item, "id"));
+        if (nonblank(field(item, "id"))) register_id(field(item, "id"), path + ".id");
+        else add(s, "identity.missing", path + ".id");
+        if (!exact(item, {"id", "targetNodeId", "boneId", "enabled"}))
+            add(s, "RIGID_BINDING_TARGET_INVALID", path, id);
+        const Value& target_id = field(item, "targetNodeId");
+        if (!nonblank(target_id) || str(field(field(nodes, str(target_id)), "kind")) != "part")
+            add(s, "RIGID_BINDING_TARGET_INVALID", path + ".targetNodeId", id);
+        const Value& bone_id = field(item, "boneId");
+        if (!nonblank(bone_id) || !contains_id(bones, bone_id) ||
+            str(field(field(nodes, str(bone_id)), "kind")) != "bone")
+            add(s, "BONE_NODE_MISSING", path + ".boneId", id);
+        const Value& active = field(item, "enabled");
+        if (!active.is<bool>()) add(s, "RIGID_BINDING_TARGET_INVALID", path + ".enabled", id);
+        if (active.is<bool>() && active.get<bool>() && nonblank(target_id)) enabled.push_back(&item);
+    }
+    std::stable_sort(enabled.begin(), enabled.end(), [](const Value* a, const Value* b) {
+        const auto left = str(field(*a, "targetNodeId")), right = str(field(*b, "targetNodeId"));
+        return left == right ? str(field(*a, "id")) < str(field(*b, "id")) : left < right;
+    });
+    std::map<std::string, std::string> by_target;
+    for (const Value* item : enabled) {
+        const std::string target = str(field(*item, "targetNodeId"));
+        const std::string id = str(field(*item, "id"));
+        const auto previous = by_target.find(target);
+        if (previous != by_target.end() || skin_targets.count(target))
+            add(s, "RIGID_BINDING_CONFLICT", "rig.rigidBoneBindings", previous != by_target.end() ? previous->second : id);
+        else by_target.emplace(target, id);
+    }
+}
 bool utf8(const uint8_t* data, uint32_t length) {
     for (uint32_t i = 0; i < length;) {
         uint8_t c = data[i++];
@@ -375,6 +423,7 @@ void validate(Snapshot& s, const Value& project) {
     validate_deformation_samples(s, project);
     validate_rotation_constraints(s, project);
     validate_ik_constraints(s, project);
+    validate_rigid_bindings(s, project, register_id);
     if (root != node_map.end()) {
         std::set<std::string> visiting, visited;
         auto walk = [&](auto&& self, const std::string& id) -> void {
