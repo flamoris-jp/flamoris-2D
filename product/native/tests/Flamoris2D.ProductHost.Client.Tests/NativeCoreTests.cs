@@ -85,9 +85,9 @@ internal static class NativeCoreTests
                     }
                 }
                 var actual = Enumerable.Range(0, checked((int)summary.IssueCount)).Select(i => snapshot.Issue((uint)i))
-                    .Select(x => (x.Code, x.Path, x.EntityId)).Order().ToArray();
+                    .Select(x => (x.Code, x.Path, x.EntityId, x.Severity)).Order().ToArray();
                 var expected = fixture.GetProperty("expected").EnumerateArray()
-                    .Select(x => (x.GetProperty("code").GetString()!, x.GetProperty("path").GetString()!, x.GetProperty("entityId").GetString()!))
+                    .Select(x => (x.GetProperty("code").GetString()!, x.GetProperty("path").GetString()!, x.GetProperty("entityId").GetString()!, x.GetProperty("severity").GetString()!))
                     .Order().ToArray();
                 if (!actual.SequenceEqual(expected)) throw new Exception($"Snapshot validation differs: {fixture.GetProperty("name")}");
             }

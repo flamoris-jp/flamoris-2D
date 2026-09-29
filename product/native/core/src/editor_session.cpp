@@ -93,59 +93,42 @@ fl2d_status copy(const std::string& value, char* buffer, uint32_t capacity, uint
     std::memcpy(buffer, value.c_str(), *required);
     return FL2D_OK;
 }
-// The snapshot loader is the focused native Project validator. It also enforces
-// the interchange size, encoding and JSON syntax before any session mutation.
-bool session_shape(const Value& project) {
-    const Value& scene = field(project, "scene");
-    const Value& nodes = field(scene, "nodes");
-    const Value& root = field(scene, "rootId");
-    if (!nodes.is<Object>() || !root.is<std::string>()) return false;
-    const auto& map = nodes.get<Object>();
-    for (const auto& [key, node] : map) {
-        if (!node.is<Object>() || !field(node, "id").is<std::string>() ||
-            field(node, "id").get<std::string>() != key || !nonblank(field(node, "displayName")) ||
-            !field(node, "visible").is<bool>() || !number(field(node, "opacity"))) return false;
-        const Value& t = field(node, "transform");
-        if (!point(field(t, "position")) || !number(field(t, "rotation")) ||
-            !point(field(t, "scale")) || !point(field(t, "pivot"))) return false;
-    }
-    // The focused snapshot validator checks each parent/child link, but not
-    // whether every node is reachable or whether a child cycle exists.
-    std::set<std::string> visiting, visited;
-    auto walk = [&](auto&& self, const std::string& id) -> bool {
-        auto it = map.find(id);
-        if (it == map.end() || visiting.count(id)) return false;
-        if (visited.count(id)) return true;
-        visiting.insert(id);
-        for (const auto& child : field(it->second, "children").get<Array>()) {
-            if (!child.is<std::string>() || !self(self, child.get<std::string>())) return false;
-        }
-        visiting.erase(id);
-        visited.insert(id);
-        return true;
-    };
-    return walk(walk, root.get<std::string>()) && visited.size() == map.size();
-}
-
+// Snapshot admission is the single native Project validation path, including
+// the interchange size, encoding and JSON syntax gates.
 fl2d_status parse_project(const uint8_t* bytes, uint32_t length, Value& project) {
     fl2d_snapshot* snapshot = nullptr;
     auto status = fl2d_snapshot_load(bytes, length, &snapshot);
     if (status != FL2D_OK) return status;
     int32_t schema; double width, height; uint32_t nodes, issues;
     status = fl2d_snapshot_summary(snapshot, &schema, &width, &height, &nodes, &issues);
+    if (status != FL2D_OK) { fl2d_snapshot_destroy(snapshot); return status; }
+    for (uint32_t i = 0; i < issues; ++i) {
+        char severity[16]; uint32_t required = 0;
+        status = fl2d_snapshot_issue_string(snapshot, i, "severity", severity, sizeof(severity), &required);
+        if (status != FL2D_OK || std::strcmp(severity, "error") == 0) {
+            fl2d_snapshot_destroy(snapshot);
+            return status == FL2D_OK ? FL2D_PROJECT_INVALID : status;
+        }
+    }
     fl2d_snapshot_destroy(snapshot);
-    if (status != FL2D_OK) return status;
-    if (issues) return FL2D_PROJECT_INVALID;
     std::string source(reinterpret_cast<const char*>(bytes), length), error;
     auto end = picojson::parse(project, source.begin(), source.end(), &error);
     if (!error.empty() || end != source.end()) return FL2D_MALFORMED_JSON;
-    return session_shape(project) ? FL2D_OK : FL2D_PROJECT_INVALID;
+    return FL2D_OK;
 }
 fl2d_status validate_candidate(const Value& project) {
     const auto text = project.serialize();
     if (text.size() > FL2D_SNAPSHOT_MAX_BYTES) return FL2D_INPUT_TOO_LARGE;
     Value ignored;
     return parse_project(reinterpret_cast<const uint8_t*>(text.data()), static_cast<uint32_t>(text.size()), ignored);
+}
+fl2d_status validate_transaction_candidate(const Value& before, const Value& after) {
+    // Product JS additionally validates temporal ownership across before/after.
+    // The current native command set changes only scene node name, visibility,
+    // and transform, so it cannot alter a program owner, track, or binding.
+    // Keep this two-state seam when those command families migrate.
+    (void)before;
+    return validate_candidate(after);
 }
 fl2d_status parse_commands(const uint8_t* bytes, uint32_t length, Array& commands) {
     if (!bytes || !length) return FL2D_COMMAND_INVALID;
@@ -230,7 +213,7 @@ std::pair<Value, std::string> apply(Value& project, const Value& cmd) {
         if (name.empty()) throw Failure{FL2D_COMMAND_INVALID, "scene.empty_display_name"};
         properties["displayName"] = Value(name);
     } else if (type == "scene.set_visibility") {
-        inverse["visible"] = properties.at("visible");
+        inverse["visible"] = field(target, "visible");
         properties["visible"] = field(payload, "visible");
     } else {
         inverse["coordinateSpace"] = Value("node-local");
@@ -322,7 +305,7 @@ extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_session_node_state(const fl2d_ses
     const auto& p = field(t, "position"), &scale = field(t, "scale"), &pivot = field(t, "pivot");
     *result = {field(p, "x").get<double>(), field(p, "y").get<double>(), field(t, "rotation").get<double>(),
         field(scale, "x").get<double>(), field(scale, "y").get<double>(), field(pivot, "x").get<double>(),
-        field(pivot, "y").get<double>(), field(*n, "opacity").get<double>(), field(*n, "visible").get<bool>() ? 1 : 0};
+        field(pivot, "y").get<double>(), field(*n, "opacity").get<double>(), field(*n, "visible") == Value(true) ? 1 : 0};
     return FL2D_OK;
 }
 extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_session_project_json(const fl2d_session* session, char* buffer, uint32_t capacity, uint32_t* required) {
@@ -370,7 +353,7 @@ fl2d_status prepare(fl2d_session* session, const Array& commands, const char* la
             inverses.insert(inverses.begin(), std::move(inverse));
             if (seen.insert(id).second) affected.push_back(id);
         }
-        auto validation = validate_candidate(draft->project);
+        auto validation = validate_transaction_candidate(current.project, draft->project);
         if (validation != FL2D_OK) {
             current.error = validation == FL2D_PROJECT_INVALID ? "transaction.validation_failed" : error_name(validation);
             return validation;
