@@ -50,18 +50,46 @@ this phase. The checked conformance fixtures are generated from current JS by
 `node product/native/tests/check-temporal-conformance.mjs --write` and checked
 against JS in CI. Native and managed tests compare exact integer results.
 
-The native ABI is declared in `core/include/flamoris2d_core.h` (version 1.0).
+The native ABI is declared in `core/include/flamoris2d_core.h` (version 1.2).
 It uses C calling convention, fixed-size integers, an opaque engine handle and
 32-bit status codes. The DLL build exports its functions; native consumers import
 them through the same header. `fl2d_engine_create` transfers ownership of a handle to
 the caller; destroy it once with `fl2d_engine_destroy` (C# uses `SafeHandle`).
 Null output pointers and invalid arguments return `FL2D_INVALID_ARGUMENT`.
-No strings or allocated buffers cross the ABI. Do not reuse a pointer after
+The Phase 1 frame-rate primitive exchanges no strings or allocated buffers. Do not reuse a pointer after
 destroying it. The first primitive reduces a positive rational frame rate using
 the same safe-integer limits and GCD behavior as Product JS; it is a stable
 timebase input with existing deterministic Product tests, and introduces no
 Project state or separate history. Extending this contract requires version
 negotiation before changing existing entry points.
+
+Phase 1B (#121) adds an immutable schema-15 Project snapshot via a UTF-8 JSON
+interchange boundary. `fl2d_snapshot_load` copies at most 1 MiB of caller-owned
+bytes; the caller destroys its returned handle once. Malformed JSON, invalid
+UTF-8 and oversized data have distinct status codes. Native snapshot strings
+are copied into caller-owned buffers: query `required` (including the NUL byte),
+then provide that capacity. C# uses `SafeHandle`. The C++ representation retains
+project identity, canvas, scene node IDs/hierarchy, transform, visibility, opacity and focused validation issues;
+it records presence of unsupported mesh/rig/animation and other domain sections
+without treating those payloads as native authority. JSON is only an interchange
+format, not the native internal model. The read-only validation subset follows
+`product/src/model/validation.js` and is tested against JS-generated fixtures;
+it does not cover the full base validator. In particular, IDs inside
+`animation.clips` and `animation.deformationSamples` are not entered into the
+native duplicate-ID registry yet. Native node queries use stable `node.id`
+even when a mismatched `scene.nodes` key produces a validation issue.
+it is currently authoritative for conformance testing only. JS `EditorSession`
+remains the sole editing authority, including WPF/MCP mutations, Undo/Redo and
+save. The DLL still is not in the portable WPF package. The next migration step
+will establish native session, Command, revision and Undo/Redo semantics before
+any authority switch.
+
+The bounded JSON parser is the vendored BSD-2-Clause `picojson` header
+(upstream commit `111c9be5188f7350c2eac9ddaedd8cca3d7bf394`) under
+`core/third_party/picojson/`, with its license alongside it. Its built-in depth
+limit and the explicit size/UTF-8 gate protect the host boundary. Regenerate
+the checked project fixtures deliberately with
+`node product/native/tests/check-project-conformance.mjs --write`.
 
 `ProductHost.files.props` is the explicit native source allowlist: main Host and both
 workers, closed over their relative import graph. Build dependencies include no tests,

@@ -43,3 +43,8 @@ Chipsy is supplied FLAMORIS artwork, not covered by the code license. Its canoni
 WebP comes unchanged from the Core package; a decoded PNG cache is produced during
 candidate assembly solely for WPF display. Asset usage follows Core's assets/README.md.
 The superseded TypeScript MCP server/node/hono/zod runtime is no longer packaged.
+# picojson
+
+The native Project snapshot parser vendors `picojson` by Kazuho Oku and
+Cybozu Labs under the BSD-2-Clause license. The full license is included at
+`core/third_party/picojson/LICENSE`.
