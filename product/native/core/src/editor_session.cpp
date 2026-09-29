@@ -133,9 +133,16 @@ fl2d_status parse_project(const uint8_t* bytes, uint32_t length, Value& project)
     if (status != FL2D_OK) return status;
     int32_t schema; double width, height; uint32_t nodes, issues;
     status = fl2d_snapshot_summary(snapshot, &schema, &width, &height, &nodes, &issues);
+    if (status != FL2D_OK) { fl2d_snapshot_destroy(snapshot); return status; }
+    for (uint32_t i = 0; i < issues; ++i) {
+        char severity[16]; uint32_t required = 0;
+        status = fl2d_snapshot_issue_string(snapshot, i, "severity", severity, sizeof(severity), &required);
+        if (status != FL2D_OK || std::strcmp(severity, "error") == 0) {
+            fl2d_snapshot_destroy(snapshot);
+            return status == FL2D_OK ? FL2D_PROJECT_INVALID : status;
+        }
+    }
     fl2d_snapshot_destroy(snapshot);
-    if (status != FL2D_OK) return status;
-    if (issues) return FL2D_PROJECT_INVALID;
     std::string source(reinterpret_cast<const char*>(bytes), length), error;
     auto end = picojson::parse(project, source.begin(), source.end(), &error);
     if (!error.empty() || end != source.end()) return FL2D_MALFORMED_JSON;

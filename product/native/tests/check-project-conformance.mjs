@@ -134,6 +134,16 @@ variant("clipping_cycle", hierarchy, p => {
   p.clippingBindings.push({ id: "binding_1", targetNodeId: "part_1", sourceNodeId: "part_2", mode: "inside", enabled: true });
   p.clippingBindings.push({ id: "binding_2", targetNodeId: "part_2", sourceNodeId: "part_1", mode: "inside", enabled: true });
 });
+variant("loop_endpoint_warning", hierarchy, p => {
+  p.temporalPrograms.push({ id: "program_loop", durationTicks: 120000, events: [], regions: [],
+    tracks: [{ trackId: "track_opacity", version: 1, kind: "OpacityTrack",
+      target: { nodeId: "part_1" }, channels: { opacity: { keyframes: [
+        { id: "key_start", timeTicks: 0, value: 0.2, interpolationToNext: { kind: "linear" } },
+        { id: "key_end", timeTicks: 120000, value: 0.8, interpolationToNext: { kind: "step" } },
+      ] } } }] });
+  p.animation.clips.push({ id: "clip_loop", displayName: "Loop", temporalProgramId: "program_loop",
+    defaultLoopMode: "loop", metadata: {} });
+});
 
 const subset = new Set([
   "project.invalid", "project.unsupported_schema", "ANIMATION_INVALID_TIMEBASE", "project.missing_id",
@@ -178,6 +188,7 @@ const subset = new Set([
   "CLIPPING_BINDING_INVALID", "CLIPPING_TARGET_MISSING", "CLIPPING_TARGET_NOT_RENDERABLE",
   "CLIPPING_SOURCE_MISSING", "CLIPPING_SOURCE_NOT_RENDERABLE", "CLIPPING_SELF_REFERENCE",
   "CLIPPING_MODE_UNSUPPORTED", "CLIPPING_TARGET_ALREADY_BOUND", "CLIPPING_CYCLE",
+  "ANIMATION_LOOP_ENDPOINT_MISMATCH",
 ]);
 const fixtures = cases.map(([name, project]) => ({ name, project,
   expected: validateProject(project).filter(issue => subset.has(issue.code))

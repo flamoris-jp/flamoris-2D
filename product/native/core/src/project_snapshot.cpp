@@ -18,7 +18,7 @@ using Object = picojson::object;
 using Array = picojson::array;
 
 namespace {
-struct Issue { std::string code, path, entity; };
+struct Issue { std::string code, path, entity, severity; };
 struct Node {
     std::string id, kind, parent, name;
     bool null_parent = false, visible = false;
@@ -72,8 +72,8 @@ bool nonblank(const Value& value) {
     }
     return false;
 }
-void add(Snapshot& s, const char* code, std::string path, std::string entity = {}) {
-    s.issues.push_back({code, std::move(path), std::move(entity)});
+void add(Snapshot& s, const char* code, std::string path, std::string entity = {}, const char* severity = "error") {
+    s.issues.push_back({code, std::move(path), std::move(entity), severity});
 }
 bool contains_id(const Value& values, const Value& id) {
     if (!values.is<Array>()) return false;
@@ -253,6 +253,22 @@ const Value& find_id(const Value& values, const Value& id) {
         if (field(value, "id") == id) return value;
     return missing;
 }
+bool loop_value_equal(const Value& a, const Value& b, bool numeric) {
+    if (numeric && finite(a) && finite(b)) return std::abs(a.get<double>() - b.get<double>()) <= 1e-9;
+    if (a.is<Array>() && b.is<Array>()) {
+        if (a.get<Array>().size() != b.get<Array>().size()) return false;
+        for (size_t i = 0; i < a.get<Array>().size(); ++i)
+            if (!loop_value_equal(a.get<Array>()[i], b.get<Array>()[i], numeric)) return false;
+        return true;
+    }
+    if (a.is<Object>() && b.is<Object>()) {
+        if (a.get<Object>().size() != b.get<Object>().size()) return false;
+        for (const auto& [key, value] : a.get<Object>())
+            if (!has(b, key) || !loop_value_equal(value, field(b, key), numeric)) return false;
+        return true;
+    }
+    return a == b;
+}
 void validate_deformation_samples(Snapshot& s, const Value& project) {
     const Value& samples = field(field(project, "animation"), "deformationSamples");
     if (!samples.is<Array>()) { add(s, "collection.invalid", "animation.deformationSamples"); return; }
@@ -306,6 +322,16 @@ void validate_animation_clips(Snapshot& s, const Value& project) {
     const Value& clips = field(field(project, "animation"), "clips");
     if (!clips.is<Array>()) { add(s, "collection.invalid", "animation.clips"); return; }
     const Value& programs = field(project, "temporalPrograms");
+    std::set<std::string> looping;
+    for (const auto& clip : clips.get<Array>())
+        if (str(field(clip, "defaultLoopMode")) == "loop") looping.insert(str(field(clip, "id")));
+    const Value& sequences = field(project, "sequences");
+    if (sequences.is<Array>()) for (const auto& sequence : sequences.get<Array>()) {
+        const Value& instances = field(sequence, "clipInstances");
+        if (instances.is<Array>()) for (const auto& instance : instances.get<Array>())
+            if (str(field(instance, "loopMode")) == "loop" && field(instance, "clipId").is<std::string>())
+                looping.insert(str(field(instance, "clipId")));
+    }
     Array sorted = clips.get<Array>();
     std::stable_sort(sorted.begin(), sorted.end(), [](const Value& a, const Value& b) {
         return str(field(a, "id")) < str(field(b, "id"));
@@ -327,6 +353,40 @@ void validate_animation_clips(Snapshot& s, const Value& project) {
             add(s, "ANIMATION_CLIP_LOOP_MODE_INVALID", path + ".defaultLoopMode", id);
         if (!field(clip, "metadata").is<Object>())
             add(s, "ANIMATION_CLIP_INVALID", path + ".metadata", id);
+        const Value& program = find_id(programs, program_id);
+        const Value& duration = field(program, "durationTicks");
+        const Value& tracks = field(program, "tracks");
+        if (!looping.count(id) || !safe_integer(duration) || duration.get<double>() <= 0 || !tracks.is<Array>()) continue;
+        Array sorted_tracks = tracks.get<Array>();
+        std::stable_sort(sorted_tracks.begin(), sorted_tracks.end(), [](const Value& a, const Value& b) {
+            return str(field(a, "trackId")) < str(field(b, "trackId"));
+        });
+        for (const auto& track : sorted_tracks) {
+            const std::string kind = str(field(track, "kind"));
+            const Value& channels = field(track, "channels");
+            if (!channels.is<Object>() || (kind != "GeometryBlendTrack" && kind != "AppearanceTrack" &&
+                kind != "OpacityTrack" && kind != "PresenceTrack" && kind != "DrawOrderTrack" &&
+                kind != "ClippingTrack" && kind != "TransformTrack" && kind != "BoneTrack" &&
+                kind != "DeformerTrack" && kind != "CameraTrack" && kind != "MeshDeformationTrack")) continue;
+            for (const auto& [channel_name, channel] : channels.get<Object>()) {
+                const Value& keys = field(channel, "keyframes");
+                if (!keys.is<Array>() || keys.get<Array>().empty()) continue;
+                Array ordered = keys.get<Array>();
+                bool valid = true;
+                for (const auto& key : ordered) if (!valid_time(field(key, "timeTicks"))) valid = false;
+                if (!valid) continue;
+                std::stable_sort(ordered.begin(), ordered.end(), [](const Value& a, const Value& b) {
+                    const double at = field(a, "timeTicks").get<double>();
+                    const double bt = field(b, "timeTicks").get<double>();
+                    return at == bt ? str(field(a, "id")) < str(field(b, "id")) : at < bt;
+                });
+                const bool numeric = kind == "GeometryBlendTrack" || kind == "AppearanceTrack" ||
+                    kind == "OpacityTrack" || kind == "TransformTrack" || kind == "BoneTrack" ||
+                    kind == "DeformerTrack" || kind == "CameraTrack";
+                if (!loop_value_equal(field(ordered.front(), "value"), field(ordered.back(), "value"), numeric))
+                    add(s, "ANIMATION_LOOP_ENDPOINT_MISMATCH", path + ".temporalProgramId", id, "warning");
+            }
+        }
     }
 }
 void validate_rotation_constraints(Snapshot& s, const Value& project) {
@@ -1137,6 +1197,6 @@ extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_issue_string(const fl2d_
     if (!std::strcmp(field_name, "code")) return copy(issue.code, buffer, capacity, required);
     if (!std::strcmp(field_name, "path")) return copy(issue.path, buffer, capacity, required);
     if (!std::strcmp(field_name, "entityId")) return copy(issue.entity, buffer, capacity, required);
-    if (!std::strcmp(field_name, "severity")) return copy("error", buffer, capacity, required);
+    if (!std::strcmp(field_name, "severity")) return copy(issue.severity, buffer, capacity, required);
     return FL2D_INVALID_ARGUMENT;
 }

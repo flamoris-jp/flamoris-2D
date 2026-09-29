@@ -38,7 +38,6 @@ static void check_project_snapshots() {
         assert(schema == static_cast<int32_t>(fixture.at("project").get<picojson::object>().at("schemaVersion").get<double>()));
         std::multiset<std::string> actual, expected;
         for (uint32_t i = 0; i < issues; ++i) {
-            assert(read_string(snapshot, i, "severity") == "error");
             actual.insert(read_string(snapshot, i, "code") + "|" + read_string(snapshot, i, "path") + "|" +
                 read_string(snapshot, i, "entityId") + "|" + read_string(snapshot, i, "severity"));
         }
@@ -52,6 +51,13 @@ static void check_project_snapshots() {
             for (const auto& value : actual) fprintf(stderr, " native: %s\n", value.c_str());
             for (const auto& value : expected) fprintf(stderr, " JS:     %s\n", value.c_str());
             assert(false);
+        }
+        if (fixture.at("name").get<std::string>() == "loop_endpoint_warning") {
+            fl2d_session* session = nullptr;
+            assert(fl2d_session_create(reinterpret_cast<const uint8_t*>(json.data()),
+                static_cast<uint32_t>(json.size()), &session) == FL2D_OK);
+            assert(session);
+            fl2d_session_destroy(session);
         }
         uint32_t length = 0;
         assert(fl2d_snapshot_string(snapshot, "rootId", nullptr, 0, &length) == FL2D_BUFFER_TOO_SMALL);

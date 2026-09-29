@@ -4353,5 +4353,168 @@
         "severity": "error"
       }
     ]
+  },
+  {
+    "name": "loop_endpoint_warning",
+    "project": {
+      "schemaVersion": 15,
+      "timebaseTicksPerSecond": 120000,
+      "id": "project_あ",
+      "displayName": "夜明け",
+      "canvas": {
+        "width": 1920,
+        "height": 1080
+      },
+      "sourceAssets": [],
+      "semanticSlots": [],
+      "keyArts": [],
+      "scene": {
+        "rootId": "node_1",
+        "nodes": {
+          "node_1": {
+            "id": "node_1",
+            "kind": "group",
+            "displayName": "夜明け",
+            "sourceRef": null,
+            "parentId": null,
+            "children": [
+              "part_1"
+            ],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          },
+          "part_1": {
+            "id": "part_1",
+            "kind": "part",
+            "displayName": "前髪",
+            "sourceRef": null,
+            "parentId": "node_1",
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          }
+        }
+      },
+      "meshes": [],
+      "meshTopologies": [],
+      "meshKeyforms": [],
+      "meshFormCorrectionKeyforms": [],
+      "clippingBindings": [],
+      "rig": {
+        "deformers": [],
+        "warpControlPoints": [],
+        "warpDeformerKeyforms": [],
+        "bones": [],
+        "bonePoseKeyforms": [],
+        "rigidBoneBindings": [],
+        "skinBindings": [],
+        "boneRotationConstraints": [],
+        "twoBoneIkConstraints": [],
+        "constraints": []
+      },
+      "transitions": [],
+      "temporalPrograms": [
+        {
+          "id": "program_loop",
+          "durationTicks": 120000,
+          "events": [],
+          "regions": [],
+          "tracks": [
+            {
+              "trackId": "track_opacity",
+              "version": 1,
+              "kind": "OpacityTrack",
+              "target": {
+                "nodeId": "part_1"
+              },
+              "channels": {
+                "opacity": {
+                  "keyframes": [
+                    {
+                      "id": "key_start",
+                      "timeTicks": 0,
+                      "value": 0.2,
+                      "interpolationToNext": {
+                        "kind": "linear"
+                      }
+                    },
+                    {
+                      "id": "key_end",
+                      "timeTicks": 120000,
+                      "value": 0.8,
+                      "interpolationToNext": {
+                        "kind": "step"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "animation": {
+        "clips": [
+          {
+            "id": "clip_loop",
+            "displayName": "Loop",
+            "temporalProgramId": "program_loop",
+            "defaultLoopMode": "loop",
+            "metadata": {}
+          }
+        ],
+        "deformationSamples": []
+      },
+      "sequences": [],
+      "renderSettings": {
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "alpha": true
+      }
+    },
+    "expected": [
+      {
+        "code": "ANIMATION_LOOP_ENDPOINT_MISMATCH",
+        "path": "animation.clips.0.temporalProgramId",
+        "entityId": "clip_loop",
+        "severity": "warning"
+      }
+    ]
   }
 ]
