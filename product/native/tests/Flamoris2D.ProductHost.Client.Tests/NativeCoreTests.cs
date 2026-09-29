@@ -77,8 +77,10 @@ internal static class NativeCoreTests
                         throw new Exception($"Native node state changed: {id}");
                     if (keyedNode.Name != id)
                     {
-                        try { snapshot.NodeField(keyedNode.Name, "id"); throw new Exception("Object key resolved as stable ID."); }
-                        catch (InvalidOperationException) { }
+                        var keyResolved = true;
+                        try { snapshot.NodeField(keyedNode.Name, "id"); }
+                        catch (InvalidOperationException) { keyResolved = false; }
+                        if (keyResolved) throw new Exception("Object key resolved as stable ID.");
                     }
                 }
                 var actual = Enumerable.Range(0, checked((int)summary.IssueCount)).Select(i => snapshot.Issue((uint)i))
