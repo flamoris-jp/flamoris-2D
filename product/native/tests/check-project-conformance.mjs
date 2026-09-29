@@ -284,6 +284,19 @@ variant("cross_domain_sequence_clipping_id", populated, p => {
 variant("cross_domain_vertex_transition_id", meshed, p => {
   p.transitions[0].partTransitions[0].id = "vertex_a";
 });
+variant("topology_metadata_sequence", meshed, p => {
+  p.meshTopologies[0].vertexIds = ["vtx_1", "vtx_2", "vtx_3"];
+  p.meshTopologies[0].nextVertexSequence = 2;
+  p.meshTopologies[0].vertexMetadata = {
+    vtx_1: { semanticLabel: "left" }, vtx_2: { semanticLabel: "left" },
+    ghost: { semanticLabel: "missing" },
+  };
+});
+variant("sequence_ambiguous_keyform", meshed, p => {
+  p.meshKeyforms.push({ ...structuredClone(p.meshKeyforms[0]), id: "keyform_a2" });
+  p.sequences[0].viewLaneItems = [{ id: "hold_a", kind: "KeyArtHold", keyArtId: "art_a",
+    startTicks: 0, endTicks: 300 }];
+});
 
 const fixtures = cases.map(([name, project]) => ({ name, project,
   expected: validateProject(project)

@@ -231,6 +231,22 @@ void validate_sequences(Snapshot& s, const Value& project, Register&& register_i
                 add(s, "SEQUENCE_INVALID_TIME", item_path, str(item_id));
             if (hold && !contains_id(key_arts, field(item, "keyArtId")))
                 add(s, "SEQUENCE_KEYART_REFERENCE_INVALID", item_path + ".keyArtId", str(item_id));
+            if (hold && contains_id(key_arts, field(item, "keyArtId"))) {
+                const Value& slots = field(project, "semanticSlots");
+                const Value& keyforms = field(project, "meshKeyforms");
+                if (slots.is<Array>()) for (const auto& slot : slots.get<Array>()) {
+                    const Value& mappings = field(slot, "mappings");
+                    bool mapped = false;
+                    if (mappings.is<Array>()) for (const auto& mapping : mappings.get<Array>())
+                        if (field(mapping, "keyArtId") == field(item, "keyArtId")) mapped = true;
+                    if (!mapped || !keyforms.is<Array>()) continue;
+                    size_t matching = 0;
+                    for (const auto& keyform : keyforms.get<Array>())
+                        if (field(keyform, "keyArtId") == field(item, "keyArtId") &&
+                            field(keyform, "semanticSlotId") == field(slot, "id")) ++matching;
+                    if (matching > 1) add(s, "SEQUENCE_KEYART_BASE_AMBIGUOUS", item_path + ".keyArtId", str(item_id));
+                }
+            }
             if (instance && !contains_id(transitions, field(item, "transitionId")))
                 add(s, "SEQUENCE_TRANSITION_REFERENCE_INVALID", item_path + ".transitionId", str(item_id));
         }
@@ -536,7 +552,21 @@ void validate_transition_domain(Snapshot& s, const Value& project, Register&& re
         }
         if (!only_keys(topology, {"id", "vertexIds", "indices", "vertexMetadata", "nextVertexSequence"}))
             add(s, "MESH_TOPOLOGY_INVALID", path, id);
+        const Value& next = field(topology, "nextVertexSequence");
+        if (has(topology, "nextVertexSequence")) {
+            double maximum = 0;
+            for (const auto& vertex : vertices.get<Array>()) {
+                const std::string name = str(vertex);
+                if (name.rfind("vtx_", 0) != 0 || name.size() == 4) continue;
+                const std::string suffix = name.substr(4);
+                if (!std::all_of(suffix.begin(), suffix.end(), [](unsigned char ch) { return ch >= '0' && ch <= '9'; })) continue;
+                try { maximum = std::max(maximum, std::stod(suffix)); } catch (...) {}
+            }
+            if (!positive_time(next) || next.get<double>() <= maximum)
+                add(s, "MESH_TOPOLOGY_VERTEX_SEQUENCE_INVALID", path + ".nextVertexSequence", id);
+        }
         std::set<std::string> unique;
+        for (const auto& vertex : vertices.get<Array>()) unique.insert(vertex.serialize());
         for (size_t j = 0; j < vertices.get<Array>().size(); ++j) {
             const Value& vertex = vertices.get<Array>()[j];
             if (!nonblank(vertex)) continue;
@@ -546,11 +576,30 @@ void validate_transition_domain(Snapshot& s, const Value& project, Register&& re
                 add(s, "MESH_TOPOLOGY_DUPLICATE_VERTEX_ACROSS_TOPOLOGIES", vertex_path, vertex_id);
             else if (found == vertex_owners.end()) vertex_owners.emplace(vertex_id, std::make_pair(id, vertex_path));
             register_id(vertex, vertex_path);
-            unique.insert(vertex_id);
         }
-        if (vertices.get<Array>().size() < 3 || unique.size() != vertices.get<Array>().size()) {
-            if (vertices.get<Array>().size() < 3) add(s, "MESH_TOPOLOGY_INVALID", path + ".vertexIds", id);
+        bool blank_vertex = false;
+        for (const auto& vertex : vertices.get<Array>()) if (!nonblank(vertex)) blank_vertex = true;
+        if (vertices.get<Array>().size() < 3 || blank_vertex || unique.size() != vertices.get<Array>().size()) {
+            if (vertices.get<Array>().size() < 3 || blank_vertex) add(s, "MESH_TOPOLOGY_INVALID", path + ".vertexIds", id);
             if (unique.size() != vertices.get<Array>().size()) add(s, "MESH_TOPOLOGY_DUPLICATE_VERTEX", path + ".vertexIds", id);
+        }
+        const Value& metadata = field(topology, "vertexMetadata");
+        if (!metadata.is<picojson::null>() && !metadata.is<Object>())
+            add(s, "MESH_TOPOLOGY_VERTEX_METADATA_INVALID", path + ".vertexMetadata", id);
+        else if (metadata.is<Object>()) {
+            std::set<std::string> labels;
+            for (const auto& [vertex_id, annotation] : metadata.get<Object>()) {
+                const std::string annotation_path = path + ".vertexMetadata." + vertex_id;
+                bool exists = false;
+                for (const auto& vertex : vertices.get<Array>()) if (str(vertex) == vertex_id) exists = true;
+                if (!exists) { add(s, "MESH_TOPOLOGY_MISSING_VERTEX_REFERENCE", annotation_path, id); continue; }
+                const Value& label = field(annotation, "semanticLabel");
+                if (!annotation.is<Object>() || !only_keys(annotation, {"semanticLabel"}) || !nonblank(label)) {
+                    add(s, "MESH_TOPOLOGY_VERTEX_METADATA_INVALID", annotation_path, vertex_id); continue;
+                }
+                if (!labels.insert(str(label)).second)
+                    add(s, "MESH_TOPOLOGY_DUPLICATE_SEMANTIC_LABEL", annotation_path + ".semanticLabel", vertex_id);
+            }
         }
         if (indices.get<Array>().empty() || indices.get<Array>().size() % 3)
             add(s, "MESH_TOPOLOGY_INVALID_TRIANGLES", path + ".indices", id);
