@@ -172,69 +172,30 @@ variant("temporal_keys_events_regions", hierarchy, p => {
     regions: [{ id: "region_1", startTicks: 130000, endTicks: 10, type: "wrong", metadata: null }],
   });
 });
+variant("key_art_semantic_mapping", hierarchy, p => {
+  p.keyArts.push({ id: "art_1", displayName: "Art", rootNodeId: "part_1", members: [
+    { nodeId: "part_1", appearanceId: "appearance_1", opacity: 2, presence: "wrong",
+      drawOrder: 1, clipping: { sourceNodeId: "ghost" } },
+    { nodeId: "part_1", appearanceId: "", opacity: 1, presence: "present",
+      drawOrder: 1, clipping: { sourceNodeId: null } },
+  ] });
+  p.semanticSlots.push({ id: "slot_1", displayName: "Slot", mappings: [
+    { keyArtId: "art_1", nodeId: "part_1" },
+    { keyArtId: "art_1", nodeId: "ghost" },
+  ] });
+});
+variant("transition_parts", minimal, p => {
+  p.transitions.push({ id: "transition_1", displayName: "", fromKeyArtId: "missing",
+    toKeyArtId: "missing", temporalProgramId: "missing", diagnosticOverrides: [
+      { key: "override_1", code: "test", evidenceFingerprint: "f", semanticSlotId: "missing" },
+      { key: "override_1", code: "test", evidenceFingerprint: "f" },
+    ], partTransitions: [{ id: "part_transition_1", semanticSlotId: "missing", mode: "morph",
+      topologyId: "missing", fromKeyformId: "missing", toKeyformId: "missing",
+      configuration: { holdEndpoint: "to" } }] });
+});
 
-const subset = new Set([
-  "project.invalid", "project.unsupported_schema", "ANIMATION_INVALID_TIMEBASE", "project.missing_id",
-  "canvas.invalid_width", "canvas.invalid_height", "ANIMATION_INVALID_FRAME_RATE", "scene.missing_nodes",
-  "scene.missing_root", "scene.root_parent_not_null", "scene.root_not_group", "identity.missing",
-  "identity.duplicate", "scene.key_id_mismatch", "scene.invalid_kind", "scene.invalid_opacity",
-  "scene.invalid_children", "scene.orphan", "scene.missing_parent", "scene.missing_child",
-  "scene.parent_child_mismatch", "transform.non_finite", "transform.zero_scale", "collection.invalid",
-  "ANIMATION_SECOND_DURATION_AUTHORITY", "ANIMATION_SCHEMA_INVALID", "scene.invalid_display_name",
-  "scene.cycle", "scene.unreachable",
-  "ANIMATION_DEFORMATION_SAMPLE_INVALID", "ANIMATION_DEFORMATION_OFFSET_INVALID",
-  "ANIMATION_TRACK_TARGET_INVALID", "ANIMATION_TOPOLOGY_INCOMPATIBLE",
-  "ANIMATION_DEFORMATION_VERTEX_DUPLICATE", "ANIMATION_DEFORMATION_VERTEX_ORDER_INVALID",
-  "ANIMATION_CLIP_INVALID", "ANIMATION_CLIP_PROGRAM_REFERENCE_INVALID", "ANIMATION_CLIP_LOOP_MODE_INVALID",
-  "BONE_ROTATION_CONSTRAINT_INVALID", "BONE_ROTATION_CONSTRAINT_BONE_MISSING",
-  "BONE_ROTATION_CONSTRAINT_CONFLICT",
-  "TWO_BONE_IK_INVALID", "TWO_BONE_IK_BONES_INVALID", "TWO_BONE_IK_BONE_MISSING",
-  "TWO_BONE_IK_HIERARCHY_INVALID", "TWO_BONE_IK_CHAIN_GEOMETRY_INVALID", "TWO_BONE_IK_END_CONFLICT",
-  "RIGID_BINDING_TARGET_INVALID", "RIGID_BINDING_CONFLICT", "BONE_NODE_MISSING",
-  "MESH_FORM_CORRECTION_INVALID", "MESH_FORM_CORRECTION_TOPOLOGY_MISSING",
-  "MESH_FORM_CORRECTION_KEY_ART_MISSING", "MESH_FORM_CORRECTION_SEMANTIC_SLOT_MISSING",
-  "MESH_FORM_CORRECTION_CONTEXT_DUPLICATE", "MESH_FORM_CORRECTION_CONTEXT_INCOMPATIBLE",
-  "MESH_FORM_CORRECTION_MAPPING_INCOMPATIBLE", "MESH_FORM_CORRECTION_VERTEX_INVALID",
-  "MESH_FORM_CORRECTION_VERTEX_MISSING", "MESH_FORM_CORRECTION_VERTEX_DUPLICATE",
-  "MESH_FORM_CORRECTION_VERTEX_ORDER_INVALID", "MESH_FORM_CORRECTION_OFFSET_INVALID",
-  "MESH_FORM_CORRECTION_ZERO_OFFSET",
-  "BONE_REST_INVALID", "BONE_NODE_MISSING", "BONE_SCENE_IDENTITY_MISMATCH",
-  "BONE_PARENT_INVALID", "BONE_LENGTH_INVALID", "BONE_HIERARCHY_CYCLE",
-  "BONE_POSE_INVALID", "BONE_KEYART_REFERENCE_INVALID",
-  "DEFORMER_CHILD_REFERENCE_INVALID", "DEFORMER_PARENT_MISSING", "DEFORMER_TYPE_INVALID",
-  "DEFORMER_CONTROL_POINT_INVALID", "DEFORMER_KEYFORM_INCOMPATIBLE", "DEFORMER_CYCLE",
-  "SKIN_BINDING_TARGET_INVALID", "SKIN_BINDING_TARGET_MISSING", "SKIN_BINDING_TOPOLOGY_MISSING",
-  "SKIN_BINDING_TOPOLOGY_TARGET_MISMATCH", "SKIN_BINDING_TARGET_CONFLICT",
-  "SKIN_BINDING_VERTEX_INVALID", "SKIN_BINDING_VERTEX_MISSING", "SKIN_BINDING_VERTEX_DUPLICATE",
-  "SKIN_BINDING_VERTEX_ORDER_INVALID", "SKIN_BINDING_INFLUENCE_COUNT_INVALID",
-  "SKIN_BINDING_INFLUENCE_INVALID", "SKIN_BINDING_INFLUENCE_DUPLICATE",
-  "SKIN_BINDING_INFLUENCE_ORDER_INVALID", "SKIN_BINDING_WEIGHT_INVALID",
-  "SKIN_BINDING_WEIGHT_NOT_NORMALIZED", "SKIN_BINDING_WEIGHT_NOT_CANONICAL",
-  "SKIN_BINDING_BONE_HIERARCHY_INCOMPATIBLE",
-  "ANIMATION_INVALID_PROGRAM", "ANIMATION_INVALID_DURATION", "TEMPORAL_PROGRAM_OWNERSHIP_CONFLICT",
-  "ANIMATION_TRACK_OWNER_INVALID", "SEQUENCE_CAMERA_TRACK_MULTIPLE",
-  "CLIPPING_BINDING_INVALID", "CLIPPING_TARGET_MISSING", "CLIPPING_TARGET_NOT_RENDERABLE",
-  "CLIPPING_SOURCE_MISSING", "CLIPPING_SOURCE_NOT_RENDERABLE", "CLIPPING_SELF_REFERENCE",
-  "CLIPPING_MODE_UNSUPPORTED", "CLIPPING_TARGET_ALREADY_BOUND", "CLIPPING_CYCLE",
-  "ANIMATION_LOOP_ENDPOINT_MISMATCH",
-  "SEQUENCE_INVALID", "SEQUENCE_PROGRAM_REFERENCE_INVALID", "SEQUENCE_VIEW_ITEM_INVALID",
-  "SEQUENCE_INVALID_TIME", "SEQUENCE_KEYART_REFERENCE_INVALID", "SEQUENCE_TRANSITION_REFERENCE_INVALID",
-  "SEQUENCE_VIEW_GAP", "SEQUENCE_VIEW_OVERLAP", "SEQUENCE_VIEW_CONTINUITY_MISMATCH",
-  "SEQUENCE_TRANSITION_ENDPOINT_MISMATCH", "ANIMATION_CLIP_INSTANCE_INVALID",
-  "ANIMATION_CLIP_REFERENCE_INVALID", "ANIMATION_CLIP_INSTANCE_PLACEMENT_INVALID",
-  "ANIMATION_CLIP_SOURCE_OFFSET_INVALID", "ANIMATION_CLIP_PLAYBACK_RATE_INVALID",
-  "ANIMATION_CLIP_PLAYBACK_RATE_NONCANONICAL", "ANIMATION_CLIP_LOOP_MODE_INVALID",
-  "ANIMATION_CLIP_WEIGHT_INVALID", "ANIMATION_CLIP_LAYER_INVALID",
-  "ANIMATION_DISCRETE_WEIGHT_INVALID", "ANIMATION_CLIP_ONCE_OVERRUN",
-  "ANIMATION_CLIP_LOOP_OFFSET_INVALID", "ANIMATION_CLIP_LOCAL_TIME_OVERFLOW",
-  "ANIMATION_INVALID_TRACK", "ANIMATION_UNKNOWN_TRACK_KIND", "ANIMATION_TRACK_VERSION_UNSUPPORTED",
-  "ANIMATION_INVALID_CHANNEL", "ANIMATION_INVALID_KEYFRAME", "ANIMATION_INVALID_TIME",
-  "ANIMATION_KEY_OUTSIDE_PROGRAM", "ANIMATION_DUPLICATE_KEY_TIME", "ANIMATION_INVALID_VALUE",
-  "ANIMATION_INVALID_DRAW_ORDER", "ANIMATION_INVALID_PRESENCE_VALUE", "ANIMATION_UNKNOWN_TARGET",
-  "ANIMATION_INVALID_CURVE", "ANIMATION_INVALID_EVENT", "ANIMATION_INVALID_REGION",
-]);
 const fixtures = cases.map(([name, project]) => ({ name, project,
-  expected: validateProject(project).filter(issue => subset.has(issue.code))
+  expected: validateProject(project)
     .map(({ code, path, entityId, severity }) => ({ code, path, entityId: entityId ?? "", severity }))
     .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b), "en")),
 }));

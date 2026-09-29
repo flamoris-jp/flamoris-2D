@@ -1203,6 +1203,18 @@
         "path": "keyArts.0.id",
         "entityId": "project_あ",
         "severity": "error"
+      },
+      {
+        "code": "KEYART_INVALID",
+        "path": "keyArts.0.displayName",
+        "entityId": "project_あ",
+        "severity": "error"
+      },
+      {
+        "code": "KEYART_UNKNOWN_ROOT",
+        "path": "keyArts.0.rootNodeId",
+        "entityId": "project_あ",
+        "severity": "error"
       }
     ]
   },
@@ -2210,6 +2222,18 @@
         "path": "keyArts.0.id",
         "entityId": "part_1",
         "severity": "error"
+      },
+      {
+        "code": "KEYART_INVALID",
+        "path": "keyArts.0.displayName",
+        "entityId": "part_1",
+        "severity": "error"
+      },
+      {
+        "code": "KEYART_UNKNOWN_ROOT",
+        "path": "keyArts.0.rootNodeId",
+        "entityId": "part_1",
+        "severity": "error"
       }
     ]
   },
@@ -2454,6 +2478,12 @@
         "code": "ANIMATION_TOPOLOGY_INCOMPATIBLE",
         "path": "animation.deformationSamples.0.offsets.3.vertexId",
         "entityId": "sample_1",
+        "severity": "error"
+      },
+      {
+        "code": "MESH_TOPOLOGY_INVALID",
+        "path": "meshTopologies.0",
+        "entityId": "topo_1",
         "severity": "error"
       }
     ]
@@ -3710,6 +3740,12 @@
         "code": "BONE_NODE_MISSING",
         "path": "rig.skinBindings.0.vertexWeights.1.influences.0.boneId",
         "entityId": "skin_1",
+        "severity": "error"
+      },
+      {
+        "code": "MESH_TOPOLOGY_INVALID",
+        "path": "meshTopologies.0",
+        "entityId": "topology_1",
         "severity": "error"
       },
       {
@@ -5158,6 +5194,400 @@
         "code": "ANIMATION_UNKNOWN_TARGET",
         "path": "temporalPrograms.0.events.0.participants",
         "entityId": "ghost",
+        "severity": "error"
+      }
+    ]
+  },
+  {
+    "name": "key_art_semantic_mapping",
+    "project": {
+      "schemaVersion": 15,
+      "timebaseTicksPerSecond": 120000,
+      "id": "project_あ",
+      "displayName": "夜明け",
+      "canvas": {
+        "width": 1920,
+        "height": 1080
+      },
+      "sourceAssets": [],
+      "semanticSlots": [
+        {
+          "id": "slot_1",
+          "displayName": "Slot",
+          "mappings": [
+            {
+              "keyArtId": "art_1",
+              "nodeId": "part_1"
+            },
+            {
+              "keyArtId": "art_1",
+              "nodeId": "ghost"
+            }
+          ]
+        }
+      ],
+      "keyArts": [
+        {
+          "id": "art_1",
+          "displayName": "Art",
+          "rootNodeId": "part_1",
+          "members": [
+            {
+              "nodeId": "part_1",
+              "appearanceId": "appearance_1",
+              "opacity": 2,
+              "presence": "wrong",
+              "drawOrder": 1,
+              "clipping": {
+                "sourceNodeId": "ghost"
+              }
+            },
+            {
+              "nodeId": "part_1",
+              "appearanceId": "",
+              "opacity": 1,
+              "presence": "present",
+              "drawOrder": 1,
+              "clipping": {
+                "sourceNodeId": null
+              }
+            }
+          ]
+        }
+      ],
+      "scene": {
+        "rootId": "node_1",
+        "nodes": {
+          "node_1": {
+            "id": "node_1",
+            "kind": "group",
+            "displayName": "夜明け",
+            "sourceRef": null,
+            "parentId": null,
+            "children": [
+              "part_1"
+            ],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          },
+          "part_1": {
+            "id": "part_1",
+            "kind": "part",
+            "displayName": "前髪",
+            "sourceRef": null,
+            "parentId": "node_1",
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          }
+        }
+      },
+      "meshes": [],
+      "meshTopologies": [],
+      "meshKeyforms": [],
+      "meshFormCorrectionKeyforms": [],
+      "clippingBindings": [],
+      "rig": {
+        "deformers": [],
+        "warpControlPoints": [],
+        "warpDeformerKeyforms": [],
+        "bones": [],
+        "bonePoseKeyforms": [],
+        "rigidBoneBindings": [],
+        "skinBindings": [],
+        "boneRotationConstraints": [],
+        "twoBoneIkConstraints": [],
+        "constraints": []
+      },
+      "transitions": [],
+      "temporalPrograms": [],
+      "animation": {
+        "clips": [],
+        "deformationSamples": []
+      },
+      "sequences": [],
+      "renderSettings": {
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "alpha": true
+      }
+    },
+    "expected": [
+      {
+        "code": "KEYART_DUPLICATE_MEMBER",
+        "path": "keyArts.0.members.1.nodeId",
+        "entityId": "part_1",
+        "severity": "error"
+      },
+      {
+        "code": "KEYART_INVALID_MEMBER",
+        "path": "keyArts.0.members.0.opacity",
+        "entityId": "part_1",
+        "severity": "error"
+      },
+      {
+        "code": "KEYART_INVALID_MEMBER",
+        "path": "keyArts.0.members.0.presence",
+        "entityId": "part_1",
+        "severity": "error"
+      },
+      {
+        "code": "KEYART_INVALID_MEMBER",
+        "path": "keyArts.0.members.1.appearanceId",
+        "entityId": "part_1",
+        "severity": "error"
+      },
+      {
+        "code": "SEMANTIC_MAPPING_DUPLICATE",
+        "path": "semanticSlots.0.mappings.1",
+        "entityId": "slot_1",
+        "severity": "error"
+      },
+      {
+        "code": "SEMANTIC_MAPPING_NOT_MEMBER",
+        "path": "semanticSlots.0.mappings.1.nodeId",
+        "entityId": "ghost",
+        "severity": "error"
+      },
+      {
+        "code": "SEMANTIC_MAPPING_UNKNOWN_NODE",
+        "path": "semanticSlots.0.mappings.1.nodeId",
+        "entityId": "slot_1",
+        "severity": "error"
+      },
+      {
+        "code": "TRANSITION_CLIPPING_REFERENCE_INVALID",
+        "path": "keyArts.0.members.0.clipping.sourceNodeId",
+        "entityId": "part_1",
+        "severity": "error"
+      },
+      {
+        "code": "TRANSITION_DRAW_ORDER_CONFLICT",
+        "path": "keyArts.0.members.1.drawOrder",
+        "entityId": "art_1",
+        "severity": "error"
+      }
+    ]
+  },
+  {
+    "name": "transition_parts",
+    "project": {
+      "schemaVersion": 15,
+      "timebaseTicksPerSecond": 120000,
+      "id": "project_あ",
+      "displayName": "夜明け",
+      "canvas": {
+        "width": 1920,
+        "height": 1080
+      },
+      "sourceAssets": [],
+      "semanticSlots": [],
+      "keyArts": [],
+      "scene": {
+        "rootId": "node_1",
+        "nodes": {
+          "node_1": {
+            "id": "node_1",
+            "kind": "group",
+            "displayName": "夜明け",
+            "sourceRef": null,
+            "parentId": null,
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          }
+        }
+      },
+      "meshes": [],
+      "meshTopologies": [],
+      "meshKeyforms": [],
+      "meshFormCorrectionKeyforms": [],
+      "clippingBindings": [],
+      "rig": {
+        "deformers": [],
+        "warpControlPoints": [],
+        "warpDeformerKeyforms": [],
+        "bones": [],
+        "bonePoseKeyforms": [],
+        "rigidBoneBindings": [],
+        "skinBindings": [],
+        "boneRotationConstraints": [],
+        "twoBoneIkConstraints": [],
+        "constraints": []
+      },
+      "transitions": [
+        {
+          "id": "transition_1",
+          "displayName": "",
+          "fromKeyArtId": "missing",
+          "toKeyArtId": "missing",
+          "temporalProgramId": "missing",
+          "diagnosticOverrides": [
+            {
+              "key": "override_1",
+              "code": "test",
+              "evidenceFingerprint": "f",
+              "semanticSlotId": "missing"
+            },
+            {
+              "key": "override_1",
+              "code": "test",
+              "evidenceFingerprint": "f"
+            }
+          ],
+          "partTransitions": [
+            {
+              "id": "part_transition_1",
+              "semanticSlotId": "missing",
+              "mode": "morph",
+              "topologyId": "missing",
+              "fromKeyformId": "missing",
+              "toKeyformId": "missing",
+              "configuration": {
+                "holdEndpoint": "to"
+              }
+            }
+          ]
+        }
+      ],
+      "temporalPrograms": [],
+      "animation": {
+        "clips": [],
+        "deformationSamples": []
+      },
+      "sequences": [],
+      "renderSettings": {
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "alpha": true
+      }
+    },
+    "expected": [
+      {
+        "code": "TRANSITION_DIAGNOSTIC_OVERRIDE_INVALID",
+        "path": "transitions.0.diagnosticOverrides.0.semanticSlotId",
+        "entityId": "transition_1",
+        "severity": "error"
+      },
+      {
+        "code": "TRANSITION_DIAGNOSTIC_OVERRIDE_INVALID",
+        "path": "transitions.0.diagnosticOverrides.1.key",
+        "entityId": "transition_1",
+        "severity": "error"
+      },
+      {
+        "code": "TRANSITION_INVALID_MODE_FOR_MAPPING",
+        "path": "transitions.0.partTransitions.0.mode",
+        "entityId": "part_transition_1",
+        "severity": "error"
+      },
+      {
+        "code": "TRANSITION_INVALID_PART",
+        "path": "transitions.0.partTransitions.0.configuration.holdEndpoint",
+        "entityId": "part_transition_1",
+        "severity": "error"
+      },
+      {
+        "code": "TRANSITION_INVALID",
+        "path": "transitions.0.displayName",
+        "entityId": "transition_1",
+        "severity": "error"
+      },
+      {
+        "code": "TRANSITION_MISSING_KEYFORM",
+        "path": "transitions.0.partTransitions.0",
+        "entityId": "part_transition_1",
+        "severity": "error"
+      },
+      {
+        "code": "TRANSITION_SAME_KEYART",
+        "path": "transitions.0",
+        "entityId": "transition_1",
+        "severity": "error"
+      },
+      {
+        "code": "TRANSITION_TOPOLOGY_INCOMPATIBLE",
+        "path": "transitions.0.partTransitions.0.topologyId",
+        "entityId": "part_transition_1",
+        "severity": "error"
+      },
+      {
+        "code": "TRANSITION_UNKNOWN_KEYART",
+        "path": "transitions.0.fromKeyArtId",
+        "entityId": "transition_1",
+        "severity": "error"
+      },
+      {
+        "code": "TRANSITION_UNKNOWN_KEYART",
+        "path": "transitions.0.toKeyArtId",
+        "entityId": "transition_1",
+        "severity": "error"
+      },
+      {
+        "code": "TRANSITION_UNKNOWN_PROGRAM",
+        "path": "transitions.0.temporalProgramId",
+        "entityId": "transition_1",
+        "severity": "error"
+      },
+      {
+        "code": "TRANSITION_UNKNOWN_SLOT",
+        "path": "transitions.0.partTransitions.0.semanticSlotId",
+        "entityId": "part_transition_1",
         "severity": "error"
       }
     ]

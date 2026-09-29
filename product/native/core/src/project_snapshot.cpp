@@ -394,6 +394,261 @@ void validate_curve(Snapshot& s, const Value& value, const std::string& path,
         (!finite(y2) || y2.get<double>() < 0 || y2.get<double>() > 1)))
         add(s, "ANIMATION_INVALID_CURVE", path);
 }
+bool only_keys(const Value& value, std::initializer_list<const char*> allowed) {
+    if (!value.is<Object>()) return false;
+    for (const auto& [key, ignored] : value.get<Object>()) {
+        (void)ignored;
+        bool found = false;
+        for (const auto* name : allowed) if (key == name) found = true;
+        if (!found) return false;
+    }
+    return true;
+}
+template <typename Register>
+void validate_transition_domain(Snapshot& s, const Value& project, Register&& register_id) {
+    const Value& nodes = field(field(project, "scene"), "nodes");
+    const Value& key_arts = field(project, "keyArts");
+    const Value& slots = field(project, "semanticSlots");
+    const Value& keyforms = field(project, "meshKeyforms");
+    const Value& transitions = field(project, "transitions");
+    const Value& topologies = field(project, "meshTopologies");
+    if (!key_arts.is<Array>()) add(s, "collection.invalid", "keyArts");
+    if (!slots.is<Array>()) add(s, "collection.invalid", "semanticSlots");
+    if (!keyforms.is<Array>()) add(s, "collection.invalid", "meshKeyforms");
+    if (!transitions.is<Array>()) add(s, "collection.invalid", "transitions");
+    if (!topologies.is<Array>()) add(s, "collection.invalid", "meshTopologies");
+    if (key_arts.is<Array>()) for (size_t i = 0; i < key_arts.get<Array>().size(); ++i) {
+        const Value& art = key_arts.get<Array>()[i];
+        const std::string path = "keyArts." + std::to_string(i);
+        if (!art.is<Object>()) { add(s, "KEYART_INVALID", path); continue; }
+        const std::string id = str(field(art, "id"));
+        if (!only_keys(art, {"id", "displayName", "rootNodeId", "sourceAssetId", "members", "metadata"}))
+            add(s, "KEYART_INVALID", path, id);
+        if (!nonblank(field(art, "displayName"))) add(s, "KEYART_INVALID", path + ".displayName", id);
+        const Value& metadata = field(art, "metadata");
+        if (!metadata.is<picojson::null>() && !metadata.is<Object>())
+            add(s, "KEYART_INVALID", path + ".metadata", id);
+        const std::string root_id = str(field(art, "rootNodeId"));
+        if (!nonblank(field(art, "rootNodeId")) || !has(nodes, root_id))
+            add(s, "KEYART_UNKNOWN_ROOT", path + ".rootNodeId", id);
+        const Value& source = field(art, "sourceAssetId");
+        if (!source.is<picojson::null>() && !contains_id(field(project, "sourceAssets"), source))
+            add(s, "KEYART_UNKNOWN_SOURCE", path + ".sourceAssetId", id);
+        const Value& members = field(art, "members");
+        if (!members.is<picojson::null>() && !members.is<Array>()) {
+            add(s, "KEYART_INVALID", path + ".members", id); continue;
+        }
+        if (!members.is<Array>()) continue;
+        std::set<std::string> allowed_nodes, member_ids;
+        auto visit = [&](auto&& self, const std::string& node) -> void {
+            if (!has(nodes, node) || !allowed_nodes.insert(node).second) return;
+            const Value& children = field(field(nodes, node), "children");
+            if (children.is<Array>()) for (const auto& child : children.get<Array>()) self(self, str(child));
+        };
+        visit(visit, root_id);
+        std::map<double, std::string> draw_orders;
+        for (size_t j = 0; j < members.get<Array>().size(); ++j) {
+            const Value& member = members.get<Array>()[j];
+            const std::string member_path = path + ".members." + std::to_string(j);
+            if (!member.is<Object>() || !nonblank(field(member, "nodeId"))) {
+                add(s, "KEYART_INVALID_MEMBER", member_path, id); continue;
+            }
+            const std::string node_id = str(field(member, "nodeId"));
+            if (!only_keys(member, {"nodeId", "appearanceId", "opacity", "presence", "drawOrder", "clipping"}))
+                add(s, "KEYART_INVALID_MEMBER", member_path, node_id);
+            if (!allowed_nodes.count(node_id)) add(s, "KEYART_UNKNOWN_MEMBER", member_path + ".nodeId", node_id);
+            if (!member_ids.insert(node_id).second) add(s, "KEYART_DUPLICATE_MEMBER", member_path + ".nodeId", node_id);
+            if (!nonblank(field(member, "appearanceId"))) add(s, "KEYART_INVALID_MEMBER", member_path + ".appearanceId", node_id);
+            const Value& opacity = field(member, "opacity");
+            if (!finite(opacity) || opacity.get<double>() < 0 || opacity.get<double>() > 1)
+                add(s, "KEYART_INVALID_MEMBER", member_path + ".opacity", node_id);
+            const std::string presence = str(field(member, "presence"));
+            if (presence != "present" && presence != "occluded" && presence != "absent")
+                add(s, "KEYART_INVALID_MEMBER", member_path + ".presence", node_id);
+            const Value& order = field(member, "drawOrder");
+            if (!safe_integer(order)) add(s, "ANIMATION_INVALID_DRAW_ORDER", member_path + ".drawOrder", node_id);
+            else if (!draw_orders.emplace(order.get<double>(), node_id).second)
+                add(s, "TRANSITION_DRAW_ORDER_CONFLICT", member_path + ".drawOrder", id);
+            const Value& clipping = field(member, "clipping");
+            const Value& clipping_source = field(clipping, "sourceNodeId");
+            if (!clipping.is<Object>() || !has(clipping, "sourceNodeId") ||
+                (!clipping_source.is<picojson::null>() && !nonblank(clipping_source)))
+                add(s, "TRANSITION_CLIPPING_REFERENCE_INVALID", member_path + ".clipping", node_id);
+            else if (!clipping_source.is<picojson::null>() && !has(nodes, str(clipping_source)))
+                add(s, "TRANSITION_CLIPPING_REFERENCE_INVALID", member_path + ".clipping.sourceNodeId", node_id);
+        }
+    }
+    std::map<std::string, std::string> mapped_node_owner;
+    if (slots.is<Array>()) for (size_t i = 0; i < slots.get<Array>().size(); ++i) {
+        const Value& slot = slots.get<Array>()[i];
+        const std::string path = "semanticSlots." + std::to_string(i);
+        if (!slot.is<Object>()) { add(s, "SEMANTIC_SLOT_INVALID", path); continue; }
+        const std::string id = str(field(slot, "id"));
+        if (!only_keys(slot, {"id", "displayName", "role", "mappings", "metadata"}))
+            add(s, "SEMANTIC_SLOT_INVALID", path, id);
+        for (const char* key : {"displayName", "role"}) {
+            const Value& value = field(slot, key);
+            if (!value.is<picojson::null>() && !nonblank(value))
+                add(s, "SEMANTIC_SLOT_INVALID", path + "." + key, id);
+        }
+        const Value& metadata = field(slot, "metadata");
+        if (!metadata.is<picojson::null>() && !metadata.is<Object>())
+            add(s, "SEMANTIC_SLOT_INVALID", path + ".metadata", id);
+        const Value& mappings = field(slot, "mappings");
+        if (!mappings.is<picojson::null>() && !mappings.is<Array>()) {
+            add(s, "SEMANTIC_SLOT_INVALID", path + ".mappings", id); continue;
+        }
+        if (!mappings.is<Array>()) continue;
+        std::set<std::string> art_ids;
+        for (size_t j = 0; j < mappings.get<Array>().size(); ++j) {
+            const Value& mapping = mappings.get<Array>()[j];
+            const std::string mapping_path = path + ".mappings." + std::to_string(j);
+            const Value& art_id = field(mapping, "keyArtId"), &node_id = field(mapping, "nodeId");
+            if (!mapping.is<Object>() || !nonblank(art_id) || !nonblank(node_id)) {
+                add(s, "SEMANTIC_MAPPING_INVALID", mapping_path, id); continue;
+            }
+            if (!only_keys(mapping, {"keyArtId", "nodeId"})) add(s, "SEMANTIC_MAPPING_INVALID", mapping_path, id);
+            const Value& art = find_id(key_arts, art_id);
+            if (!art.is<Object>()) add(s, "SEMANTIC_MAPPING_UNKNOWN_KEYART", mapping_path + ".keyArtId", id);
+            if (!has(nodes, str(node_id))) add(s, "SEMANTIC_MAPPING_UNKNOWN_NODE", mapping_path + ".nodeId", id);
+            if (!art_ids.insert(str(art_id)).second) add(s, "SEMANTIC_MAPPING_DUPLICATE", mapping_path, id);
+            std::string node_key = str(art_id); node_key.push_back('\0'); node_key += str(node_id);
+            auto owner = mapped_node_owner.find(node_key);
+            if (owner != mapped_node_owner.end() && owner->second != id)
+                add(s, "SEMANTIC_MAPPING_DUPLICATE", mapping_path, str(node_id));
+            else mapped_node_owner[node_key] = id;
+            const Value& members = field(art, "members");
+            bool member = false;
+            if (members.is<Array>()) for (const auto& item : members.get<Array>())
+                if (field(item, "nodeId") == node_id) member = true;
+            if (art.is<Object>() && !member)
+                add(s, "SEMANTIC_MAPPING_NOT_MEMBER", mapping_path + ".nodeId", str(node_id));
+        }
+    }
+    std::map<std::string, std::pair<std::string, std::string>> vertex_owners;
+    if (topologies.is<Array>()) for (size_t i = 0; i < topologies.get<Array>().size(); ++i) {
+        const Value& topology = topologies.get<Array>()[i];
+        const std::string path = "meshTopologies." + std::to_string(i);
+        const Value& vertices = field(topology, "vertexIds"), &indices = field(topology, "indices");
+        const std::string id = str(field(topology, "id"));
+        if (!topology.is<Object>() || !vertices.is<Array>() || !indices.is<Array>()) {
+            add(s, "MESH_TOPOLOGY_INVALID", path, id); continue;
+        }
+        if (!only_keys(topology, {"id", "vertexIds", "indices", "vertexMetadata", "nextVertexSequence"}))
+            add(s, "MESH_TOPOLOGY_INVALID", path, id);
+        std::set<std::string> unique;
+        for (size_t j = 0; j < vertices.get<Array>().size(); ++j) {
+            const Value& vertex = vertices.get<Array>()[j];
+            if (!nonblank(vertex)) continue;
+            const std::string vertex_id = str(vertex), vertex_path = path + ".vertexIds." + std::to_string(j);
+            auto found = vertex_owners.find(vertex_id);
+            if (found != vertex_owners.end() && found->second.first != id)
+                add(s, "MESH_TOPOLOGY_DUPLICATE_VERTEX_ACROSS_TOPOLOGIES", vertex_path, vertex_id);
+            else if (found == vertex_owners.end()) vertex_owners.emplace(vertex_id, std::make_pair(id, vertex_path));
+            register_id(vertex, vertex_path);
+            unique.insert(vertex_id);
+        }
+        if (vertices.get<Array>().size() < 3 || unique.size() != vertices.get<Array>().size()) {
+            if (vertices.get<Array>().size() < 3) add(s, "MESH_TOPOLOGY_INVALID", path + ".vertexIds", id);
+            if (unique.size() != vertices.get<Array>().size()) add(s, "MESH_TOPOLOGY_DUPLICATE_VERTEX", path + ".vertexIds", id);
+        }
+        if (indices.get<Array>().empty() || indices.get<Array>().size() % 3)
+            add(s, "MESH_TOPOLOGY_INVALID_TRIANGLES", path + ".indices", id);
+    }
+    if (transitions.is<Array>()) for (size_t i = 0; i < transitions.get<Array>().size(); ++i) {
+        const Value& transition = transitions.get<Array>()[i];
+        const std::string path = "transitions." + std::to_string(i);
+        if (!transition.is<Object>()) { add(s, "TRANSITION_INVALID", path); continue; }
+        const std::string id = str(field(transition, "id"));
+        if (!only_keys(transition, {"id", "displayName", "fromKeyArtId", "toKeyArtId", "temporalProgramId",
+            "partTransitions", "diagnosticOverrides"})) add(s, "TRANSITION_INVALID", path, id);
+        if (!nonblank(field(transition, "displayName"))) add(s, "TRANSITION_INVALID", path + ".displayName", id);
+        const Value& from_id = field(transition, "fromKeyArtId"), &to_id = field(transition, "toKeyArtId");
+        if (!contains_id(key_arts, from_id)) add(s, "TRANSITION_UNKNOWN_KEYART", path + ".fromKeyArtId", id);
+        if (!contains_id(key_arts, to_id)) add(s, "TRANSITION_UNKNOWN_KEYART", path + ".toKeyArtId", id);
+        if (from_id == to_id) add(s, "TRANSITION_SAME_KEYART", path, id);
+        if (!contains_id(field(project, "temporalPrograms"), field(transition, "temporalProgramId")))
+            add(s, "TRANSITION_UNKNOWN_PROGRAM", path + ".temporalProgramId", id);
+        const Value& parts = field(transition, "partTransitions");
+        if (!parts.is<Array>()) { add(s, "TRANSITION_INVALID", path + ".partTransitions", id); continue; }
+        const Value& overrides = field(transition, "diagnosticOverrides");
+        if (!overrides.is<Array>()) add(s, "TRANSITION_INVALID", path + ".diagnosticOverrides", id);
+        else {
+            std::set<std::string> override_keys;
+            for (size_t j = 0; j < overrides.get<Array>().size(); ++j) {
+                const Value& override = overrides.get<Array>()[j];
+                const std::string override_path = path + ".diagnosticOverrides." + std::to_string(j);
+                const Value& key = field(override, "key");
+                if (!override.is<Object>() || !nonblank(key) || !nonblank(field(override, "code")) ||
+                    !nonblank(field(override, "evidenceFingerprint"))) {
+                    add(s, "TRANSITION_DIAGNOSTIC_OVERRIDE_INVALID", override_path, id); continue;
+                }
+                if (!only_keys(override, {"key", "code", "semanticSlotId", "timeTicks", "evidenceFingerprint"}))
+                    add(s, "TRANSITION_DIAGNOSTIC_OVERRIDE_INVALID", override_path, id);
+                if (!override_keys.insert(str(key)).second)
+                    add(s, "TRANSITION_DIAGNOSTIC_OVERRIDE_INVALID", override_path + ".key", id);
+                const Value& slot_id = field(override, "semanticSlotId"), &tick = field(override, "timeTicks");
+                if (!slot_id.is<picojson::null>() && !contains_id(slots, slot_id))
+                    add(s, "TRANSITION_DIAGNOSTIC_OVERRIDE_INVALID", override_path + ".semanticSlotId", id);
+                if (!tick.is<picojson::null>() && !valid_time(tick))
+                    add(s, "TRANSITION_DIAGNOSTIC_OVERRIDE_INVALID", override_path + ".timeTicks", id);
+            }
+        }
+        std::set<std::string> part_slots;
+        for (size_t j = 0; j < parts.get<Array>().size(); ++j) {
+            const Value& part = parts.get<Array>()[j];
+            const std::string part_path = path + ".partTransitions." + std::to_string(j);
+            if (!part.is<Object>() || !nonblank(field(part, "id"))) {
+                add(s, "TRANSITION_INVALID_PART", part_path, id); continue;
+            }
+            const std::string part_id = str(field(part, "id")), mode = str(field(part, "mode"));
+            if (!only_keys(part, {"id", "semanticSlotId", "mode", "topologyId", "fromKeyformId", "toKeyformId", "configuration"}))
+                add(s, "TRANSITION_INVALID_PART", part_path, part_id);
+            const Value& configuration = field(part, "configuration");
+            if (!configuration.is<Object>() || !only_keys(configuration, {"holdEndpoint", "compositeGroupId"}))
+                add(s, "TRANSITION_INVALID_PART", part_path + ".configuration", part_id);
+            if (configuration.is<Object>()) {
+                const Value& hold = field(configuration, "holdEndpoint"), &group = field(configuration, "compositeGroupId");
+                if (!hold.is<picojson::null>() && (mode != "hold" || (str(hold) != "from" && str(hold) != "to")))
+                    add(s, "TRANSITION_INVALID_PART", part_path + ".configuration.holdEndpoint", part_id);
+                if (!group.is<picojson::null>() && (mode != "replace" || !nonblank(group)))
+                    add(s, "TRANSITION_INVALID_PART", part_path + ".configuration.compositeGroupId", part_id);
+            }
+            register_id(field(part, "id"), part_path + ".id");
+            const Value& slot_id = field(part, "semanticSlotId");
+            const Value& slot = find_id(slots, slot_id);
+            if (!slot.is<Object>()) add(s, "TRANSITION_UNKNOWN_SLOT", part_path + ".semanticSlotId", part_id);
+            if (!part_slots.insert(str(slot_id)).second)
+                add(s, "TRANSITION_DUPLICATE_PART", part_path + ".semanticSlotId", part_id);
+            const std::set<std::string> modes = {"morph", "hold", "replace", "appear", "disappear", "occlusion"};
+            if (!modes.count(mode)) add(s, "TRANSITION_INVALID_MODE", part_path + ".mode", part_id);
+            bool from_mapping = false, to_mapping = false;
+            const Value& mappings = field(slot, "mappings");
+            if (mappings.is<Array>()) for (const auto& mapping : mappings.get<Array>()) {
+                if (field(mapping, "keyArtId") == from_id) from_mapping = true;
+                if (field(mapping, "keyArtId") == to_id) to_mapping = true;
+            }
+            if (((mode == "morph" || mode == "replace" || mode == "occlusion") && (!from_mapping || !to_mapping)) ||
+                (mode == "appear" && (from_mapping || !to_mapping)) ||
+                (mode == "disappear" && (!from_mapping || to_mapping)) ||
+                (mode == "hold" && !from_mapping && !to_mapping))
+                add(s, "TRANSITION_INVALID_MODE_FOR_MAPPING", part_path + ".mode", part_id);
+            if (mode == "morph") {
+                const Value& topology_id = field(part, "topologyId");
+                const Value& from_form = find_id(keyforms, field(part, "fromKeyformId"));
+                const Value& to_form = find_id(keyforms, field(part, "toKeyformId"));
+                if (!contains_id(topologies, topology_id))
+                    add(s, "TRANSITION_TOPOLOGY_INCOMPATIBLE", part_path + ".topologyId", part_id);
+                if (!from_form.is<Object>() || !to_form.is<Object>())
+                    add(s, "TRANSITION_MISSING_KEYFORM", part_path, part_id);
+                else if (field(from_form, "topologyId") != topology_id || field(to_form, "topologyId") != topology_id ||
+                    field(from_form, "keyArtId") != from_id || field(to_form, "keyArtId") != to_id ||
+                    field(from_form, "semanticSlotId") != slot_id || field(to_form, "semanticSlotId") != slot_id)
+                    add(s, "TRANSITION_TOPOLOGY_INCOMPATIBLE", part_path, part_id);
+            }
+        }
+    }
+}
 template <typename Register>
 void validate_temporal_ownership(Snapshot& s, const Value& project, Register&& register_id) {
     const Value& programs = field(project, "temporalPrograms");
@@ -1486,6 +1741,7 @@ void validate(Snapshot& s, const Value& project) {
     for (const char* name : {"rig", "animation", "temporalPrograms", "clippingBindings", "renderSettings"})
         s.unsupported_sections[name] = has(project, name);
     validate_temporal_ownership(s, project, register_id);
+    validate_transition_domain(s, project, register_id);
     validate_clipping(s, project, register_id);
     validate_animation_clips(s, project);
     validate_deformation_samples(s, project);
