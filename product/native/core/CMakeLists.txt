@@ -3,6 +3,7 @@ project(Flamoris2D.Core.Native LANGUAGES CXX)
 
 add_library(Flamoris2D.Core.Native SHARED src/flamoris2d_core.cpp)
 target_compile_features(Flamoris2D.Core.Native PRIVATE cxx_std_17)
+target_compile_definitions(Flamoris2D.Core.Native PRIVATE FL2D_CORE_BUILD)
 target_include_directories(Flamoris2D.Core.Native PUBLIC include)
 if(MSVC)
   target_compile_options(Flamoris2D.Core.Native PRIVATE /W4 /WX)
