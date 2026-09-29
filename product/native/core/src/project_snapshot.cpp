@@ -465,6 +465,142 @@ void validate_bones(Snapshot& s, const Value& project) {
             add(s, "BONE_POSE_INVALID", path + ".localDelta", id);
     }
 }
+template <class Register>
+void validate_warp(Snapshot& s, const Value& project, Register&& register_id) {
+    const Value& rig = field(project, "rig"), &nodes = field(field(project, "scene"), "nodes");
+    if (!rig.is<Object>()) { add(s, "collection.invalid", "rig"); return; }
+    const Value& deformers = field(rig, "deformers"), &points = field(rig, "warpControlPoints");
+    const Value& keyforms = field(rig, "warpDeformerKeyforms");
+    if (!deformers.is<Array>()) add(s, "collection.invalid", "rig.deformers");
+    if (!points.is<Array>()) add(s, "collection.invalid", "rig.warpControlPoints");
+    if (!keyforms.is<Array>()) add(s, "collection.invalid", "rig.warpDeformerKeyforms");
+    if (!deformers.is<Array>() || !points.is<Array>() || !keyforms.is<Array>()) return;
+    auto grid = [](const Value& value) {
+        const Value& columns = field(value, "columns"), &rows = field(value, "rows");
+        return finite(columns) && columns == rows &&
+            (columns.get<double>() == 2 || columns.get<double>() == 3 || columns.get<double>() == 4);
+    };
+    std::map<std::string, const Value*> by_deformer, by_point;
+    for (size_t i = 0; i < deformers.get<Array>().size(); ++i) {
+        const Value& item = deformers.get<Array>()[i];
+        const std::string path = "rig.deformers." + std::to_string(i);
+        const std::string id = str(field(item, "id"));
+        if (id.empty()) { add(s, "identity.missing", path + ".id"); continue; }
+        if (!by_deformer.emplace(id, &item).second) add(s, "identity.duplicate", path + ".id", id);
+        const Value& node = field(nodes, id);
+        if (str(field(node, "kind")) != "deformer") add(s, "DEFORMER_CHILD_REFERENCE_INVALID", path + ".id", id);
+        const Value& parent = field(nodes, str(field(item, "parentNodeId")));
+        if (parent.is<picojson::null>()) add(s, "DEFORMER_PARENT_MISSING", path + ".parentNodeId", id);
+        else if (!node.is<picojson::null>() && field(node, "parentId") != field(item, "parentNodeId"))
+            add(s, "DEFORMER_CHILD_REFERENCE_INVALID", path + ".parentNodeId", id);
+        if (str(field(item, "type")) != "warp") add(s, "DEFORMER_TYPE_INVALID", path + ".type", id);
+        if (!nonblank(field(item, "displayName")))
+            add(s, "DEFORMER_CONTROL_POINT_INVALID", path + ".displayName", id);
+        else if (!node.is<picojson::null>() && field(node, "displayName") != field(item, "displayName"))
+            add(s, "DEFORMER_CHILD_REFERENCE_INVALID", path + ".displayName", id);
+        if (!grid(item)) add(s, "DEFORMER_CONTROL_POINT_INVALID", path + ".columns", id);
+        const Value& bounds = field(item, "bounds");
+        const Value& left = field(bounds, "left"), &top = field(bounds, "top");
+        const Value& right = field(bounds, "right"), &bottom = field(bounds, "bottom");
+        if (!finite(left) || !finite(top) || !finite(right) || !finite(bottom) ||
+            (finite(left) && finite(right) && right.get<double>() <= left.get<double>()) ||
+            (finite(top) && finite(bottom) && bottom.get<double>() <= top.get<double>()))
+            add(s, "DEFORMER_CONTROL_POINT_INVALID", path + ".bounds", id);
+        const Value& ids = field(item, "controlPointIds");
+        std::set<std::string> unique;
+        if (ids.is<Array>()) for (const auto& point : ids.get<Array>()) unique.insert(point.serialize());
+        if (!ids.is<Array>() || !finite(field(item, "columns")) || !finite(field(item, "rows")) ||
+            ids.get<Array>().size() != field(item, "columns").get<double>() * field(item, "rows").get<double>() ||
+            unique.size() != ids.get<Array>().size())
+            add(s, "DEFORMER_CONTROL_POINT_INVALID", path + ".controlPointIds", id);
+    }
+    for (size_t i = 0; i < points.get<Array>().size(); ++i) {
+        const Value& point = points.get<Array>()[i];
+        const std::string path = "rig.warpControlPoints." + std::to_string(i);
+        const Value& point_id = field(point, "id");
+        register_id(point_id, path + ".id");
+        const std::string id = str(point_id);
+        if (id.empty()) continue;
+        if (!by_point.emplace(id, &point).second) {
+            add(s, "DEFORMER_CONTROL_POINT_INVALID", path + ".id", id); continue;
+        }
+        const Value& u = field(point, "u"), &v = field(point, "v");
+        if (!by_deformer.count(str(field(point, "deformerId"))) || !finite(u) || !finite(v) ||
+            (finite(u) && (u.get<double>() < 0 || u.get<double>() > 1)) ||
+            (finite(v) && (v.get<double>() < 0 || v.get<double>() > 1)))
+            add(s, "DEFORMER_CONTROL_POINT_INVALID", path, id);
+    }
+    for (size_t i = 0; i < deformers.get<Array>().size(); ++i) {
+        const Value& deformer = deformers.get<Array>()[i];
+        const Value& ids = field(deformer, "controlPointIds");
+        if (!ids.is<Array>() || !grid(deformer)) continue;
+        const int columns = static_cast<int>(field(deformer, "columns").get<double>());
+        const int rows = static_cast<int>(field(deformer, "rows").get<double>());
+        for (size_t j = 0; j < ids.get<Array>().size(); ++j) {
+            const auto found = by_point.find(str(ids.get<Array>()[j]));
+            const Value& entry = found == by_point.end() ? Value() : *found->second;
+            const Value& u = field(entry, "u"), &v = field(entry, "v");
+            if (found == by_point.end() || field(entry, "deformerId") != field(deformer, "id") ||
+                !finite(u) || !finite(v) || u.get<double>() != static_cast<double>(j % columns) / (columns - 1) ||
+                v.get<double>() != static_cast<double>(j / columns) / (rows - 1))
+                add(s, "DEFORMER_CONTROL_POINT_INVALID", "rig.deformers." + std::to_string(i) +
+                    ".controlPointIds." + std::to_string(j), str(field(deformer, "id")));
+        }
+    }
+    for (const auto& [id, point] : by_point) {
+        const auto owner = by_deformer.find(str(field(*point, "deformerId")));
+        if (owner != by_deformer.end()) {
+            const Value& ids = field(*owner->second, "controlPointIds");
+            bool included = false;
+            if (ids.is<Array>()) for (const auto& candidate : ids.get<Array>()) if (candidate == field(*point, "id")) included = true;
+            if (!included) add(s, "DEFORMER_CONTROL_POINT_INVALID", "rig.warpControlPoints." + id, id);
+        }
+    }
+    std::set<std::string> keys;
+    for (size_t i = 0; i < keyforms.get<Array>().size(); ++i) {
+        const Value& keyform = keyforms.get<Array>()[i];
+        const std::string path = "rig.warpDeformerKeyforms." + std::to_string(i);
+        const std::string id = str(field(keyform, "deformerId"));
+        if (!keys.insert(id + std::string(1, '\0') + str(field(keyform, "keyArtId"))).second)
+            add(s, "DEFORMER_KEYFORM_INCOMPATIBLE", path, id);
+        const auto deformer = by_deformer.find(id);
+        if (deformer == by_deformer.end() || !contains_id(field(project, "keyArts"), field(keyform, "keyArtId"))) {
+            add(s, "DEFORMER_KEYFORM_INCOMPATIBLE", path, id); continue;
+        }
+        const Value& positions = field(keyform, "controlPoints");
+        const Value& ids = field(*deformer->second, "controlPointIds");
+        std::set<std::string> position_ids;
+        if (positions.is<Array>()) for (const auto& entry : positions.get<Array>()) position_ids.insert(field(entry, "controlPointId").serialize());
+        bool invalid = !positions.is<Array>() || !ids.is<Array>() ||
+            positions.get<Array>().size() != ids.get<Array>().size() || position_ids.size() != positions.get<Array>().size();
+        if (!invalid) for (const auto& entry : positions.get<Array>()) {
+            bool found = false;
+            for (const auto& candidate : ids.get<Array>()) if (candidate == field(entry, "controlPointId")) found = true;
+            if (!found) invalid = true;
+        }
+        if (invalid) add(s, "DEFORMER_KEYFORM_INCOMPATIBLE", path + ".controlPoints", id);
+        if (positions.is<Array>()) for (size_t j = 0; j < positions.get<Array>().size(); ++j) {
+            const Value& entry = positions.get<Array>()[j];
+            if (!finite(field(entry, "x")) || !finite(field(entry, "y")))
+                add(s, "DEFORMER_CONTROL_POINT_INVALID", path + ".controlPoints." + std::to_string(j), id);
+        }
+    }
+    if (nodes.is<Object>()) for (const auto& [key, node] : nodes.get<Object>()) {
+        (void)key;
+        if (str(field(node, "kind")) == "deformer" && !by_deformer.count(str(field(node, "id"))))
+            add(s, "DEFORMER_CHILD_REFERENCE_INVALID", "scene.nodes." + str(field(node, "id")), str(field(node, "id")));
+    }
+    for (const auto& deformer : deformers.get<Array>()) {
+        std::set<std::string> seen;
+        const std::string original = str(field(deformer, "id"));
+        const Value* node = &field(nodes, original);
+        while (!str(field(*node, "parentId")).empty()) {
+            const std::string id = str(field(*node, "id"));
+            if (!seen.insert(id).second) { add(s, "DEFORMER_CYCLE", "scene.nodes." + id, original); break; }
+            node = &field(nodes, str(field(*node, "parentId")));
+        }
+    }
+}
 bool utf8(const uint8_t* data, uint32_t length) {
     for (uint32_t i = 0; i < length;) {
         uint8_t c = data[i++];
@@ -600,6 +736,7 @@ void validate(Snapshot& s, const Value& project) {
     validate_rigid_bindings(s, project, register_id);
     validate_mesh_form_corrections(s, project);
     validate_bones(s, project);
+    validate_warp(s, project, register_id);
     if (root != node_map.end()) {
         std::set<std::string> visiting, visited;
         auto walk = [&](auto&& self, const std::string& id) -> void {

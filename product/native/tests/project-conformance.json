@@ -3313,5 +3313,184 @@
         "severity": "error"
       }
     ]
+  },
+  {
+    "name": "warp_deformer",
+    "project": {
+      "schemaVersion": 15,
+      "timebaseTicksPerSecond": 120000,
+      "id": "project_あ",
+      "displayName": "夜明け",
+      "canvas": {
+        "width": 1920,
+        "height": 1080
+      },
+      "sourceAssets": [],
+      "semanticSlots": [],
+      "keyArts": [],
+      "scene": {
+        "rootId": "node_1",
+        "nodes": {
+          "node_1": {
+            "id": "node_1",
+            "kind": "group",
+            "displayName": "夜明け",
+            "sourceRef": null,
+            "parentId": null,
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          }
+        }
+      },
+      "meshes": [],
+      "meshTopologies": [],
+      "meshKeyforms": [],
+      "meshFormCorrectionKeyforms": [],
+      "clippingBindings": [],
+      "rig": {
+        "deformers": [
+          {
+            "id": "warp_1",
+            "parentNodeId": "missing",
+            "type": "wrong",
+            "displayName": "　",
+            "columns": 2,
+            "rows": 2,
+            "bounds": {
+              "left": 1,
+              "top": 1,
+              "right": 0,
+              "bottom": 0
+            },
+            "controlPointIds": [
+              "point_1",
+              "point_1"
+            ]
+          }
+        ],
+        "warpControlPoints": [
+          {
+            "id": "point_1",
+            "deformerId": "warp_1",
+            "u": 2,
+            "v": 0
+          }
+        ],
+        "warpDeformerKeyforms": [
+          {
+            "deformerId": "warp_1",
+            "keyArtId": "missing",
+            "controlPoints": [
+              {
+                "controlPointId": "point_1",
+                "x": null,
+                "y": 0
+              }
+            ]
+          }
+        ],
+        "bones": [],
+        "bonePoseKeyforms": [],
+        "rigidBoneBindings": [],
+        "skinBindings": [],
+        "boneRotationConstraints": [],
+        "twoBoneIkConstraints": [],
+        "constraints": []
+      },
+      "transitions": [],
+      "temporalPrograms": [],
+      "animation": {
+        "clips": [],
+        "deformationSamples": []
+      },
+      "sequences": [],
+      "renderSettings": {
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "alpha": true
+      }
+    },
+    "expected": [
+      {
+        "code": "DEFORMER_CHILD_REFERENCE_INVALID",
+        "path": "rig.deformers.0.id",
+        "entityId": "warp_1",
+        "severity": "error"
+      },
+      {
+        "code": "DEFORMER_CONTROL_POINT_INVALID",
+        "path": "rig.deformers.0.bounds",
+        "entityId": "warp_1",
+        "severity": "error"
+      },
+      {
+        "code": "DEFORMER_CONTROL_POINT_INVALID",
+        "path": "rig.deformers.0.controlPointIds.0",
+        "entityId": "warp_1",
+        "severity": "error"
+      },
+      {
+        "code": "DEFORMER_CONTROL_POINT_INVALID",
+        "path": "rig.deformers.0.controlPointIds.1",
+        "entityId": "warp_1",
+        "severity": "error"
+      },
+      {
+        "code": "DEFORMER_CONTROL_POINT_INVALID",
+        "path": "rig.deformers.0.controlPointIds",
+        "entityId": "warp_1",
+        "severity": "error"
+      },
+      {
+        "code": "DEFORMER_CONTROL_POINT_INVALID",
+        "path": "rig.deformers.0.displayName",
+        "entityId": "warp_1",
+        "severity": "error"
+      },
+      {
+        "code": "DEFORMER_CONTROL_POINT_INVALID",
+        "path": "rig.warpControlPoints.0",
+        "entityId": "point_1",
+        "severity": "error"
+      },
+      {
+        "code": "DEFORMER_KEYFORM_INCOMPATIBLE",
+        "path": "rig.warpDeformerKeyforms.0",
+        "entityId": "warp_1",
+        "severity": "error"
+      },
+      {
+        "code": "DEFORMER_PARENT_MISSING",
+        "path": "rig.deformers.0.parentNodeId",
+        "entityId": "warp_1",
+        "severity": "error"
+      },
+      {
+        "code": "DEFORMER_TYPE_INVALID",
+        "path": "rig.deformers.0.type",
+        "entityId": "warp_1",
+        "severity": "error"
+      }
+    ]
   }
 ]

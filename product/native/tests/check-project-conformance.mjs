@@ -90,6 +90,14 @@ variant("bone_and_pose", minimal, p => {
   p.rig.bonePoseKeyforms.push({ boneId: "bone_1", keyArtId: "missing",
     localDelta: { x: 0, y: 0, rotation: null } });
 });
+variant("warp_deformer", minimal, p => {
+  p.rig.deformers.push({ id: "warp_1", parentNodeId: "missing", type: "wrong",
+    displayName: "\u3000", columns: 2, rows: 2, bounds: { left: 1, top: 1, right: 0, bottom: 0 },
+    controlPointIds: ["point_1", "point_1"] });
+  p.rig.warpControlPoints.push({ id: "point_1", deformerId: "warp_1", u: 2, v: 0 });
+  p.rig.warpDeformerKeyforms.push({ deformerId: "warp_1", keyArtId: "missing",
+    controlPoints: [{ controlPointId: "point_1", x: null, y: 0 }] });
+});
 
 const subset = new Set([
   "project.invalid", "project.unsupported_schema", "ANIMATION_INVALID_TIMEBASE", "project.missing_id",
@@ -119,6 +127,8 @@ const subset = new Set([
   "BONE_REST_INVALID", "BONE_NODE_MISSING", "BONE_SCENE_IDENTITY_MISMATCH",
   "BONE_PARENT_INVALID", "BONE_LENGTH_INVALID", "BONE_HIERARCHY_CYCLE",
   "BONE_POSE_INVALID", "BONE_KEYART_REFERENCE_INVALID",
+  "DEFORMER_CHILD_REFERENCE_INVALID", "DEFORMER_PARENT_MISSING", "DEFORMER_TYPE_INVALID",
+  "DEFORMER_CONTROL_POINT_INVALID", "DEFORMER_KEYFORM_INCOMPATIBLE", "DEFORMER_CYCLE",
 ]);
 const fixtures = cases.map(([name, project]) => ({ name, project,
   expected: validateProject(project).filter(issue => subset.has(issue.code))
