@@ -52,7 +52,9 @@ jobs:
         run: node --test product/tests/product-host.test.js product/tests/native-mesh-host.test.js product/tests/native-document-host.test.js product/tests/native-source-host.test.js product/tests/native-render-projection.test.js product/tests/native-rig-host.test.js product/tests/native-timeline-host.test.js product/tests/native-export-host.test.js product/tests/native-key-state-host.test.js product/tests/native-live-mcp.test.js product/tests/production-manifest.test.js
 
       - name: Verify native conformance fixtures against Product JS
-        run: node product/native/tests/check-temporal-conformance.mjs
+        run: |
+          node product/native/tests/check-temporal-conformance.mjs
+          node product/native/tests/check-project-conformance.mjs
 
       - name: Build native solution
         run: dotnet build product/native/Flamoris2D.Native.sln -c Release
