@@ -56,7 +56,7 @@ It uses C calling convention, fixed-size integers, an opaque engine handle and
 them through the same header. `fl2d_engine_create` transfers ownership of a handle to
 the caller; destroy it once with `fl2d_engine_destroy` (C# uses `SafeHandle`).
 Null output pointers and invalid arguments return `FL2D_INVALID_ARGUMENT`.
-No strings or allocated buffers cross the ABI. Do not reuse a pointer after
+The Phase 1 frame-rate primitive exchanges no strings or allocated buffers. Do not reuse a pointer after
 destroying it. The first primitive reduces a positive rational frame rate using
 the same safe-integer limits and GCD behavior as Product JS; it is a stable
 timebase input with existing deterministic Product tests, and introduces no
@@ -80,7 +80,8 @@ save. The DLL still is not in the portable WPF package. The next migration step
 will establish native session, Command, revision and Undo/Redo semantics before
 any authority switch.
 
-The bounded JSON parser is the vendored BSD-2-Clause `picojson` header under
+The bounded JSON parser is the vendored BSD-2-Clause `picojson` header
+(upstream commit `111c9be5188f7350c2eac9ddaedd8cca3d7bf394`) under
 `core/third_party/picojson/`, with its license alongside it. Its built-in depth
 limit and the explicit size/UTF-8 gate protect the host boundary. Regenerate
 the checked project fixtures deliberately with
