@@ -26,7 +26,9 @@ struct Node {
     std::vector<std::string> children;
     fl2d_node_state state{};
 };
+using ObjectOrder = std::map<const Object*, std::vector<std::string>>;
 struct Snapshot {
+    ObjectOrder object_order;
     int32_t schema = 0;
     double width = 0, height = 0;
     std::string id, name, root;
@@ -35,6 +37,54 @@ struct Snapshot {
     // Presence is retained explicitly; these payloads are not interpreted yet.
     std::map<std::string, bool> unsupported_sections;
 };
+
+// Preserve JSON property insertion order for Object.entries-based duplicate
+// registration. picojson's value remains unchanged; metadata lives only during
+// validation. Numeric property names use ECMAScript's array-index order.
+class OrderedParseContext : public picojson::default_parse_context {
+    ObjectOrder& order_;
+public:
+    OrderedParseContext(Value* out, ObjectOrder& order, size_t depths = picojson::DEFAULT_MAX_DEPTHS)
+        : picojson::default_parse_context(out, depths), order_(order) {}
+    bool parse_object_start() {
+        if (!picojson::default_parse_context::parse_object_start()) return false;
+        --depths_;
+        order_[&out_->get<Object>()].clear();
+        return true;
+    }
+    template <typename Iter> bool parse_object_item(picojson::input<Iter>& in, const std::string& key) {
+        auto& object = out_->get<Object>();
+        if (!object.count(key)) order_[&object].push_back(key);
+        OrderedParseContext child(&object[key], order_, depths_);
+        return picojson::_parse(child, in);
+    }
+    template <typename Iter> bool parse_array_item(picojson::input<Iter>& in, size_t) {
+        auto& array = out_->get<Array>();
+        array.emplace_back();
+        OrderedParseContext child(&array.back(), order_, depths_);
+        return picojson::_parse(child, in);
+    }
+};
+std::vector<std::pair<std::string, const Value&>> ordered_object(const Snapshot& snapshot, const Value& value) {
+    std::vector<std::pair<std::string, const Value&>> result;
+    if (!value.is<Object>()) return result;
+    const auto& object = value.get<Object>();
+    auto found = snapshot.object_order.find(&object);
+    if (found == snapshot.object_order.end()) {
+        for (const auto& [key, item] : object) result.emplace_back(key, item);
+        return result;
+    }
+    auto keys = found->second;
+    auto index = [](const std::string& key) -> uint64_t {
+        if (key.empty() || (key.size() > 1 && key.front() == '0') || key.size() > 10) return UINT64_MAX;
+        uint64_t number = 0;
+        for (unsigned char ch : key) { if (ch < '0' || ch > '9') return UINT64_MAX; number = number * 10 + ch - '0'; }
+        return number < UINT32_MAX ? number : UINT64_MAX;
+    };
+    std::stable_sort(keys.begin(), keys.end(), [&](const std::string& a, const std::string& b) { return index(a) < index(b); });
+    for (const auto& key : keys) result.emplace_back(key, object.at(key));
+    return result;
+}
 
 const Value& field(const Value& value, const std::string& key) {
     static const Value missing;
@@ -48,6 +98,32 @@ bool has(const Value& value, const std::string& key) {
 }
 std::string str(const Value& value) { return value.is<std::string>() ? value.get<std::string>() : ""; }
 bool finite(const Value& value) { return value.is<double>() && std::isfinite(value.get<double>()); }
+bool js_truthy(const Value& value) {
+    if (value.is<picojson::null>()) return false;
+    if (value.is<bool>()) return value.get<bool>();
+    if (value.is<double>()) return value.get<double>() != 0 && !std::isnan(value.get<double>());
+    if (value.is<std::string>()) return !value.get<std::string>().empty();
+    return true;
+}
+double js_number(const Value& value) {
+    if (value.is<picojson::null>()) return 0;
+    if (value.is<double>()) return value.get<double>();
+    if (value.is<bool>()) return value.get<bool>() ? 1 : 0;
+    if (value.is<Array>()) {
+        if (value.get<Array>().empty()) return 0;
+        if (value.get<Array>().size() == 1) return js_number(value.get<Array>().front());
+    }
+    if (value.is<std::string>()) {
+        const auto& text = value.get<std::string>();
+        if (text.find_first_not_of(" \t\r\n") == std::string::npos) return 0;
+        try {
+            size_t used = 0;
+            const double number = std::stod(text, &used);
+            if (text.find_first_not_of(" \t\r\n", used) == std::string::npos) return number;
+        } catch (...) {}
+    }
+    return std::numeric_limits<double>::quiet_NaN();
+}
 bool exact(const Value& value, std::initializer_list<const char*> names) {
     if (!value.is<Object>() || value.get<Object>().size() != names.size()) return false;
     for (const auto name : names) if (!has(value, name)) return false;
@@ -242,7 +318,7 @@ bool endpoint_selection_signature(const Value& project, const Value& item, bool 
                         if (field(transform, component).is<picojson::null>()) return false;
                     node_id = str(field(node, "parentId"));
                 }
-                if (str(field(*member, "presence")) == "present" && !requested.is<picojson::null>() && !str(requested).empty()) {
+                if (str(field(*member, "presence")) == "present" && js_truthy(requested)) {
                     const Value& topology = find_id(field(project, "meshTopologies"), field(keyform, "topologyId"));
                     if (!keyform.is<Object>() || !field(keyform, "positions").is<Array>() ||
                         !field(keyform, "uvs").is<Array>() || !field(topology, "indices").is<Array>()) return false;
@@ -328,24 +404,24 @@ void validate_sequences(Snapshot& s, const Value& project, Register&& register_i
         if (!finite(field(items.front(), "startTicks")) || ticks(items.front(), "startTicks") != 0)
             add(s, "SEQUENCE_VIEW_GAP", path + ".viewLaneItems", id);
         auto endpoint = [&](const Value& item, bool ending) {
-            if (str(field(item, "kind")) == "KeyArtHold") return str(field(item, "keyArtId"));
+            if (str(field(item, "kind")) == "KeyArtHold") return field(item, "keyArtId");
             const Value& transition = find_id(transitions, field(item, "transitionId"));
-            return str(field(transition, ending ? "toKeyArtId" : "fromKeyArtId"));
+            return field(transition, ending ? "toKeyArtId" : "fromKeyArtId");
         };
         for (size_t j = 1; j < items.size(); ++j) {
             const Value& previous = items[j - 1], &current = items[j];
             if (!previous.is<Object>() || !current.is<Object>()) continue;
-            if (ticks(previous, "endTicks") < ticks(current, "startTicks"))
+            if (js_number(field(previous, "endTicks")) < js_number(field(current, "startTicks")))
                 add(s, "SEQUENCE_VIEW_GAP", path + ".viewLaneItems", id);
-            else if (ticks(previous, "endTicks") > ticks(current, "startTicks"))
+            else if (js_number(field(previous, "endTicks")) > js_number(field(current, "startTicks")))
                 add(s, "SEQUENCE_VIEW_OVERLAP", path + ".viewLaneItems", id);
-            const std::string outgoing = endpoint(previous, true), incoming = endpoint(current, false);
-            if (!outgoing.empty() && !incoming.empty() && outgoing != incoming)
+            const Value outgoing = endpoint(previous, true), incoming = endpoint(current, false);
+            if (js_truthy(outgoing) && js_truthy(incoming) && outgoing != incoming)
                 add(s, (str(field(previous, "kind")) == "TransitionInstance" ||
                     str(field(current, "kind")) == "TransitionInstance") ?
                     "SEQUENCE_TRANSITION_ENDPOINT_MISMATCH" : "SEQUENCE_VIEW_CONTINUITY_MISMATCH",
                     path + ".viewLaneItems", id);
-            else if (!outgoing.empty() && !incoming.empty()) {
+            else if (js_truthy(outgoing) && js_truthy(incoming)) {
                 Value left, right;
                 if (endpoint_selection_signature(project, previous, true, left) &&
                     endpoint_selection_signature(project, current, false, right) && left != right)
@@ -353,9 +429,9 @@ void validate_sequences(Snapshot& s, const Value& project, Register&& register_i
             }
         }
         const Value& duration = field(program, "durationTicks");
-        if (finite(duration) && ticks(items.back(), "endTicks") < duration.get<double>())
+        if (finite(duration) && js_number(field(items.back(), "endTicks")) < duration.get<double>())
             add(s, "SEQUENCE_VIEW_GAP", path + ".viewLaneItems", id);
-        else if (finite(duration) && ticks(items.back(), "endTicks") > duration.get<double>())
+        else if (finite(duration) && js_number(field(items.back(), "endTicks")) > duration.get<double>())
             add(s, "SEQUENCE_VIEW_OVERLAP", path + ".viewLaneItems", id);
     }
 }
@@ -663,11 +739,11 @@ void validate_transition_domain(Snapshot& s, const Value& project, Register&& re
             if (unique.size() != vertices.get<Array>().size()) add(s, "MESH_TOPOLOGY_DUPLICATE_VERTEX", path + ".vertexIds", id);
         }
         const Value& metadata = field(topology, "vertexMetadata");
-        if (!metadata.is<picojson::null>() && !metadata.is<Object>())
+        if (js_truthy(metadata) && !metadata.is<Object>())
             add(s, "MESH_TOPOLOGY_VERTEX_METADATA_INVALID", path + ".vertexMetadata", id);
         else if (metadata.is<Object>()) {
             std::set<std::string> labels;
-            for (const auto& [vertex_id, annotation] : metadata.get<Object>()) {
+            for (const auto& [vertex_id, annotation] : ordered_object(s, metadata)) {
                 const std::string annotation_path = path + ".vertexMetadata." + vertex_id;
                 bool exists = false;
                 for (const auto& vertex : vertices.get<Array>()) if (str(vertex) == vertex_id) exists = true;
@@ -683,7 +759,7 @@ void validate_transition_domain(Snapshot& s, const Value& project, Register&& re
         if (indices.get<Array>().empty() || indices.get<Array>().size() % 3)
             add(s, "MESH_TOPOLOGY_INVALID_TRIANGLES", path + ".indices", id);
         for (size_t offset = 0; offset < indices.get<Array>().size(); offset += 3) {
-            bool references_valid = offset + 2 < indices.get<Array>().size();
+            bool references_valid = true;
             std::set<double> triangle;
             for (size_t j = offset; j < indices.get<Array>().size() && j < offset + 3; ++j) {
                 const Value& vertex = indices.get<Array>()[j];
@@ -715,7 +791,9 @@ void validate_transition_domain(Snapshot& s, const Value& project, Register&& re
             const std::string field_path = path + "." + name;
             if (!valid) add(s, std::strcmp(name, "positions") == 0 ? "MESH_KEYFORM_POSITIONS_INVALID" :
                 "MESH_KEYFORM_UVS_INVALID", field_path, id);
-            else if (topology.is<Object>() && vertices.is<Array>() && coordinates.get<Array>().size() != expected)
+            else if (topology.is<Object>() && (!vertices.is<Array>() ?
+                (!vertices.is<std::string>() || coordinates.get<Array>().size() != vertices.get<std::string>().size() * 2) :
+                coordinates.get<Array>().size() != expected))
                 add(s, std::strcmp(name, "positions") == 0 ? "MESH_KEYFORM_POSITION_COUNT_MISMATCH" :
                     "MESH_KEYFORM_UV_COUNT_MISMATCH", field_path, id);
         }
@@ -975,6 +1053,22 @@ const Value& clipping_member(const Value& project, const Value& art, const Value
     }
     return missing;
 }
+bool clipping_state_evaluable(const Value& project, const Value& state, const Value& keyform_id) {
+    if (!state.is<Object>()) return true;
+    const Value& nodes = field(field(project, "scene"), "nodes");
+    std::string node_id = str(field(state, "nodeId"));
+    std::set<std::string> visited;
+    while (!node_id.empty()) {
+        if (!has(nodes, node_id) || !visited.insert(node_id).second) return false;
+        const Value& node = field(nodes, node_id), &transform = field(node, "transform");
+        for (const char* component : {"position", "pivot", "scale"}) if (field(transform, component).is<picojson::null>()) return false;
+        node_id = str(field(node, "parentId"));
+    }
+    if (!js_truthy(keyform_id)) return true;
+    const Value& form = find_id(field(project, "meshKeyforms"), keyform_id);
+    const Value& topology = find_id(field(project, "meshTopologies"), field(form, "topologyId"));
+    return form.is<Object>() && field(form, "positions").is<Array>() && field(form, "uvs").is<Array>() && field(topology, "indices").is<Array>();
+}
 struct ClippingInstance { std::string id, slot, node, source; };
 std::vector<ClippingInstance> transition_clipping_instances(const Value& project, const Value& transition,
     const Value& program, double ticks) {
@@ -1008,10 +1102,15 @@ std::vector<ClippingInstance> transition_clipping_instances(const Value& project
         };
         if (ticks == 0 || ticks == duration) {
             const Value& state = ticks == 0 ? from : to;
-            if (str(field(state, "presence")) == "present") emit(state, ticks == 0 ? "from" : "to", true);
+            if (str(field(state, "presence")) == "present") {
+                if (!clipping_state_evaluable(project, state, part ? field(*part, ticks == 0 ? "fromKeyformId" : "toKeyformId") : Value())) return {};
+                emit(state, ticks == 0 ? "from" : "to", true);
+            }
             continue;
         }
         if (!part) continue;
+        if (!clipping_state_evaluable(project, from, field(*part, "fromKeyformId")) ||
+            !clipping_state_evaluable(project, to, field(*part, "toKeyformId"))) return {};
         const std::string mode = str(field(*part, "mode"));
         if (mode == "morph") {
             if (!from.is<Object>() || !to.is<Object>()) return {};
@@ -1283,7 +1382,7 @@ void validate_temporal_ownership(Snapshot& s, const Value& project, Register&& r
             const Value& channels = field(track, "channels");
             if (!channels.is<Object>() || channels.get<Object>().empty())
                 add(s, "ANIMATION_INVALID_CHANNEL", track_path + ".channels", str(track_id));
-            else for (const auto& [channel_name, channel] : channels.get<Object>()) {
+            else for (const auto& [channel_name, channel] : ordered_object(s, channels)) {
                 const std::string channel_path = track_path + ".channels." + channel_name;
                 if (!definition.channels.count(channel_name)) {
                     add(s, "ANIMATION_INVALID_CHANNEL", channel_path, str(track_id)); continue;
@@ -1638,7 +1737,7 @@ void validate_animation_clips(Snapshot& s, const Value& project) {
                 kind != "OpacityTrack" && kind != "PresenceTrack" && kind != "DrawOrderTrack" &&
                 kind != "ClippingTrack" && kind != "TransformTrack" && kind != "BoneTrack" &&
                 kind != "DeformerTrack" && kind != "CameraTrack" && kind != "MeshDeformationTrack")) continue;
-            for (const auto& [channel_name, channel] : channels.get<Object>()) {
+            for (const auto& [channel_name, channel] : ordered_object(s, channels)) {
                 const Value& keys = field(channel, "keyframes");
                 if (!keys.is<Array>() || keys.get<Array>().empty()) continue;
                 Array ordered = keys.get<Array>();
@@ -2293,11 +2392,12 @@ void validate(Snapshot& s, const Value& project) {
     std::map<std::string, std::string> ids;
     auto register_id = [&](const Value& id, const std::string& path) {
         std::string text = str(id);
-        if (text.empty()) add(s, "identity.missing", path);
-        else if (!ids.emplace(text, path).second) add(s, "identity.duplicate", path, text);
+        if (!js_truthy(id)) add(s, "identity.missing", path);
+        else if (id.is<Object>() || id.is<Array>()) return; // JSON object identities are distinct JS Map keys.
+        else if (!ids.emplace(id.serialize(), path).second) add(s, "identity.duplicate", path, text);
     };
     register_id(field(project, "id"), "id");
-    for (const auto& [key, value] : node_map) {
+    for (const auto& [key, value] : ordered_object(s, nodes)) {
         const std::string path = "scene.nodes." + key;
         const Value& id = field(value, "id");
         register_id(id, path + ".id");
@@ -2415,12 +2515,15 @@ extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_load(const uint8_t* byte
         Value parsed;
         std::string json(reinterpret_cast<const char*>(bytes), length);
         std::string error;
-        auto end = picojson::parse(parsed, json.begin(), json.end(), &error);
+        ObjectOrder order;
+        OrderedParseContext context(&parsed, order);
+        auto end = picojson::_parse(context, json.begin(), json.end(), &error);
         if (!error.empty() || (end != json.end() &&
             json.find_first_not_of(" \t\r\n", static_cast<size_t>(end - json.begin())) != std::string::npos))
             return FL2D_MALFORMED_JSON;
         auto snapshot = new fl2d_snapshot();
-        try { validate(*snapshot, parsed); } catch (...) { delete snapshot; throw; }
+        snapshot->object_order = std::move(order);
+        try { validate(*snapshot, parsed); snapshot->object_order.clear(); } catch (...) { delete snapshot; throw; }
         *result = snapshot;
         return FL2D_OK;
     } catch (const std::bad_alloc&) { return FL2D_OUT_OF_MEMORY; }

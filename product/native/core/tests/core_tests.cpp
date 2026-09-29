@@ -29,7 +29,7 @@ static void check_project_snapshots() {
     assert(picojson::parse(fixtures, stream).empty());
     for (const auto& entry : fixtures.get<picojson::array>()) {
         const auto& fixture = entry.get<picojson::object>();
-        const std::string json = fixture.at("project").serialize();
+        const std::string json = fixture.at("projectJson").get<std::string>();
         fl2d_snapshot* snapshot = nullptr;
         assert(fl2d_snapshot_load(reinterpret_cast<const uint8_t*>(json.data()), static_cast<uint32_t>(json.size()), &snapshot) == FL2D_OK);
         assert(snapshot);
@@ -52,20 +52,17 @@ static void check_project_snapshots() {
             for (const auto& value : expected) fprintf(stderr, " JS:     %s\n", value.c_str());
             assert(false);
         }
-        if (fixture.at("name").get<std::string>() == "loop_endpoint_warning") {
-            fl2d_session* session = nullptr;
-            assert(fl2d_session_create(reinterpret_cast<const uint8_t*>(json.data()),
-                static_cast<uint32_t>(json.size()), &session) == FL2D_OK);
-            assert(session);
-            fl2d_session_destroy(session);
-        }
-        if (fixture.at("name").get<std::string>() == "temporal_keys_events_regions" ||
-            fixture.at("name").get<std::string>() == "populated_sequence_multi_error") {
-            fl2d_session* session = nullptr;
-            assert(fl2d_session_create(reinterpret_cast<const uint8_t*>(json.data()),
-                static_cast<uint32_t>(json.size()), &session) == FL2D_PROJECT_INVALID);
-            assert(!session);
-        }
+        // Every fixture exercises the shared session admission path, including
+        // valid populated rigs and warning-only Projects, not just snapshots.
+        bool errors = false;
+        for (const auto& issue : fixture.at("expected").get<picojson::array>())
+            if (issue.get<picojson::object>().at("severity").get<std::string>() == "error") errors = true;
+        fl2d_session* admitted = nullptr;
+        const auto admission = fl2d_session_create(reinterpret_cast<const uint8_t*>(json.data()),
+            static_cast<uint32_t>(json.size()), &admitted);
+        assert(admission == (errors ? FL2D_PROJECT_INVALID : FL2D_OK));
+        assert(errors ? admitted == nullptr : admitted != nullptr);
+        fl2d_session_destroy(admitted);
         uint32_t length = 0;
         assert(fl2d_snapshot_string(snapshot, "rootId", nullptr, 0, &length) == FL2D_BUFFER_TOO_SMALL);
         std::string root(length, '\0');
@@ -196,8 +193,7 @@ static void check_session() {
             state.history_depth == static_cast<uint32_t>(n("historyDepth")) &&
             state.dirty == static_cast<uint32_t>(expectation.at("dirty").get<bool>()));
     }
-    // The legacy snapshot validator omits display-name and reachability checks;
-    // session admission must reject both before commands can touch the graph.
+    // Shared validation rejects malformed names and disconnected graphs before mutation.
     {
         auto invalid = root.at("initial");
         auto& nodes = invalid.get<picojson::object>().at("scene").get<picojson::object>().at("nodes").get<picojson::object>();
@@ -252,6 +248,29 @@ static void check_session() {
         fl2d_session* rejected = reinterpret_cast<fl2d_session*>(1);
         assert(fl2d_session_create(reinterpret_cast<const uint8_t*>(text.data()),
             static_cast<uint32_t>(text.size()), &rejected) == FL2D_PROJECT_INVALID && rejected == nullptr);
+    }
+    // Failed full-domain replacement must preserve a populated history and
+    // revision state for every JS-rejected Project in the conformance corpus.
+    std::ifstream project_stream(FL2D_PROJECT_FIXTURES);
+    picojson::value projects;
+    assert(picojson::parse(projects, project_stream).empty());
+    for (const auto& fixture : projects.get<picojson::array>()) {
+        const auto& test = fixture.get<picojson::object>();
+        bool errors = false;
+        for (const auto& issue : test.at("expected").get<picojson::array>())
+            if (issue.get<picojson::object>().at("severity").get<std::string>() == "error") errors = true;
+        if (!errors) continue;
+        const auto project = session_text(session), history = session_text(session, true);
+        fl2d_session_state before{}, after{};
+        assert(fl2d_session_state_get(session, &before) == FL2D_OK);
+        const auto input = test.at("projectJson").get<std::string>();
+        assert(fl2d_session_replace(session, reinterpret_cast<const uint8_t*>(input.data()),
+            static_cast<uint32_t>(input.size()), 0) == FL2D_PROJECT_INVALID);
+        assert(fl2d_session_state_get(session, &after) == FL2D_OK);
+        assert(project == session_text(session) && history == session_text(session, true));
+        assert(before.revision_counter == after.revision_counter && before.current_revision == after.current_revision &&
+            before.saved_revision == after.saved_revision && before.undo_depth == after.undo_depth &&
+            before.redo_depth == after.redo_depth && before.history_depth == after.history_depth && before.dirty == after.dirty);
     }
     for (auto& [key, p] : prepared) { (void)key; fl2d_prepared_destroy(p); }
     fl2d_session_destroy(session);

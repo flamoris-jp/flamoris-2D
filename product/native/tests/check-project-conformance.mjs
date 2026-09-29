@@ -429,7 +429,50 @@ variant("sequence_endpoint_equal_geometry_different_selection", meshed, p => {
   ];
 });
 
-const fixtures = cases.map(([name, project]) => ({ name, project,
+for (const value of [null, false, 0, ""]) {
+  variant("topology_falsy_metadata_" + JSON.stringify(value), meshed, p => { p.meshTopologies[0].vertexMetadata = value; });
+}
+for (const value of [-1, {}, false, "bad"]) {
+  variant("topology_malformed_vertices_" + JSON.stringify(value), meshed, p => { p.meshTopologies[0].vertexIds = value; });
+}
+variant("topology_incomplete_triangle", meshed, p => { p.meshTopologies[0].indices = [0, 1]; });
+for (const value of [-1, [], {}]) {
+  variant("base_truthy_identity_" + JSON.stringify(value), populated, p => { p.keyArts[0].id = value; });
+  variant("sequence_malformed_endpoint_keyart_" + JSON.stringify(value), populated, p => { p.transitions[0].fromKeyArtId = value; });
+  variant("sequence_malformed_endpoint_keyform_" + JSON.stringify(value), meshed, p => { p.transitions[0].partTransitions[0].fromKeyformId = value; });
+}
+for (const value of ["bad", {}, [], null]) {
+  variant("sequence_nonnumeric_end_" + JSON.stringify(value), populated, p => { p.sequences[0].viewLaneItems[1].endTicks = value; });
+}
+
+variant("scene_duplicate_id_insertion_order", hierarchy, p => {
+  p.scene.nodes.part_0 = { ...structuredClone(p.scene.nodes.part_1), id: "same" };
+  p.scene.nodes.part_1.id = "same";
+  p.scene.nodes[p.scene.rootId].children.push("part_0");
+});
+variant("temporal_duplicate_id_channel_order", populated, p => {
+  p.temporalPrograms[0].tracks.push({ trackId: "duplicate_channels", version: 1, kind: "TransformTrack",
+    target: { nodeId: "node_a", coordinateSpace: "node-local" }, channels: {
+      positionY: { keyframes: [{ id: "same_key", timeTicks: 0, value: 1, interpolationToNext: { kind: "step" } }] },
+      positionX: { keyframes: [{ id: "same_key", timeTicks: 0, value: 0, interpolationToNext: { kind: "step" } }] },
+    } });
+});
+variant("topology_duplicate_label_property_order", meshed, p => {
+  p.meshTopologies[0].vertexMetadata = { vertex_c: { semanticLabel: "same" }, vertex_a: { semanticLabel: "same" } };
+});
+
+variant("evaluated_clipping_invalid_mesh_skips_evaluation", evaluatedClipping, p => {
+  p.transitions[0].partTransitions[0].fromKeyformId = "missing";
+});
+
+// Synthetic populated and rejection Projects retained from the existing Product
+// domain tests. Expected diagnostics are always recomputed from current JS.
+for (const { name, project } of JSON.parse(await readFile(
+  new URL("./validation-domain-projects.json", import.meta.url), "utf8"))) {
+  cases.push([name, project]);
+}
+
+const fixtures = cases.map(([name, project]) => ({ name, project, projectJson: JSON.stringify(project),
   expected: validateProject(project)
     .map(({ code, path, entityId, severity }) => ({ code, path, entityId: entityId ?? "", severity }))
     .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b), "en")),
