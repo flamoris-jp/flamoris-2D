@@ -14,8 +14,8 @@ if (-not (Test-Path (Join-Path $repo 'product/node_modules/ag-psd'))) {
     if ($LASTEXITCODE -ne 0) { throw 'npm ci failed' }
 }
 
-$ffmpegUrl = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-14-13-17/ffmpeg-N-126556-g639ee84952-win64-lgpl-shared.zip'
-$ffmpegHash = '526562B18482314EA17110B7E5A0CFBB701815DCBA66156817B7EEF4662A57F8'
+$ffmpegUrl = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-28-13-06/ffmpeg-N-126947-g45f3fecca9-win64-lgpl-shared.zip'
+$ffmpegHash = '7F82D0E4ED9C20E9CA96573F5AB82B85F1B44A5D62F195E5CF09FFC28DA70A4E'
 $temp = Join-Path ([IO.Path]::GetTempPath()) ([IO.Path]::GetRandomFileName())
 New-Item -ItemType Directory -Path $temp | Out-Null
 try {

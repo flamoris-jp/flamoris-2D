@@ -10,13 +10,13 @@ file association, or replace the Electron release.
   The complete upstream license and third-party notices are in `runtime/LICENSE.txt`.
 - ag-psd 31.0.2, base64-js and pako: package metadata and upstream licenses are in
   their respective `node_modules` directories. The decoder runs in a bounded worker.
-- FFmpeg N-126556-g639ee84952, Windows x64 LGPL shared distribution:
-  https://github.com/BtbN/FFmpeg-Builds/releases/tag/autobuild-2026-09-14-13-17 .
-  Archive: `ffmpeg-N-126556-g639ee84952-win64-lgpl-shared.zip`.
-  SHA256: `526562b18482314ea17110b7e5a0cfbb701815dcba66156817b7eef4662a57f8`.
+- FFmpeg N-126947-g45f3fecca9, Windows x64 LGPL shared distribution:
+  https://github.com/BtbN/FFmpeg-Builds/releases/tag/autobuild-2026-09-28-13-06 .
+  Archive: `ffmpeg-N-126947-g45f3fecca9-win64-lgpl-shared.zip`.
+  SHA256: `7f82d0e4ed9c20e9ca96573f5ab82b85f1b44a5d62f195e5cf09ffc28da70a4e`.
   The distribution, documentation, notices and replaceable shared libraries are
   retained together in `ffmpeg/`. Its build/source information is supplied by
-  https://github.com/BtbN/FFmpeg-Builds and https://github.com/FFmpeg/FFmpeg/tree/639ee84952 .
+  https://github.com/BtbN/FFmpeg-Builds and https://github.com/FFmpeg/FFmpeg/tree/45f3fecca9 .
   The application invokes a separate process with an argument list; it does not
   link FFmpeg into the application. Export accepts the existing Product LGPL-only
   `h264_mf` encoder contract. The executable can be selected in Export settings.

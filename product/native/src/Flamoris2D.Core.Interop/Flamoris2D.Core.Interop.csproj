@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NativeCoreBuildDir>$(MSBuildProjectDirectory)/obj/native-x64</NativeCoreBuildDir>
+    <NativeCoreDll>$(NativeCoreBuildDir)/$(Configuration)/Flamoris2D.Core.Native.dll</NativeCoreDll>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="$(NativeCoreDll)" Link="Flamoris2D.Core.Native.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="BuildNativeCore" BeforeTargets="CoreCompile;GetCopyToOutputDirectoryItems" Condition="'$(OS)' == 'Windows_NT'">
+    <Exec Command='cmake -S &quot;$(MSBuildProjectDirectory)/../../core&quot; -B &quot;$(NativeCoreBuildDir)&quot; -A x64 -DBUILD_TESTING=ON' />
+    <Exec Command='cmake --build &quot;$(NativeCoreBuildDir)&quot; --config $(Configuration) --parallel' />
+    <Exec Command='ctest --test-dir &quot;$(NativeCoreBuildDir)&quot; -C $(Configuration) --output-on-failure' />
+  </Target>
+</Project>
