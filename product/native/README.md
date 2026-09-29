@@ -44,15 +44,16 @@ dotnet run --project product/native/src/Flamoris2D.App -c Release
 Phase 1 of [#118](https://github.com/flamoris-jp/flamoris-2D/issues/118)
 adds `Flamoris2D.Core.Native.dll` and a managed adapter. The JS Product Host
 remains the only authoritative editing session. No WPF gesture or MCP command
-calls the C++ engine yet. The package carries the DLL beside the executable
-for future migrations; it needs the Windows x64 native runtime. The checked
-conformance fixtures are generated from current JS by
+calls the C++ engine yet. The interop adapter and DLL are built and exercised by
+the solution and focused tests; the portable WPF package does not carry them in
+this phase. The checked conformance fixtures are generated from current JS by
 `node product/native/tests/check-temporal-conformance.mjs --write` and checked
 against JS in CI. Native and managed tests compare exact integer results.
 
 The native ABI is declared in `core/include/flamoris2d_core.h` (version 1.0).
 It uses C calling convention, fixed-size integers, an opaque engine handle and
-explicit status codes. `fl2d_engine_create` transfers ownership of a handle to
+32-bit status codes. The DLL build exports its functions; native consumers import
+them through the same header. `fl2d_engine_create` transfers ownership of a handle to
 the caller; destroy it once with `fl2d_engine_destroy` (C# uses `SafeHandle`).
 Null output pointers and invalid arguments return `FL2D_INVALID_ARGUMENT`.
 No strings or allocated buffers cross the ABI. Do not reuse a pointer after
