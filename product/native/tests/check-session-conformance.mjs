@@ -24,6 +24,8 @@ const steps = [
   { op: 'transaction', commands: [rename('do not commit'), visibility('invalid')], label: 'invalid' },
   { op: 'transaction', commands: [visibility(true), rename('  ')], label: 'blank' },
   { op: 'transaction', commands: [], label: 'empty' },
+  { op: 'transaction', commands: [rename('untouched'), { ...transform, payload: { ...transform.payload, transform: { ...transform.payload.transform, scale: { x: 0, y: 1 } } } }], label: 'invalid project' },
+  { op: 'transaction', commands: [rename('untouched'), visibility(false), { type: 'scene.rename_node', payload: { nodeId: 'missing', displayName: 'ghost' } }], label: 'missing node' },
   { op: 'undo' }, { op: 'undo' }, { op: 'redo' },
   { op: 'transaction', commands: [rename('新規')], label: 'new' }, { op: 'redo' },
   { op: 'markSaved' },
@@ -35,7 +37,9 @@ const steps = [
   { op: 'commit', key: 'A' },
   { op: 'prepare', key: 'B', commands: [rename('準備')], label: 'prepared' },
   { op: 'commit', key: 'B' }, { op: 'commit', key: 'B' },
+  { op: 'prepare', key: 'C', commands: [rename('replacement stale')], label: 'will replace' },
   { op: 'replace', project: replacement, saved: false },
+  { op: 'commit', key: 'C' },
   { op: 'markSaved' },
   { op: 'undo' }, { op: 'redo' },
 ];

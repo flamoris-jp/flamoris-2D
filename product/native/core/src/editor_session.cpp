@@ -75,6 +75,20 @@ fl2d_status copy(const std::string& value, char* buffer, uint32_t capacity, uint
 }
 // The snapshot loader is the focused native Project validator. It also enforces
 // the interchange size, encoding and JSON syntax before any session mutation.
+bool session_shape(const Value& project) {
+    const Value& scene = field(project, "scene");
+    const Value& nodes = field(scene, "nodes");
+    if (!nodes.is<Object>()) return false;
+    for (const auto& [key, node] : nodes.get<Object>()) {
+        if (!node.is<Object>() || !field(node, "id").is<std::string>() ||
+            field(node, "id").get<std::string>() != key || !field(node, "displayName").is<std::string>() ||
+            !field(node, "visible").is<bool>() || !number(field(node, "opacity"))) return false;
+        const Value& t = field(node, "transform");
+        if (!point(field(t, "position")) || !number(field(t, "rotation")) ||
+            !point(field(t, "scale")) || !point(field(t, "pivot"))) return false;
+    }
+    return true;
+}
 fl2d_status parse_project(const uint8_t* bytes, uint32_t length, Value& project) {
     fl2d_snapshot* snapshot = nullptr;
     auto status = fl2d_snapshot_load(bytes, length, &snapshot);
@@ -86,7 +100,8 @@ fl2d_status parse_project(const uint8_t* bytes, uint32_t length, Value& project)
     if (issues) return FL2D_PROJECT_INVALID;
     std::string source(reinterpret_cast<const char*>(bytes), length), error;
     auto end = picojson::parse(project, source.begin(), source.end(), &error);
-    return error.empty() && end == source.end() ? FL2D_OK : FL2D_MALFORMED_JSON;
+    if (!error.empty() || end != source.end()) return FL2D_MALFORMED_JSON;
+    return session_shape(project) ? FL2D_OK : FL2D_PROJECT_INVALID;
 }
 fl2d_status validate_candidate(const Value& project) {
     const auto text = project.serialize();
@@ -318,7 +333,10 @@ fl2d_status prepare(fl2d_session* session, const Array& commands, const char* la
             if (seen.insert(id).second) affected.push_back(id);
         }
         auto validation = validate_candidate(draft->project);
-        if (validation != FL2D_OK) return record(current, validation);
+        if (validation != FL2D_OK) {
+            current.error = validation == FL2D_PROJECT_INVALID ? "transaction.validation_failed" : error_name(validation);
+            return validation;
+        }
         if (kind == 0) {
             entry.inverses = std::move(inverses); entry.affected = affected;
             draft->counter = entry.after; draft->current = entry.after;

@@ -35,6 +35,8 @@ using the same command as the Native Shell Boundary workflow, then build and tes
 ```powershell
 npm ci --prefix product --workspaces=false --ignore-scripts
 node product/native/tests/check-temporal-conformance.mjs
+node product/native/tests/check-project-conformance.mjs
+node product/native/tests/check-session-conformance.mjs
 dotnet build product/native/Flamoris2D.Native.sln -c Release
 dotnet run --project product/native/tests/Flamoris2D.ProductHost.Client.Tests -c Release --no-build -- product/product-host/main.mjs
 dotnet run --project product/native/src/Flamoris2D.App -c Release --no-build -- --smoke-test
@@ -50,7 +52,7 @@ this phase. The checked conformance fixtures are generated from current JS by
 `node product/native/tests/check-temporal-conformance.mjs --write` and checked
 against JS in CI. Native and managed tests compare exact integer results.
 
-The native ABI is declared in `core/include/flamoris2d_core.h` (version 1.2).
+The native ABI is declared in `core/include/flamoris2d_core.h` (version 1.3).
 It uses C calling convention, fixed-size integers, an opaque engine handle and
 32-bit status codes. The DLL build exports its functions; native consumers import
 them through the same header. `fl2d_engine_create` transfers ownership of a handle to
@@ -83,6 +85,35 @@ remains the sole editing authority, including WPF/MCP mutations, Undo/Redo and
 save. The DLL still is not in the portable WPF package. The next migration step
 will establish native session, Command, revision and Undo/Redo semantics before
 any authority switch.
+
+Phase 1C (#123) adds a test-only native EditorSession owning its own Project
+state. It accepts the existing Product command envelope for `scene.rename_node`,
+`scene.set_visibility`, and complete `scene.set_transform` (node-local). A
+transaction validates its commands and candidate Project before a one-shot,
+revision-qualified commit; its inverse list is replayed in reverse order for
+Undo. Redo replays the original commands. `revisionCounter` is monotonic,
+`currentRevision` follows the selected history entry, and `savedRevision` is
+independent; the limit is the JS safe integer maximum. Replacement resets
+history and invalidates pending prepares. A prepared handle uses a weak session
+reference so destroying the session makes it unusable; callers must destroy
+both handles. Callers serialize access to one session. C# uses `SafeHandle`.
+
+The ABI exposes fixed-width session state, stable-ID node queries, caller-owned
+UTF-8 project/history/error buffers, and deterministic statuses. Project and
+history JSON are inspection projections; the session's native parsed state is
+owned exclusively by its handle. The snapshot validator is still a focused
+subset of full Product validation; the session additionally checks the node
+fields it needs. Unsupported domains and commands remain JS-only. The
+conformance fixture is generated from the current JS `EditorSession` and covers
+transactions, atomic failure, Undo/Redo, stale and one-shot prepared edits,
+save/dirty lineage, and replacement. Check it with
+`node product/native/tests/check-session-conformance.mjs`, or regenerate
+intentionally with `--write`.
+
+**The WPF/MCP Product Host remains the only production editing authority.** The
+native DLL is excluded from the portable package. The next step is to extend
+native Project validation and command coverage, prove save/load parity, then
+explicitly switch WPF/MCP to the one native session before retiring JS/Node.
 
 The bounded JSON parser is the vendored BSD-2-Clause `picojson` header
 (upstream commit `111c9be5188f7350c2eac9ddaedd8cca3d7bf394`) under
