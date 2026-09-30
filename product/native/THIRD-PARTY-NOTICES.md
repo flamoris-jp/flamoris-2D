@@ -1,7 +1,7 @@
 # Native candidate runtime provenance
 
 The portable candidate contains a self-contained .NET 10 Windows desktop runtime,
-Vortice.Direct3D11 3.8.3 and its NuGet dependencies, the repository Product Host,
+the C++ Direct3D11 compositor, the repository Product Host,
 and the dependencies below. This preview does not install services, register a
 file association, or replace the Electron release.
 
@@ -22,8 +22,7 @@ file association, or replace the Electron release.
   `h264_mf` encoder contract. The executable can be selected in Export settings.
 - .NET: https://github.com/dotnet/runtime and https://github.com/dotnet/wpf .
   Runtime notices accompany the self-contained publish output.
-- Vortice.Windows: https://github.com/amerkoleci/Vortice.Windows (MIT).
-  Dependency versions are recorded by the published `.deps.json` files.
+- The native renderer links Windows Direct3D11 and the system shader compiler.
 
 `SHA256SUMS.txt` records each packaged file after assembly. The CI smoke launches
 this exact directory with Node/.NET removed from PATH and exports a real H.264
@@ -45,9 +44,10 @@ candidate assembly solely for WPF display. Asset usage follows Core's assets/REA
 The superseded TypeScript MCP server/node/hono/zod runtime is no longer packaged.
 # picojson
 
-The native Project snapshot parser vendors `picojson` by Kazuho Oku and
-Cybozu Labs under the BSD-2-Clause license. The full license is included at
-`core/third_party/picojson/LICENSE`.
+The native compositor and experimental Project snapshot parser vendor `picojson`
+by Kazuho Oku and Cybozu Labs under the BSD-2-Clause license. The full license
+accompanies the portable compositor as `LICENSE-picojson.txt`; its repository
+source is `core/third_party/picojson/LICENSE`.
 
 ## Experimental native locale queries
 

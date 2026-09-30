@@ -42,7 +42,7 @@ try {
     Copy-Item $node (Join-Path $runtime 'node.exe')
     Invoke-WebRequest 'https://raw.githubusercontent.com/nodejs/node/v24.21.0/LICENSE' -OutFile (Join-Path $runtime 'LICENSE.txt')
     Copy-Item $ffmpegRoot (Join-Path $package 'ffmpeg') -Recurse
-    foreach ($required in @('Flamoris2D.exe', 'runtime/node.exe', 'ffmpeg/bin/ffmpeg.exe', 'mcp/Flamoris.Mcp.Bridge.exe', 'mcp/Flamoris.Mcp.Core.dll', 'Flamoris.Mcp.Core.dll', 'Flamoris.Mcp.Wpf.dll')) {
+    foreach ($required in @('Flamoris2D.exe', 'Flamoris2D.Renderer.Native.dll', 'LICENSE-picojson.txt', 'runtime/node.exe', 'ffmpeg/bin/ffmpeg.exe', 'mcp/Flamoris.Mcp.Bridge.exe', 'mcp/Flamoris.Mcp.Core.dll', 'Flamoris.Mcp.Core.dll', 'Flamoris.Mcp.Wpf.dll')) {
         if (-not (Test-Path (Join-Path $package $required))) { throw "Missing runtime: $required" }
     }
     if (Test-Path (Join-Path $package 'node_modules/@modelcontextprotocol')) { throw 'Obsolete Node MCP runtime packaged' }

@@ -3,9 +3,14 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <NativeRendererBuildDir>$(MSBuildProjectDirectory)/obj/renderer-x64</NativeRendererBuildDir>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
-    <PackageReference Include="Vortice.D3DCompiler" Version="3.8.3" />
+    <Content Include="$(NativeRendererBuildDir)/$(Configuration)/Flamoris2D.Renderer.Native.dll" Link="Flamoris2D.Renderer.Native.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../core/third_party/picojson/LICENSE" Link="LICENSE-picojson.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+  <Target Name="BuildNativeRenderer" BeforeTargets="CoreCompile;GetCopyToOutputDirectoryItems" Condition="'$(OS)' == 'Windows_NT'">
+    <Exec Command='cmake -S &quot;$(MSBuildProjectDirectory)/../../renderer&quot; -B &quot;$(NativeRendererBuildDir)&quot; -A x64' />
+    <Exec Command='cmake --build &quot;$(NativeRendererBuildDir)&quot; --config $(Configuration) --parallel' />
+  </Target>
 </Project>

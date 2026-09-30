@@ -91,3 +91,19 @@ document extent for camera/picking. Export uses the canonical canvas-to-output m
 with at most 4096 pixels per edge / 8294400 pixels; H.264 requires even dimensions.
 Both use the same D3D11 compositor. Native runtime assembly uses the reviewed Host/worker
 allowlist and excludes tests, private artwork, Electron and DOM view modules.
+
+## C++ compositor ownership (#118)
+
+The selected D3D11 device, shaders, texture cache, mask surfaces, weighted groups,
+source-over composition and BGRA readback move to a separate native renderer DLL.
+The existing managed `Direct3DRenderer` interface remains the WPF/Export adapter,
+with a serialized handle and bounded C ABI for copied canonical projection JSON,
+texture upload and caller-owned output. No editable Project or animation model is
+introduced in the renderer. Hardware/WARP selection, premultiplied byte rounding,
+shader arithmetic, mask dependency order and output budgets stay the same.
+
+The software C# renderer remains the independent conformance reference. Existing
+Windows raster comparisons, representative measurements and packaged workflow
+exercise the native renderer through the same managed interface; no extra CI is
+needed for this ownership transfer. Persistence and WPF/MCP session cutover remain
+separate work. Physical visual/interaction acceptance remains outstanding.

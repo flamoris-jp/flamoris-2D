@@ -52,6 +52,14 @@ this phase. The checked conformance fixtures are generated from current JS by
 `node product/native/tests/check-temporal-session-conformance.mjs --write` and checked
 against JS in CI. Native and managed tests compare exact integer results.
 
+The selected preview/export compositor is now `Flamoris2D.Renderer.Native.dll`.
+C++ owns its D3D11 device, shaders, texture cache, masks, weighted groups and BGRA
+readback. `Direct3DRenderer` is the serialized managed interop adapter; hardware
+and WARP share the same path. The renderer DLL and `LICENSE-picojson.txt` accompany
+the portable package. This ownership transfer does not switch editing authority:
+the JS Product Host remains the authoritative session, and the experimental Core
+DLL remains outside the package.
+
 The native ABI is declared in `core/include/flamoris2d_core.h` (version 1.4).
 It uses C calling convention, fixed-size integers, an opaque engine handle and
 32-bit status codes. The DLL build exports its functions; native consumers import
