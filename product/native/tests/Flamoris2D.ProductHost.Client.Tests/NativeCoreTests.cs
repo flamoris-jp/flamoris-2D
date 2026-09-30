@@ -6,7 +6,7 @@ internal static class NativeCoreTests
     public static void Run(string hostPath)
     {
         if (!OperatingSystem.IsWindows()) return;
-        if (NativeEngine.Version() != (1, 3)) throw new Exception("Unexpected native ABI version.");
+        if (NativeEngine.Version() != (1, 4)) throw new Exception("Unexpected native ABI version.");
         var path = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(hostPath)!,
             "../native/tests/temporal-conformance.json"));
         using var document = JsonDocument.Parse(File.ReadAllText(path));
@@ -134,9 +134,35 @@ internal static class NativeCoreTests
                 throw new Exception("Redo prepare failed.");
             using (redo) if (redo.Commit() != NativeStatus.Ok) throw new Exception("Redo failed.");
             if (session.NodeField("part_1", "displayName") != "夕暮れ") throw new Exception("Redo did not restore state.");
+            TestQueries(session);
         }
         try { session.State(); throw new Exception("Disposed session was accepted."); }
         catch (ObjectDisposedException) { }
+        try { session.Query("project.get_summary"); throw new Exception("Disposed query was accepted."); }
+        catch (ObjectDisposedException) { }
+    }
+
+    private static void TestQueries(NativeSession session)
+    {
+        var beforeProject = session.ProjectJson(); var beforeHistory = session.HistoryJson();
+        if (session.MarkSaved(-1) != NativeStatus.SavedRevisionInvalid) throw new Exception("Query setup error missing.");
+        var beforeError = session.ErrorCode(); var beforeState = session.State();
+        var summary = session.Query("project.get_summary");
+        if (summary.GetProperty("id").GetString() != "project_あ") throw new Exception("Managed Product Query failed.");
+        var node = session.Query("scene.get_node", JsonSerializer.SerializeToElement(new { nodeId = "part_1" }));
+        if (node.GetProperty("displayName").GetString() != "夕暮れ" || node.GetProperty("worldTransform").GetArrayLength() != 6)
+            throw new Exception("Managed scene projection changed.");
+        var nullable = session.Query("bone.get_keyform", JsonSerializer.SerializeToElement(new { boneId = "missing", keyArtId = "missing" }));
+        if (nullable.ValueKind != JsonValueKind.Null) throw new Exception("Managed nullable Query changed.");
+        try { session.Query("bone.get"); throw new Exception("Missing selector was accepted."); }
+        catch (NativeQueryException error) when (error.ProductName == "Error" && error.Message == "Unknown Bone undefined.") { }
+        try { session.Query("unknown.query"); throw new Exception("Unknown Query was accepted."); }
+        catch (NativeQueryException error) when (error.ProductName == "Error" && error.Message == "Unknown query unknown.query.") { }
+        try { session.Query("skin.evaluate"); throw new Exception("Pending Query was accepted."); }
+        catch (NotSupportedException) { }
+        if (beforeProject != session.ProjectJson() || beforeHistory != session.HistoryJson() ||
+            beforeError != session.ErrorCode() || !beforeState.Equals(session.State()))
+            throw new Exception("Managed Query mutated session state.");
     }
 
 }

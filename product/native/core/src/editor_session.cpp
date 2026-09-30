@@ -1,6 +1,7 @@
 #include "flamoris2d_core.h"
 #include "picojson.h"
 #include "native_commands.h"
+#include "native_queries.h"
 
 #include <algorithm>
 #include <cmath>
@@ -76,8 +77,8 @@ fl2d_status validate_transaction_candidate(const Value& before, const Value& aft
     if (status != FL2D_OK) return status;
     return fl2d_commands::valid_temporal_ownership_change(before, after) ? FL2D_OK : FL2D_PROJECT_INVALID;
 }
-fl2d_status parse_commands(const uint8_t* bytes, uint32_t length, Array& commands) {
-    if (!bytes || !length) return FL2D_COMMAND_INVALID;
+fl2d_status parse_interchange(const uint8_t* bytes, uint32_t length, Value& parsed) {
+    if (!bytes || !length) return FL2D_INVALID_ARGUMENT;
     if (length > FL2D_SNAPSHOT_MAX_BYTES) return FL2D_INPUT_TOO_LARGE;
     // Reuse the snapshot parser's UTF-8 gate for command interchange below by
     // checking byte sequences before parsing (picojson does not enforce UTF-8).
@@ -92,9 +93,16 @@ fl2d_status parse_commands(const uint8_t* bytes, uint32_t length, Array& command
         for (int j = 0; j < extra; ++j) if ((bytes[i++] & 0xC0) != 0x80) return FL2D_INVALID_UTF8;
     }
     std::string text(reinterpret_cast<const char*>(bytes), length), error;
-    Value parsed;
     auto end = picojson::parse(parsed, text.begin(), text.end(), &error);
-    if (!error.empty() || end != text.end() || !parsed.is<Array>()) return FL2D_COMMAND_INVALID;
+    if (!error.empty() || end != text.end()) return FL2D_MALFORMED_JSON;
+    return FL2D_OK;
+}
+fl2d_status parse_commands(const uint8_t* bytes, uint32_t length, Array& commands) {
+    Value parsed;
+    const auto status = parse_interchange(bytes, length, parsed);
+    if (status == FL2D_INVALID_ARGUMENT || status == FL2D_MALFORMED_JSON) return FL2D_COMMAND_INVALID;
+    if (status != FL2D_OK) return status;
+    if (!parsed.is<Array>()) return FL2D_COMMAND_INVALID;
     commands = parsed.get<Array>();
     return commands.empty() ? FL2D_TRANSACTION_EMPTY : FL2D_OK;
 }
@@ -143,6 +151,26 @@ struct fl2d_prepared {
     uint64_t generation;
     bool used = false, empty = false;
 };
+
+extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_session_query_json(const fl2d_session* session,
+    const uint8_t* bytes, uint32_t length, char* buffer, uint32_t capacity, uint32_t* required) {
+    if (!session || !required) return FL2D_INVALID_ARGUMENT;
+    *required = 0;
+    try {
+        Value request;
+        const auto status = parse_interchange(bytes,length,request);
+        if (status != FL2D_OK) return status;
+        if (!request.is<Object>() || !field(request,"name").is<std::string>()) return FL2D_INVALID_ARGUMENT;
+        const auto& object = request.get<Object>();
+        for (const auto& [key,value] : object) { (void)value; if (key != "name" && key != "input") return FL2D_INVALID_ARGUMENT; }
+        const Value input = object.count("input") ? object.at("input") : Value(Object{});
+        if (!input.is<Object>()) return FL2D_INVALID_ARGUMENT;
+        return copy(fl2d_queries::query(session->state->project,field(request,"name").get<std::string>(),input).serialize(),
+            buffer,capacity,required);
+    } catch (const fl2d_queries::Unsupported&) { return FL2D_QUERY_UNSUPPORTED; }
+      catch (const std::bad_alloc&) { return FL2D_OUT_OF_MEMORY; }
+      catch (...) { return FL2D_INTERNAL_ERROR; }
+}
 
 extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_session_create(const uint8_t* bytes, uint32_t length, fl2d_session** result) {
     if (!result) return FL2D_INVALID_ARGUMENT;

@@ -11,6 +11,8 @@
 #include <map>
 #include <set>
 #include <string>
+#include <cmath>
+#include <vector>
 #include "picojson.h"
 
 static std::string read_string(const fl2d_snapshot* s, uint32_t index, const char* field) {
@@ -273,11 +275,123 @@ static void check_session(const picojson::object& root, bool full_admission) {
     fl2d_session_destroy(session);
 }
 
+static bool query_equal(const picojson::value& actual, const picojson::value& expected, bool geometry = false) {
+    using Object = picojson::object; using Array = picojson::array;
+    if (geometry && actual.is<double>() && expected.is<double>()) {
+        const auto a = actual.get<double>(), b = expected.get<double>();
+        return std::abs(a-b) <= 1e-12*std::max(1.0,std::max(std::abs(a),std::abs(b)));
+    }
+    if (actual.is<Object>() && expected.is<Object>()) {
+        const auto& a = actual.get<Object>(); const auto& b = expected.get<Object>();
+        if (a.size() != b.size()) return false;
+        for (const auto& [key,value] : b)
+            if (!a.count(key) || !query_equal(a.at(key),value,geometry || key == "worldTransform")) return false;
+        return true;
+    }
+    if (actual.is<Array>() && expected.is<Array>()) {
+        const auto& a = actual.get<Array>(); const auto& b = expected.get<Array>();
+        if (a.size() != b.size()) return false;
+        for (size_t i = 0; i < a.size(); ++i) if (!query_equal(a[i],b[i],geometry)) return false;
+        return true;
+    }
+    return actual == expected;
+}
+static bool same_state(const fl2d_session_state& a, const fl2d_session_state& b) {
+    return a.revision_counter == b.revision_counter && a.current_revision == b.current_revision &&
+        a.saved_revision == b.saved_revision && a.undo_depth == b.undo_depth && a.redo_depth == b.redo_depth &&
+        a.history_depth == b.history_depth && a.dirty == b.dirty;
+}
+static void check_queries() {
+    using Value = picojson::value; using Object = picojson::object; using Array = picojson::array;
+    std::ifstream stream(FL2D_QUERY_FIXTURES); assert(stream.good()); Value fixtures;
+    assert(picojson::parse(fixtures,stream).empty());
+    for (const auto& row : fixtures.get<Object>().at("fixtures").get<Array>()) {
+        const auto& fixture = row.get<Object>();
+        const auto input = fixture.at("project").serialize(); fl2d_session* session = nullptr;
+        assert(fl2d_session_create(reinterpret_cast<const uint8_t*>(input.data()),static_cast<uint32_t>(input.size()),&session) == FL2D_OK);
+        const auto& scene = fixture.at("project").get<Object>().at("scene").get<Object>();
+        const auto& root = scene.at("nodes").get<Object>().at(scene.at("rootId").get<std::string>()).get<Object>();
+        const auto command = Value(Array{Value(Object{{"type",Value("scene.rename_node")},
+            {"payload",Value(Object{{"nodeId",root.at("id")},{"displayName",root.at("displayName")}})}})}).serialize();
+        // Populated undo, redo and history, dirty state, and an outstanding prepared
+        // edit make hidden query mutations observable beyond Project equality.
+        for (int i = 0; i < 2; ++i) {
+            fl2d_prepared* edit = nullptr;
+            assert(fl2d_session_prepare(session,reinterpret_cast<const uint8_t*>(command.data()),static_cast<uint32_t>(command.size()),"query setup",&edit) == FL2D_OK);
+            assert(fl2d_prepared_commit(edit) == FL2D_OK); fl2d_prepared_destroy(edit);
+        }
+        fl2d_prepared* undo = nullptr;
+        assert(fl2d_session_prepare_undo(session,&undo) == FL2D_OK && fl2d_prepared_commit(undo) == FL2D_OK);
+        fl2d_prepared_destroy(undo);
+        fl2d_prepared* pending = nullptr;
+        assert(fl2d_session_prepare(session,reinterpret_cast<const uint8_t*>(command.data()),static_cast<uint32_t>(command.size()),"after queries",&pending) == FL2D_OK);
+        assert(fl2d_session_mark_saved(session,-1) == FL2D_SAVED_REVISION_INVALID);
+        const auto before_project = session_text(session), before_history = session_text(session,true), before_error = session_error(session);
+        fl2d_session_state before{}; assert(fl2d_session_state_get(session,&before) == FL2D_OK);
+        auto untouched = [&] {
+            fl2d_session_state after{}; assert(fl2d_session_state_get(session,&after) == FL2D_OK);
+            assert(same_state(before,after) && before_project == session_text(session) &&
+                before_history == session_text(session,true) && before_error == session_error(session));
+        };
+        for (const auto& test : fixture.at("cases").get<Array>()) {
+            const auto& object = test.get<Object>(); const auto request = object.at("request").serialize(); uint32_t length = 0;
+            auto call = [&](char* buffer, uint32_t capacity, uint32_t* needed) {
+                return fl2d_session_query_json(session,reinterpret_cast<const uint8_t*>(request.data()),static_cast<uint32_t>(request.size()),buffer,capacity,needed);
+            };
+            const auto measured = call(nullptr,0,&length);
+            if (measured != FL2D_BUFFER_TOO_SMALL || !length) {
+                fprintf(stderr,"Query sizing failed in %s: %s (status %d)\n",fixture.at("name").get<std::string>().c_str(),request.c_str(),measured);
+                assert(false);
+            }
+            std::vector<char> buffer(static_cast<size_t>(length)+8,0x5a); uint32_t short_length = 0;
+            assert(call(buffer.data(),length-1,&short_length) == FL2D_BUFFER_TOO_SMALL && short_length == length);
+            for (const auto byte : buffer) assert(byte == 0x5a);
+            assert(call(buffer.data(),length,&short_length) == FL2D_OK && short_length == length && buffer[length-1] == 0);
+            for (size_t i = length; i < buffer.size(); ++i) assert(buffer[i] == 0x5a);
+            const auto actual = parsed(std::string(buffer.data(),length-1));
+            if (!query_equal(actual,object.at("expected"))) {
+                fprintf(stderr,"Query mismatch in %s: %s\n native: %s\n JS: %s\n",
+                    fixture.at("name").get<std::string>().c_str(),request.c_str(),actual.serialize().c_str(),object.at("expected").serialize().c_str());
+                assert(false);
+            }
+            untouched();
+        }
+        for (const auto& name : fixtures.get<Object>().at("pending").get<Array>()) {
+            const auto request = Value(Object{{"name",name}}).serialize(); uint32_t required = 999;
+            assert(fl2d_session_query_json(session,reinterpret_cast<const uint8_t*>(request.data()),static_cast<uint32_t>(request.size()),nullptr,0,&required) == FL2D_QUERY_UNSUPPORTED && required == 0);
+            untouched();
+        }
+        const std::pair<std::string,fl2d_status> rejected[] = {
+            {"",FL2D_INVALID_ARGUMENT},{"{",FL2D_MALFORMED_JSON},{"[]",FL2D_INVALID_ARGUMENT},
+            {"{}",FL2D_INVALID_ARGUMENT},{"{\"name\":1}",FL2D_INVALID_ARGUMENT},
+            {"{\"name\":\"bone.get\",\"input\":null}",FL2D_INVALID_ARGUMENT},
+            {"{\"name\":\"bone.get\",\"input\":[]}",FL2D_INVALID_ARGUMENT},
+            {"{\"name\":\"bone.get\",\"extra\":{}}",FL2D_INVALID_ARGUMENT},
+            {std::string(1,static_cast<char>(0xc0)),FL2D_INVALID_UTF8},
+            {std::string(101,'[')+"0"+std::string(101,']'),FL2D_MALFORMED_JSON},
+        };
+        for (const auto& [request,status] : rejected) {
+            uint32_t required = 99;
+            assert(fl2d_session_query_json(session,reinterpret_cast<const uint8_t*>(request.data()),static_cast<uint32_t>(request.size()),nullptr,0,&required) == status && required == 0);
+            untouched();
+        }
+        uint32_t required = 0;
+        assert(fl2d_session_query_json(session,nullptr,0,nullptr,0,&required) == FL2D_INVALID_ARGUMENT);
+        const uint8_t byte = 0;
+        assert(fl2d_session_query_json(session,&byte,FL2D_SNAPSHOT_MAX_BYTES+1,nullptr,0,&required) == FL2D_INPUT_TOO_LARGE);
+        assert(fl2d_session_query_json(nullptr,&byte,1,nullptr,0,&required) == FL2D_INVALID_ARGUMENT);
+        assert(fl2d_session_query_json(session,&byte,1,nullptr,0,nullptr) == FL2D_INVALID_ARGUMENT);
+        untouched();
+        assert(fl2d_prepared_commit(pending) == FL2D_OK); fl2d_prepared_destroy(pending);
+        fl2d_session_destroy(session);
+    }
+}
+
 static_assert(sizeof(fl2d_status) == sizeof(int32_t), "ABI status must be 32-bit");
 
 int main() {
     int32_t major = 0, minor = -1;
-    assert(fl2d_abi_version(&major, &minor) == FL2D_OK && major == 1 && minor == 3);
+    assert(fl2d_abi_version(&major, &minor) == FL2D_OK && major == 1 && minor == 4);
     assert(fl2d_abi_version(nullptr, &minor) == FL2D_INVALID_ARGUMENT);
     fl2d_engine* engine = nullptr;
     assert(fl2d_engine_create(&engine) == FL2D_OK && engine);
@@ -293,6 +407,7 @@ int main() {
     assert(fl2d_normalize_frame_rate(engine, 1, 1, nullptr) == FL2D_INVALID_ARGUMENT);
     fl2d_engine_destroy(engine);
     check_project_snapshots();
+    check_queries();
     for (const auto& input : {std::pair<const char*, bool>{FL2D_SESSION_FIXTURES, true}, {FL2D_RIG_FIXTURES, false}, {FL2D_HIERARCHY_FIXTURES, false}, {FL2D_TEMPORAL_FIXTURES, false}, {FL2D_TRANSITION_FIXTURES, false}, {FL2D_MESH_FIXTURES, false}, {FL2D_SOURCE_FIXTURES, false}}) {
         std::ifstream stream(input.first); assert(stream.good()); picojson::value fixture;
         assert(picojson::parse(fixture, stream).empty());
