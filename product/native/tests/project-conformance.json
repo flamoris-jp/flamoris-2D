@@ -5907,6 +5907,1176 @@
     "expected": []
   },
   {
+    "name": "clip_exact_near_unity_valid",
+    "project": {
+      "schemaVersion": 15,
+      "timebaseTicksPerSecond": 120000,
+      "id": "project_native_parity_0001",
+      "displayName": "Populated",
+      "canvas": {
+        "width": 100,
+        "height": 100
+      },
+      "sourceAssets": [],
+      "semanticSlots": [
+        {
+          "id": "slot_1",
+          "displayName": "Subject",
+          "role": "subject",
+          "mappings": [
+            {
+              "keyArtId": "art_a",
+              "nodeId": "node_a"
+            },
+            {
+              "keyArtId": "art_b",
+              "nodeId": "node_b"
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "keyArts": [
+        {
+          "id": "art_a",
+          "displayName": "A",
+          "rootNodeId": "node_native_parity_0002",
+          "members": [
+            {
+              "nodeId": "node_a",
+              "appearanceId": "appearance_a",
+              "opacity": 1,
+              "presence": "present",
+              "drawOrder": 0,
+              "clipping": {
+                "sourceNodeId": null
+              }
+            }
+          ],
+          "metadata": {}
+        },
+        {
+          "id": "art_b",
+          "displayName": "B",
+          "rootNodeId": "node_native_parity_0002",
+          "members": [
+            {
+              "nodeId": "node_b",
+              "appearanceId": "appearance_b",
+              "opacity": 1,
+              "presence": "present",
+              "drawOrder": 0,
+              "clipping": {
+                "sourceNodeId": null
+              }
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "scene": {
+        "rootId": "node_native_parity_0002",
+        "nodes": {
+          "node_native_parity_0002": {
+            "id": "node_native_parity_0002",
+            "kind": "group",
+            "displayName": "Populated",
+            "sourceRef": null,
+            "parentId": null,
+            "children": [
+              "node_a",
+              "node_b"
+            ],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          },
+          "node_a": {
+            "id": "node_a",
+            "kind": "part",
+            "displayName": "A",
+            "sourceRef": null,
+            "parentId": "node_native_parity_0002",
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "bounds": {
+              "left": 0,
+              "top": 0,
+              "right": 10,
+              "bottom": 10
+            }
+          },
+          "node_b": {
+            "id": "node_b",
+            "kind": "part",
+            "displayName": "B",
+            "sourceRef": null,
+            "parentId": "node_native_parity_0002",
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "bounds": {
+              "left": 0,
+              "top": 0,
+              "right": 10,
+              "bottom": 10
+            }
+          }
+        }
+      },
+      "meshes": [],
+      "meshTopologies": [],
+      "meshKeyforms": [],
+      "meshFormCorrectionKeyforms": [],
+      "clippingBindings": [],
+      "rig": {
+        "deformers": [],
+        "warpControlPoints": [],
+        "warpDeformerKeyforms": [],
+        "bones": [],
+        "bonePoseKeyforms": [],
+        "rigidBoneBindings": [],
+        "skinBindings": [],
+        "boneRotationConstraints": [],
+        "twoBoneIkConstraints": [],
+        "constraints": []
+      },
+      "transitions": [
+        {
+          "id": "transition_ab",
+          "displayName": "A to B",
+          "fromKeyArtId": "art_a",
+          "toKeyArtId": "art_b",
+          "temporalProgramId": "program_transition",
+          "partTransitions": [
+            {
+              "id": "part_ab",
+              "semanticSlotId": "slot_1",
+              "mode": "replace",
+              "topologyId": null,
+              "fromKeyformId": null,
+              "toKeyformId": null,
+              "configuration": {
+                "compositeGroupId": "group_1"
+              }
+            }
+          ],
+          "diagnosticOverrides": []
+        }
+      ],
+      "temporalPrograms": [
+        {
+          "id": "program_transition",
+          "durationTicks": 100,
+          "tracks": [],
+          "events": [],
+          "regions": []
+        },
+        {
+          "id": "program_sequence",
+          "durationTicks": 9007199254740991,
+          "tracks": [],
+          "events": [],
+          "regions": []
+        },
+        {
+          "id": "exact_clip_program",
+          "durationTicks": 9007199254740991,
+          "tracks": [],
+          "events": [],
+          "regions": []
+        }
+      ],
+      "animation": {
+        "clips": [
+          {
+            "id": "exact_clip",
+            "displayName": "Exact ticks",
+            "temporalProgramId": "exact_clip_program",
+            "defaultLoopMode": "once",
+            "metadata": {}
+          }
+        ],
+        "deformationSamples": []
+      },
+      "sequences": [
+        {
+          "id": "sequence_1",
+          "displayName": "Shot",
+          "temporalProgramId": "program_sequence",
+          "viewLaneItems": [
+            {
+              "id": "exact_hold",
+              "kind": "KeyArtHold",
+              "keyArtId": "art_a",
+              "startTicks": 0,
+              "endTicks": 9007199254740991
+            }
+          ],
+          "clipInstances": [
+            {
+              "id": "exact_instance",
+              "clipId": "exact_clip",
+              "startTicks": 0,
+              "endTicks": 9007199254740991,
+              "sourceOffsetTicks": 0,
+              "playbackRate": {
+                "numerator": 9007199254740991,
+                "denominator": 9007199254740990
+              },
+              "loopMode": "once",
+              "weight": 1,
+              "layer": 0,
+              "enabled": true
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "renderSettings": {
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "alpha": true
+      }
+    },
+    "projectJson": "{\"schemaVersion\":15,\"timebaseTicksPerSecond\":120000,\"id\":\"project_native_parity_0001\",\"displayName\":\"Populated\",\"canvas\":{\"width\":100,\"height\":100},\"sourceAssets\":[],\"semanticSlots\":[{\"id\":\"slot_1\",\"displayName\":\"Subject\",\"role\":\"subject\",\"mappings\":[{\"keyArtId\":\"art_a\",\"nodeId\":\"node_a\"},{\"keyArtId\":\"art_b\",\"nodeId\":\"node_b\"}],\"metadata\":{}}],\"keyArts\":[{\"id\":\"art_a\",\"displayName\":\"A\",\"rootNodeId\":\"node_native_parity_0002\",\"members\":[{\"nodeId\":\"node_a\",\"appearanceId\":\"appearance_a\",\"opacity\":1,\"presence\":\"present\",\"drawOrder\":0,\"clipping\":{\"sourceNodeId\":null}}],\"metadata\":{}},{\"id\":\"art_b\",\"displayName\":\"B\",\"rootNodeId\":\"node_native_parity_0002\",\"members\":[{\"nodeId\":\"node_b\",\"appearanceId\":\"appearance_b\",\"opacity\":1,\"presence\":\"present\",\"drawOrder\":0,\"clipping\":{\"sourceNodeId\":null}}],\"metadata\":{}}],\"scene\":{\"rootId\":\"node_native_parity_0002\",\"nodes\":{\"node_native_parity_0002\":{\"id\":\"node_native_parity_0002\",\"kind\":\"group\",\"displayName\":\"Populated\",\"sourceRef\":null,\"parentId\":null,\"children\":[\"node_a\",\"node_b\"],\"visible\":true,\"locked\":false,\"opacity\":1,\"blendMode\":\"normal\",\"transform\":{\"position\":{\"x\":0,\"y\":0},\"rotation\":0,\"scale\":{\"x\":1,\"y\":1},\"pivot\":{\"x\":0,\"y\":0}}},\"node_a\":{\"id\":\"node_a\",\"kind\":\"part\",\"displayName\":\"A\",\"sourceRef\":null,\"parentId\":\"node_native_parity_0002\",\"children\":[],\"visible\":true,\"locked\":false,\"opacity\":1,\"blendMode\":\"normal\",\"transform\":{\"position\":{\"x\":0,\"y\":0},\"rotation\":0,\"scale\":{\"x\":1,\"y\":1},\"pivot\":{\"x\":0,\"y\":0}},\"bounds\":{\"left\":0,\"top\":0,\"right\":10,\"bottom\":10}},\"node_b\":{\"id\":\"node_b\",\"kind\":\"part\",\"displayName\":\"B\",\"sourceRef\":null,\"parentId\":\"node_native_parity_0002\",\"children\":[],\"visible\":true,\"locked\":false,\"opacity\":1,\"blendMode\":\"normal\",\"transform\":{\"position\":{\"x\":0,\"y\":0},\"rotation\":0,\"scale\":{\"x\":1,\"y\":1},\"pivot\":{\"x\":0,\"y\":0}},\"bounds\":{\"left\":0,\"top\":0,\"right\":10,\"bottom\":10}}}},\"meshes\":[],\"meshTopologies\":[],\"meshKeyforms\":[],\"meshFormCorrectionKeyforms\":[],\"clippingBindings\":[],\"rig\":{\"deformers\":[],\"warpControlPoints\":[],\"warpDeformerKeyforms\":[],\"bones\":[],\"bonePoseKeyforms\":[],\"rigidBoneBindings\":[],\"skinBindings\":[],\"boneRotationConstraints\":[],\"twoBoneIkConstraints\":[],\"constraints\":[]},\"transitions\":[{\"id\":\"transition_ab\",\"displayName\":\"A to B\",\"fromKeyArtId\":\"art_a\",\"toKeyArtId\":\"art_b\",\"temporalProgramId\":\"program_transition\",\"partTransitions\":[{\"id\":\"part_ab\",\"semanticSlotId\":\"slot_1\",\"mode\":\"replace\",\"topologyId\":null,\"fromKeyformId\":null,\"toKeyformId\":null,\"configuration\":{\"compositeGroupId\":\"group_1\"}}],\"diagnosticOverrides\":[]}],\"temporalPrograms\":[{\"id\":\"program_transition\",\"durationTicks\":100,\"tracks\":[],\"events\":[],\"regions\":[]},{\"id\":\"program_sequence\",\"durationTicks\":9007199254740991,\"tracks\":[],\"events\":[],\"regions\":[]},{\"id\":\"exact_clip_program\",\"durationTicks\":9007199254740991,\"tracks\":[],\"events\":[],\"regions\":[]}],\"animation\":{\"clips\":[{\"id\":\"exact_clip\",\"displayName\":\"Exact ticks\",\"temporalProgramId\":\"exact_clip_program\",\"defaultLoopMode\":\"once\",\"metadata\":{}}],\"deformationSamples\":[]},\"sequences\":[{\"id\":\"sequence_1\",\"displayName\":\"Shot\",\"temporalProgramId\":\"program_sequence\",\"viewLaneItems\":[{\"id\":\"exact_hold\",\"kind\":\"KeyArtHold\",\"keyArtId\":\"art_a\",\"startTicks\":0,\"endTicks\":9007199254740991}],\"clipInstances\":[{\"id\":\"exact_instance\",\"clipId\":\"exact_clip\",\"startTicks\":0,\"endTicks\":9007199254740991,\"sourceOffsetTicks\":0,\"playbackRate\":{\"numerator\":9007199254740991,\"denominator\":9007199254740990},\"loopMode\":\"once\",\"weight\":1,\"layer\":0,\"enabled\":true}],\"metadata\":{}}],\"renderSettings\":{\"frameRate\":{\"numerator\":30,\"denominator\":1},\"alpha\":true}}",
+    "expected": []
+  },
+  {
+    "name": "clip_exact_near_unity_overflow",
+    "project": {
+      "schemaVersion": 15,
+      "timebaseTicksPerSecond": 120000,
+      "id": "project_native_parity_0001",
+      "displayName": "Populated",
+      "canvas": {
+        "width": 100,
+        "height": 100
+      },
+      "sourceAssets": [],
+      "semanticSlots": [
+        {
+          "id": "slot_1",
+          "displayName": "Subject",
+          "role": "subject",
+          "mappings": [
+            {
+              "keyArtId": "art_a",
+              "nodeId": "node_a"
+            },
+            {
+              "keyArtId": "art_b",
+              "nodeId": "node_b"
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "keyArts": [
+        {
+          "id": "art_a",
+          "displayName": "A",
+          "rootNodeId": "node_native_parity_0002",
+          "members": [
+            {
+              "nodeId": "node_a",
+              "appearanceId": "appearance_a",
+              "opacity": 1,
+              "presence": "present",
+              "drawOrder": 0,
+              "clipping": {
+                "sourceNodeId": null
+              }
+            }
+          ],
+          "metadata": {}
+        },
+        {
+          "id": "art_b",
+          "displayName": "B",
+          "rootNodeId": "node_native_parity_0002",
+          "members": [
+            {
+              "nodeId": "node_b",
+              "appearanceId": "appearance_b",
+              "opacity": 1,
+              "presence": "present",
+              "drawOrder": 0,
+              "clipping": {
+                "sourceNodeId": null
+              }
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "scene": {
+        "rootId": "node_native_parity_0002",
+        "nodes": {
+          "node_native_parity_0002": {
+            "id": "node_native_parity_0002",
+            "kind": "group",
+            "displayName": "Populated",
+            "sourceRef": null,
+            "parentId": null,
+            "children": [
+              "node_a",
+              "node_b"
+            ],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          },
+          "node_a": {
+            "id": "node_a",
+            "kind": "part",
+            "displayName": "A",
+            "sourceRef": null,
+            "parentId": "node_native_parity_0002",
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "bounds": {
+              "left": 0,
+              "top": 0,
+              "right": 10,
+              "bottom": 10
+            }
+          },
+          "node_b": {
+            "id": "node_b",
+            "kind": "part",
+            "displayName": "B",
+            "sourceRef": null,
+            "parentId": "node_native_parity_0002",
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "bounds": {
+              "left": 0,
+              "top": 0,
+              "right": 10,
+              "bottom": 10
+            }
+          }
+        }
+      },
+      "meshes": [],
+      "meshTopologies": [],
+      "meshKeyforms": [],
+      "meshFormCorrectionKeyforms": [],
+      "clippingBindings": [],
+      "rig": {
+        "deformers": [],
+        "warpControlPoints": [],
+        "warpDeformerKeyforms": [],
+        "bones": [],
+        "bonePoseKeyforms": [],
+        "rigidBoneBindings": [],
+        "skinBindings": [],
+        "boneRotationConstraints": [],
+        "twoBoneIkConstraints": [],
+        "constraints": []
+      },
+      "transitions": [
+        {
+          "id": "transition_ab",
+          "displayName": "A to B",
+          "fromKeyArtId": "art_a",
+          "toKeyArtId": "art_b",
+          "temporalProgramId": "program_transition",
+          "partTransitions": [
+            {
+              "id": "part_ab",
+              "semanticSlotId": "slot_1",
+              "mode": "replace",
+              "topologyId": null,
+              "fromKeyformId": null,
+              "toKeyformId": null,
+              "configuration": {
+                "compositeGroupId": "group_1"
+              }
+            }
+          ],
+          "diagnosticOverrides": []
+        }
+      ],
+      "temporalPrograms": [
+        {
+          "id": "program_transition",
+          "durationTicks": 100,
+          "tracks": [],
+          "events": [],
+          "regions": []
+        },
+        {
+          "id": "program_sequence",
+          "durationTicks": 9007199254740991,
+          "tracks": [],
+          "events": [],
+          "regions": []
+        },
+        {
+          "id": "exact_clip_program",
+          "durationTicks": 9007199254740991,
+          "tracks": [],
+          "events": [],
+          "regions": []
+        }
+      ],
+      "animation": {
+        "clips": [
+          {
+            "id": "exact_clip",
+            "displayName": "Exact ticks",
+            "temporalProgramId": "exact_clip_program",
+            "defaultLoopMode": "once",
+            "metadata": {}
+          }
+        ],
+        "deformationSamples": []
+      },
+      "sequences": [
+        {
+          "id": "sequence_1",
+          "displayName": "Shot",
+          "temporalProgramId": "program_sequence",
+          "viewLaneItems": [
+            {
+              "id": "exact_hold",
+              "kind": "KeyArtHold",
+              "keyArtId": "art_a",
+              "startTicks": 0,
+              "endTicks": 9007199254740991
+            }
+          ],
+          "clipInstances": [
+            {
+              "id": "exact_instance",
+              "clipId": "exact_clip",
+              "startTicks": 0,
+              "endTicks": 9007199254740991,
+              "sourceOffsetTicks": 0,
+              "playbackRate": {
+                "numerator": 9007199254740991,
+                "denominator": 9007199254740989
+              },
+              "loopMode": "once",
+              "weight": 1,
+              "layer": 0,
+              "enabled": true
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "renderSettings": {
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "alpha": true
+      }
+    },
+    "projectJson": "{\"schemaVersion\":15,\"timebaseTicksPerSecond\":120000,\"id\":\"project_native_parity_0001\",\"displayName\":\"Populated\",\"canvas\":{\"width\":100,\"height\":100},\"sourceAssets\":[],\"semanticSlots\":[{\"id\":\"slot_1\",\"displayName\":\"Subject\",\"role\":\"subject\",\"mappings\":[{\"keyArtId\":\"art_a\",\"nodeId\":\"node_a\"},{\"keyArtId\":\"art_b\",\"nodeId\":\"node_b\"}],\"metadata\":{}}],\"keyArts\":[{\"id\":\"art_a\",\"displayName\":\"A\",\"rootNodeId\":\"node_native_parity_0002\",\"members\":[{\"nodeId\":\"node_a\",\"appearanceId\":\"appearance_a\",\"opacity\":1,\"presence\":\"present\",\"drawOrder\":0,\"clipping\":{\"sourceNodeId\":null}}],\"metadata\":{}},{\"id\":\"art_b\",\"displayName\":\"B\",\"rootNodeId\":\"node_native_parity_0002\",\"members\":[{\"nodeId\":\"node_b\",\"appearanceId\":\"appearance_b\",\"opacity\":1,\"presence\":\"present\",\"drawOrder\":0,\"clipping\":{\"sourceNodeId\":null}}],\"metadata\":{}}],\"scene\":{\"rootId\":\"node_native_parity_0002\",\"nodes\":{\"node_native_parity_0002\":{\"id\":\"node_native_parity_0002\",\"kind\":\"group\",\"displayName\":\"Populated\",\"sourceRef\":null,\"parentId\":null,\"children\":[\"node_a\",\"node_b\"],\"visible\":true,\"locked\":false,\"opacity\":1,\"blendMode\":\"normal\",\"transform\":{\"position\":{\"x\":0,\"y\":0},\"rotation\":0,\"scale\":{\"x\":1,\"y\":1},\"pivot\":{\"x\":0,\"y\":0}}},\"node_a\":{\"id\":\"node_a\",\"kind\":\"part\",\"displayName\":\"A\",\"sourceRef\":null,\"parentId\":\"node_native_parity_0002\",\"children\":[],\"visible\":true,\"locked\":false,\"opacity\":1,\"blendMode\":\"normal\",\"transform\":{\"position\":{\"x\":0,\"y\":0},\"rotation\":0,\"scale\":{\"x\":1,\"y\":1},\"pivot\":{\"x\":0,\"y\":0}},\"bounds\":{\"left\":0,\"top\":0,\"right\":10,\"bottom\":10}},\"node_b\":{\"id\":\"node_b\",\"kind\":\"part\",\"displayName\":\"B\",\"sourceRef\":null,\"parentId\":\"node_native_parity_0002\",\"children\":[],\"visible\":true,\"locked\":false,\"opacity\":1,\"blendMode\":\"normal\",\"transform\":{\"position\":{\"x\":0,\"y\":0},\"rotation\":0,\"scale\":{\"x\":1,\"y\":1},\"pivot\":{\"x\":0,\"y\":0}},\"bounds\":{\"left\":0,\"top\":0,\"right\":10,\"bottom\":10}}}},\"meshes\":[],\"meshTopologies\":[],\"meshKeyforms\":[],\"meshFormCorrectionKeyforms\":[],\"clippingBindings\":[],\"rig\":{\"deformers\":[],\"warpControlPoints\":[],\"warpDeformerKeyforms\":[],\"bones\":[],\"bonePoseKeyforms\":[],\"rigidBoneBindings\":[],\"skinBindings\":[],\"boneRotationConstraints\":[],\"twoBoneIkConstraints\":[],\"constraints\":[]},\"transitions\":[{\"id\":\"transition_ab\",\"displayName\":\"A to B\",\"fromKeyArtId\":\"art_a\",\"toKeyArtId\":\"art_b\",\"temporalProgramId\":\"program_transition\",\"partTransitions\":[{\"id\":\"part_ab\",\"semanticSlotId\":\"slot_1\",\"mode\":\"replace\",\"topologyId\":null,\"fromKeyformId\":null,\"toKeyformId\":null,\"configuration\":{\"compositeGroupId\":\"group_1\"}}],\"diagnosticOverrides\":[]}],\"temporalPrograms\":[{\"id\":\"program_transition\",\"durationTicks\":100,\"tracks\":[],\"events\":[],\"regions\":[]},{\"id\":\"program_sequence\",\"durationTicks\":9007199254740991,\"tracks\":[],\"events\":[],\"regions\":[]},{\"id\":\"exact_clip_program\",\"durationTicks\":9007199254740991,\"tracks\":[],\"events\":[],\"regions\":[]}],\"animation\":{\"clips\":[{\"id\":\"exact_clip\",\"displayName\":\"Exact ticks\",\"temporalProgramId\":\"exact_clip_program\",\"defaultLoopMode\":\"once\",\"metadata\":{}}],\"deformationSamples\":[]},\"sequences\":[{\"id\":\"sequence_1\",\"displayName\":\"Shot\",\"temporalProgramId\":\"program_sequence\",\"viewLaneItems\":[{\"id\":\"exact_hold\",\"kind\":\"KeyArtHold\",\"keyArtId\":\"art_a\",\"startTicks\":0,\"endTicks\":9007199254740991}],\"clipInstances\":[{\"id\":\"exact_instance\",\"clipId\":\"exact_clip\",\"startTicks\":0,\"endTicks\":9007199254740991,\"sourceOffsetTicks\":0,\"playbackRate\":{\"numerator\":9007199254740991,\"denominator\":9007199254740989},\"loopMode\":\"once\",\"weight\":1,\"layer\":0,\"enabled\":true}],\"metadata\":{}}],\"renderSettings\":{\"frameRate\":{\"numerator\":30,\"denominator\":1},\"alpha\":true}}",
+    "expected": [
+      {
+        "code": "ANIMATION_CLIP_LOCAL_TIME_OVERFLOW",
+        "path": "sequences.0.clipInstances.0",
+        "entityId": "exact_instance",
+        "severity": "error"
+      }
+    ]
+  },
+  {
+    "name": "clip_exact_below_half_valid",
+    "project": {
+      "schemaVersion": 15,
+      "timebaseTicksPerSecond": 120000,
+      "id": "project_native_parity_0001",
+      "displayName": "Populated",
+      "canvas": {
+        "width": 100,
+        "height": 100
+      },
+      "sourceAssets": [],
+      "semanticSlots": [
+        {
+          "id": "slot_1",
+          "displayName": "Subject",
+          "role": "subject",
+          "mappings": [
+            {
+              "keyArtId": "art_a",
+              "nodeId": "node_a"
+            },
+            {
+              "keyArtId": "art_b",
+              "nodeId": "node_b"
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "keyArts": [
+        {
+          "id": "art_a",
+          "displayName": "A",
+          "rootNodeId": "node_native_parity_0002",
+          "members": [
+            {
+              "nodeId": "node_a",
+              "appearanceId": "appearance_a",
+              "opacity": 1,
+              "presence": "present",
+              "drawOrder": 0,
+              "clipping": {
+                "sourceNodeId": null
+              }
+            }
+          ],
+          "metadata": {}
+        },
+        {
+          "id": "art_b",
+          "displayName": "B",
+          "rootNodeId": "node_native_parity_0002",
+          "members": [
+            {
+              "nodeId": "node_b",
+              "appearanceId": "appearance_b",
+              "opacity": 1,
+              "presence": "present",
+              "drawOrder": 0,
+              "clipping": {
+                "sourceNodeId": null
+              }
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "scene": {
+        "rootId": "node_native_parity_0002",
+        "nodes": {
+          "node_native_parity_0002": {
+            "id": "node_native_parity_0002",
+            "kind": "group",
+            "displayName": "Populated",
+            "sourceRef": null,
+            "parentId": null,
+            "children": [
+              "node_a",
+              "node_b"
+            ],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          },
+          "node_a": {
+            "id": "node_a",
+            "kind": "part",
+            "displayName": "A",
+            "sourceRef": null,
+            "parentId": "node_native_parity_0002",
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "bounds": {
+              "left": 0,
+              "top": 0,
+              "right": 10,
+              "bottom": 10
+            }
+          },
+          "node_b": {
+            "id": "node_b",
+            "kind": "part",
+            "displayName": "B",
+            "sourceRef": null,
+            "parentId": "node_native_parity_0002",
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "bounds": {
+              "left": 0,
+              "top": 0,
+              "right": 10,
+              "bottom": 10
+            }
+          }
+        }
+      },
+      "meshes": [],
+      "meshTopologies": [],
+      "meshKeyforms": [],
+      "meshFormCorrectionKeyforms": [],
+      "clippingBindings": [],
+      "rig": {
+        "deformers": [],
+        "warpControlPoints": [],
+        "warpDeformerKeyforms": [],
+        "bones": [],
+        "bonePoseKeyforms": [],
+        "rigidBoneBindings": [],
+        "skinBindings": [],
+        "boneRotationConstraints": [],
+        "twoBoneIkConstraints": [],
+        "constraints": []
+      },
+      "transitions": [
+        {
+          "id": "transition_ab",
+          "displayName": "A to B",
+          "fromKeyArtId": "art_a",
+          "toKeyArtId": "art_b",
+          "temporalProgramId": "program_transition",
+          "partTransitions": [
+            {
+              "id": "part_ab",
+              "semanticSlotId": "slot_1",
+              "mode": "replace",
+              "topologyId": null,
+              "fromKeyformId": null,
+              "toKeyformId": null,
+              "configuration": {
+                "compositeGroupId": "group_1"
+              }
+            }
+          ],
+          "diagnosticOverrides": []
+        }
+      ],
+      "temporalPrograms": [
+        {
+          "id": "program_transition",
+          "durationTicks": 100,
+          "tracks": [],
+          "events": [],
+          "regions": []
+        },
+        {
+          "id": "program_sequence",
+          "durationTicks": 9007199254740991,
+          "tracks": [],
+          "events": [],
+          "regions": []
+        },
+        {
+          "id": "exact_clip_program",
+          "durationTicks": 9007199254740990,
+          "tracks": [],
+          "events": [],
+          "regions": []
+        }
+      ],
+      "animation": {
+        "clips": [
+          {
+            "id": "exact_clip",
+            "displayName": "Exact ticks",
+            "temporalProgramId": "exact_clip_program",
+            "defaultLoopMode": "once",
+            "metadata": {}
+          }
+        ],
+        "deformationSamples": []
+      },
+      "sequences": [
+        {
+          "id": "sequence_1",
+          "displayName": "Shot",
+          "temporalProgramId": "program_sequence",
+          "viewLaneItems": [
+            {
+              "id": "exact_hold",
+              "kind": "KeyArtHold",
+              "keyArtId": "art_a",
+              "startTicks": 0,
+              "endTicks": 9007199254740991
+            }
+          ],
+          "clipInstances": [
+            {
+              "id": "exact_instance",
+              "clipId": "exact_clip",
+              "startTicks": 0,
+              "endTicks": 4503599627370495,
+              "sourceOffsetTicks": 9007199254740990,
+              "playbackRate": {
+                "numerator": 1,
+                "denominator": 9007199254740990
+              },
+              "loopMode": "once",
+              "weight": 1,
+              "layer": 0,
+              "enabled": true
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "renderSettings": {
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "alpha": true
+      }
+    },
+    "projectJson": "{\"schemaVersion\":15,\"timebaseTicksPerSecond\":120000,\"id\":\"project_native_parity_0001\",\"displayName\":\"Populated\",\"canvas\":{\"width\":100,\"height\":100},\"sourceAssets\":[],\"semanticSlots\":[{\"id\":\"slot_1\",\"displayName\":\"Subject\",\"role\":\"subject\",\"mappings\":[{\"keyArtId\":\"art_a\",\"nodeId\":\"node_a\"},{\"keyArtId\":\"art_b\",\"nodeId\":\"node_b\"}],\"metadata\":{}}],\"keyArts\":[{\"id\":\"art_a\",\"displayName\":\"A\",\"rootNodeId\":\"node_native_parity_0002\",\"members\":[{\"nodeId\":\"node_a\",\"appearanceId\":\"appearance_a\",\"opacity\":1,\"presence\":\"present\",\"drawOrder\":0,\"clipping\":{\"sourceNodeId\":null}}],\"metadata\":{}},{\"id\":\"art_b\",\"displayName\":\"B\",\"rootNodeId\":\"node_native_parity_0002\",\"members\":[{\"nodeId\":\"node_b\",\"appearanceId\":\"appearance_b\",\"opacity\":1,\"presence\":\"present\",\"drawOrder\":0,\"clipping\":{\"sourceNodeId\":null}}],\"metadata\":{}}],\"scene\":{\"rootId\":\"node_native_parity_0002\",\"nodes\":{\"node_native_parity_0002\":{\"id\":\"node_native_parity_0002\",\"kind\":\"group\",\"displayName\":\"Populated\",\"sourceRef\":null,\"parentId\":null,\"children\":[\"node_a\",\"node_b\"],\"visible\":true,\"locked\":false,\"opacity\":1,\"blendMode\":\"normal\",\"transform\":{\"position\":{\"x\":0,\"y\":0},\"rotation\":0,\"scale\":{\"x\":1,\"y\":1},\"pivot\":{\"x\":0,\"y\":0}}},\"node_a\":{\"id\":\"node_a\",\"kind\":\"part\",\"displayName\":\"A\",\"sourceRef\":null,\"parentId\":\"node_native_parity_0002\",\"children\":[],\"visible\":true,\"locked\":false,\"opacity\":1,\"blendMode\":\"normal\",\"transform\":{\"position\":{\"x\":0,\"y\":0},\"rotation\":0,\"scale\":{\"x\":1,\"y\":1},\"pivot\":{\"x\":0,\"y\":0}},\"bounds\":{\"left\":0,\"top\":0,\"right\":10,\"bottom\":10}},\"node_b\":{\"id\":\"node_b\",\"kind\":\"part\",\"displayName\":\"B\",\"sourceRef\":null,\"parentId\":\"node_native_parity_0002\",\"children\":[],\"visible\":true,\"locked\":false,\"opacity\":1,\"blendMode\":\"normal\",\"transform\":{\"position\":{\"x\":0,\"y\":0},\"rotation\":0,\"scale\":{\"x\":1,\"y\":1},\"pivot\":{\"x\":0,\"y\":0}},\"bounds\":{\"left\":0,\"top\":0,\"right\":10,\"bottom\":10}}}},\"meshes\":[],\"meshTopologies\":[],\"meshKeyforms\":[],\"meshFormCorrectionKeyforms\":[],\"clippingBindings\":[],\"rig\":{\"deformers\":[],\"warpControlPoints\":[],\"warpDeformerKeyforms\":[],\"bones\":[],\"bonePoseKeyforms\":[],\"rigidBoneBindings\":[],\"skinBindings\":[],\"boneRotationConstraints\":[],\"twoBoneIkConstraints\":[],\"constraints\":[]},\"transitions\":[{\"id\":\"transition_ab\",\"displayName\":\"A to B\",\"fromKeyArtId\":\"art_a\",\"toKeyArtId\":\"art_b\",\"temporalProgramId\":\"program_transition\",\"partTransitions\":[{\"id\":\"part_ab\",\"semanticSlotId\":\"slot_1\",\"mode\":\"replace\",\"topologyId\":null,\"fromKeyformId\":null,\"toKeyformId\":null,\"configuration\":{\"compositeGroupId\":\"group_1\"}}],\"diagnosticOverrides\":[]}],\"temporalPrograms\":[{\"id\":\"program_transition\",\"durationTicks\":100,\"tracks\":[],\"events\":[],\"regions\":[]},{\"id\":\"program_sequence\",\"durationTicks\":9007199254740991,\"tracks\":[],\"events\":[],\"regions\":[]},{\"id\":\"exact_clip_program\",\"durationTicks\":9007199254740990,\"tracks\":[],\"events\":[],\"regions\":[]}],\"animation\":{\"clips\":[{\"id\":\"exact_clip\",\"displayName\":\"Exact ticks\",\"temporalProgramId\":\"exact_clip_program\",\"defaultLoopMode\":\"once\",\"metadata\":{}}],\"deformationSamples\":[]},\"sequences\":[{\"id\":\"sequence_1\",\"displayName\":\"Shot\",\"temporalProgramId\":\"program_sequence\",\"viewLaneItems\":[{\"id\":\"exact_hold\",\"kind\":\"KeyArtHold\",\"keyArtId\":\"art_a\",\"startTicks\":0,\"endTicks\":9007199254740991}],\"clipInstances\":[{\"id\":\"exact_instance\",\"clipId\":\"exact_clip\",\"startTicks\":0,\"endTicks\":4503599627370495,\"sourceOffsetTicks\":9007199254740990,\"playbackRate\":{\"numerator\":1,\"denominator\":9007199254740990},\"loopMode\":\"once\",\"weight\":1,\"layer\":0,\"enabled\":true}],\"metadata\":{}}],\"renderSettings\":{\"frameRate\":{\"numerator\":30,\"denominator\":1},\"alpha\":true}}",
+    "expected": []
+  },
+  {
+    "name": "clip_exact_at_half_overrun",
+    "project": {
+      "schemaVersion": 15,
+      "timebaseTicksPerSecond": 120000,
+      "id": "project_native_parity_0001",
+      "displayName": "Populated",
+      "canvas": {
+        "width": 100,
+        "height": 100
+      },
+      "sourceAssets": [],
+      "semanticSlots": [
+        {
+          "id": "slot_1",
+          "displayName": "Subject",
+          "role": "subject",
+          "mappings": [
+            {
+              "keyArtId": "art_a",
+              "nodeId": "node_a"
+            },
+            {
+              "keyArtId": "art_b",
+              "nodeId": "node_b"
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "keyArts": [
+        {
+          "id": "art_a",
+          "displayName": "A",
+          "rootNodeId": "node_native_parity_0002",
+          "members": [
+            {
+              "nodeId": "node_a",
+              "appearanceId": "appearance_a",
+              "opacity": 1,
+              "presence": "present",
+              "drawOrder": 0,
+              "clipping": {
+                "sourceNodeId": null
+              }
+            }
+          ],
+          "metadata": {}
+        },
+        {
+          "id": "art_b",
+          "displayName": "B",
+          "rootNodeId": "node_native_parity_0002",
+          "members": [
+            {
+              "nodeId": "node_b",
+              "appearanceId": "appearance_b",
+              "opacity": 1,
+              "presence": "present",
+              "drawOrder": 0,
+              "clipping": {
+                "sourceNodeId": null
+              }
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "scene": {
+        "rootId": "node_native_parity_0002",
+        "nodes": {
+          "node_native_parity_0002": {
+            "id": "node_native_parity_0002",
+            "kind": "group",
+            "displayName": "Populated",
+            "sourceRef": null,
+            "parentId": null,
+            "children": [
+              "node_a",
+              "node_b"
+            ],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            }
+          },
+          "node_a": {
+            "id": "node_a",
+            "kind": "part",
+            "displayName": "A",
+            "sourceRef": null,
+            "parentId": "node_native_parity_0002",
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "bounds": {
+              "left": 0,
+              "top": 0,
+              "right": 10,
+              "bottom": 10
+            }
+          },
+          "node_b": {
+            "id": "node_b",
+            "kind": "part",
+            "displayName": "B",
+            "sourceRef": null,
+            "parentId": "node_native_parity_0002",
+            "children": [],
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blendMode": "normal",
+            "transform": {
+              "position": {
+                "x": 0,
+                "y": 0
+              },
+              "rotation": 0,
+              "scale": {
+                "x": 1,
+                "y": 1
+              },
+              "pivot": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "bounds": {
+              "left": 0,
+              "top": 0,
+              "right": 10,
+              "bottom": 10
+            }
+          }
+        }
+      },
+      "meshes": [],
+      "meshTopologies": [],
+      "meshKeyforms": [],
+      "meshFormCorrectionKeyforms": [],
+      "clippingBindings": [],
+      "rig": {
+        "deformers": [],
+        "warpControlPoints": [],
+        "warpDeformerKeyforms": [],
+        "bones": [],
+        "bonePoseKeyforms": [],
+        "rigidBoneBindings": [],
+        "skinBindings": [],
+        "boneRotationConstraints": [],
+        "twoBoneIkConstraints": [],
+        "constraints": []
+      },
+      "transitions": [
+        {
+          "id": "transition_ab",
+          "displayName": "A to B",
+          "fromKeyArtId": "art_a",
+          "toKeyArtId": "art_b",
+          "temporalProgramId": "program_transition",
+          "partTransitions": [
+            {
+              "id": "part_ab",
+              "semanticSlotId": "slot_1",
+              "mode": "replace",
+              "topologyId": null,
+              "fromKeyformId": null,
+              "toKeyformId": null,
+              "configuration": {
+                "compositeGroupId": "group_1"
+              }
+            }
+          ],
+          "diagnosticOverrides": []
+        }
+      ],
+      "temporalPrograms": [
+        {
+          "id": "program_transition",
+          "durationTicks": 100,
+          "tracks": [],
+          "events": [],
+          "regions": []
+        },
+        {
+          "id": "program_sequence",
+          "durationTicks": 9007199254740991,
+          "tracks": [],
+          "events": [],
+          "regions": []
+        },
+        {
+          "id": "exact_clip_program",
+          "durationTicks": 9007199254740990,
+          "tracks": [],
+          "events": [],
+          "regions": []
+        }
+      ],
+      "animation": {
+        "clips": [
+          {
+            "id": "exact_clip",
+            "displayName": "Exact ticks",
+            "temporalProgramId": "exact_clip_program",
+            "defaultLoopMode": "once",
+            "metadata": {}
+          }
+        ],
+        "deformationSamples": []
+      },
+      "sequences": [
+        {
+          "id": "sequence_1",
+          "displayName": "Shot",
+          "temporalProgramId": "program_sequence",
+          "viewLaneItems": [
+            {
+              "id": "exact_hold",
+              "kind": "KeyArtHold",
+              "keyArtId": "art_a",
+              "startTicks": 0,
+              "endTicks": 9007199254740991
+            }
+          ],
+          "clipInstances": [
+            {
+              "id": "exact_instance",
+              "clipId": "exact_clip",
+              "startTicks": 0,
+              "endTicks": 4503599627370496,
+              "sourceOffsetTicks": 9007199254740990,
+              "playbackRate": {
+                "numerator": 1,
+                "denominator": 9007199254740990
+              },
+              "loopMode": "once",
+              "weight": 1,
+              "layer": 0,
+              "enabled": true
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "renderSettings": {
+        "frameRate": {
+          "numerator": 30,
+          "denominator": 1
+        },
+        "alpha": true
+      }
+    },
+    "projectJson": "{\"schemaVersion\":15,\"timebaseTicksPerSecond\":120000,\"id\":\"project_native_parity_0001\",\"displayName\":\"Populated\",\"canvas\":{\"width\":100,\"height\":100},\"sourceAssets\":[],\"semanticSlots\":[{\"id\":\"slot_1\",\"displayName\":\"Subject\",\"role\":\"subject\",\"mappings\":[{\"keyArtId\":\"art_a\",\"nodeId\":\"node_a\"},{\"keyArtId\":\"art_b\",\"nodeId\":\"node_b\"}],\"metadata\":{}}],\"keyArts\":[{\"id\":\"art_a\",\"displayName\":\"A\",\"rootNodeId\":\"node_native_parity_0002\",\"members\":[{\"nodeId\":\"node_a\",\"appearanceId\":\"appearance_a\",\"opacity\":1,\"presence\":\"present\",\"drawOrder\":0,\"clipping\":{\"sourceNodeId\":null}}],\"metadata\":{}},{\"id\":\"art_b\",\"displayName\":\"B\",\"rootNodeId\":\"node_native_parity_0002\",\"members\":[{\"nodeId\":\"node_b\",\"appearanceId\":\"appearance_b\",\"opacity\":1,\"presence\":\"present\",\"drawOrder\":0,\"clipping\":{\"sourceNodeId\":null}}],\"metadata\":{}}],\"scene\":{\"rootId\":\"node_native_parity_0002\",\"nodes\":{\"node_native_parity_0002\":{\"id\":\"node_native_parity_0002\",\"kind\":\"group\",\"displayName\":\"Populated\",\"sourceRef\":null,\"parentId\":null,\"children\":[\"node_a\",\"node_b\"],\"visible\":true,\"locked\":false,\"opacity\":1,\"blendMode\":\"normal\",\"transform\":{\"position\":{\"x\":0,\"y\":0},\"rotation\":0,\"scale\":{\"x\":1,\"y\":1},\"pivot\":{\"x\":0,\"y\":0}}},\"node_a\":{\"id\":\"node_a\",\"kind\":\"part\",\"displayName\":\"A\",\"sourceRef\":null,\"parentId\":\"node_native_parity_0002\",\"children\":[],\"visible\":true,\"locked\":false,\"opacity\":1,\"blendMode\":\"normal\",\"transform\":{\"position\":{\"x\":0,\"y\":0},\"rotation\":0,\"scale\":{\"x\":1,\"y\":1},\"pivot\":{\"x\":0,\"y\":0}},\"bounds\":{\"left\":0,\"top\":0,\"right\":10,\"bottom\":10}},\"node_b\":{\"id\":\"node_b\",\"kind\":\"part\",\"displayName\":\"B\",\"sourceRef\":null,\"parentId\":\"node_native_parity_0002\",\"children\":[],\"visible\":true,\"locked\":false,\"opacity\":1,\"blendMode\":\"normal\",\"transform\":{\"position\":{\"x\":0,\"y\":0},\"rotation\":0,\"scale\":{\"x\":1,\"y\":1},\"pivot\":{\"x\":0,\"y\":0}},\"bounds\":{\"left\":0,\"top\":0,\"right\":10,\"bottom\":10}}}},\"meshes\":[],\"meshTopologies\":[],\"meshKeyforms\":[],\"meshFormCorrectionKeyforms\":[],\"clippingBindings\":[],\"rig\":{\"deformers\":[],\"warpControlPoints\":[],\"warpDeformerKeyforms\":[],\"bones\":[],\"bonePoseKeyforms\":[],\"rigidBoneBindings\":[],\"skinBindings\":[],\"boneRotationConstraints\":[],\"twoBoneIkConstraints\":[],\"constraints\":[]},\"transitions\":[{\"id\":\"transition_ab\",\"displayName\":\"A to B\",\"fromKeyArtId\":\"art_a\",\"toKeyArtId\":\"art_b\",\"temporalProgramId\":\"program_transition\",\"partTransitions\":[{\"id\":\"part_ab\",\"semanticSlotId\":\"slot_1\",\"mode\":\"replace\",\"topologyId\":null,\"fromKeyformId\":null,\"toKeyformId\":null,\"configuration\":{\"compositeGroupId\":\"group_1\"}}],\"diagnosticOverrides\":[]}],\"temporalPrograms\":[{\"id\":\"program_transition\",\"durationTicks\":100,\"tracks\":[],\"events\":[],\"regions\":[]},{\"id\":\"program_sequence\",\"durationTicks\":9007199254740991,\"tracks\":[],\"events\":[],\"regions\":[]},{\"id\":\"exact_clip_program\",\"durationTicks\":9007199254740990,\"tracks\":[],\"events\":[],\"regions\":[]}],\"animation\":{\"clips\":[{\"id\":\"exact_clip\",\"displayName\":\"Exact ticks\",\"temporalProgramId\":\"exact_clip_program\",\"defaultLoopMode\":\"once\",\"metadata\":{}}],\"deformationSamples\":[]},\"sequences\":[{\"id\":\"sequence_1\",\"displayName\":\"Shot\",\"temporalProgramId\":\"program_sequence\",\"viewLaneItems\":[{\"id\":\"exact_hold\",\"kind\":\"KeyArtHold\",\"keyArtId\":\"art_a\",\"startTicks\":0,\"endTicks\":9007199254740991}],\"clipInstances\":[{\"id\":\"exact_instance\",\"clipId\":\"exact_clip\",\"startTicks\":0,\"endTicks\":4503599627370496,\"sourceOffsetTicks\":9007199254740990,\"playbackRate\":{\"numerator\":1,\"denominator\":9007199254740990},\"loopMode\":\"once\",\"weight\":1,\"layer\":0,\"enabled\":true}],\"metadata\":{}}],\"renderSettings\":{\"frameRate\":{\"numerator\":30,\"denominator\":1},\"alpha\":true}}",
+    "expected": [
+      {
+        "code": "ANIMATION_CLIP_ONCE_OVERRUN",
+        "path": "sequences.0.clipInstances.0",
+        "entityId": "exact_instance",
+        "severity": "error"
+      }
+    ]
+  },
+  {
     "name": "populated_sequence_multi_error",
     "project": {
       "schemaVersion": 15,

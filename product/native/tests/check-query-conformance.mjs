@@ -3,6 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { cloneProject, createSceneNode } from '../../src/model/project.js';
 import { validationResult } from '../../src/model/validation.js';
 import { projectQueries, queryProject } from '../../src/queries/project.js';
+import { TEMPORAL_TRACK_DEFINITIONS } from '../../src/core/temporal.js';
 
 const inventory = await readFile(new URL('../core/src/native_query_names.inc', import.meta.url), 'utf8');
 const entries = [...inventory.matchAll(/FL2D_QUERY\(\w+, "([^"]+)", ([01])\)/g)].map(match => ({ name: match[1], implemented: match[2] === '1' }));
@@ -68,6 +69,67 @@ for (const topology of hugeVertices.meshTopologies) {
   topology.vertexIds = topology.vertexIds.map(() => vertexIndex++ === 0 ? 'vtx_1000000000000000000000' : `vtx_${vertexIndex}`);
 }
 add(hugeVertices);
+const temporalSource = projects.find(project => project.sequences.length && project.keyArts.length);
+assert(temporalSource);
+const exactTime = cloneProject(temporalSource), maximum = Number.MAX_SAFE_INTEGER;
+exactTime.sequences = [exactTime.sequences[0]];
+const exactSequence = exactTime.sequences[0];
+const exactProgram = exactTime.temporalPrograms.find(program => program.id === exactSequence.temporalProgramId);
+Object.assign(exactProgram, { durationTicks: maximum, tracks: [], events: [], regions: [] });
+exactSequence.viewLaneItems = [{ id: 'query_long_hold', kind: 'KeyArtHold', keyArtId: exactTime.keyArts[0].id, startTicks: 0, endTicks: maximum }];
+exactTime.temporalPrograms.push({ id: 'query_exact_clip_program', durationTicks: maximum, tracks: [], events: [], regions: [] });
+exactTime.animation.clips.push({ id: 'query_exact_clip', displayName: 'Exact tick edge', temporalProgramId: 'query_exact_clip_program', defaultLoopMode: 'once', metadata: {} });
+exactSequence.clipInstances = [
+  { id: 'query_near_unity', clipId: 'query_exact_clip', startTicks: 0, endTicks: maximum, sourceOffsetTicks: 0, playbackRate: { numerator: maximum, denominator: maximum - 1 }, loopMode: 'once', weight: 1, layer: 0, enabled: true },
+  { id: 'query_near_half', clipId: 'query_exact_clip', startTicks: 0, endTicks: maximum, sourceOffsetTicks: maximum - 1, playbackRate: { numerator: 1, denominator: maximum - 1 }, loopMode: 'loop', weight: 1, layer: 1, enabled: true },
+  { id: 'query_disabled', clipId: 'query_exact_clip', startTicks: 0, endTicks: maximum, sourceOffsetTicks: maximum - 1, playbackRate: { numerator: 1, denominator: maximum - 1 }, loopMode: 'loop', weight: 1, layer: 2, enabled: false },
+  { id: 'query_zero_weight', clipId: 'query_exact_clip', startTicks: 0, endTicks: maximum, sourceOffsetTicks: 0, playbackRate: { numerator: maximum, denominator: maximum - 1 }, loopMode: 'once', weight: 0, layer: 3, enabled: true },
+];
+add(exactTime);
+const sampling = cloneProject(projects.find(project => project.rig.deformers.length));
+const sampleSource = projects.find(project => project.animation.deformationSamples.length);
+sampling.meshes = cloneProject(sampleSource.meshes);
+sampling.animation.deformationSamples = cloneProject(sampleSource.animation.deformationSamples);
+const sample = sampling.animation.deformationSamples[0];
+sampling.animation.deformationSamples.push({ ...cloneProject(sample), id: 'query_sample_second' });
+const mask = createSceneNode({ id: 'query_sample_mask', displayName: 'Sample mask', parentId: sampling.scene.rootId });
+sampling.scene.nodes[mask.id] = mask; sampling.scene.nodes[sampling.scene.rootId].children.push(mask.id);
+const samplingProgram = { id: 'query_sampling', durationTicks: 100, tracks: [], events: [
+  { id: 'query_event_\uE000', timeTicks: 50, type: 'marker', participants: ['part'], payload: { cue: 'private-use' } },
+  { id: 'query_event_\u{10000}', timeTicks: 50, type: 'marker', participants: ['part'], payload: { cue: 'astral' } },
+], regions: [
+  { id: 'query_region_later', startTicks: 25, endTicks: 100, type: 'hold', metadata: {} },
+  { id: 'query_region_first', startTicks: 0, endTicks: 50, type: 'hold', metadata: {} },
+] };
+const track = (id, kind, target, channels, curve = { kind: 'linear' }) => {
+  samplingProgram.tracks.push({ trackId: `query_track_${id}`, version: 1, kind, target, channels:
+    Object.fromEntries(Object.entries(channels).map(([name, values]) => [name, { keyframes: values.map((value, index) => ({
+      id: `query_key_${id}_${name}_${index}`, timeTicks: index * 100, value,
+      interpolationToNext: index ? { kind: 'step' } : curve,
+    })) }])) });
+};
+const nodeTarget = { nodeId: 'part' }, slotTarget = { semanticSlotId: sampling.semanticSlots[0].id };
+const bezier = { kind: 'bezier', x1: 0.17, y1: 0.03, x2: 0.83, y2: 0.91 };
+track('geometry', 'GeometryBlendTrack', slotTarget, { geometryWeight: [0.1, 0.9] }, bezier);
+track('appearance', 'AppearanceTrack', slotTarget, { appearance: [{ appearance: 1 }, { alternate: 1 }] }, bezier);
+track('opacity', 'OpacityTrack', nodeTarget, { opacity: [0.2, 0.8] });
+track('presence', 'PresenceTrack', nodeTarget, { presence: ['present', 'absent'] }, { kind: 'step' });
+track('draw_order', 'DrawOrderTrack', nodeTarget, { drawOrder: [2, -3] }, { kind: 'step' });
+track('clipping', 'ClippingTrack', nodeTarget, { clipping: [{ sourceNodeId: null }, { sourceNodeId: mask.id }] }, { kind: 'step' });
+track('transform', 'TransformTrack', { ...nodeTarget, coordinateSpace: 'node-local' }, { rotation: [170 * Math.PI / 180, -170 * Math.PI / 180], positionX: [1e308, -1e308], positionY: [], scaleX: [0.5, 2.3] }, bezier);
+track('\u{10000}', 'BoneTrack', { boneId: sampling.rig.bones[0].id }, { rotation: [0, Math.PI], x: [-3, 15], y: [0, 6] });
+track('\uE000', 'BoneTrack', { boneId: sampling.rig.bones[1].id }, { rotation: [0, -Math.PI] });
+const warp = sampling.rig.deformers[0];
+track('deformer', 'DeformerTrack', { deformerId: warp.id, controlPointId: warp.controlPointIds[0] }, { deltaX: [-3, 15], deltaY: [0, 6] });
+track('camera', 'CameraTrack', { cameraId: 'main' }, { rotation: [0, Math.PI * 2 - 0.01], scale: [1, 2], positionX: [], positionY: [-10, 10] });
+track('deformation', 'MeshDeformationTrack', { meshId: sample.meshId }, { deformation: [{ deformationSampleId: sample.id, weight: 0 }, { deformationSampleId: sample.id, weight: 1 }] });
+const cameraProgram = { id: 'query_camera_sampling', durationTicks: 100, tracks: samplingProgram.tracks.filter(track => track.kind === 'CameraTrack'), events: [], regions: [] };
+samplingProgram.tracks = samplingProgram.tracks.filter(track => track.kind !== 'CameraTrack');
+sampling.temporalPrograms.push(samplingProgram, cameraProgram);
+sampling.sequences.push({ id: 'query_sampling_sequence', displayName: 'Sample inspection', temporalProgramId: cameraProgram.id,
+  viewLaneItems: [{ id: 'query_sampling_hold', kind: 'KeyArtHold', keyArtId: sampling.keyArts[0].id, startTicks: 0, endTicks: 100 }], clipInstances: [], metadata: {} });
+add(sampling);
+assert.deepEqual([...new Set([...samplingProgram.tracks, ...cameraProgram.tracks].map(track => track.kind))].sort(), Object.keys(TEMPORAL_TRACK_DEFINITIONS).sort(), 'All typed temporal track families must be sampled');
 
 const getters = {
   'deformer.get': ['rig.deformers', 'deformerId'], 'bone.get': ['rig.bones', 'boneId'],
@@ -135,6 +197,39 @@ const fixtures = projects.map((project, projectIndex) => {
     run('animation.deformation_sample.list', { meshId: value.meshId, topologyId: value.topologyId });
   }
   for (const meshId of ['', null, false, 'missing']) run('animation.deformation_sample.list', { meshId });
+  if (implemented.includes('animation.sample_program')) for (const program of project.temporalPrograms) {
+    const times = new Set([0, program.durationTicks, Math.floor(program.durationTicks / 2), 1, 17, 25, 49, 51, 75, 99].filter(time => time <= program.durationTicks));
+    for (const event of program.events) times.add(event.timeTicks);
+    for (const region of program.regions) { times.add(region.startTicks); times.add(region.endTicks); }
+    for (const track of program.tracks) for (const channel of Object.values(track.channels)) {
+      const keys = [...channel.keyframes].sort((a, b) => a.timeTicks - b.timeTicks);
+      for (const [index, key] of keys.entries()) {
+        times.add(key.timeTicks);
+        if (index) times.add(Math.floor((keys[index - 1].timeTicks + key.timeTicks) / 2));
+      }
+    }
+    for (const timeTicks of times) run('animation.sample_program', { programId: program.id, timeTicks });
+    for (const timeTicks of [-1, null, false, '0', 0.5, program.durationTicks + 1, Number.MAX_SAFE_INTEGER + 1]) run('animation.sample_program', { programId: program.id, timeTicks });
+  }
+  if (implemented.includes('sequence.project_clip_instances')) for (const sequence of project.sequences) {
+    const duration = project.temporalPrograms.find(program => program.id === sequence.temporalProgramId).durationTicks;
+    const middle = Math.floor(duration / 2);
+    const times = new Set([0, duration, middle, Math.max(0, middle - 1), Math.min(duration, middle + 1)]);
+    for (const instance of sequence.clipInstances) for (const time of [instance.startTicks - 1, instance.startTicks, instance.startTicks + 1, instance.endTicks - 1, instance.endTicks])
+      if (time >= 0 && time <= duration) times.add(time);
+    for (const timeTicks of times) run('sequence.project_clip_instances', { sequenceId: sequence.id, timeTicks });
+    for (const timeTicks of [-1, null, false, '0', 0.5, duration + 1]) run('sequence.project_clip_instances', { sequenceId: sequence.id, timeTicks });
+  }
+  if (implemented.includes('export.get_frame_plan')) {
+    const rates = [{ numerator: 24, denominator: 1 }, { numerator: 30000, denominator: 1001 },
+      { numerator: 60000, denominator: 2002 }, { numerator: 1000000, denominator: 1 },
+      { numerator: Number.MAX_SAFE_INTEGER, denominator: 1 }, { numerator: 1, denominator: Number.MAX_SAFE_INTEGER },
+      { numerator: Number.MAX_SAFE_INTEGER, denominator: Number.MAX_SAFE_INTEGER - 1 },
+      { numerator: 0, denominator: 1 }, { numerator: 1, denominator: 0 }, { numerator: '24', denominator: 1 },
+      { numerator: 24.5, denominator: 1 }, null, {}];
+    for (const transition of project.transitions) for (const frameRate of rates) run('export.get_frame_plan', { transitionId: transition.id, frameRate });
+    for (const sequence of project.sequences) for (const frameRate of rates) run('export.get_frame_plan', { sequenceId: sequence.id, frameRate });
+  }
   return { name: `query-project-${projectIndex}`, project, cases };
 });
 const coverage = new Set(fixtures.flatMap(fixture => fixture.cases.map(entry => entry.request.name)));

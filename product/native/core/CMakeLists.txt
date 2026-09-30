@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 project(Flamoris2D.Core.Native LANGUAGES CXX)
 
-add_library(Flamoris2D.Core.Native SHARED src/flamoris2d_core.cpp src/project_snapshot.cpp src/editor_session.cpp src/native_commands.cpp src/rig_hierarchy_commands.cpp src/temporal_commands.cpp src/transition_commands.cpp src/mesh_commands.cpp src/native_queries.cpp)
+add_library(Flamoris2D.Core.Native SHARED src/flamoris2d_core.cpp src/project_snapshot.cpp src/editor_session.cpp src/native_commands.cpp src/rig_hierarchy_commands.cpp src/temporal_commands.cpp src/transition_commands.cpp src/mesh_commands.cpp src/native_queries.cpp src/native_temporal_evaluation.cpp)
 target_compile_features(Flamoris2D.Core.Native PRIVATE cxx_std_17)
 target_compile_definitions(Flamoris2D.Core.Native PRIVATE FL2D_CORE_BUILD)
 target_include_directories(Flamoris2D.Core.Native PUBLIC include)

@@ -45,6 +45,7 @@
 // for isnan/isinf
 #if __cplusplus >= 201103L
 #include <cmath>
+#include <cstdint>
 #else
 extern "C" {
 #ifdef _MSC_VER

@@ -282,11 +282,15 @@ re-import uses the ordinary Project snapshot inverse, logical identity check,
 affected-ID enumeration and before/after owner validation.
 `source-session-conformance.json` protects state/history parity and observable
 property order across typed node creation, source replacement, Undo/Redo and
-serialization. ABI 1.4 now adds 48 of the 72 readonly Product queries on this
+serialization. ABI 1.4 now adds 51 of the 72 readonly Product queries on this
 same session; see [the Query boundary](../../docs/native-query-migration.md).
 `query-conformance.json` protects values, Product exception messages, canonical
 lists, ancestor/pivot matrices, nullable selectors and complete session immutability,
 including outstanding prepared edits. Project validation reuses admission and
-retains the three existing warning messages/details. The remaining 24 queries
-include locale-sensitive lists/search and evaluation/export projections; runtime
+retains the three existing warning messages/details. Native temporal sampling, rational Clip tick inspection and export frame planning
+now share deterministic math, including exact 128-bit intermediate tick products.
+Admission uses the same exact Clip arithmetic. Export planning bounds sub-tick
+frames directly instead of iterating potentially billions of trailing candidates.
+The remaining 21 queries include locale-sensitive lists/search and rig/Transition/
+Sequence evaluation/export projections; runtime
 authority cutover remains pending.
