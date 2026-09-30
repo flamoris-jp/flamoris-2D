@@ -58,6 +58,28 @@ test("tick-domain exclusivity removes a frame that round-half-up projects onto d
   assert.throws(() => planner.frameAt(1), /planned frame range/);
 });
 
+test("valid sub-tick frame rates exclude billions of trailing candidates without iterating them", () => {
+  const frameRate = { numerator: Number.MAX_SAFE_INTEGER, denominator: 1 };
+  const planner = new ExportFramePlanner({ durationTicks: 1, frameRate });
+  assert.equal(planner.frameCount, 37529996895);
+  assert.deepEqual(planner.firstFrame(), { frameIndex: 0, timeTicks: 0, exact: true });
+  assert.deepEqual(planner.lastFrame(), { frameIndex: 37529996894, timeTicks: 0, exact: false });
+  assert.equal(frameToTicks(planner.frameCount, frameRate).ticks, 1);
+  assert.throws(() => new ExportFramePlanner({ durationTicks: Number.MAX_SAFE_INTEGER, frameRate }), /Export frame count exceeds/);
+});
+
+test("exact count optimization preserves the canonical tick boundary at rational sub-tick rates", () => {
+  for (const durationTicks of [1, 2, 7, 19]) for (const numerator of [7, 120000, 240000, 999999]) for (const denominator of [1, 2, 7]) {
+    const frameRate = { numerator, denominator };
+    const candidate = Math.ceil(durationTicks * numerator / (120000 * denominator));
+    let reference = candidate;
+    while (reference && frameToTicks(reference - 1, frameRate).ticks >= durationTicks) --reference;
+    const planner = new ExportFramePlanner({ durationTicks, frameRate });
+    assert.equal(planner.frameCount, reference);
+    assert(planner.lastFrame().timeTicks < durationTicks);
+  }
+});
+
 test("every planned frame remains strictly inside the tick-domain duration", () => {
   const cases = [
     { durationTicks: 17143, frameRate: { numerator: 7, denominator: 1 }, frameCount: 1 },

@@ -226,6 +226,22 @@ populated.sequences.push({ id: "sequence_1", displayName: "Shot", temporalProgra
     { id: "hold_a", kind: "KeyArtHold", keyArtId: "art_a", startTicks: 0, endTicks: 100 },
   ], clipInstances: [], metadata: {} });
 cases.push(["populated_sequence_transition", populated]);
+for (const mode of ['near_unity_valid', 'near_unity_overflow', 'below_half_valid', 'at_half_overrun']) {
+  variant('clip_exact_' + mode, populated, p => {
+    const maximum = Number.MAX_SAFE_INTEGER;
+    const sequence = p.sequences[0];
+    p.temporalPrograms.find(program => program.id === sequence.temporalProgramId).durationTicks = maximum;
+    sequence.viewLaneItems = [{ id: 'exact_hold', kind: 'KeyArtHold', keyArtId: p.keyArts[0].id, startTicks: 0, endTicks: maximum }];
+    const half = mode.startsWith('below_half') || mode.startsWith('at_half');
+    p.temporalPrograms.push({ id: 'exact_clip_program', durationTicks: half ? maximum - 1 : maximum, tracks: [], events: [], regions: [] });
+    p.animation.clips.push({ id: 'exact_clip', displayName: 'Exact ticks', temporalProgramId: 'exact_clip_program', defaultLoopMode: 'once', metadata: {} });
+    sequence.clipInstances = [{ id: 'exact_instance', clipId: 'exact_clip', startTicks: 0,
+      endTicks: half ? (maximum - 1) / 2 + (mode === 'at_half_overrun' ? 1 : 0) : maximum,
+      sourceOffsetTicks: half ? maximum - 1 : 0,
+      playbackRate: { numerator: half ? 1 : maximum, denominator: maximum - (mode === 'near_unity_overflow' ? 2 : 1) },
+      loopMode: 'once', weight: 1, layer: 0, enabled: true }];
+  });
+}
 variant("populated_sequence_multi_error", populated, p => {
   p.sequences[0].viewLaneItems.find(item => item.id === "hold_b").startTicks = 190;
   p.transitions[0].partTransitions[0].semanticSlotId = "missing";

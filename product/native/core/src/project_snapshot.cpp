@@ -2,6 +2,7 @@
 #include "picojson.h"
 #include "js_text.h"
 #include "native_validation.h"
+#include "wide_ticks.h"
 
 #include <algorithm>
 #include <cmath>
@@ -214,11 +215,11 @@ void validate_clip_instances(Snapshot& s, const Value& project, const Value& seq
             continue;
         }
         // Compute the last active local tick without overflowing a JS safe integer.
-        const long double elapsed = static_cast<long double>(end.get<double>() - 1 - start.get<double>());
-        const long double raw = static_cast<long double>(offset.get<double>()) +
-            std::floor((elapsed * n.get<double>() / d.get<double>()) + 0.5L);
-        if (raw > 9007199254740991.0L) add(s, "ANIMATION_CLIP_LOCAL_TIME_OVERFLOW", path, id);
-        else if (loop == "once" && finite(clip_duration) && raw > clip_duration.get<double>())
+        const auto elapsed = static_cast<uint64_t>(end.get<double>())-1-static_cast<uint64_t>(start.get<double>());
+        const auto raw = fl2d_ticks::local_tick(elapsed,static_cast<uint64_t>(offset.get<double>()),
+            static_cast<uint64_t>(n.get<double>()),static_cast<uint64_t>(d.get<double>()));
+        if (!raw.safe()) add(s, "ANIMATION_CLIP_LOCAL_TIME_OVERFLOW", path, id);
+        else if (loop == "once" && finite(clip_duration) && static_cast<double>(raw.low()) > clip_duration.get<double>())
             add(s, "ANIMATION_CLIP_ONCE_OVERRUN", path, id);
     }
 }

@@ -2,6 +2,7 @@
 #include "native_commands.h"
 #include "native_math.h"
 #include "native_validation.h"
+#include "native_temporal_evaluation.h"
 #include "js_text.h"
 #include <algorithm>
 #include <charconv>
@@ -15,7 +16,6 @@
 namespace fl2d_queries {
 namespace {
 using namespace fl2d_commands;
-struct Error { std::string name, message; };
 enum class Query {
 #define FL2D_QUERY(symbol, name, implemented) symbol,
 #include "native_query_names.inc"
@@ -119,36 +119,6 @@ Value program(const Value& p, const Value& id) {
 Value with_duration(const Value& p, Value value) {
     value.get<Object>()["durationTicks"] = field(program(p,field(value,"temporalProgramId")),"durationTicks");
     return value;
-}
-Value canonical(Value value) {
-    if (value.is<Array>()) {
-        for (auto& item : value.get<Array>()) item = canonical(std::move(item));
-    } else if (value.is<Object>()) {
-        auto keys = value.get<Object>().keys(); std::sort(keys.begin(),keys.end(),fl2d_text::less);
-        Object result;
-        for (const auto& key : keys) result.emplace(key,canonical(value.get<Object>().at(key)));
-        value = Value(result);
-    }
-    return value;
-}
-Value temporal_projection(Value value) {
-    auto& object = value.get<Object>();
-    auto tracks = sorted(object.at("tracks"),"trackId");
-    for (auto& track : tracks) {
-        const auto& channels = field(track,"channels").get<Object>();
-        auto names = channels.keys(); std::sort(names.begin(),names.end(),fl2d_text::less);
-        Object result;
-        for (const auto& name : names) {
-            Value channel = channels.at(name);
-            auto& keys = channel.get<Object>().at("keyframes").get<Array>();
-            sort_timed(keys,{"timeTicks"}); result.emplace(name,std::move(channel));
-        }
-        track.get<Object>()["channels"] = Value(result);
-    }
-    object["tracks"] = Value(tracks);
-    sort_timed(object.at("events").get<Array>(),{"timeTicks"});
-    sort_timed(object.at("regions").get<Array>(),{"startTicks","endTicks"});
-    return canonical(std::move(value));
 }
 Value sequence_projection(const Value& p, Value value) {
     sort_timed(value.get<Object>().at("viewLaneItems").get<Array>(),{"startTicks","endTicks"});
@@ -357,7 +327,7 @@ Value dispatch(const Value& p, Query id, const Value& input) {
         return value;
     }
     case Query::animation_get_program: case Query::animation_list_tracks: {
-        auto value = temporal_projection(get(p,input,"temporalPrograms","programId","TemporalProgram"));
+        auto value = fl2d_evaluation::sort_program(get(p,input,"temporalPrograms","programId","TemporalProgram"));
         return id == Query::animation_list_tracks ? field(value,"tracks") : value;
     }
     case Query::animation_clip_get: return with_duration(p,get(p,input,"animation.clips","clipId","AnimationClip"));
@@ -397,6 +367,29 @@ Value dispatch(const Value& p, Query id, const Value& input) {
     case Query::sequence_get_diagnostics:
         (void)get(p,input,"sequences","sequenceId","Sequence");
         return Value(Object{{"valid",Value(true)},{"issues",Value(Array{})}});
+    case Query::animation_sample_program:
+        return fl2d_evaluation::sample_program(get(p,input,"temporalPrograms","programId","TemporalProgram"),field(input,"timeTicks"));
+    case Query::sequence_project_clip_instances: {
+        const auto sequence = get(p,input,"sequences","sequenceId","Sequence");
+        const auto& time = field(input,"timeTicks");
+        const auto duration = field(program(p,field(sequence,"temporalProgramId")),"durationTicks").get<double>();
+        if (!time.is<double>() || !std::isfinite(time.get<double>()) || time.get<double>() < 0 ||
+            std::trunc(time.get<double>()) != time.get<double>() || time.get<double>() > duration)
+            throw Error{"RangeError","Sequence time must be within its inclusive inspection domain."};
+        auto instances = field(sequence,"clipInstances").get<Array>(); sort_timed(instances,{"startTicks","endTicks","layer"});
+        Array result;
+        for (const auto& instance : instances) {
+            const auto clip = find(collection(p,"animation.clips"),field(instance,"clipId"));
+            const auto clip_duration = field(program(p,field(clip,"temporalProgramId")),"durationTicks").get<double>();
+            result.push_back(fl2d_evaluation::clip_projection(instance,static_cast<uint64_t>(time.get<double>()),static_cast<uint64_t>(clip_duration)));
+        }
+        return Value(result);
+    }
+    case Query::export_get_frame_plan: {
+        const auto owner = truthy(field(input,"sequenceId")) ? get(p,input,"sequences","sequenceId","Sequence") : get(p,input,"transitions","transitionId","Transition");
+        const auto duration = field(program(p,field(owner,"temporalProgramId")),"durationTicks").get<double>();
+        return fl2d_evaluation::frame_plan(static_cast<uint64_t>(duration),field(input,"frameRate"));
+    }
     default: throw Unsupported{};
     }
 }

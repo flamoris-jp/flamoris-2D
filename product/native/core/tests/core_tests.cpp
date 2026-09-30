@@ -275,7 +275,7 @@ static void check_session(const picojson::object& root, bool full_admission) {
     fl2d_session_destroy(session);
 }
 
-static bool query_equal(const picojson::value& actual, const picojson::value& expected, bool geometry = false) {
+static bool query_equal(const picojson::value& actual, const picojson::value& expected, bool geometry = false, bool sampling = false) {
     using Object = picojson::object; using Array = picojson::array;
     if (geometry && actual.is<double>() && expected.is<double>()) {
         const auto a = actual.get<double>(), b = expected.get<double>();
@@ -285,13 +285,13 @@ static bool query_equal(const picojson::value& actual, const picojson::value& ex
         const auto& a = actual.get<Object>(); const auto& b = expected.get<Object>();
         if (a.size() != b.size()) return false;
         for (const auto& [key,value] : b)
-            if (!a.count(key) || !query_equal(a.at(key),value,geometry || key == "worldTransform")) return false;
+            if (!a.count(key) || !query_equal(a.at(key),value,geometry || key == "worldTransform" || (sampling && key == "values"),sampling)) return false;
         return true;
     }
     if (actual.is<Array>() && expected.is<Array>()) {
         const auto& a = actual.get<Array>(); const auto& b = expected.get<Array>();
         if (a.size() != b.size()) return false;
-        for (size_t i = 0; i < a.size(); ++i) if (!query_equal(a[i],b[i],geometry)) return false;
+        for (size_t i = 0; i < a.size(); ++i) if (!query_equal(a[i],b[i],geometry,sampling)) return false;
         return true;
     }
     return actual == expected;
@@ -335,6 +335,7 @@ static void check_queries() {
         };
         for (const auto& test : fixture.at("cases").get<Array>()) {
             const auto& object = test.get<Object>(); const auto request = object.at("request").serialize(); uint32_t length = 0;
+            const bool sampled = object.at("request").get<Object>().at("name") == Value("animation.sample_program");
             auto call = [&](char* buffer, uint32_t capacity, uint32_t* needed) {
                 return fl2d_session_query_json(session,reinterpret_cast<const uint8_t*>(request.data()),static_cast<uint32_t>(request.size()),buffer,capacity,needed);
             };
@@ -349,7 +350,7 @@ static void check_queries() {
             assert(call(buffer.data(),length,&short_length) == FL2D_OK && short_length == length && buffer[length-1] == 0);
             for (size_t i = length; i < buffer.size(); ++i) assert(buffer[i] == 0x5a);
             const auto actual = parsed(std::string(buffer.data(),length-1));
-            if (!query_equal(actual,object.at("expected"))) {
+            if (!query_equal(actual,object.at("expected"),false,sampled)) {
                 fprintf(stderr,"Query mismatch in %s: %s\n native: %s\n JS: %s\n",
                     fixture.at("name").get<std::string>().c_str(),request.c_str(),actual.serialize().c_str(),object.at("expected").serialize().c_str());
                 assert(false);

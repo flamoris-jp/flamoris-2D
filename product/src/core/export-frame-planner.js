@@ -40,10 +40,13 @@ export class ExportFramePlanner {
       BigInt(durationTicks) * BigInt(normalizedRate.numerator),
       BigInt(TIMEBASE_TICKS_PER_SECOND) * BigInt(normalizedRate.denominator),
     ), "Export frame count");
-    while (frameCount > 0 &&
-      frameToTicks(frameCount - 1, normalizedRate).ticks >= durationTicks) {
-      frameCount -= 1;
-    }
+    // round-half-up reaches the exclusive end at duration - 1/2 tick.
+    // Use the exact bound instead of discarding potentially billions of
+    // sub-tick frames one at a time at a high (but valid) rational rate.
+    frameCount = Math.min(frameCount, safeNumber(ceilDivide(
+      (BigInt(durationTicks) * 2n - 1n) * BigInt(normalizedRate.numerator),
+      BigInt(TIMEBASE_TICKS_PER_SECOND) * BigInt(normalizedRate.denominator) * 2n,
+    ), "Export frame count"));
 
     this.durationTicks = durationTicks;
     this.frameRate = Object.freeze(normalizedRate);

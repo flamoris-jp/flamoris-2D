@@ -49,3 +49,37 @@ scene tree/world matrix projection, canonical temporal lists, Clip/Sequence dura
 and Transition authoring. Full Project validation shares admission and retains
 zero-area/near-degenerate triangle and loop seam warnings, including message and
 details. The sealed inventory marks the remaining 24 names explicitly pending.
+
+## Temporal evaluation checkpoint
+
+Temporal sampling is shared native math for later Transition/Sequence evaluation:
+step/linear/60-step Bezier, sparse object interpolation and signed shortest-arc
+Bone/Transform/Camera rotation retain Product semantics. Canonical track/channel,
+event and inclusive region ordering remain observable in returned projections.
+Sampled channel numbers use the same 1e-12 relative platform-math tolerance as
+world matrices; IDs, ticks, frame counts, other data and all array order are exact.
+
+Clip inspection uses half-open placement, enabled flags, rational playback,
+source offsets and round-half-up ticks. Export planning uses rational timestamps
+and excludes trailing frames which round onto the end boundary. Intermediate
+integer products can exceed 64 bits even though every input/output is a JS safe
+integer. A bounded private unsigned 128-bit helper supports these products on
+both MSVC and GCC without platform-specific arithmetic or floating rounding.
+The largest required frame product is below 2^123; this is fixed tick arithmetic,
+not a persistent format or general arbitrary-precision runtime. Admission's
+existing Clip last-active-tick check shares this exact calculation, replacing its
+long-double approximation. Tests include half-tick ties and safe-range extremes.
+
+Very high valid frame rates expose an existing planner performance defect: its
+trailing-frame loop can discard billions of frames one at a time. Both Product
+and native planning replace that loop with the exact bound
+`ceil((2 * durationTicks - 1) * numerator / (2 * 120000 * denominator))`.
+The initial candidate count's safe-range check still occurs first. This preserves
+all planned values and exception priority while making planning independent of
+the number of discarded sub-tick frames.
+
+The Temporal checkpoint raises coverage to 51/72 queries. All eleven typed track
+families, all three interpolation kinds, signed half-turns, sparse weight maps,
+empty channels, events and inclusive regions are sampled. Tick/frame results are
+exact at safe-integer extremes; sampled channels and matrices retain the stated
+platform-math tolerance. Production authority and physical acceptance remain pending.
