@@ -247,3 +247,9 @@ and Project validation, including astral-plane/private-use characters.
 `rig-conformance.json` protects full Project/history/error/state parity for
 bindings, constraints, weight authoring and mesh samples through ordinary
 native transactions, Undo/Redo, save points and replacement.
+
+Bone creation/rest/pose/reparent/removal and Warp grid/keyform/control-point/
+hierarchy commands now use the same native session. `hierarchy-conformance.json`
+compares full Project/history/error/revision state for typed edits and Undo/Redo,
+including hierarchy cycles, dependency locks, topology compatibility, ordered
+child lifting/restoration, grid presets and atomic candidate rejection.
