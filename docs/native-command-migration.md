@@ -186,7 +186,7 @@ PSD re-import keeps its current typed Project replacement contract: preserve log
 
 ## Current query inventory
 
-72 JS query handlers: 68 native and 4 pending. See the current
+72 JS query handlers: 72 native and 0 pending. See the current
 [Query migration boundary](native-query-migration.md) and sealed native inventory
 for implementation status; JS remains production authority pending cutover.
 

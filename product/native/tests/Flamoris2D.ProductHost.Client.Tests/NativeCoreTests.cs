@@ -158,8 +158,12 @@ internal static class NativeCoreTests
         catch (NativeQueryException error) when (error.ProductName == "Error" && error.Message == "Unknown Bone undefined.") { }
         try { session.Query("unknown.query"); throw new Exception("Unknown Query was accepted."); }
         catch (NativeQueryException error) when (error.ProductName == "Error" && error.Message == "Unknown query unknown.query.") { }
-        try { session.Query("transition.evaluate"); throw new Exception("Pending Query was accepted."); }
-        catch (NotSupportedException) { }
+        try { session.Query("transition.evaluate"); throw new Exception("Missing Transition time was accepted."); }
+        catch (NativeQueryException error) when (error.ProductName == "RangeError" && error.Message == "Transition timeTicks must be a safe integer.") { }
+        try { session.Query("sequence.evaluate"); throw new Exception("Missing Sequence selector was accepted."); }
+        catch (NativeQueryException error) when (error.ProductName == "Error" && error.Message == "Unknown Sequence undefined.") { }
+        try { session.Query("export.evaluate_frame"); throw new Exception("Missing export owner was accepted."); }
+        catch (NativeQueryException error) when (error.ProductName == "Error" && error.Message == "Unknown Transition null.") { }
         try { session.Query("skin.evaluate"); throw new Exception("Missing Skin selector was accepted."); }
         catch (NativeQueryException error) when (error.ProductName == "Error" && error.Message == "Unknown SkinBinding undefined.") { }
         if (beforeProject != session.ProjectJson() || beforeHistory != session.HistoryJson() ||

@@ -288,7 +288,7 @@ static bool query_equal(const picojson::value& actual, const picojson::value& ex
         for (const auto& [key,value] : b)
             if (!a.count(key) || !query_equal(a.at(key),value,geometry || key == "worldTransform" ||
                 (sampling && (key == "values" || key == "bindMatrix" || key == "poseMatrix" || key == "skinMatrix" ||
-                key == "head" || key == "tip" || key == "positions" || key == "localDelta" || key == "end" || key == "joints")),sampling)) return false;
+                key == "transform" || key == "opacity" || key == "weight" || key == "compositeWeight" || key == "normalizedTime" || key == "head" || key == "tip" || key == "positions" || key == "localDelta" || key == "end" || key == "joints")),sampling)) return false;
         return true;
     }
     if (actual.is<Array>() && expected.is<Array>()) {
@@ -304,9 +304,9 @@ static bool same_state(const fl2d_session_state& a, const fl2d_session_state& b)
         a.saved_revision == b.saved_revision && a.undo_depth == b.undo_depth && a.redo_depth == b.redo_depth &&
         a.history_depth == b.history_depth && a.dirty == b.dirty;
 }
-static void check_queries() {
+static void check_queries(const char* path) {
     using Value = picojson::value; using Object = picojson::object; using Array = picojson::array;
-    std::ifstream stream(FL2D_QUERY_FIXTURES); assert(stream.good()); Value fixtures;
+    std::ifstream stream(path); assert(stream.good()); Value fixtures;
     assert(picojson::parse(fixtures,stream).empty());
     for (const auto& row : fixtures.get<Object>().at("fixtures").get<Array>()) {
         const auto& fixture = row.get<Object>();
@@ -343,7 +343,7 @@ static void check_queries() {
             const auto& query_name = object.at("request").get<Object>().at("name");
             const bool sampled = query_name == Value("animation.sample_program") || query_name == Value("bone.get_evaluated_pose") ||
                 query_name == Value("bone.get_two_bone_ik_pose") || query_name == Value("bone.solve_two_bone_ik") ||
-                query_name == Value("skin.evaluate") || query_name == Value("mesh_form.evaluate");
+                query_name == Value("sequence.evaluate") || query_name == Value("export.evaluate_frame") || query_name == Value("transition.evaluate") || query_name == Value("skin.evaluate") || query_name == Value("mesh_form.evaluate");
             auto call = [&](char* buffer, uint32_t capacity, uint32_t* needed) {
                 return fl2d_session_query_json(session,reinterpret_cast<const uint8_t*>(request.data()),static_cast<uint32_t>(request.size()),buffer,capacity,needed);
             };
@@ -417,7 +417,9 @@ int main() {
     assert(fl2d_normalize_frame_rate(engine, 1, 1, nullptr) == FL2D_INVALID_ARGUMENT);
     fl2d_engine_destroy(engine);
     check_project_snapshots();
-    check_queries();
+    check_queries(FL2D_QUERY_FIXTURES);
+    check_queries(FL2D_QUERY_FIXTURES_2);
+    check_queries(FL2D_QUERY_FIXTURES_3);
     for (const auto& input : {std::pair<const char*, bool>{FL2D_SESSION_FIXTURES, true}, {FL2D_RIG_FIXTURES, false}, {FL2D_HIERARCHY_FIXTURES, false}, {FL2D_TEMPORAL_FIXTURES, false}, {FL2D_TRANSITION_FIXTURES, false}, {FL2D_MESH_FIXTURES, false}, {FL2D_SOURCE_FIXTURES, false}}) {
         std::ifstream stream(input.first); assert(stream.good()); picojson::value fixture;
         assert(picojson::parse(fixture, stream).empty());

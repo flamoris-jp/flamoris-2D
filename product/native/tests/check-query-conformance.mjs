@@ -191,6 +191,125 @@ for (const variant of ['translation', 'shear', 'nested', 'missing', 'degenerate'
   add(p);
 }
 
+// Full frame evaluation fixtures: every admitted part mode, endpoint semantics,
+// resolved clipping, composite groups and the shared rig/warp/form stages.
+const frameSource = cloneProject(projects.find(p => p.transitions.some(t => t.partTransitions.some(part => part.mode === 'morph'))));
+frameSource.sequences = [];
+for (const mode of ['morph', 'replace', 'hold', 'appear', 'disappear', 'occlusion']) {
+  for (const variant of ['plain', 'sampled', 'presence', 'transformed', 'clipping', 'group', 'holdTo']) {
+    if (variant === 'group' && mode !== 'replace' || variant === 'holdTo' && mode !== 'hold') continue;
+    const p = cloneProject(frameSource), t = p.transitions[0], part = t.partTransitions[0], slot = p.semanticSlots[0];
+    part.mode = mode;
+    if (mode !== 'morph') part.topologyId = null;
+    if (mode === 'appear' || mode === 'disappear') {
+      const removed = mode === 'appear' ? t.fromKeyArtId : t.toKeyArtId;
+      slot.mappings = slot.mappings.filter(m => m.keyArtId !== removed);
+      part[mode === 'appear' ? 'fromKeyformId' : 'toKeyformId'] = null;
+    }
+    if (variant === 'group') part.configuration.compositeGroupId = 'frame_group';
+    if (variant === 'holdTo') part.configuration.holdEndpoint = 'to';
+    if (variant === 'presence') p.keyArts.forEach((art, i) => { art.members[0].presence = i ? 'occluded' : 'absent'; art.members[0].opacity = 0.3+i*0.2; });
+    if (variant === 'transformed') for (const [i, node] of Object.values(p.scene.nodes).entries()) {
+      node.transform = { position: { x: i*3.25, y: -i*2.5 }, rotation: i ? (i === 1 ? 2.8 : -2.8) : 0.37,
+        scale: { x: 1+i/8, y: i === 2 ? -1 : 1+i/4 }, pivot: { x: 2, y: -3 } };
+    }
+    if (variant === 'sampled') {
+      const program = p.temporalPrograms.find(v => v.id === t.temporalProgramId);
+      const target = { semanticSlotId: slot.id };
+      program.tracks = [['geometry','GeometryBlendTrack','geometryWeight',0.2,0.8],
+        ['opacity','OpacityTrack','opacity',0.3,0.7], ['presence','PresenceTrack','presence','present','absent'],
+        ['order','DrawOrderTrack','drawOrder',7,-3], ['appearance','AppearanceTrack','appearance',{ appearance_a: 0.25, unknown: 0.75 },{ appearance_b: 1 }],
+        ['clipping','ClippingTrack','clipping',{ sourceNodeId: null },{ sourceNodeId: null }]].map(([id,kind,channel,a,b]) => ({
+          trackId: 'frame_track_'+id, version: 1, kind, target, channels: { [channel]: { keyframes: [
+            { id: 'frame_start_'+id, timeTicks: 0, value: a, interpolationToNext: { kind: ['geometry','opacity','appearance'].includes(id) ? 'linear' : 'step' } },
+            { id: 'frame_end_'+id, timeTicks: program.durationTicks, value: b, interpolationToNext: { kind: 'step' } },
+          ] } },
+        }));
+    }
+    if (variant === 'clipping') {
+      const mask = createSceneNode({ id: 'frame_mask', displayName: 'Frame mask', parentId: p.scene.rootId });
+      p.scene.nodes[mask.id] = mask; p.scene.nodes[p.scene.rootId].children.push(mask.id);
+      p.semanticSlots.push({ id: 'frame_mask_slot', displayName: 'Mask', role: 'mask', mappings: p.keyArts.map(a => ({ keyArtId: a.id, nodeId: mask.id })), metadata: {} });
+      for (const art of p.keyArts) { art.members[0].clipping.sourceNodeId = mask.id; art.members.push({ nodeId: mask.id, appearanceId: 'mask_image', opacity: 1, presence: 'present', drawOrder: 3, clipping: { sourceNodeId: null } }); }
+      t.partTransitions.push({ id: 'frame_mask_part', semanticSlotId: 'frame_mask_slot', mode: 'hold', topologyId: null, fromKeyformId: null, toKeyformId: null, configuration: {} });
+    }
+    add(p);
+  }
+}
+for (const kind of ['rigid', 'skin', 'skinMismatch', 'rigidMismatch', 'warp', 'warpMissing', 'form','formOne','formIncompatible','formOverflow']) {
+  const p = cloneProject(frameSource), t = p.transitions[0], slot = p.semanticSlots[0], topology = p.meshTopologies[0];
+  p.meshKeyforms[0].positions = [0,0,10,0,0,10]; p.meshKeyforms[1].positions = [1,2,12,1,2,13];
+  const bone = { id: 'frame_bone', parentNodeId: p.scene.rootId, restLocalTransform: { x: 2, y: 3, rotation: 0.1 }, length: 10, enabled: true };
+  p.rig.bones.push(bone); p.scene.nodes[bone.id] = createSceneNode({ id: bone.id, kind: 'bone', displayName: 'Frame bone', parentId: p.scene.rootId }); p.scene.nodes[p.scene.rootId].children.push(bone.id);
+  p.scene.nodes[bone.id].transform.position = { x: 2, y: 3 }; p.scene.nodes[bone.id].transform.rotation = 0.1;
+  p.rig.bonePoseKeyforms = p.keyArts.map((a,i) => ({ boneId: bone.id, keyArtId: a.id, localDelta: { x: i*4, y: 2-i, rotation: i ? -0.7 : 0.5 } }));
+  if (kind.startsWith('skin')) p.rig.skinBindings = ['node_a','node_b'].slice(0,kind === 'skinMismatch' ? 1 : 2).map((node,i) => ({ id: 'frame_skin_'+i, targetNodeId: node, topologyId: topology.id, enabled: true,
+    vertexWeights: topology.vertexIds.map(vertexId => ({ vertexId, influences: [{ boneId: bone.id, weight: 1 }] })) }));
+  if (kind.startsWith('rigid')) p.rig.rigidBoneBindings = ['node_a','node_b'].slice(0,kind === 'rigidMismatch' ? 1 : 2).map((node,i) => ({ id: 'frame_rigid_'+i, targetNodeId: node, boneId: bone.id, enabled: true }));
+  if (kind.startsWith('warp')) {
+    const id = 'frame_warp', created = createWarpDeformer({ id, displayName: id, parentNodeId: p.scene.rootId, columns: 2, rows: 2, bounds: { left: -20, top: -20, right: 100, bottom: 100 }, controlPointIds: ['tl','tr','bl','br'].map(s => id+'_'+s) });
+    p.rig.deformers.push(created.deformer); p.rig.warpControlPoints.push(...created.controlPoints);
+    p.scene.nodes[id] = createSceneNode({ id, kind: 'deformer', displayName: id, parentId: p.scene.rootId }); p.scene.nodes[p.scene.rootId].children.push(id);
+    for (const nodeId of ['node_a','node_b',bone.id]) { p.scene.nodes[p.scene.rootId].children = p.scene.nodes[p.scene.rootId].children.filter(v => v !== nodeId); p.scene.nodes[id].children.push(nodeId); p.scene.nodes[nodeId].parentId = id; }
+    bone.parentNodeId = id;
+    if (kind !== 'warpMissing') p.rig.warpDeformerKeyforms = p.keyArts.map((art,i) => ({ deformerId: id, keyArtId: art.id, controlPoints: defaultWarpKeyformControlPoints(created.deformer,created.controlPoints).map((v,j) => ({ ...v, x: v.x+i*5+(j%2 ? 2 : 0), y: v.y-i*3+(j===3 ? 7 : 0) })) }));
+    p.rig.rigidBoneBindings = ['node_a','node_b'].map((node,i) => ({ id: 'frame_rigid_'+i, targetNodeId: node, boneId: bone.id, enabled: true }));
+  }
+  if (kind.startsWith('form')) p.meshFormCorrectionKeyforms = p.keyArts.map((a,i) => ({ id: 'frame_form_'+i, topologyId: topology.id, keyArtId: a.id, semanticSlotId: slot.id, vertexOffsets: [{ vertexId: topology.vertexIds[1], x: i ? -3 : 2, y: i ? 4 : -1 }] }));
+  if (kind === 'formOne') p.meshFormCorrectionKeyforms = p.meshFormCorrectionKeyforms.slice(0,1);
+  if (kind === 'formIncompatible') {
+    const other = cloneProject(topology); other.id = 'frame_form_topology'; other.vertexIds = other.vertexIds.map(v => 'form_'+v); p.meshTopologies.push(other); p.meshKeyforms.push({ ...cloneProject(p.meshKeyforms[1]),id: 'frame_other_keyform',topologyId: other.id });
+    p.meshFormCorrectionKeyforms[1].topologyId = other.id; p.meshFormCorrectionKeyforms[1].vertexOffsets[0].vertexId = other.vertexIds[1];
+  }
+  if (kind === 'formOverflow') p.meshFormCorrectionKeyforms.forEach((k,i) => { k.vertexOffsets[0].x = i ? -1e308 : 1e308; });
+  add(p);
+}
+
+// Large finite area ratios exercise JSON.stringify's shortest-decimal spelling
+// in diagnostic evidence, including integers whose exact binary value is longer.
+for (const width of [1000000000000000128, 1e21, 1e-6]) {
+  const p = cloneProject(frameSource);
+  p.meshKeyforms[0].positions = [0,0,1,0,0,1];
+  p.meshKeyforms[1].positions = [0,0,width,0,0,1];
+  add(p);
+}
+
+const mixedFrameSource = cloneProject(projects.find(p => p.scene.nodes.frame_warp && p.rig.warpDeformerKeyforms.length));
+for (const baseKind of ['KeyArtHold','TransitionInstance']) for (const variant of ['transformNode','transformSlot','opacity','presence','order','clipping','conflict','highestLayer','bone','warp','warpInactive','warpBone','warpMissing','mesh','meshInactive','zero','mixed']) {
+  const p = cloneProject(mixedFrameSource), t = p.transitions[0], slot = p.semanticSlots[0];
+  const program = { id: 'frame_sequence_program', durationTicks: 100, tracks: [{ trackId: 'frame_camera',version: 1,kind: 'CameraTrack',target: { cameraId: 'main' },channels: { scale: { keyframes: [{ id: 'frame_camera_key',timeTicks: 0,value: 1.5,interpolationToNext: { kind: 'step' } }] } } }],events: [{ id: 'frame_sequence_event',timeTicks: 1,type: 'marker',participants: [],payload: {} }],regions: [] };
+  p.temporalPrograms.push(program); p.meshes = [{ id: 'frame_mesh' }];
+  p.animation.deformationSamples = [{ id: 'frame_sample',meshId: 'frame_mesh',topologyId: p.meshTopologies[0].id,offsets: [{ vertexId: p.meshTopologies[0].vertexIds[0],dx: 3,dy: -2 }] }];
+  const sequence = { id: 'frame_sequence',displayName: 'Frame mixer',temporalProgramId: program.id,viewLaneItems: [{ id: 'frame_view',kind: baseKind,...(baseKind === 'KeyArtHold' ? { keyArtId: t.fromKeyArtId } : { transitionId: t.id }),startTicks: 0,endTicks: 100 }],clipInstances: [],metadata: {} }; p.sequences = [sequence];
+  const addClip = (id,kind,target,channels,weight=1,layer=0) => {
+    const clipProgram = { id: 'frame_clip_program_'+id,durationTicks: 100,tracks: [{ trackId: 'frame_clip_track_'+id,version: 1,kind,target,channels: Object.fromEntries(Object.entries(channels).map(([channel,value]) => [channel,{ keyframes: [{ id: 'frame_clip_key_'+id+'_'+channel,timeTicks: 0,value,interpolationToNext: { kind: 'step' } }] }])) }],events: [{ id: 'frame_clip_event_'+id,timeTicks: 1,type: 'marker',participants: [],payload: {} }],regions: [] };
+    p.temporalPrograms.push(clipProgram); p.animation.clips.push({ id: 'frame_clip_'+id,displayName: id,temporalProgramId: clipProgram.id,defaultLoopMode: 'once',metadata: {} });
+    sequence.clipInstances.push({ id: 'frame_instance_'+id,clipId: 'frame_clip_'+id,startTicks: 0,endTicks: 100,sourceOffsetTicks: 0,playbackRate: { numerator: 1,denominator: 1 },loopMode: 'once',weight,layer,enabled: true });
+  };
+  const semantic = { semanticSlotId: slot.id };
+  if (variant === 'transformNode') addClip('node','TransformTrack',{ nodeId: 'node_a',coordinateSpace: 'node-local' },{ positionX: 7,rotation: 0.3,scaleX: 1.5 },0.5);
+  if (variant === 'transformSlot' || variant === 'mixed') addClip('slot','TransformTrack',{ ...semantic,coordinateSpace: 'node-local' },{ positionX: 7,positionY: -3,rotation: 0.3,scaleX: 1.5,scaleY: 0.7 },0.5);
+  if (variant === 'opacity' || variant === 'zero' || variant === 'mixed') addClip('opacity','OpacityTrack',semantic,{ opacity: 0.3 },variant === 'zero' ? 0 : 0.5);
+  if (variant === 'presence' || variant === 'fractional' || variant === 'conflict' || variant === 'highestLayer') addClip('presence','PresenceTrack',semantic,{ presence: 'absent' },variant === 'fractional' ? 0.5 : 1);
+  if (variant === 'conflict' || variant === 'highestLayer') addClip('other_presence','PresenceTrack',semantic,{ presence: 'present' },1,variant === 'highestLayer' ? 3 : 0);
+  if (variant === 'order' || variant === 'mixed') addClip('order','DrawOrderTrack',semantic,{ drawOrder: 9 });
+  if (variant === 'clipping') addClip('clipping','ClippingTrack',{ nodeId: 'node_a' },{ clipping: { sourceNodeId: 'node_b' } });
+  if (variant === 'bone' || variant === 'mixed') addClip('bone','BoneTrack',{ boneId: 'frame_bone' },{ x: 2,y: -1,rotation: 0.25 },0.7);
+  if (variant === 'warp' || variant === 'warpInactive' || variant === 'warpBone' || variant === 'warpMissing' || variant === 'mixed') {
+    if (variant === 'warpMissing') p.rig.warpDeformerKeyforms = [];
+    if (variant === 'warpInactive' || variant === 'warpBone') {
+      for (const id of (variant === 'warpBone' ? ['node_a','node_b'] : ['node_a','node_b','frame_bone'])) { p.scene.nodes.frame_warp.children = p.scene.nodes.frame_warp.children.filter(v => v !== id); p.scene.nodes[p.scene.rootId].children.push(id); p.scene.nodes[id].parentId = p.scene.rootId; }
+      if (variant === 'warpInactive') p.rig.bones[0].parentNodeId = p.scene.rootId;
+    }
+    addClip('warp','DeformerTrack',{ deformerId: 'frame_warp',controlPointId: p.rig.deformers[0].controlPointIds[0] },{ deltaX: 3,deltaY: -2 },0.7);
+  }
+  if (variant === 'mesh' || variant === 'meshInactive' || variant === 'mixed') {
+    if (variant === 'meshInactive') { const topology = cloneProject(p.meshTopologies[0]); topology.id = 'frame_other_topology'; topology.vertexIds = topology.vertexIds.map(id => 'other_'+id); p.animation.deformationSamples[0].offsets[0].vertexId = topology.vertexIds[0]; p.meshTopologies.push(topology); p.animation.deformationSamples[0].topologyId = topology.id; }
+    addClip('mesh','MeshDeformationTrack',{ meshId: 'frame_mesh' },{ deformation: { deformationSampleId: 'frame_sample',weight: 0.3 } },0.7);
+  }
+  add(p);
+}
+
 const getters = {
   'deformer.get': ['rig.deformers', 'deformerId'], 'bone.get': ['rig.bones', 'boneId'],
   'bone.get_rotation_constraint': ['rig.boneRotationConstraints', 'constraintId'],
@@ -206,6 +325,7 @@ const getters = {
   'mesh.get_topology': ['meshTopologies', 'topologyId'], 'mesh.get_vertex': ['meshTopologies', 'topologyId'],
   'mesh.get_keyform': ['meshKeyforms', 'keyformId'],
   'transition.get': ['transitions', 'transitionId'], 'transition.get_authoring': ['transitions', 'transitionId'],
+  'transition.get_diagnostics': ['transitions', 'transitionId'],
   'sequence.get': ['sequences', 'sequenceId'], 'sequence.get_diagnostics': ['sequences', 'sequenceId'],
 };
 const fixtures = projects.map((project, projectIndex) => {
@@ -313,6 +433,23 @@ const fixtures = projects.map((project, projectIndex) => {
     for (const timeTicks of times) run('sequence.project_clip_instances', { sequenceId: sequence.id, timeTicks });
     for (const timeTicks of [-1, null, false, '0', 0.5, duration + 1]) run('sequence.project_clip_instances', { sequenceId: sequence.id, timeTicks });
   }
+  if (implemented.includes('sequence.evaluate')) for (const sequence of project.sequences) {
+    const duration = project.temporalPrograms.find(program => program.id === sequence.temporalProgramId).durationTicks;
+    const times = new Set([0,1,Math.floor(duration/2),duration-1,duration]);
+    for (const item of sequence.viewLaneItems) for (const tick of [item.startTicks,item.startTicks+1,item.endTicks-1,item.endTicks]) if (tick <= duration) times.add(tick);
+    for (const instance of sequence.clipInstances) for (const tick of [instance.startTicks,instance.startTicks+1,instance.endTicks-1,instance.endTicks]) if (tick <= duration) times.add(tick);
+    for (const timeTicks of [...times,-1,null,'0',0.5,duration+1]) run('sequence.evaluate', { sequenceId: sequence.id,timeTicks });
+  }
+  if (implemented.includes('export.evaluate_frame')) for (const [collection,key] of [['transitions','transitionId'],['sequences','sequenceId']]) for (const owner of project[collection]) {
+    for (const frameRate of [{ numerator: 24,denominator: 1 },{ numerator: 30000,denominator: 1001 },{ numerator: 120000,denominator: 1 }]) {
+      const plan = oracle(project,'export.get_frame_plan',{ [key]: owner.id,frameRate });
+      for (const frameIndex of new Set([0,1,Math.floor(plan.frameCount/2),plan.frameCount-1,plan.frameCount,-1,null,'0',0.5])) run('export.evaluate_frame', { [key]: owner.id,frameRate,frameIndex });
+    }
+  }
+  if (implemented.includes('transition.evaluate')) for (const transition of project.transitions) {
+    const duration = project.temporalPrograms.find(program => program.id === transition.temporalProgramId).durationTicks;
+    for (const timeTicks of [-1, 0, 1, Math.floor(duration/4), Math.floor(duration/2), duration-1, duration, duration+1, null, '0', 0.5, Number.MAX_SAFE_INTEGER+1]) run('transition.evaluate', { transitionId: transition.id, timeTicks });
+  }
   if (implemented.includes('export.get_frame_plan')) {
     const rates = [{ numerator: 24, denominator: 1 }, { numerator: 30000, denominator: 1001 },
       { numerator: 60000, denominator: 2002 }, { numerator: 1000000, denominator: 1 },
@@ -396,9 +533,17 @@ const boneLocale = fixtures.find(fixture => fixture.name === 'locale-en-US-bone.
 for (const locale of ['en_US_POSIX', 'c']) fixtures.push({ ...boneLocale, name: `locale-fallback-${locale}`, locale });
 const coverage = new Set(fixtures.flatMap(fixture => fixture.cases.map(entry => entry.request.name)));
 for (const name of implemented) assert(coverage.has(name));
-const rows = fixtures.map(fixture => JSON.stringify(fixture)).join(',\n');
-const text = `{\n"implemented":${JSON.stringify(implemented)},\n"pending":${JSON.stringify(pending)},\n"fixtures":[\n${rows}\n]\n}\n`;
-const path = new URL('./query-conformance.json', import.meta.url);
-if (process.argv.includes('--write')) await writeFile(path, text);
-else assert.equal((await readFile(path, 'utf8')).replaceAll('\r\n', '\n'), text, 'Query fixtures differ from current JS');
-console.log(`Query conformance: ${implemented.length}/72 queries; ${fixtures.length} Projects; ${fixtures.reduce((sum, fixture) => sum + fixture.cases.length, 0)} reads.`);
+// Keep committed oracle files bounded; all partitions are read by the same test.
+const batches = [[]]; let bytes = 0;
+for (const fixture of fixtures) {
+  const row = JSON.stringify(fixture);
+  if (bytes + Buffer.byteLength(row) > 6 * 1024 * 1024 && batches.at(-1).length) { batches.push([]); bytes = 0; }
+  batches.at(-1).push(row); bytes += Buffer.byteLength(row);
+}
+for (let index = 0; index < batches.length; index++) {
+  const text = `{\n"implemented":${JSON.stringify(implemented)},\n"pending":${JSON.stringify(pending)},\n"fixtures":[\n${batches[index].join(',\n')}\n]\n}\n`;
+  const path = new URL(index ? `./query-conformance-${index + 1}.json` : './query-conformance.json', import.meta.url);
+  if (process.argv.includes('--write')) await writeFile(path, text);
+  else assert.equal((await readFile(path, 'utf8')).replaceAll('\r\n', '\n'), text, 'Query fixtures differ from current JS');
+}
+console.log(`Query conformance: ${implemented.length}/72 queries; ${fixtures.length} Projects; ${fixtures.reduce((sum, fixture) => sum + fixture.cases.length, 0)} reads in ${batches.length} files.`);

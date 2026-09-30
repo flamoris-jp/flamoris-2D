@@ -145,3 +145,38 @@ behavior, while failed bind-frame evaluation returns the existing diagnostics.
 Transition evaluation/diagnostics, Sequence evaluation and export frame
 evaluation are the four remaining queries. Production WPF/MCP authority,
 persistence/source ingest and physical acceptance remain pending.
+
+
+## Complete frame query checkpoint
+
+All 72 current Product query handlers now have native implementations on the
+same immutable session snapshot. Transition endpoint and interior frames share
+Warp, projected FK, Skin/rigid binding and sparse Form correction in the existing
+Product order. Every part mode preserves opacity, presence, draw order, authored
+appearance weights, endpoint UVs and explicit render-instance identity. Clipping
+resolves exact evaluated sources before semantic fallback, diagnoses ambiguity
+and removes evaluated cycles. Weighted composite groups remain renderer inputs.
+
+Sequence evaluation projects placements with exact integer tick arithmetic,
+applies additive Transform/Bone/Warp contributions, multiplicative opacity and
+scale, resolves discrete values by layer, and overlays stable-vertex deformation
+samples after the base frame stages. Camera and events retain their own temporal
+ownership. Missing active targets, incompatible topologies and conflicting
+same-layer values retain Product diagnostics. Export frame evaluation uses the
+existing rational planner and delegates to the same Transition/Sequence path.
+
+Canonical UTF-16 evidence fingerprints, keys and acknowledgement matching are
+exact. Matrices, evaluated positions, opacity/weights and normalized time use the
+existing relative 1e-12 platform-math tolerance; diagnostics, IDs, ordering, tick
+projections, Project/history/revision/error and prepared-edit state remain exact.
+The current corpus contains 190 admitted Projects and 70,381 reads. It
+exercises every mode and all supported Clip track families with current JS, rather than making the native implementation its oracle.
+
+This completes the command/query parity scope of #127. Production editing still
+uses the JS Product Host until #118's native renderer, persistence/source ingest
+and one-session WPF/MCP authority cutover is reviewed. Real-art Windows acceptance
+still precedes deletion of the old authority and bundled Node runtime.
+
+Self-review adds large finite diagnostic area ratios at decimal/exponent boundaries.
+Evidence uses shortest significant decimal formatting before ECMAScript fixed/exponent
+selection, preserving `JSON.stringify` spelling for large binary floating-point integers.
