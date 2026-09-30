@@ -3,6 +3,7 @@
 #include "native_math.h"
 #include "native_validation.h"
 #include "native_temporal_evaluation.h"
+#include "native_rig_evaluation.h"
 #include "native_locale.h"
 #include "js_text.h"
 #include <algorithm>
@@ -351,6 +352,29 @@ Value dispatch(const Value& p, Query id, const Value& input) {
     case Query::deformer_get_keyform:
         return first_matching(collection(p,"rig.warpDeformerKeyforms"),input,{{"deformerId","deformerId"},{"keyArtId","keyArtId"}},false,false);
     case Query::bone_get: return bone_projection(p,get(p,input,"rig.bones","boneId","Bone"));
+    case Query::bone_get_evaluated_pose: {
+        (void)get(p,input,"rig.bones","boneId","Bone");
+        (void)get(p,input,"keyArts","keyArtId","KeyArt");
+        const auto evaluation = fl2d_evaluation::bone_fk(p,field(input,"keyArtId")); Array diagnostics;
+        for (const auto& d : field(evaluation,"diagnostics").get<Array>()) if (field(d,"boneId") == field(input,"boneId")) diagnostics.push_back(d);
+        return Value(Object{{"pose",find(field(evaluation,"poses"),field(input,"boneId"),"boneId")},{"diagnostics",Value(diagnostics)}});
+    }
+    case Query::bone_get_two_bone_ik_pose: case Query::bone_solve_two_bone_ik: {
+        auto result = id == Query::bone_get_two_bone_ik_pose ? fl2d_evaluation::ik_chain(p,field(input,"constraintId"),field(input,"keyArtId")) : fl2d_evaluation::solve_ik(p,input);
+        if (!input.get<Object>().count("constraintId")) for (auto& d : result.get<Object>().at("diagnostics").get<Array>())
+            if (field(d,"code") == Value("TWO_BONE_IK_NOT_FOUND")) d.get<Object>().at("details").get<Object>().erase("constraintId");
+        return result;
+    }
+    case Query::skin_evaluate: {
+        const auto binding = get(p,input,"rig.skinBindings","bindingId","SkinBinding");
+        (void)get(p,input,"keyArts","keyArtId","KeyArt");
+        return fl2d_evaluation::skin(p,binding,field(input,"keyArtId"),field(input,"positions"));
+    }
+    case Query::mesh_form_evaluate: {
+        const auto topology = find(field(p,"meshTopologies"),field(input,"topologyId"));
+        const auto keyform = truthy(field(input,"keyformId")) ? get(p,input,"meshFormCorrectionKeyforms","keyformId","MeshFormCorrectionKeyform") : Value();
+        return fl2d_evaluation::form(topology,keyform,field(input,"positions"));
+    }
     case Query::bone_get_keyform:
         return first_matching(collection(p,"rig.bonePoseKeyforms"),input,{{"boneId","boneId"},{"keyArtId","keyArtId"}},false,false);
     case Query::bone_get_rotation_constraint: return get(p,input,"rig.boneRotationConstraints","constraintId","BoneRotationConstraint");

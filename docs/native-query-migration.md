@@ -119,3 +119,29 @@ individual export frames; production authority and physical acceptance remain pe
 Upstream references: [ICU 78.3](https://github.com/unicode-org/icu/releases/tag/release-78.3),
 [collation](https://unicode-org.github.io/icu/userguide/collation/), and
 [V8 default locale](https://chromium.googlesource.com/v8/v8/+/refs/heads/main/src/execution/isolate.cc).
+
+## Rig evaluation checkpoint
+
+Native reads now implement 68/72 queries. Bone FK, projected two-bone IK
+inspection/solve, linear-blend Skin and sparse Form correction share the pure
+native rig evaluator on the existing snapshot. Bone FK retains ancestor order,
+disabled poses, local rotation limits and stable diagnostic sorting. Projected
+FK uses document-space ancestor transforms and parent-first Warp cages; nested
+cages retain bilinear inverse-cell selection rather than an affine approximation.
+IK retains both bend directions, reach/rotation-limit behavior and rejection of
+sheared, reflected or otherwise non-rigid projected frames. Skin converts those
+same FK skin matrices into target geometry space and canonicalizes influence
+weights in Product order.
+
+The current corpus contains 111 admitted Projects and 25,812 reads. Authored
+poses, disabled bindings, rotation limits, UTF-16 Bone order, uniform/non-uniform/
+reflected/near-singular transforms, missing and nested Warp cages, large finite
+coordinates and malformed position arrays are compared against current JS.
+Evaluated matrices/points/positions and solved local deltas use the existing
+1e-12 relative platform-math tolerance; identities, ordering, diagnostics and
+Session state remain exact. Non-finite evaluated output retains JS JSON null
+behavior, while failed bind-frame evaluation returns the existing diagnostics.
+
+Transition evaluation/diagnostics, Sequence evaluation and export frame
+evaluation are the four remaining queries. Production WPF/MCP authority,
+persistence/source ingest and physical acceptance remain pending.

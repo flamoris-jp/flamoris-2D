@@ -158,8 +158,10 @@ internal static class NativeCoreTests
         catch (NativeQueryException error) when (error.ProductName == "Error" && error.Message == "Unknown Bone undefined.") { }
         try { session.Query("unknown.query"); throw new Exception("Unknown Query was accepted."); }
         catch (NativeQueryException error) when (error.ProductName == "Error" && error.Message == "Unknown query unknown.query.") { }
-        try { session.Query("skin.evaluate"); throw new Exception("Pending Query was accepted."); }
+        try { session.Query("transition.evaluate"); throw new Exception("Pending Query was accepted."); }
         catch (NotSupportedException) { }
+        try { session.Query("skin.evaluate"); throw new Exception("Missing Skin selector was accepted."); }
+        catch (NativeQueryException error) when (error.ProductName == "Error" && error.Message == "Unknown SkinBinding undefined.") { }
         if (beforeProject != session.ProjectJson() || beforeHistory != session.HistoryJson() ||
             beforeError != session.ErrorCode() || !beforeState.Equals(session.State()))
             throw new Exception("Managed Query mutated session state.");

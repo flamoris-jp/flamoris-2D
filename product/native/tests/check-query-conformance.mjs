@@ -4,6 +4,7 @@ import { cloneProject, createSceneNode } from '../../src/model/project.js';
 import { validationResult } from '../../src/model/validation.js';
 import { projectQueries, queryProject } from '../../src/queries/project.js';
 import { TEMPORAL_TRACK_DEFINITIONS } from '../../src/core/temporal.js';
+import { createWarpDeformer, defaultWarpKeyformControlPoints } from '../../src/model/warp-deformer.js';
 
 const inventory = await readFile(new URL('../core/src/native_query_names.inc', import.meta.url), 'utf8');
 const entries = [...inventory.matchAll(/FL2D_QUERY\(\w+, "([^"]+)", ([01])\)/g)].map(match => ({ name: match[1], implemented: match[2] === '1' }));
@@ -140,6 +141,56 @@ sampling.sequences.push({ id: 'query_sampling_sequence', displayName: 'Sample in
 add(sampling);
 assert.deepEqual([...new Set([...samplingProgram.tracks, ...cameraProgram.tracks].map(track => track.kind))].sort(), Object.keys(TEMPORAL_TRACK_DEFINITIONS).sort(), 'All typed temporal track families must be sampled');
 
+// Evaluated rig fixtures exercise authored poses, both IK bends, constrained
+// rotations, document transforms and parent-first non-affine Warp projection.
+const posedRig = cloneProject(projects.find(p => p.rig.skinBindings.length && p.rig.bones.some(b => b.id === 'bone_c')));
+assert(posedRig);
+posedRig.rig.bonePoseKeyforms = posedRig.rig.bones.flatMap((bone, index) => posedRig.keyArts.map(art => ({
+  boneId: bone.id, keyArtId: art.id, localDelta: { x: index - 2.25, y: 3 - index,
+    rotation: index % 2 ? -Math.PI : Math.PI / 3 },
+})));
+posedRig.rig.twoBoneIkConstraints = [{ id: 'query_ik', rootBoneId: 'bone_a', midBoneId: 'bone_b', endBoneId: 'bone_c', enabled: true, bendDirection: 'counterclockwise' }];
+add(posedRig);
+const constrainedRig = cloneProject(posedRig);
+constrainedRig.rig.boneRotationConstraints = [{ id: 'query_limit', boneId: 'bone_a', enabled: true, minRotation: -0.2, maxRotation: 0.2 }];
+constrainedRig.rig.twoBoneIkConstraints[0].bendDirection = 'clockwise';
+add(constrainedRig);
+for (const scale of [{ x: 1.3, y: 1.3 }, { x: -1, y: 1 }, { x: 1.2, y: 0.7 }, { x: 1e-8, y: 1e-8 }]) {
+  const p = cloneProject(constrainedRig);
+  p.scene.nodes[p.scene.rootId].transform = { position: { x: 31, y: -17 }, rotation: 0.53, scale, pivot: { x: 7, y: -2 } };
+  add(p);
+}
+const overflowRig = cloneProject(posedRig);
+overflowRig.rig.twoBoneIkConstraints = [];
+overflowRig.scene.nodes[overflowRig.scene.rootId].transform.position = { x: 1e308, y: -1e308 };
+for (const bone of overflowRig.rig.bones) {
+  bone.length = 1e308;
+  for (const form of overflowRig.rig.bonePoseKeyforms.filter(k => k.boneId === bone.id)) form.localDelta.x = 1e308;
+}
+add(overflowRig);
+for (const variant of ['translation', 'shear', 'nested', 'missing', 'degenerate']) {
+  const p = cloneProject(constrainedRig), root = p.scene.rootId;
+  const addWarp = (id, parentId, amount) => {
+    const created = createWarpDeformer({ id, displayName: id, parentNodeId: parentId, columns: 2, rows: 2,
+      bounds: { left: -20, top: -20, right: 100, bottom: 100 }, controlPointIds: ['tl', 'tr', 'bl', 'br'].map(s => id + '_' + s) });
+    p.rig.deformers.push(created.deformer); p.rig.warpControlPoints.push(...created.controlPoints);
+    p.scene.nodes[id] = createSceneNode({ id, kind: 'deformer', displayName: id, parentId }); p.scene.nodes[parentId].children.push(id);
+    for (const art of p.keyArts) p.rig.warpDeformerKeyforms.push({ deformerId: id, keyArtId: art.id,
+      controlPoints: defaultWarpKeyformControlPoints(created.deformer, created.controlPoints).map((v, i) => ({ ...v,
+        x: variant === 'degenerate' ? 0 : v.x + (i % 2 ? amount : 3), y: variant === 'degenerate' ? 0 : v.y + (i === 3 ? 13 : amount),
+      })) });
+    return id;
+  };
+  let parent = addWarp('query_warp', root, variant === 'translation' ? 3 : 19);
+  if (variant === 'nested') parent = addWarp('query_nested', parent, -7);
+  for (const bone of p.rig.bones.filter(b => b.parentNodeId === root)) {
+    p.scene.nodes[root].children = p.scene.nodes[root].children.filter(id => id !== bone.id);
+    p.scene.nodes[parent].children.push(bone.id); p.scene.nodes[bone.id].parentId = parent; bone.parentNodeId = parent;
+  }
+  if (variant === 'missing') p.rig.warpDeformerKeyforms = [];
+  add(p);
+}
+
 const getters = {
   'deformer.get': ['rig.deformers', 'deformerId'], 'bone.get': ['rig.bones', 'boneId'],
   'bone.get_rotation_constraint': ['rig.boneRotationConstraints', 'constraintId'],
@@ -199,6 +250,28 @@ const fixtures = projects.map((project, projectIndex) => {
   for (const includeHidden of [false, true, null, 0]) run('scene.get_tree', { includeHidden });
   for (const value of project.rig.warpDeformerKeyforms) run('deformer.get_keyform', { deformerId: value.deformerId, keyArtId: value.keyArtId });
   for (const value of project.rig.bonePoseKeyforms) run('bone.get_keyform', { boneId: value.boneId, keyArtId: value.keyArtId });
+  if (implemented.includes('bone.get_evaluated_pose')) for (const bone of project.rig.bones) {
+    for (const art of [...project.keyArts, { id: 'missing' }]) run('bone.get_evaluated_pose', { boneId: bone.id, keyArtId: art.id });
+  }
+  if (implemented.includes('bone.get_two_bone_ik_pose')) for (const constraint of [...project.rig.twoBoneIkConstraints, { id: 'missing' }]) {
+    for (const art of [...project.keyArts, { id: 'missing' }]) {
+      const input = { constraintId: constraint.id, keyArtId: art.id };
+      run('bone.get_two_bone_ik_pose', input);
+      for (const target of [{ x: 0, y: 0 }, { x: 13, y: -7 }, { x: 1e4, y: 1e4 }, { x: -31, y: 29 }, null, {}, { x: '1', y: 0 }]) run('bone.solve_two_bone_ik', { ...input, target });
+    }
+  }
+  if (implemented.includes('skin.evaluate')) for (const binding of project.rig.skinBindings) for (const art of project.keyArts) {
+    const topology = project.meshTopologies.find(t => t.id === binding.topologyId);
+    const positions = topology.vertexIds.flatMap((_, i) => [i * 13 - 7, i * -9 + 17]);
+    for (const values of [positions, positions.map(() => 1e308), [], positions.slice(1), positions.map((v, i) => i ? v : null), '🐱', false, null, {}]) run('skin.evaluate', { bindingId: binding.id, keyArtId: art.id, positions: values });
+    run('skin.evaluate', { bindingId: binding.id, keyArtId: art.id });
+  }
+  if (implemented.includes('mesh_form.evaluate')) for (const topology of [...project.meshTopologies, { id: 'missing', vertexIds: [] }]) {
+    const positions = topology.vertexIds.flatMap((_, i) => [i * 5 - 3, i * -11 + 21]);
+    for (const keyformId of [undefined, null, false, 'missing', ...project.meshFormCorrectionKeyforms.map(k => k.id)])
+      for (const values of [positions, [], positions.slice(1), positions.map((v, i) => i ? v : null), '🐱', false, null, {}])
+        run('mesh_form.evaluate', { topologyId: topology.id, keyformId, positions: values });
+  }
   for (const value of project.meshFormCorrectionKeyforms) run('mesh_form.get_for_context', { topologyId: value.topologyId, keyArtId: value.keyArtId, semanticSlotId: value.semanticSlotId });
   for (const value of project.animation.deformationSamples) {
     run('animation.deformation_sample.list', { meshId: value.meshId });

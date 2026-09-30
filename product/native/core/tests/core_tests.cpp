@@ -286,7 +286,9 @@ static bool query_equal(const picojson::value& actual, const picojson::value& ex
         const auto& a = actual.get<Object>(); const auto& b = expected.get<Object>();
         if (a.size() != b.size()) return false;
         for (const auto& [key,value] : b)
-            if (!a.count(key) || !query_equal(a.at(key),value,geometry || key == "worldTransform" || (sampling && key == "values"),sampling)) return false;
+            if (!a.count(key) || !query_equal(a.at(key),value,geometry || key == "worldTransform" ||
+                (sampling && (key == "values" || key == "bindMatrix" || key == "poseMatrix" || key == "skinMatrix" ||
+                key == "head" || key == "tip" || key == "positions" || key == "localDelta" || key == "end" || key == "joints")),sampling)) return false;
         return true;
     }
     if (actual.is<Array>() && expected.is<Array>()) {
@@ -338,7 +340,10 @@ static void check_queries() {
         };
         for (const auto& test : fixture.at("cases").get<Array>()) {
             const auto& object = test.get<Object>(); const auto request = object.at("request").serialize(); uint32_t length = 0;
-            const bool sampled = object.at("request").get<Object>().at("name") == Value("animation.sample_program");
+            const auto& query_name = object.at("request").get<Object>().at("name");
+            const bool sampled = query_name == Value("animation.sample_program") || query_name == Value("bone.get_evaluated_pose") ||
+                query_name == Value("bone.get_two_bone_ik_pose") || query_name == Value("bone.solve_two_bone_ik") ||
+                query_name == Value("skin.evaluate") || query_name == Value("mesh_form.evaluate");
             auto call = [&](char* buffer, uint32_t capacity, uint32_t* needed) {
                 return fl2d_session_query_json(session,reinterpret_cast<const uint8_t*>(request.data()),static_cast<uint32_t>(request.size()),buffer,capacity,needed);
             };
