@@ -11,7 +11,6 @@
 #include <limits>
 #include <map>
 #include <memory>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -253,8 +252,12 @@ int32_t FL2DR_CALL fl2dr_render(fl2dr_renderer* renderer,const uint8_t* projecti
         const uint64_t bytes = width > 0 && height > 0 ? static_cast<uint64_t>(width)*height*4 : 0;
         if (!renderer || !projection || !length || length > 32u*1024*1024 || !output || !bytes || width > 4096 || height > 4096 || bytes > 8294400ull*4 || bytes > capacity)
             throw std::invalid_argument("Native GPU output/input budget exceeded.");
-        Value parsed; const auto result = picojson::parse(parsed,reinterpret_cast<const char*>(projection),reinterpret_cast<const char*>(projection)+length);
-        if (!result.empty()) throw std::invalid_argument("Malformed render projection.");
+        Value parsed; std::string parse_error;
+        const auto* first = reinterpret_cast<const char*>(projection);
+        const auto* last = first+length;
+        auto end = picojson::parse(parsed,first,last,&parse_error);
+        while (end != last && (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n')) ++end;
+        if (!parse_error.empty() || end != last) throw std::invalid_argument("Malformed render projection.");
         renderer->render(parsed,width,height,output,cancelled,cancel_context);
     });
 }
