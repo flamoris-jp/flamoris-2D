@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Content Include="$(NativeRendererBuildDir)/$(Configuration)/Flamoris2D.Renderer.Native.dll" Link="Flamoris2D.Renderer.Native.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../core/third_party/picojson/LICENSE" Link="LICENSE-picojson.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="BuildNativeRenderer" BeforeTargets="CoreCompile;GetCopyToOutputDirectoryItems" Condition="'$(OS)' == 'Windows_NT'">
     <Exec Command='cmake -S &quot;$(MSBuildProjectDirectory)/../../renderer&quot; -B &quot;$(NativeRendererBuildDir)&quot; -A x64' />
