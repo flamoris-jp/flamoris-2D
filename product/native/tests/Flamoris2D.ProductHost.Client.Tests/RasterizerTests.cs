@@ -46,6 +46,24 @@ internal static class RasterizerTests
             var reference=EvaluatedRasterizer.Render(projection,textures,4,4);var gpu=direct.Render(projection,textures,4,4);
             if(reference.Zip(gpu).Any(p=>Math.Abs(p.First-p.Second)>2))throw new InvalidOperationException("D3D11/software canonical fixture differs.");
         }
+        using (var cancellation = new CancellationTokenSource())
+        {
+            cancellation.Cancel();
+            try { direct.Render(Projection(4), textures, 4, 4, cancellation.Token); throw new Exception("Native cancellation ignored."); }
+            catch (OperationCanceledException) { }
+        }
+        var changedTextures = new Dictionary<string,RenderTexture>(textures) { ["red"] = new(1,1,[0,255,0,255]) };
+        var changed = direct.Render(Projection(4), changedTextures, 4, 4);
+        if (changed[1] != 255 || changed[2] != 0) throw new Exception("Native texture replacement retained stale pixels.");
+        var restored = direct.Render(Projection(4), textures, 4, 4);
+        if (restored[2] != 255 || restored[1] != 0) throw new Exception("Native texture replacement did not restore pixels.");
+        var malformed = JsonSerializer.SerializeToElement(new {
+            plan = new { unsupportedReasons = Array.Empty<string>(), batches = new[] { new { kind="instance", renderInstances=new[]{new {renderInstanceId="bad"}} } } },
+            maskSourceIds=Array.Empty<string>(), contributions=new Dictionary<string,double>()
+        });
+        try { direct.Render(malformed, textures, 4, 4); throw new Exception("Incomplete native render instance accepted."); }
+        catch (InvalidOperationException) { }
+        if (!direct.Render(Projection(4), textures, 4, 4).SequenceEqual(restored)) throw new Exception("Rejected native render poisoned subsequent frame.");
         Console.WriteLine($"Direct3D candidate device: {direct.Driver}");
         try { using var hardware=new Direct3DRenderer();Console.WriteLine($"Direct3D hardware available: {hardware.Driver}"); }
         catch(Exception error){Console.WriteLine($"Direct3D hardware unavailable on runner: {error.Message}");}
