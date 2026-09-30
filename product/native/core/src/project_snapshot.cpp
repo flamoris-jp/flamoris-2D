@@ -27,9 +27,7 @@ struct Node {
     std::vector<std::string> children;
     fl2d_node_state state{};
 };
-using ObjectOrder = std::map<const Object*, std::vector<std::string>>;
 struct Snapshot {
-    ObjectOrder object_order;
     int32_t schema = 0;
     double width = 0, height = 0;
     std::string id, name, root;
@@ -39,51 +37,12 @@ struct Snapshot {
     std::map<std::string, bool> unsupported_sections;
 };
 
-// Preserve JSON property insertion order for Object.entries-based duplicate
-// registration. picojson's value remains unchanged; metadata lives only during
-// validation. Numeric property names use ECMAScript's array-index order.
-class OrderedParseContext : public picojson::default_parse_context {
-    ObjectOrder& order_;
-public:
-    OrderedParseContext(Value* out, ObjectOrder& order, size_t depths = picojson::DEFAULT_MAX_DEPTHS)
-        : picojson::default_parse_context(out, depths), order_(order) {}
-    bool parse_object_start() {
-        if (!picojson::default_parse_context::parse_object_start()) return false;
-        --depths_;
-        order_[&out_->get<Object>()].clear();
-        return true;
-    }
-    template <typename Iter> bool parse_object_item(picojson::input<Iter>& in, const std::string& key) {
-        auto& object = out_->get<Object>();
-        if (!object.count(key)) order_[&object].push_back(key);
-        OrderedParseContext child(&object[key], order_, depths_);
-        return picojson::_parse(child, in);
-    }
-    template <typename Iter> bool parse_array_item(picojson::input<Iter>& in, size_t) {
-        auto& array = out_->get<Array>();
-        array.emplace_back();
-        OrderedParseContext child(&array.back(), order_, depths_);
-        return picojson::_parse(child, in);
-    }
-};
-std::vector<std::pair<std::string, const Value&>> ordered_object(const Snapshot& snapshot, const Value& value) {
+// JSON objects retain ECMAScript property order through parsing and copying.
+std::vector<std::pair<std::string, const Value&>> ordered_object(const Snapshot&, const Value& value) {
     std::vector<std::pair<std::string, const Value&>> result;
     if (!value.is<Object>()) return result;
     const auto& object = value.get<Object>();
-    auto found = snapshot.object_order.find(&object);
-    if (found == snapshot.object_order.end()) {
-        for (const auto& [key, item] : object) result.emplace_back(key, item);
-        return result;
-    }
-    auto keys = found->second;
-    auto index = [](const std::string& key) -> uint64_t {
-        if (key.empty() || (key.size() > 1 && key.front() == '0') || key.size() > 10) return UINT64_MAX;
-        uint64_t number = 0;
-        for (unsigned char ch : key) { if (ch < '0' || ch > '9') return UINT64_MAX; number = number * 10 + ch - '0'; }
-        return number < UINT32_MAX ? number : UINT64_MAX;
-    };
-    std::stable_sort(keys.begin(), keys.end(), [&](const std::string& a, const std::string& b) { return index(a) < index(b); });
-    for (const auto& key : keys) result.emplace_back(key, object.at(key));
+    for (const auto& key : object.keys()) result.emplace_back(key, object.at(key));
     return result;
 }
 
@@ -2534,15 +2493,12 @@ extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_load(const uint8_t* byte
         Value parsed;
         std::string json(reinterpret_cast<const char*>(bytes), length);
         std::string error;
-        ObjectOrder order;
-        OrderedParseContext context(&parsed, order);
-        auto end = picojson::_parse(context, json.begin(), json.end(), &error);
+        auto end = picojson::parse(parsed, json.begin(), json.end(), &error);
         if (!error.empty() || (end != json.end() &&
             json.find_first_not_of(" \t\r\n", static_cast<size_t>(end - json.begin())) != std::string::npos))
             return FL2D_MALFORMED_JSON;
         auto snapshot = new fl2d_snapshot();
-        snapshot->object_order = std::move(order);
-        try { validate(*snapshot, parsed); snapshot->object_order.clear(); } catch (...) { delete snapshot; throw; }
+        try { validate(*snapshot, parsed); } catch (...) { delete snapshot; throw; }
         *result = snapshot;
         return FL2D_OK;
     } catch (const std::bad_alloc&) { return FL2D_OUT_OF_MEMORY; }

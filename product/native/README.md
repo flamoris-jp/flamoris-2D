@@ -157,7 +157,9 @@ explicitly switch WPF/MCP to the one native session before retiring JS/Node.
 
 The bounded JSON parser is the vendored BSD-2-Clause `picojson` header
 (upstream commit `111c9be5188f7350c2eac9ddaedd8cca3d7bf394`) under
-`core/third_party/picojson/`, with its license alongside it. Its built-in depth
+`core/third_party/picojson/`, with its license alongside it. The documented
+[private C++17 patch](core/third_party/picojson/FLAMORIS.md) retains ECMAScript
+property order through copies/mutations and enforces object depth consistently. Its built-in depth
 limit and the explicit size/UTF-8 gate protect the host boundary. Regenerate
 the checked project fixtures deliberately with
 `node product/native/tests/check-project-conformance.mjs --write`.
@@ -274,3 +276,10 @@ metadata, Skin/form locks, geometric checks and replacement consent retain
 Product behavior. `mesh-session-conformance.json` compares complete state and
 history across two KeyArts, shared-edge subdivision, Undo/Redo and rejection
 cases, including a malformed intermediate Keyform within a transaction.
+
+All 155 current Product command handlers now have native implementations. PSD
+re-import uses the ordinary Project snapshot inverse, logical identity check,
+affected-ID enumeration and before/after owner validation.
+`source-session-conformance.json` protects state/history parity and observable
+property order across typed node creation, source replacement, Undo/Redo and
+serialization. All 72 queries and runtime authority cutover remain pending.

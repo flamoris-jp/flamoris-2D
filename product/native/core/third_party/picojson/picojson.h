@@ -133,11 +133,12 @@ enum {
 enum { INDENT_WIDTH = 2, DEFAULT_MAX_DEPTHS = 100 };
 
 struct null {};
+class ordered_object;
 
 class value {
 public:
   typedef std::vector<value> array;
-  typedef std::map<std::string, value> object;
+  typedef ordered_object object;
   union _storage {
     bool boolean_;
     double number_;
@@ -204,6 +205,80 @@ private:
   template <typename Iter> void _serialize(Iter os, int indent) const;
   std::string _serialize(int indent) const;
   void clear();
+};
+
+// FLAMORIS patch: retain Object.keys order through native copies and mutations.
+// std::map iteration remains lexical for existing lookup/validation code.
+class ordered_object : private std::map<std::string, value> {
+  typedef std::map<std::string, value> base;
+  std::vector<std::string> order_;
+public:
+  using base::iterator;
+  using base::const_iterator;
+  using base::value_type;
+  using base::begin;
+  using base::end;
+  using base::find;
+  using base::count;
+  using base::at;
+  using base::size;
+  using base::empty;
+  friend bool operator==(const ordered_object& a, const ordered_object& b) {
+    return static_cast<const base&>(a) == static_cast<const base&>(b);
+  }
+  ordered_object() = default;
+  ordered_object(std::initializer_list<base::value_type> values) {
+    for (const auto& item : values) (*this)[item.first] = item.second;
+  }
+  ordered_object(const ordered_object&) = default;
+  ordered_object(ordered_object&&) = default;
+  ordered_object& operator=(const ordered_object&) = default;
+  ordered_object& operator=(ordered_object&&) = default;
+  value& operator[](const std::string& key) {
+    auto found = base::find(key);
+    if (found != base::end()) return found->second;
+    auto inserted = base::emplace(key, value());
+    order_.push_back(key);
+    return inserted.first->second;
+  }
+  value& operator[](std::string&& key) { return (*this)[static_cast<const std::string&>(key)]; }
+  template <typename... Args> std::pair<iterator, bool> emplace(Args&&... args) {
+    auto inserted = base::emplace(std::forward<Args>(args)...);
+    if (inserted.second) order_.push_back(inserted.first->first);
+    return inserted;
+  }
+  std::pair<iterator, bool> insert(const base::value_type& value) { return emplace(value); }
+  std::pair<iterator, bool> insert(base::value_type&& value) { return emplace(std::move(value)); }
+  template <typename Iter> void insert(Iter first, Iter last) { for (; first != last; ++first) insert(*first); }
+  void insert(std::initializer_list<base::value_type> values) { insert(values.begin(), values.end()); }
+  template <typename... Args> iterator emplace_hint(const_iterator, Args&&... args) { return emplace(std::forward<Args>(args)...).first; }
+  iterator insert(const_iterator hint, const base::value_type& value) { return emplace_hint(hint, value); }
+  iterator insert(const_iterator hint, base::value_type&& value) { return emplace_hint(hint, std::move(value)); }
+  void swap(ordered_object& other) { base::swap(other); order_.swap(other.order_); }
+  size_t erase(const std::string& key) {
+    const auto count = base::erase(key);
+    if (count) order_.erase(std::remove(order_.begin(), order_.end(), key), order_.end());
+    return count;
+  }
+  iterator erase(const_iterator at) {
+    const auto key = at->first;
+    auto next = base::erase(at);
+    order_.erase(std::remove(order_.begin(), order_.end(), key), order_.end());
+    return next;
+  }
+  iterator erase(const_iterator first, const_iterator last) { while (first != last) first = erase(first); return base::erase(first, first); }
+  void clear() { base::clear(); order_.clear(); }
+  std::vector<std::string> keys() const {
+    auto keys = order_;
+    auto index = [](const std::string& key) -> uint64_t {
+      if (key.empty() || (key.size() > 1 && key.front() == '0') || key.size() > 10) return UINT64_MAX;
+      uint64_t number = 0;
+      for (unsigned char ch : key) { if (ch < '0' || ch > '9') return UINT64_MAX; number = number * 10 + ch - '0'; }
+      return number < UINT32_MAX ? number : UINT64_MAX;
+    };
+    std::stable_sort(keys.begin(), keys.end(), [&](const std::string& a, const std::string& b) { return index(a) < index(b); });
+    return keys;
+  }
 };
 
 typedef value::array array;
@@ -611,19 +686,21 @@ template <typename Iter> void value::_serialize(Iter oi, int indent) const {
     if (indent != -1) {
       ++indent;
     }
-    for (object::const_iterator i = u_.object_->begin(); i != u_.object_->end(); ++i) {
-      if (i != u_.object_->begin()) {
+    bool first = true;
+    for (const auto& key : u_.object_->keys()) {
+      if (!first) {
         *oi++ = ',';
       }
       if (indent != -1) {
         _indent(oi, indent);
       }
-      serialize_str(i->first, oi);
+      first = false;
+      serialize_str(key, oi);
       *oi++ = ':';
       if (indent != -1) {
         *oi++ = ' ';
       }
-      i->second._serialize(oi, indent);
+      u_.object_->at(key)._serialize(oi, indent);
     }
     if (indent != -1) {
       --indent;
@@ -1013,6 +1090,7 @@ public:
   bool parse_object_start() {
     if (depths_ == 0)
       return false;
+    --depths_;
     *out_ = value(object_type, false);
     return true;
   }

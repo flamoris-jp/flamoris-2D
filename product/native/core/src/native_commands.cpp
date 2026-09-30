@@ -268,6 +268,17 @@ Applied apply_impl(Value& project, const Value& cmd) {
         throw Failure{FL2D_COMMAND_INVALID, "command.payload_invalid"};
     const std::string type = field(cmd, "type").get<std::string>();
     const Value& payload = field(cmd, "payload");
+    if (type == "source.apply_psd_reimport") {
+        const auto next = field(payload, "project");
+        if (field(next, "id") != field(project, "id")) fail("project.identity_changed");
+        auto inverse = command(type, Object{{"project", project}});
+        std::vector<std::string> affected;
+        std::set<std::string> seen;
+        for (const auto* value : std::initializer_list<const Value*>{&project, &next})
+            for (const auto& key : field(field(*value, "scene"), "nodes").get<Object>().keys()) if (seen.insert(key).second) affected.push_back(key);
+        project = next;
+        return {inverse, affected};
+    }
     Applied rig_result;
     if (apply_bone_hierarchy(project, type, payload, rig_result) || apply_warp(project, type, payload, rig_result) ||
         apply_rig(project, type, payload, rig_result) || apply_samples(project, type, payload, rig_result) ||
