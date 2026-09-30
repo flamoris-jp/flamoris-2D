@@ -141,14 +141,21 @@ every rejected fixture verifies atomic replacement against the existing session,
 history and revision state. Existing transaction/Undo/Redo/prepared-commit scenarios
 remain protected by the JS-generated session fixture. Managed diagnostics expose
 severity alongside code/path/entity ID. Native before/after transaction validation has a
-dedicated seam: the migrated scene commands cannot modify temporal ownership,
-so the JS cross-state ownership rule is not triggered yet. Port that rule when
-the first applicable command moves. Unsupported domains and commands remain JS-only. The
+dedicated seam, including cross-state TemporalProgram ownership. All 155 Product
+command handlers are native; 63/72 readonly queries are implemented. The
 conformance fixture is generated from the current JS `EditorSession` and covers
 transactions, atomic failure, Undo/Redo, stale and one-shot prepared edits,
 save/dirty lineage, and replacement. Check it with
 `node product/native/tests/check-session-conformance.mjs`, or regenerate
 intentionally with `--write`.
+
+Locale list/search queries link ICU 78.3, matching the pinned Product Node runtime.
+Windows CMake fetches the official Win64 MSVC2022 archive with a pinned SHA256 and
+copies its three DLLs plus license beside the experimental core. Other platforms
+require exactly ICU 78.3 (`-DICU_ROOT=/path/to/icu` for a custom installation; make
+its shared libraries available to the loader). The query conformance corpus uses
+explicit en-US/ja-JP/sv-SE/tr-TR oracle locales without adding a Product locale API.
+See [native-query-migration](../../docs/native-query-migration.md).
 
 **The WPF/MCP Product Host remains the only production editing authority.** The
 native DLL is excluded from the portable package. The next step is to extend

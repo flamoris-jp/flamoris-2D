@@ -10,6 +10,15 @@ const entries = [...inventory.matchAll(/FL2D_QUERY\(\w+, "([^"]+)", ([01])\)/g)]
 assert.deepEqual(entries.map(entry => entry.name), Object.keys(projectQueries), 'Native Query inventory differs from current Product');
 const implemented = entries.filter(entry => entry.implemented).map(entry => entry.name);
 const pending = entries.filter(entry => !entry.implemented).map(entry => entry.name);
+// Query calls are synchronous. Explicit oracle locales make the golden corpus
+// independent of the machine's default without adding a Product locale API.
+const oracle = (project, name, input, locale = 'en-US') => {
+  const compare = String.prototype.localeCompare, lower = String.prototype.toLocaleLowerCase;
+  String.prototype.localeCompare = function(other, locales, options) { return compare.call(this, other, locales ?? locale, options); };
+  String.prototype.toLocaleLowerCase = function(locales) { return lower.call(this, locales ?? locale); };
+  try { return queryProject(project, name, input); }
+  finally { String.prototype.localeCompare = compare; String.prototype.toLocaleLowerCase = lower; }
+};
 const projects = [], seen = new Set();
 const add = project => {
   const validation = validationResult(project);
@@ -157,7 +166,7 @@ const fixtures = projects.map((project, projectIndex) => {
     seenRequests.add(text);
     const before = JSON.stringify(project);
     let expected;
-    try { expected = { value: queryProject(project, name, input) }; }
+    try { expected = { value: oracle(project, name, input) }; }
     catch (error) { expected = { error: { name: error.name, message: error.message } }; }
     assert.equal(JSON.stringify(project), before, `JS query mutated Project: ${name}`);
     cases.push({ request, expected: JSON.parse(JSON.stringify(expected)) });
@@ -197,6 +206,17 @@ const fixtures = projects.map((project, projectIndex) => {
     run('animation.deformation_sample.list', { meshId: value.meshId, topologyId: value.topologyId });
   }
   for (const meshId of ['', null, false, 'missing']) run('animation.deformation_sample.list', { meshId });
+  for (const name of ['mesh.list_keyforms', 'mesh_form.list_keyforms']) {
+    const values = name === 'mesh.list_keyforms' ? project.meshKeyforms : project.meshFormCorrectionKeyforms;
+    for (const value of values) {
+      for (const key of ['topologyId', 'keyArtId', 'semanticSlotId']) run(name, { [key]: value[key] });
+      run(name, { topologyId: value.topologyId, keyArtId: value.keyArtId, semanticSlotId: value.semanticSlotId });
+    }
+    if (projectIndex === 0 || project === projects.find(candidate => candidate.meshFormCorrectionKeyforms.length))
+      for (const value of ['', null, false, 0, [], {}, 'missing']) for (const key of ['topologyId', 'keyArtId', 'semanticSlotId']) run(name, { [key]: value });
+  }
+  if (project.scene.nodes.query_group) for (const text of ['', null, false, 0, true, 10, {}, ['x', null, 'y'], 'missing', 'Hidden', 'part'])
+    for (const includeHidden of [false, true, null, 0]) run('scene.search', { text, includeHidden });
   if (implemented.includes('animation.sample_program')) for (const program of project.temporalPrograms) {
     const times = new Set([0, program.durationTicks, Math.floor(program.durationTicks / 2), 1, 17, 25, 49, 51, 75, 99].filter(time => time <= program.durationTicks));
     for (const event of program.events) times.add(event.timeTicks);
@@ -230,8 +250,77 @@ const fixtures = projects.map((project, projectIndex) => {
     for (const transition of project.transitions) for (const frameRate of rates) run('export.get_frame_plan', { transitionId: transition.id, frameRate });
     for (const sequence of project.sequences) for (const frameRate of rates) run('export.get_frame_plan', { sequenceId: sequence.id, frameRate });
   }
-  return { name: `query-project-${projectIndex}`, project, cases };
+  return { name: `query-project-${projectIndex}`, locale: 'en_US', project, cases };
 });
+const localeLists = {
+  'clipping.list': 'clippingBindings', 'deformer.list': 'rig.deformers', 'bone.list': 'rig.bones',
+  'bone.list_rotation_constraints': 'rig.boneRotationConstraints', 'bone.list_two_bone_ik': 'rig.twoBoneIkConstraints',
+  'bone.list_rigid_bindings': 'rig.rigidBoneBindings', 'skin.list_bindings': 'rig.skinBindings',
+  'mesh_form.list_keyforms': 'meshFormCorrectionKeyforms', 'mesh.list_topologies': 'meshTopologies',
+  'mesh.list': 'meshes', 'mesh.list_keyforms': 'meshKeyforms',
+};
+const locales = [['en-US', 'en_US'], ['ja-JP', 'ja_JP'], ['sv-SE', 'sv_SE'], ['tr-TR', 'tr_TR']];
+// Rename test identities and references together. This is fixture construction,
+// never a Product mutation API. Accent/case/equivalent forms retain stable IDs.
+const localeIds = ['Ö', 'Å', 'z', 'ä', 'a\u0308', 'A', 'a', 'İ', 'ı', '\u{10000}', '\uE000'];
+const remap = (value, replacements, field = '') => {
+  if (typeof value === 'string') return /(^id$|Ids?$|^children$)/.test(field) ? replacements.get(value) ?? value : value;
+  if (Array.isArray(value)) return value.map(entry => remap(entry, replacements, field));
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, entry]) => [field === "nodes" ? replacements.get(key) ?? key : key, remap(entry, replacements, key)]));
+  return value;
+};
+for (const [name, path] of Object.entries(localeLists)) {
+  let project = cloneProject(projects.reduce((left, right) => at(right, path).length > at(left, path).length ? right : left));
+  const values = at(project, path);
+  assert(values.length);
+  if (['rig.boneRotationConstraints', 'rig.twoBoneIkConstraints', 'rig.rigidBoneBindings', 'rig.skinBindings'].includes(path)) {
+    const source = cloneProject(values[0]);
+    while (values.length < localeIds.length) values.push({ ...cloneProject(source), id: `query_locale_copy_${values.length}`, enabled: false });
+  }
+  if (path === 'clippingBindings') {
+    const source = cloneProject(values[0]);
+    while (values.length < localeIds.length) {
+      const node = createSceneNode({ id: `query_locale_target_${values.length}`, displayName: 'Locale target', parentId: project.scene.rootId });
+      project.scene.nodes[node.id] = node; project.scene.nodes[project.scene.rootId].children.push(node.id);
+      values.push({ ...cloneProject(source), id: `query_locale_copy_${values.length}`, targetNodeId: node.id, enabled: false });
+    }
+  }
+  if (path === 'meshFormCorrectionKeyforms' || path === 'meshKeyforms') {
+    const source = cloneProject(values[0]);
+    const compatible = project.meshKeyforms.find(entry => entry.topologyId === source.topologyId && entry.keyArtId === source.keyArtId && entry.semanticSlotId === source.semanticSlotId);
+    while (values.length < localeIds.length) {
+      const keyArtId = `query_locale_art_${values.length}`;
+      project.keyArts.push({ ...cloneProject(project.keyArts.find(entry => entry.id === source.keyArtId)), id: keyArtId });
+      for (const slot of project.semanticSlots) {
+        const mapping = slot.mappings.find(entry => entry.keyArtId === source.keyArtId);
+        if (mapping) slot.mappings.push({ ...cloneProject(mapping), keyArtId });
+      }
+      values.push({ ...cloneProject(source), id: `query_locale_copy_${values.length}`, keyArtId });
+      if (path === 'meshFormCorrectionKeyforms') project.meshKeyforms.push({ ...cloneProject(compatible), id: `query_locale_layout_${values.length}`, keyArtId });
+    }
+  }
+  project = remap(project, new Map(values.map((entry, index) => [entry.id, `query_locale_${localeIds[index % localeIds.length]}`])));
+  assert.equal(validationResult(project).valid, true, `Locale ${name} fixture must be admitted: ${JSON.stringify(validationResult(project).issues.filter(issue => issue.severity === "error"))}`);
+  for (const [locale, nativeLocale] of locales) fixtures.push({ name: `locale-${locale}-${name}`, locale: nativeLocale, project,
+    cases: [{ request: { name }, expected: { value: oracle(project, name, undefined, locale) } }] });
+}
+const searchProject = cloneProject(transformed);
+for (const [index, displayName] of ['Äpfel', 'Ångström', 'Örebro', 'Istanbul', 'İZMİR', 'ΣΟΣ', 'ΟΣ', 'straße', 'ẞ', 'ﬃ', 'a\u0308', 'emoji 🐱', 'I\u0307', 'Embedded\u0000Name'].entries()) {
+  const id = `query_locale_search_${index}`, parentId = index % 2 ? group.id : root.id;
+  const n = createSceneNode({ id, displayName, parentId }); searchProject.scene.nodes[id] = n; searchProject.scene.nodes[parentId].children.push(id);
+}
+assert.equal(validationResult(searchProject).valid, true);
+for (const [locale, nativeLocale] of [...locales, ['en-US', 'en_US_POSIX'], ['en-US', 'c']]) {
+  const cases = [];
+  for (const text of ['i', 'I', 'İ', 'ı', 'σ', 'ς', 'ss', 'ß', 'ä', 'Å', 'a\u0308', '🐱', '\u0000', '']) for (const includeHidden of [true, false]) {
+    const input = { text, includeHidden };
+    cases.push({ request: { name: 'scene.search', input }, expected: { value: oracle(searchProject, 'scene.search', input, locale) } });
+  }
+  fixtures.push({ name: `locale-search-${nativeLocale}`, locale: nativeLocale, project: searchProject, cases });
+}
+// A native POSIX/C default must use V8's en-US collation as well as case mapping.
+const boneLocale = fixtures.find(fixture => fixture.name === 'locale-en-US-bone.list');
+for (const locale of ['en_US_POSIX', 'c']) fixtures.push({ ...boneLocale, name: `locale-fallback-${locale}`, locale });
 const coverage = new Set(fixtures.flatMap(fixture => fixture.cases.map(entry => entry.request.name)));
 for (const name of implemented) assert(coverage.has(name));
 const rows = fixtures.map(fixture => JSON.stringify(fixture)).join(',\n');

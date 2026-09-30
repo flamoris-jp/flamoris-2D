@@ -14,6 +14,7 @@
 #include <cmath>
 #include <vector>
 #include "picojson.h"
+#include <unicode/uloc.h>
 
 static std::string read_string(const fl2d_snapshot* s, uint32_t index, const char* field) {
     uint32_t length = 0;
@@ -307,6 +308,8 @@ static void check_queries() {
     assert(picojson::parse(fixtures,stream).empty());
     for (const auto& row : fixtures.get<Object>().at("fixtures").get<Array>()) {
         const auto& fixture = row.get<Object>();
+        const std::string original_locale(uloc_getDefault()); UErrorCode locale_status = U_ZERO_ERROR;
+        uloc_setDefault(fixture.at("locale").get<std::string>().c_str(),&locale_status); assert(U_SUCCESS(locale_status));
         const auto input = fixture.at("project").serialize(); fl2d_session* session = nullptr;
         assert(fl2d_session_create(reinterpret_cast<const uint8_t*>(input.data()),static_cast<uint32_t>(input.size()),&session) == FL2D_OK);
         const auto& scene = fixture.at("project").get<Object>().at("scene").get<Object>();
@@ -385,6 +388,7 @@ static void check_queries() {
         untouched();
         assert(fl2d_prepared_commit(pending) == FL2D_OK); fl2d_prepared_destroy(pending);
         fl2d_session_destroy(session);
+        locale_status = U_ZERO_ERROR; uloc_setDefault(original_locale.c_str(),&locale_status); assert(U_SUCCESS(locale_status));
     }
 }
 
