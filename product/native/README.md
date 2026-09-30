@@ -234,3 +234,16 @@ whole batch before applying a domain handler. The JS-derived session fixture
 compares full Project, history, revision/dirty state and error after every operation,
 including cycles, invalid payloads, internal-command rejection, Undo/Redo and
 stale prepared hierarchy edits. WPF/MCP and portable packaging are unchanged.
+
+The next #127 checkpoint adds rigid bindings, rotation/IK constraints, Skin
+bindings and sparse form/deformation offsets. Compiled command schemas are
+checked against current JS as part of the existing session conformance gate;
+no runtime JS or test files are loaded by native execution. The payload validator
+is shared across native domains and public/history command classification follows
+Product schemas, including its existing public mesh-target restore contract.
+Skin normalization, sparse zero-offset removal, duplicate handling and sorting
+preserve JS behavior. Stable-ID sorting uses UTF-16 code units in both commands
+and Project validation, including astral-plane/private-use characters.
+`rig-conformance.json` protects full Project/history/error/state parity for
+bindings, constraints, weight authoring and mesh samples through ordinary
+native transactions, Undo/Redo, save points and replacement.

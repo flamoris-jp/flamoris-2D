@@ -127,12 +127,7 @@ static picojson::value parsed(const std::string& text) {
     assert(picojson::parse(result, text).empty());
     return result;
 }
-static void check_session() {
-    std::ifstream stream(FL2D_SESSION_FIXTURES);
-    assert(stream.good());
-    picojson::value fixture;
-    assert(picojson::parse(fixture, stream).empty());
-    const auto& root = fixture.get<picojson::object>();
+static void check_session(const picojson::object& root, bool full_admission) {
     auto initial = root.at("initial").serialize();
     fl2d_session* session = nullptr;
     assert(fl2d_session_create(reinterpret_cast<const uint8_t*>(initial.data()),
@@ -193,6 +188,7 @@ static void check_session() {
             state.history_depth == static_cast<uint32_t>(n("historyDepth")) &&
             state.dirty == static_cast<uint32_t>(expectation.at("dirty").get<bool>()));
     }
+    if (full_admission) {
     // Shared validation rejects malformed names and disconnected graphs before mutation.
     {
         auto invalid = root.at("initial");
@@ -272,6 +268,7 @@ static void check_session() {
             before.saved_revision == after.saved_revision && before.undo_depth == after.undo_depth &&
             before.redo_depth == after.redo_depth && before.history_depth == after.history_depth && before.dirty == after.dirty);
     }
+    }
     for (auto& [key, p] : prepared) { (void)key; fl2d_prepared_destroy(p); }
     fl2d_session_destroy(session);
 }
@@ -296,5 +293,9 @@ int main() {
     assert(fl2d_normalize_frame_rate(engine, 1, 1, nullptr) == FL2D_INVALID_ARGUMENT);
     fl2d_engine_destroy(engine);
     check_project_snapshots();
-    check_session();
+    for (const auto& input : {std::pair<const char*, bool>{FL2D_SESSION_FIXTURES, true}, {FL2D_RIG_FIXTURES, false}}) {
+        std::ifstream stream(input.first); assert(stream.good()); picojson::value fixture;
+        assert(picojson::parse(fixture, stream).empty());
+        check_session(fixture.get<picojson::object>(), input.second);
+    }
 }
