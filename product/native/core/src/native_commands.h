@@ -20,4 +20,7 @@ void assert_command(const Value& command, bool allow_internal);
 Applied apply(Value& project, const Value& command);
 bool apply_bone_hierarchy(Value& project, const std::string& type, const Value& payload, Applied& result);
 bool apply_warp(Value& project, const std::string& type, const Value& payload, Applied& result);
+bool apply_temporal(Value& project, const std::string& type, const Value& payload, Applied& result);
+bool apply_owners(Value& project, const std::string& type, const Value& payload, Applied& result);
+bool valid_temporal_ownership_change(const Value& before, const Value& after);
 }
