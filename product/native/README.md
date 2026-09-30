@@ -261,3 +261,9 @@ creation/removal must include its program, and a surviving stable owner cannot
 reassign programs. `temporal-session-conformance.json` compares complete snapshots and
 history across successful atomic owner edits, lifecycle failures, time/channel
 checks, typed item edits, canonical ordering and schema preflight.
+
+KeyArt, SemanticSlot mapping, Topology/Keyform lifecycle and Transition part/
+diagnostic authoring now run through native commands. Product normalizers,
+stable identity/mapping exclusivity, topology dependency locks and indexed
+inverses are preserved. `transition-session-conformance.json` compares full
+Project/history/error/revision state, including atomic failures and Undo/Redo.

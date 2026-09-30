@@ -1,12 +1,14 @@
 # Native command/query migration (#127)
 
-This checkpoint follows reviewed main `e3c8f1a` (#130). Production remains the JS Product Host until the explicit #118 cutover. WPF/MCP never dual-write. Native commands run in the same session, candidate validator, prepared commit and history path introduced by #123.
+This checkpoint follows reviewed main `1611596` (#131). Production remains the JS Product Host until the explicit #118 cutover. WPF/MCP never dual-write. Native commands run in the same session, candidate validator, prepared commit and history path introduced by #123.
 
 ## Command contract
 
 Validate every command envelope/payload in a batch before invoking its first domain handler, matching JS error precedence. Public execution rejects history-only command types; native Undo may replay them. A command returns one inverse plus an ordered list of affected stable IDs. The transaction deduplicates those IDs in first-seen order. Hierarchy changes synchronize a matching WarpDeformer parent. Binding and rig deletion/restoration preserves collection index. Bone rest/reparent operations reject dependent IK, authored poses, rigid/Skin bindings in Product order; Bone deletion also rejects rotation constraints. Warp topology changes reject authored keyforms. Warp removal lifts children and its inverse restores their ordered hierarchy and indexed points/keyforms. The existing candidate-admission rejection for a Warp with a Bone child remains atomic. Ordinary candidate validation owns cycle/reference rejection and failure is atomic. No generic property-path editing API is added.
 
 The next Temporal/Clip/Sequence checkpoint validates Project admission and then the before/after ownership lifecycle at the prepared transaction boundary, including Undo/Redo. Existing Sequence/AnimationClip owners cannot reassign programs, a new owner cannot adopt a program present before the transaction, and deleting an owner cannot retain its program. Creating/removing the owner and its program together is atomic; removing and recreating the same stable owner ID cannot bypass ownership immutability. Transition ownership keeps its current distinct Product contract. Failed prepare leaves Project/history/revisions unchanged; full project replacement remains admission rather than a transaction lifecycle change. This cross-state check must also cover future source replacement commands. Scene hierarchy and clipping cannot alter owner/program relationships. Source decode/import belongs with persistence/ingest; source.apply_psd_reimport still needs parity before authority cutover.
+
+The Transition authoring checkpoint preserves typed KeyArt/SemanticSlot/Topology/Keyform/Transition lifecycle commands. Normalizers fill current Product defaults without adding a new persistent schema. Stable identity, mapping exclusivity, Skin/form topology locks and atomic topology mutation requirements retain Product error precedence. Transition part/diagnostic inverses preserve indices; candidate validation owns endpoint/topology/reference compatibility. Transition removal keeps its current independent program lifecycle contract.
 
 ## Completion order
 
@@ -18,7 +20,7 @@ The next Temporal/Clip/Sequence checkpoint validates Project admission and then 
 
 ## Current handler inventory
 
-155 JS handlers: 111 native, 44 pending. Status means native coverage; JS remains production authority for every handler. Internal/public classification comes from current commandSchemas/internalCommandSchemas.
+155 JS handlers: 145 native, 10 pending. Status means native coverage; JS remains production authority for every handler. Internal/public classification comes from current commandSchemas/internalCommandSchemas.
 
 | Command | Access | Native | JS source |
 | --- | --- | --- | --- |
@@ -126,40 +128,40 @@ The next Temporal/Clip/Sequence checkpoint validates Project admission and then 
 | `animation.temporal.add_region` | public | native | `temporal-command-handlers.js` |
 | `animation.temporal.remove_region` | history | native | `temporal-command-handlers.js` |
 | `animation.temporal.restore_region` | history | native | `temporal-command-handlers.js` |
-| `keyart.create` | public | pending | `transition-command-handlers.js` |
-| `keyart.update` | public | pending | `transition-command-handlers.js` |
-| `keyart.remove` | public | pending | `transition-command-handlers.js` |
-| `keyArts.remove_internal` | history | pending | `transition-command-handlers.js` |
-| `keyart.restore` | history | pending | `transition-command-handlers.js` |
-| `semantic_slot.create` | public | pending | `transition-command-handlers.js` |
-| `semantic_slot.update` | public | pending | `transition-command-handlers.js` |
-| `semantic_slot.remove` | public | pending | `transition-command-handlers.js` |
-| `semanticSlots.remove_internal` | history | pending | `transition-command-handlers.js` |
-| `semantic_slot.restore` | history | pending | `transition-command-handlers.js` |
-| `semantic_slot.map_node` | public | pending | `transition-command-handlers.js` |
-| `semantic_slot.unmap_node` | public | pending | `transition-command-handlers.js` |
-| `semantic_slot.restore_mapping` | history | pending | `transition-command-handlers.js` |
-| `mesh_topology.create` | public | pending | `transition-command-handlers.js` |
-| `mesh_topology.update` | public | pending | `transition-command-handlers.js` |
-| `mesh_topology.remove` | public | pending | `transition-command-handlers.js` |
-| `meshTopologies.remove_internal` | history | pending | `transition-command-handlers.js` |
-| `mesh_topology.restore` | history | pending | `transition-command-handlers.js` |
-| `mesh_keyform.create` | public | pending | `transition-command-handlers.js` |
-| `mesh_keyform.update` | public | pending | `transition-command-handlers.js` |
-| `mesh_keyform.remove` | public | pending | `transition-command-handlers.js` |
-| `meshKeyforms.remove_internal` | history | pending | `transition-command-handlers.js` |
-| `mesh_keyform.restore` | history | pending | `transition-command-handlers.js` |
-| `transition.create` | public | pending | `transition-command-handlers.js` |
-| `transition.update` | public | pending | `transition-command-handlers.js` |
-| `transition.remove` | public | pending | `transition-command-handlers.js` |
-| `transitions.remove_internal` | history | pending | `transition-command-handlers.js` |
-| `transition.restore` | history | pending | `transition-command-handlers.js` |
-| `transition.set_part_mode` | public | pending | `transition-command-handlers.js` |
-| `transition.set_part_topology` | public | pending | `transition-command-handlers.js` |
-| `transition.remove_part` | history | pending | `transition-command-handlers.js` |
-| `transition.restore_part` | history | pending | `transition-command-handlers.js` |
-| `transition.set_diagnostic_override` | public | pending | `transition-command-handlers.js` |
-| `transition.clear_diagnostic_override` | public | pending | `transition-command-handlers.js` |
+| `keyart.create` | public | native | `transition-command-handlers.js` |
+| `keyart.update` | public | native | `transition-command-handlers.js` |
+| `keyart.remove` | public | native | `transition-command-handlers.js` |
+| `keyArts.remove_internal` | history | native | `transition-command-handlers.js` |
+| `keyart.restore` | history | native | `transition-command-handlers.js` |
+| `semantic_slot.create` | public | native | `transition-command-handlers.js` |
+| `semantic_slot.update` | public | native | `transition-command-handlers.js` |
+| `semantic_slot.remove` | public | native | `transition-command-handlers.js` |
+| `semanticSlots.remove_internal` | history | native | `transition-command-handlers.js` |
+| `semantic_slot.restore` | history | native | `transition-command-handlers.js` |
+| `semantic_slot.map_node` | public | native | `transition-command-handlers.js` |
+| `semantic_slot.unmap_node` | public | native | `transition-command-handlers.js` |
+| `semantic_slot.restore_mapping` | history | native | `transition-command-handlers.js` |
+| `mesh_topology.create` | public | native | `transition-command-handlers.js` |
+| `mesh_topology.update` | public | native | `transition-command-handlers.js` |
+| `mesh_topology.remove` | public | native | `transition-command-handlers.js` |
+| `meshTopologies.remove_internal` | history | native | `transition-command-handlers.js` |
+| `mesh_topology.restore` | history | native | `transition-command-handlers.js` |
+| `mesh_keyform.create` | public | native | `transition-command-handlers.js` |
+| `mesh_keyform.update` | public | native | `transition-command-handlers.js` |
+| `mesh_keyform.remove` | public | native | `transition-command-handlers.js` |
+| `meshKeyforms.remove_internal` | history | native | `transition-command-handlers.js` |
+| `mesh_keyform.restore` | history | native | `transition-command-handlers.js` |
+| `transition.create` | public | native | `transition-command-handlers.js` |
+| `transition.update` | public | native | `transition-command-handlers.js` |
+| `transition.remove` | public | native | `transition-command-handlers.js` |
+| `transitions.remove_internal` | history | native | `transition-command-handlers.js` |
+| `transition.restore` | history | native | `transition-command-handlers.js` |
+| `transition.set_part_mode` | public | native | `transition-command-handlers.js` |
+| `transition.set_part_topology` | public | native | `transition-command-handlers.js` |
+| `transition.remove_part` | history | native | `transition-command-handlers.js` |
+| `transition.restore_part` | history | native | `transition-command-handlers.js` |
+| `transition.set_diagnostic_override` | public | native | `transition-command-handlers.js` |
+| `transition.clear_diagnostic_override` | public | native | `transition-command-handlers.js` |
 | `bone.create_two_bone_ik` | public | native | `two-bone-ik-command-handlers.js` |
 | `bone.remove_two_bone_ik` | public | native | `two-bone-ik-command-handlers.js` |
 | `bone.remove_two_bone_ik_internal` | history | native | `two-bone-ik-command-handlers.js` |

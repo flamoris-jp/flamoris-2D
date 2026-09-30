@@ -23,4 +23,5 @@ bool apply_warp(Value& project, const std::string& type, const Value& payload, A
 bool apply_temporal(Value& project, const std::string& type, const Value& payload, Applied& result);
 bool apply_owners(Value& project, const std::string& type, const Value& payload, Applied& result);
 bool valid_temporal_ownership_change(const Value& before, const Value& after);
+bool apply_transition(Value& project, const std::string& type, const Value& payload, Applied& result);
 }
