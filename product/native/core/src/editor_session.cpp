@@ -1,5 +1,6 @@
 #include "flamoris2d_core.h"
 #include "picojson.h"
+#include "native_commands.h"
 
 #include <algorithm>
 #include <cmath>
@@ -13,12 +14,12 @@
 #include <vector>
 
 namespace {
+using namespace fl2d_commands;
 using Value = picojson::value;
 using Object = picojson::object;
 using Array = picojson::array;
 constexpr int64_t max_js_revision = 9007199254740991LL;
 
-struct Failure { fl2d_status status; const char* code; };
 struct Entry {
     std::string label;
     Array commands, inverses;
@@ -33,59 +34,6 @@ struct State {
     uint64_t generation = 0;
     std::string error;
 };
-const Value& field(const Value& value, const std::string& key) {
-    static const Value missing;
-    if (!value.is<Object>()) return missing;
-    const auto& object = value.get<Object>();
-    auto it = object.find(key);
-    return it == object.end() ? missing : it->second;
-}
-bool exact(const Value& value, std::initializer_list<const char*> required) {
-    if (!value.is<Object>() || value.get<Object>().size() != required.size()) return false;
-    for (auto name : required) if (value.get<Object>().count(name) != 1) return false;
-    return true;
-}
-bool number(const Value& v) { return v.is<double>() && std::isfinite(v.get<double>()); }
-// Both Product's nonBlank schema and rename handler use ECMAScript trim().
-bool trim_space(uint32_t code_point) {
-    return (code_point >= 0x09 && code_point <= 0x0D) || code_point == 0x20 ||
-        code_point == 0xA0 || code_point == 0x1680 ||
-        (code_point >= 0x2000 && code_point <= 0x200A) ||
-        code_point == 0x2028 || code_point == 0x2029 || code_point == 0x202F ||
-        code_point == 0x205F || code_point == 0x3000 || code_point == 0xFEFF;
-}
-uint32_t next_code_point(const std::string& text, size_t& pos) {
-    const auto lead = static_cast<unsigned char>(text[pos++]);
-    if (lead < 0x80) return lead;
-    uint32_t code_point = lead < 0xE0 ? lead & 0x1F : lead < 0xF0 ? lead & 0x0F : lead & 0x07;
-    const int continuation = lead < 0xE0 ? 1 : lead < 0xF0 ? 2 : 3;
-    for (int i = 0; i < continuation; ++i)
-        code_point = (code_point << 6) | (static_cast<unsigned char>(text[pos++]) & 0x3F);
-    return code_point;
-}
-std::string trimmed(const std::string& text) {
-    size_t begin = text.size(), end = 0;
-    for (size_t pos = 0; pos < text.size();) {
-        const size_t start = pos;
-        const bool space = trim_space(next_code_point(text, pos));
-        if (!space) {
-            if (begin == text.size()) begin = start;
-            end = pos;
-        }
-    }
-    return begin == text.size() ? "" : text.substr(begin, end - begin);
-}
-bool nonblank(const Value& v) {
-    return v.is<std::string>() && !trimmed(v.get<std::string>()).empty();
-}
-bool point(const Value& value) {
-    return exact(value, {"x", "y"}) && number(field(value, "x")) && number(field(value, "y"));
-}
-bool transform(const Value& value) {
-    return exact(value, {"position", "rotation", "scale", "pivot"}) &&
-        point(field(value, "position")) && number(field(value, "rotation")) &&
-        point(field(value, "scale")) && point(field(value, "pivot"));
-}
 fl2d_status copy(const std::string& value, char* buffer, uint32_t capacity, uint32_t* required) {
     if (!required) return FL2D_INVALID_ARGUMENT;
     if (value.size() >= UINT32_MAX) return FL2D_INPUT_TOO_LARGE;
@@ -173,178 +121,12 @@ fl2d_status record(State& s, fl2d_status status) {
     s.error = status == FL2D_OK ? "" : error_name(status);
     return status;
 }
-Value& node(Value& project, const std::string& id) {
-    auto& nodes = project.get<Object>().at("scene").get<Object>().at("nodes").get<Object>();
-    auto it = nodes.find(id);
-    if (it == nodes.end()) throw Failure{FL2D_TARGET_NOT_FOUND, "scene.node_not_found"};
-    return it->second;
-}
 const Value* find_node(const State& state, const char* id) {
     if (!id) return nullptr;
     const auto& nodes = field(field(state.project, "scene"), "nodes").get<Object>();
     auto it = nodes.find(id);
     return it == nodes.end() ? nullptr : &it->second;
 }
-Value command(const std::string& type, const Object& payload) {
-    return Value(Object{{"type", Value(type)}, {"payload", Value(payload)}});
-}
-struct Applied { Value inverse; std::vector<std::string> ids; };
-Applied apply(Value& project, const Value& cmd) {
-    if (!exact(cmd, {"type", "payload"}) || !field(cmd, "type").is<std::string>())
-        throw Failure{FL2D_COMMAND_INVALID, "command.payload_invalid"};
-    const std::string type = field(cmd, "type").get<std::string>();
-    const Value& payload = field(cmd, "payload");
-    auto bad = [] { throw Failure{FL2D_COMMAND_INVALID, "command.payload_invalid"}; };
-    auto fail = [](const char* code) { throw Failure{FL2D_COMMAND_INVALID, code}; };
-    auto text = [&](const char* key) { return field(payload, key).get<std::string>(); };
-    auto index_for = [&](size_t length) {
-        const auto& index = field(payload, "index");
-        return index.is<double>() ? static_cast<size_t>(std::min(static_cast<double>(length), index.get<double>())) : length;
-    };
-    auto children = [](Value& n) -> Array& { return n.get<Object>().at("children").get<Array>(); };
-    auto group = [](const Value& n) { return field(n, "kind") == Value("group") || field(n, "kind") == Value("deformer"); };
-    auto node_id = [](const Value& n) { return field(n, "id").get<std::string>(); };
-    if (type.rfind("clipping.", 0) == 0) {
-        auto& bindings = project.get<Object>().at("clippingBindings").get<Array>();
-        if (type == "clipping.create" || type == "clipping.restore") {
-            Value binding = field(payload, "binding");
-            const auto id = field(binding, "id").get<std::string>();
-            bindings.insert(bindings.begin() + (type == "clipping.create" ? bindings.size() : index_for(bindings.size())), binding);
-            return {command("clipping.remove_internal", Object{{"bindingId", Value(id)}}),
-                {id, field(binding, "targetNodeId").get<std::string>(), field(binding, "sourceNodeId").get<std::string>()}};
-        }
-        auto it = std::find_if(bindings.begin(), bindings.end(), [&](const Value& v) { return field(v, "id") == field(payload, "bindingId"); });
-        if (it == bindings.end()) fail("clipping.not_found");
-        auto id = field(*it, "id").get<std::string>();
-        auto target = field(*it, "targetNodeId").get<std::string>();
-        auto source = field(*it, "sourceNodeId").get<std::string>();
-        if (type == "clipping.remove" || type == "clipping.remove_internal") {
-            Value inverse = command("clipping.restore", Object{{"binding", *it}, {"index", Value(static_cast<double>(it - bindings.begin()))}});
-            bindings.erase(it);
-            return {inverse, {id, target, source}};
-        }
-        const char* property = type == "clipping.set_enabled" ? "enabled" : "sourceNodeId";
-        Value inverse = command(type, Object{{"bindingId", Value(id)}, {property, field(*it, property)}});
-        it->get<Object>()[property] = field(payload, property);
-        std::vector<std::string> ids{id, target, source};
-        if (type == "clipping.set_source") ids.push_back(text("sourceNodeId"));
-        return {inverse, ids};
-    }
-    if (type == "scene.create_group") {
-        auto& nodes = project.get<Object>().at("scene").get<Object>().at("nodes").get<Object>();
-        const auto id = text("id");
-        if (nodes.count(id)) fail("identity.duplicate");
-        Value& parent = node(project, text("parentId"));
-        if (!group(parent)) fail("scene.invalid_parent_kind");
-        const auto parent_id = node_id(parent);
-        Value identity(Object{{"position", Value(Object{{"x", Value(0.0)}, {"y", Value(0.0)}})},
-            {"rotation", Value(0.0)}, {"scale", Value(Object{{"x", Value(1.0)}, {"y", Value(1.0)}})},
-            {"pivot", Value(Object{{"x", Value(0.0)}, {"y", Value(0.0)}})}});
-        nodes[id] = Value(Object{{"id", Value(id)}, {"kind", Value("group")}, {"displayName", Value(trimmed(text("displayName")))},
-            {"sourceRef", Value()}, {"parentId", Value(parent_id)}, {"children", Value(Array{})}, {"visible", Value(true)},
-            {"locked", Value(false)}, {"opacity", Value(1.0)}, {"blendMode", Value("normal")}, {"transform", identity}});
-        auto& list = children(parent);
-        list.insert(list.begin() + index_for(list.size()), Value(id));
-        return {command("scene.remove_empty_group", Object{{"nodeId", Value(id)}}), {parent_id, id}};
-    }
-    std::string id = text("nodeId");
-    Value& target = node(project, id);
-    auto& properties = target.get<Object>();
-    Object inverse{{"nodeId", Value(id)}};
-    if (type == "scene.remove_empty_group") {
-        if (Value(id) == field(field(project, "scene"), "rootId") || field(target, "kind") != Value("group") || !children(target).empty())
-            fail("scene.group_not_empty");
-        const auto name = field(target, "displayName");
-        Value& parent = node(project, field(target, "parentId").get<std::string>());
-        const auto parent_id = node_id(parent);
-        auto& list = children(parent);
-        auto at = std::find(list.begin(), list.end(), Value(id));
-        const auto index = static_cast<double>(at - list.begin());
-        list.erase(at);
-        project.get<Object>().at("scene").get<Object>().at("nodes").get<Object>().erase(id);
-        return {command("scene.create_group", Object{{"id", Value(id)}, {"parentId", Value(parent_id)}, {"displayName", name}, {"index", Value(index)}}), {parent_id, id}};
-    }
-    if (type == "scene.reparent_node") {
-        Value& parent = node(project, text("parentId"));
-        if (Value(id) == field(field(project, "scene"), "rootId")) fail("scene.reparent_root");
-        if (!group(parent)) fail("scene.invalid_parent_kind");
-        for (const Value* ancestor = &parent; ancestor;) {
-            if (field(*ancestor, "id") == Value(id)) fail("scene.cycle");
-            const auto& parent_id = field(*ancestor, "parentId");
-            ancestor = parent_id.is<std::string>() ? &node(project, parent_id.get<std::string>()) : nullptr;
-        }
-        Value& previous = node(project, field(target, "parentId").get<std::string>());
-        const auto previous_id = node_id(previous), parent_id = node_id(parent);
-        auto& old_list = children(previous);
-        auto at = std::find(old_list.begin(), old_list.end(), Value(id));
-        const auto previous_index = static_cast<double>(at - old_list.begin());
-        old_list.erase(at);
-        auto& list = children(parent);
-        list.insert(list.begin() + index_for(list.size()), Value(id));
-        properties["parentId"] = Value(parent_id);
-        if (field(target, "kind") == Value("deformer")) {
-            auto& deformers = project.get<Object>().at("rig").get<Object>().at("deformers").get<Array>();
-            for (auto& deformer : deformers) if (field(deformer, "id") == Value(id)) deformer.get<Object>()["parentNodeId"] = Value(parent_id);
-        }
-        return {command(type, Object{{"nodeId", Value(id)}, {"parentId", Value(previous_id)}, {"index", Value(previous_index)}}), {id, previous_id, parent_id}};
-    }
-    if (type == "scene.rename_node") {
-        inverse["displayName"] = properties.at("displayName");
-        std::string name = trimmed(text("displayName"));
-        if (name.empty()) bad();
-        properties["displayName"] = Value(name);
-    } else if (type == "scene.set_visibility" || type == "scene.set_locked") {
-        const char* property = type == "scene.set_visibility" ? "visible" : "locked";
-        inverse[property] = field(target, property);
-        properties[property] = field(payload, property);
-    } else {
-        inverse["coordinateSpace"] = Value("node-local");
-        inverse["transform"] = properties.at("transform");
-        properties["transform"] = field(payload, "transform");
-    }
-    return {command(type, inverse), {id}};
-}
-bool shape(const Value& value, std::initializer_list<const char*> required, std::initializer_list<const char*> optional = {}) {
-    if (!value.is<Object>()) return false;
-    for (const auto key : required) if (!value.get<Object>().count(key)) return false;
-    for (const auto& [key, ignored] : value.get<Object>()) {
-        (void)ignored;
-        if (std::find(required.begin(), required.end(), key) == required.end() &&
-            std::find(optional.begin(), optional.end(), key) == optional.end()) return false;
-    }
-    return true;
-}
-bool index(const Value& payload) {
-    const auto& v = field(payload, "index");
-    return !payload.get<Object>().count("index") || (number(v) && v.get<double>() >= 0 && std::floor(v.get<double>()) == v.get<double>());
-}
-void assert_command(const Value& cmd, bool internal) {
-    if (!exact(cmd, {"type", "payload"}) || !field(cmd, "type").is<std::string>())
-        throw Failure{FL2D_COMMAND_INVALID, "command.payload_invalid"};
-    const auto type = field(cmd, "type").get<std::string>();
-    const auto& p = field(cmd, "payload");
-    bool valid = false, supported = true;
-    if (type == "scene.rename_node") valid = exact(p, {"nodeId", "displayName"}) && nonblank(field(p, "nodeId")) && nonblank(field(p, "displayName"));
-    else if (type == "scene.set_transform") valid = exact(p, {"nodeId", "coordinateSpace", "transform"}) && nonblank(field(p, "nodeId")) && field(p, "coordinateSpace") == Value("node-local") && transform(field(p, "transform"));
-    else if (type == "scene.set_visibility" || type == "scene.set_locked") {
-        const char* property = type == "scene.set_visibility" ? "visible" : "locked";
-        valid = exact(p, {"nodeId", property}) && nonblank(field(p, "nodeId")) && field(p, property).is<bool>();
-    } else if (type == "scene.create_group") valid = shape(p, {"id", "parentId", "displayName"}, {"index"}) && nonblank(field(p, "id")) && nonblank(field(p, "parentId")) && nonblank(field(p, "displayName")) && index(p);
-    else if (type == "scene.reparent_node") valid = shape(p, {"nodeId", "parentId"}, {"index"}) && nonblank(field(p, "nodeId")) && nonblank(field(p, "parentId")) && index(p);
-    else if (type == "scene.remove_empty_group") valid = internal && exact(p, {"nodeId"}) && nonblank(field(p, "nodeId"));
-    else if (type == "clipping.create" || type == "clipping.restore") {
-        const auto& b = field(p, "binding");
-        valid = (type == "clipping.create" ? exact(p, {"binding"}) : internal && exact(p, {"binding", "index"}) && index(p)) &&
-            exact(b, {"id", "targetNodeId", "sourceNodeId", "mode", "enabled"}) && nonblank(field(b, "id")) &&
-            nonblank(field(b, "targetNodeId")) && nonblank(field(b, "sourceNodeId")) && field(b, "mode") == Value("inside") && field(b, "enabled").is<bool>();
-    } else if (type == "clipping.set_source") valid = exact(p, {"bindingId", "sourceNodeId"}) && nonblank(field(p, "bindingId")) && nonblank(field(p, "sourceNodeId"));
-    else if (type == "clipping.set_enabled") valid = exact(p, {"bindingId", "enabled"}) && nonblank(field(p, "bindingId")) && field(p, "enabled").is<bool>();
-    else if (type == "clipping.remove" || type == "clipping.remove_internal") valid = (internal || type == "clipping.remove") && exact(p, {"bindingId"}) && nonblank(field(p, "bindingId"));
-    else supported = false;
-    if (!supported) throw Failure{FL2D_COMMAND_UNSUPPORTED, "command.unsupported"};
-    if (!valid) throw Failure{FL2D_COMMAND_INVALID, "command.payload_invalid"};
-}
-
 Array history_item(const std::string& label, const Array& commands, const std::vector<std::string>& affected) {
     Array types, ids;
     for (const auto& cmd : commands) types.emplace_back(field(cmd, "type"));

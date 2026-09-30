@@ -1,6 +1,6 @@
 # Native command/query migration (#127)
 
-This checkpoint follows reviewed main `b7b39b9` (#126). Production remains the JS Product Host until the explicit #118 cutover. WPF/MCP never dual-write. Native commands run in the same session, candidate validator, prepared commit and history path introduced by #123.
+This checkpoint follows reviewed main `40ea56a` (#128). Production remains the JS Product Host until the explicit #118 cutover. WPF/MCP never dual-write. Native commands run in the same session, candidate validator, prepared commit and history path introduced by #123.
 
 ## Command contract
 
@@ -18,7 +18,7 @@ Source replacement and owner/program lifecycle commands must add the cross-state
 
 ## Current handler inventory
 
-155 JS handlers: 13 native, 142 pending. Status means native coverage; JS remains production authority for every handler. Internal/public classification comes from current commandSchemas/internalCommandSchemas.
+155 JS handlers: 52 native, 103 pending. Status means native coverage; JS remains production authority for every handler. Internal/public classification comes from current commandSchemas/internalCommandSchemas.
 
 | Command | Access | Native | JS source |
 | --- | --- | --- | --- |
@@ -38,31 +38,31 @@ Source replacement and owner/program lifecycle commands must add the cross-state
 | `bone.set_keyform` | public | pending | `bone-command-handlers.js` |
 | `bone.reset_keyform` | public | pending | `bone-command-handlers.js` |
 | `bone.remove_keyform_internal` | history | pending | `bone-command-handlers.js` |
-| `bone.create_rotation_constraint` | public | pending | `bone-constraint-command-handlers.js` |
-| `bone.remove_rotation_constraint` | public | pending | `bone-constraint-command-handlers.js` |
-| `bone.remove_rotation_constraint_internal` | history | pending | `bone-constraint-command-handlers.js` |
-| `bone.restore_rotation_constraint` | history | pending | `bone-constraint-command-handlers.js` |
-| `bone.set_rotation_constraint_enabled` | public | pending | `bone-constraint-command-handlers.js` |
-| `bone.set_rotation_constraint_bounds` | public | pending | `bone-constraint-command-handlers.js` |
+| `bone.create_rotation_constraint` | public | native | `bone-constraint-command-handlers.js` |
+| `bone.remove_rotation_constraint` | public | native | `bone-constraint-command-handlers.js` |
+| `bone.remove_rotation_constraint_internal` | history | native | `bone-constraint-command-handlers.js` |
+| `bone.restore_rotation_constraint` | history | native | `bone-constraint-command-handlers.js` |
+| `bone.set_rotation_constraint_enabled` | public | native | `bone-constraint-command-handlers.js` |
+| `bone.set_rotation_constraint_bounds` | public | native | `bone-constraint-command-handlers.js` |
 | `clipping.create` | public | native | `clipping-command-handlers.js` |
 | `clipping.set_source` | public | native | `clipping-command-handlers.js` |
 | `clipping.set_enabled` | public | native | `clipping-command-handlers.js` |
 | `clipping.remove` | public | native | `clipping-command-handlers.js` |
 | `clipping.remove_internal` | history | native | `clipping-command-handlers.js` |
 | `clipping.restore` | history | native | `clipping-command-handlers.js` |
-| `animation.mesh_target.create` | public | pending | `mesh-deformation-sample-command-handlers.js` |
-| `animation.mesh_target.remove` | public | pending | `mesh-deformation-sample-command-handlers.js` |
-| `animation.mesh_target.restore_internal` | public | pending | `mesh-deformation-sample-command-handlers.js` |
-| `animation.deformation_sample.create` | public | pending | `mesh-deformation-sample-command-handlers.js` |
-| `animation.deformation_sample.update` | public | pending | `mesh-deformation-sample-command-handlers.js` |
-| `animation.deformation_sample.remove` | public | pending | `mesh-deformation-sample-command-handlers.js` |
-| `animation.deformation_sample.remove_internal` | history | pending | `mesh-deformation-sample-command-handlers.js` |
-| `animation.deformation_sample.restore` | history | pending | `mesh-deformation-sample-command-handlers.js` |
-| `mesh_form.create_keyform` | public | pending | `mesh-form-correction-command-handlers.js` |
-| `mesh_form.set_vertex_offsets` | public | pending | `mesh-form-correction-command-handlers.js` |
-| `mesh_form.reset_keyform` | public | pending | `mesh-form-correction-command-handlers.js` |
-| `mesh_form.remove_keyform_internal` | history | pending | `mesh-form-correction-command-handlers.js` |
-| `mesh_form.restore_keyform` | history | pending | `mesh-form-correction-command-handlers.js` |
+| `animation.mesh_target.create` | public | native | `mesh-deformation-sample-command-handlers.js` |
+| `animation.mesh_target.remove` | public | native | `mesh-deformation-sample-command-handlers.js` |
+| `animation.mesh_target.restore_internal` | public | native | `mesh-deformation-sample-command-handlers.js` |
+| `animation.deformation_sample.create` | public | native | `mesh-deformation-sample-command-handlers.js` |
+| `animation.deformation_sample.update` | public | native | `mesh-deformation-sample-command-handlers.js` |
+| `animation.deformation_sample.remove` | public | native | `mesh-deformation-sample-command-handlers.js` |
+| `animation.deformation_sample.remove_internal` | history | native | `mesh-deformation-sample-command-handlers.js` |
+| `animation.deformation_sample.restore` | history | native | `mesh-deformation-sample-command-handlers.js` |
+| `mesh_form.create_keyform` | public | native | `mesh-form-correction-command-handlers.js` |
+| `mesh_form.set_vertex_offsets` | public | native | `mesh-form-correction-command-handlers.js` |
+| `mesh_form.reset_keyform` | public | native | `mesh-form-correction-command-handlers.js` |
+| `mesh_form.remove_keyform_internal` | history | native | `mesh-form-correction-command-handlers.js` |
+| `mesh_form.restore_keyform` | history | native | `mesh-form-correction-command-handlers.js` |
 | `mesh_keyform.move_vertices` | public | pending | `mesh-topology-command-handlers.js` |
 | `mesh_topology.set_vertex_label` | public | pending | `mesh-topology-command-handlers.js` |
 | `mesh_topology.clear_vertex_label` | public | pending | `mesh-topology-command-handlers.js` |
@@ -72,12 +72,12 @@ Source replacement and owner/program lifecycle commands must add the cross-state
 | `mesh_topology.subdivide_edge` | public | pending | `mesh-topology-command-handlers.js` |
 | `mesh_topology.apply_generated_mesh` | public | pending | `mesh-topology-command-handlers.js` |
 | `mesh_topology.restore_snapshot` | history | pending | `mesh-topology-command-handlers.js` |
-| `bone.create_rigid_binding` | public | pending | `rigid-bone-binding-command-handlers.js` |
-| `bone.set_rigid_binding_bone` | public | pending | `rigid-bone-binding-command-handlers.js` |
-| `bone.set_rigid_binding_enabled` | public | pending | `rigid-bone-binding-command-handlers.js` |
-| `bone.remove_rigid_binding` | public | pending | `rigid-bone-binding-command-handlers.js` |
-| `bone.remove_rigid_binding_internal` | history | pending | `rigid-bone-binding-command-handlers.js` |
-| `bone.restore_rigid_binding` | history | pending | `rigid-bone-binding-command-handlers.js` |
+| `bone.create_rigid_binding` | public | native | `rigid-bone-binding-command-handlers.js` |
+| `bone.set_rigid_binding_bone` | public | native | `rigid-bone-binding-command-handlers.js` |
+| `bone.set_rigid_binding_enabled` | public | native | `rigid-bone-binding-command-handlers.js` |
+| `bone.remove_rigid_binding` | public | native | `rigid-bone-binding-command-handlers.js` |
+| `bone.remove_rigid_binding_internal` | history | native | `rigid-bone-binding-command-handlers.js` |
+| `bone.restore_rigid_binding` | history | native | `rigid-bone-binding-command-handlers.js` |
 | `source.apply_psd_reimport` | public | pending | `scene-command-handlers.js` |
 | `scene.rename_node` | public | native | `scene-command-handlers.js` |
 | `scene.set_transform` | public | native | `scene-command-handlers.js` |
@@ -101,14 +101,14 @@ Source replacement and owner/program lifecycle commands must add the cross-state
 | `sequence.remove_clip_instance` | public | pending | `sequence-command-handlers.js` |
 | `sequence.remove_clip_instance_internal` | history | pending | `sequence-command-handlers.js` |
 | `sequence.restore_clip_instance` | history | pending | `sequence-command-handlers.js` |
-| `skin.create_binding` | public | pending | `skin-binding-command-handlers.js` |
-| `skin.remove_binding` | public | pending | `skin-binding-command-handlers.js` |
-| `skin.remove_binding_internal` | history | pending | `skin-binding-command-handlers.js` |
-| `skin.restore_binding` | history | pending | `skin-binding-command-handlers.js` |
-| `skin.set_enabled` | public | pending | `skin-binding-command-handlers.js` |
-| `skin.set_vertex_weights` | public | pending | `skin-binding-command-handlers.js` |
-| `skin.set_weights_bulk` | public | pending | `skin-binding-command-handlers.js` |
-| `skin.clear_vertex_weights` | public | pending | `skin-binding-command-handlers.js` |
+| `skin.create_binding` | public | native | `skin-binding-command-handlers.js` |
+| `skin.remove_binding` | public | native | `skin-binding-command-handlers.js` |
+| `skin.remove_binding_internal` | history | native | `skin-binding-command-handlers.js` |
+| `skin.restore_binding` | history | native | `skin-binding-command-handlers.js` |
+| `skin.set_enabled` | public | native | `skin-binding-command-handlers.js` |
+| `skin.set_vertex_weights` | public | native | `skin-binding-command-handlers.js` |
+| `skin.set_weights_bulk` | public | native | `skin-binding-command-handlers.js` |
+| `skin.clear_vertex_weights` | public | native | `skin-binding-command-handlers.js` |
 | `animation.temporal.set_duration` | public | pending | `temporal-command-handlers.js` |
 | `animation.temporal.create_program` | public | pending | `temporal-command-handlers.js` |
 | `animation.temporal.remove_program` | public | pending | `temporal-command-handlers.js` |
@@ -160,12 +160,12 @@ Source replacement and owner/program lifecycle commands must add the cross-state
 | `transition.restore_part` | history | pending | `transition-command-handlers.js` |
 | `transition.set_diagnostic_override` | public | pending | `transition-command-handlers.js` |
 | `transition.clear_diagnostic_override` | public | pending | `transition-command-handlers.js` |
-| `bone.create_two_bone_ik` | public | pending | `two-bone-ik-command-handlers.js` |
-| `bone.remove_two_bone_ik` | public | pending | `two-bone-ik-command-handlers.js` |
-| `bone.remove_two_bone_ik_internal` | history | pending | `two-bone-ik-command-handlers.js` |
-| `bone.restore_two_bone_ik` | history | pending | `two-bone-ik-command-handlers.js` |
-| `bone.set_two_bone_ik_enabled` | public | pending | `two-bone-ik-command-handlers.js` |
-| `bone.set_two_bone_ik_bend_direction` | public | pending | `two-bone-ik-command-handlers.js` |
+| `bone.create_two_bone_ik` | public | native | `two-bone-ik-command-handlers.js` |
+| `bone.remove_two_bone_ik` | public | native | `two-bone-ik-command-handlers.js` |
+| `bone.remove_two_bone_ik_internal` | history | native | `two-bone-ik-command-handlers.js` |
+| `bone.restore_two_bone_ik` | history | native | `two-bone-ik-command-handlers.js` |
+| `bone.set_two_bone_ik_enabled` | public | native | `two-bone-ik-command-handlers.js` |
+| `bone.set_two_bone_ik_bend_direction` | public | native | `two-bone-ik-command-handlers.js` |
 | `deformer.create_warp` | public | pending | `warp-deformer-command-handlers.js` |
 | `deformer.remove` | public | pending | `warp-deformer-command-handlers.js` |
 | `deformer.remove_internal` | history | pending | `warp-deformer-command-handlers.js` |

@@ -1,5 +1,6 @@
 #include "flamoris2d_core.h"
 #include "picojson.h"
+#include "js_text.h"
 
 #include <algorithm>
 #include <cmath>
@@ -182,7 +183,7 @@ void validate_clip_instances(Snapshot& s, const Value& project, const Value& seq
         for (const char* field_name : {"startTicks", "endTicks", "layer"}) {
             if (rank(a, field_name) != rank(b, field_name)) return rank(a, field_name) < rank(b, field_name);
         }
-        return str(field(a, "id")) < str(field(b, "id"));
+        return fl2d_text::less(str(field(a, "id")), str(field(b, "id")));
     });
     const Value& clips = field(field(project, "animation"), "clips");
     const Value& programs = field(project, "temporalPrograms");
@@ -274,7 +275,7 @@ bool endpoint_selection_signature(const Value& project, const Value& item, bool 
         if (!program.is<Object>() || !parts.is<Array>()) return false;
     }
     Array ordered = slots.get<Array>(), selections;
-    std::stable_sort(ordered.begin(), ordered.end(), [](const Value& a, const Value& b) { return str(field(a, "id")) < str(field(b, "id")); });
+    std::stable_sort(ordered.begin(), ordered.end(), [](const Value& a, const Value& b) { return fl2d_text::less(str(field(a, "id")), str(field(b, "id"))); });
     const Value& keyforms = field(project, "meshKeyforms");
     for (const auto& slot : ordered) {
         const Value* part = nullptr;
@@ -359,7 +360,7 @@ void validate_sequences(Snapshot& s, const Value& project, Register&& register_i
         std::stable_sort(items.begin(), items.end(), [&](const Value& a, const Value& b) {
             if (ticks(a, "startTicks") != ticks(b, "startTicks")) return ticks(a, "startTicks") < ticks(b, "startTicks");
             if (ticks(a, "endTicks") != ticks(b, "endTicks")) return ticks(a, "endTicks") < ticks(b, "endTicks");
-            return str(field(a, "id")) < str(field(b, "id"));
+            return fl2d_text::less(str(field(a, "id")), str(field(b, "id")));
         });
         for (size_t j = 0; j < items.size(); ++j) {
             const Value& item = items[j];
@@ -937,7 +938,7 @@ std::vector<std::vector<std::string>> clipping_cycles(ClippingRelations relation
             auto found = positions.find(cursor);
             if (found != positions.end()) {
                 std::vector<std::string> cycle(stack.begin() + static_cast<std::ptrdiff_t>(found->second), stack.end());
-                std::rotate(cycle.begin(), std::min_element(cycle.begin(), cycle.end()), cycle.end());
+                std::rotate(cycle.begin(), std::min_element(cycle.begin(), cycle.end(), fl2d_text::less), cycle.end());
                 result.push_back(std::move(cycle));
                 break;
             }
@@ -946,11 +947,11 @@ std::vector<std::vector<std::string>> clipping_cycles(ClippingRelations relation
         }
         visited.insert(stack.begin(), stack.end());
     }
-    std::sort(result.begin(), result.end());
+    std::sort(result.begin(), result.end(), [](const auto& a, const auto& b) { return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end(), fl2d_text::less); });
     return result;
 }
 std::string clipping_cycle_key(std::vector<std::string> nodes) {
-    std::sort(nodes.begin(), nodes.end());
+    std::sort(nodes.begin(), nodes.end(), fl2d_text::less);
     std::string result;
     for (const auto& node : nodes) { result += node; result.push_back('\0'); }
     return result;
@@ -961,7 +962,7 @@ const Value& clipping_binding(const Value& project, const Value& target) {
     const Value& bindings = field(project, "clippingBindings");
     if (bindings.is<Array>()) for (const auto& binding : bindings.get<Array>())
         if (field(binding, "targetNodeId") == target &&
-            (result == &missing || str(field(binding, "id")) < str(field(*result, "id")))) result = &binding;
+            (result == &missing || fl2d_text::less(str(field(binding, "id")), str(field(*result, "id"))))) result = &binding;
     return *result;
 }
 bool enabled_clipping(const Value& binding) {
@@ -975,7 +976,7 @@ Value clipping_sample(const Value& keys, double ticks) {
     for (const auto& key : ordered) if (!finite(field(key, "timeTicks"))) return Value();
     std::stable_sort(ordered.begin(), ordered.end(), [](const Value& a, const Value& b) {
         const auto left = field(a, "timeTicks").get<double>(), right = field(b, "timeTicks").get<double>();
-        return left == right ? str(field(a, "id")) < str(field(b, "id")) : left < right;
+        return left == right ? fl2d_text::less(str(field(a, "id")), str(field(b, "id"))) : left < right;
     });
     if (ticks <= field(ordered.front(), "timeTicks").get<double>()) return field(ordered.front(), "value");
     if (ticks >= field(ordered.back(), "timeTicks").get<double>()) return field(ordered.back(), "value");
@@ -1163,7 +1164,7 @@ void validate_evaluated_clipping(Snapshot& s, const Value& project, std::set<std
     const Value& transitions = field(project, "transitions"), &slots = field(project, "semanticSlots");
     if (!transitions.is<Array>()) return;
     Array ordered = transitions.get<Array>();
-    std::stable_sort(ordered.begin(), ordered.end(), [](const Value& a, const Value& b) { return str(field(a, "id")) < str(field(b, "id")); });
+    std::stable_sort(ordered.begin(), ordered.end(), [](const Value& a, const Value& b) { return fl2d_text::less(str(field(a, "id")), str(field(b, "id"))); });
     for (const auto& transition : ordered) {
         const Value& program = find_id(field(project, "temporalPrograms"), field(transition, "temporalProgramId"));
         if (!positive_time(field(program, "durationTicks"))) continue;
@@ -1333,7 +1334,7 @@ void validate_temporal_ownership(Snapshot& s, const Value& project, Register&& r
         (void)unused;
         if (entries.size() < 2) continue;
         std::sort(entries.begin(), entries.end(), [](const Owner& a, const Owner& b) {
-            return a.kind == b.kind ? a.id < b.id : a.kind < b.kind;
+            return a.kind == b.kind ? fl2d_text::less(a.id, b.id) : fl2d_text::less(a.kind, b.kind);
         });
         for (const auto& entry : entries)
             add(s, "TEMPORAL_PROGRAM_OWNERSHIP_CONFLICT", entry.path, entry.id);
@@ -1499,7 +1500,7 @@ void validate_temporal_ownership(Snapshot& s, const Value& project, Register&& r
                 std::sort(ordered.begin(), ordered.end(), [](const Value* a, const Value* b) {
                     const double at = field(*a, "timeTicks").get<double>();
                     const double bt = field(*b, "timeTicks").get<double>();
-                    return at == bt ? str(field(*a, "id")) < str(field(*b, "id")) : at < bt;
+                    return at == bt ? fl2d_text::less(str(field(*a, "id")), str(field(*b, "id"))) : at < bt;
                 });
                 const Value* selected = ordered.empty() ? nullptr : ordered.front();
                 for (const auto* key : ordered) if (field(*key, "timeTicks").get<double>() <= tick) selected = key;
@@ -1621,7 +1622,7 @@ void validate_clipping(Snapshot& s, const Value& project, Register&& register_id
                     if (least.empty() || id < least) least = id;
                 }
                 std::vector<std::string> nodes_in_cycle(first, stack.end());
-                std::sort(nodes_in_cycle.begin(), nodes_in_cycle.end());
+                std::sort(nodes_in_cycle.begin(), nodes_in_cycle.end(), fl2d_text::less);
                 std::string key;
                 for (const auto& node : nodes_in_cycle) { key += node; key.push_back('\0'); }
                 if (cycle_keys.insert(key).second) add(s, "CLIPPING_CYCLE", "clippingBindings", least);
@@ -1694,7 +1695,7 @@ void validate_deformation_samples(Snapshot& s, const Value& project) {
             if (!found) add(s, "ANIMATION_TOPOLOGY_INCOMPATIBLE", offset_path + ".vertexId", id);
             if (!seen.insert(vertex_id).second)
                 add(s, "ANIMATION_DEFORMATION_VERTEX_DUPLICATE", offset_path + ".vertexId", id);
-            if (has_previous && previous > vertex_id)
+            if (has_previous && fl2d_text::less(vertex_id, previous))
                 add(s, "ANIMATION_DEFORMATION_VERTEX_ORDER_INVALID", path + ".offsets", id);
             previous = vertex_id;
             has_previous = true;
@@ -1721,7 +1722,7 @@ void validate_animation_clips(Snapshot& s, const Value& project) {
     }
     Array sorted = clips.get<Array>();
     std::stable_sort(sorted.begin(), sorted.end(), [](const Value& a, const Value& b) {
-        return str(field(a, "id")) < str(field(b, "id"));
+        return fl2d_text::less(str(field(a, "id")), str(field(b, "id")));
     });
     for (size_t i = 0; i < sorted.size(); ++i) {
         const Value& clip = sorted[i];
@@ -1746,7 +1747,7 @@ void validate_animation_clips(Snapshot& s, const Value& project) {
         if (!looping.count(id) || !safe_integer(duration) || duration.get<double>() <= 0 || !tracks.is<Array>()) continue;
         Array sorted_tracks = tracks.get<Array>();
         std::stable_sort(sorted_tracks.begin(), sorted_tracks.end(), [](const Value& a, const Value& b) {
-            return str(field(a, "trackId")) < str(field(b, "trackId"));
+            return fl2d_text::less(str(field(a, "trackId")), str(field(b, "trackId")));
         });
         for (const auto& track : sorted_tracks) {
             const std::string kind = str(field(track, "kind"));
@@ -1765,7 +1766,7 @@ void validate_animation_clips(Snapshot& s, const Value& project) {
                 std::stable_sort(ordered.begin(), ordered.end(), [](const Value& a, const Value& b) {
                     const double at = field(a, "timeTicks").get<double>();
                     const double bt = field(b, "timeTicks").get<double>();
-                    return at == bt ? str(field(a, "id")) < str(field(b, "id")) : at < bt;
+                    return at == bt ? fl2d_text::less(str(field(a, "id")), str(field(b, "id"))) : at < bt;
                 });
                 const bool numeric = kind == "GeometryBlendTrack" || kind == "AppearanceTrack" ||
                     kind == "OpacityTrack" || kind == "TransformTrack" || kind == "BoneTrack" ||
@@ -1893,7 +1894,7 @@ void validate_rigid_bindings(Snapshot& s, const Value& project, Register&& regis
     }
     std::stable_sort(enabled.begin(), enabled.end(), [](const Value* a, const Value* b) {
         const auto left = str(field(*a, "targetNodeId")), right = str(field(*b, "targetNodeId"));
-        return left == right ? str(field(*a, "id")) < str(field(*b, "id")) : left < right;
+        return left == right ? fl2d_text::less(str(field(*a, "id")), str(field(*b, "id"))) : fl2d_text::less(left, right);
     });
     std::map<std::string, std::string> by_target;
     for (const Value* item : enabled) {
@@ -1970,7 +1971,7 @@ void validate_mesh_form_corrections(Snapshot& s, const Value& project) {
             const std::string vertex_id = str(vertex);
             if (!seen.insert(vertex_id).second)
                 add(s, "MESH_FORM_CORRECTION_VERTEX_DUPLICATE", item_path + ".vertexId", id);
-            if (has_previous && previous > vertex_id)
+            if (has_previous && fl2d_text::less(vertex_id, previous))
                 add(s, "MESH_FORM_CORRECTION_VERTEX_ORDER_INVALID", path + ".vertexOffsets", id);
             previous = vertex_id;
             has_previous = true;
@@ -2283,7 +2284,7 @@ void validate_skin(Snapshot& s, const Value& project, Register&& register_id) {
                 add(s, "SKIN_BINDING_VERTEX_MISSING", weight_path + ".vertexId", id);
             if (!weighted.insert(vertex).second)
                 add(s, "SKIN_BINDING_VERTEX_DUPLICATE", weight_path + ".vertexId", id);
-            if (has_previous_vertex && previous_vertex > vertex)
+            if (has_previous_vertex && fl2d_text::less(vertex, previous_vertex))
                 add(s, "SKIN_BINDING_VERTEX_ORDER_INVALID", path + ".vertexWeights", id);
             previous_vertex = vertex; has_previous_vertex = true;
             const Value& influences = field(weight, "influences");
@@ -2304,7 +2305,7 @@ void validate_skin(Snapshot& s, const Value& project, Register&& register_id) {
                 const std::string bone_id = str(bone_value);
                 if (!seen_bones.insert(bone_id).second)
                     add(s, "SKIN_BINDING_INFLUENCE_DUPLICATE", influence_path + ".boneId", id);
-                if (has_previous_bone && previous_bone > bone_id)
+                if (has_previous_bone && fl2d_text::less(bone_id, previous_bone))
                     add(s, "SKIN_BINDING_INFLUENCE_ORDER_INVALID", weight_path + ".influences", id);
                 previous_bone = bone_id; has_previous_bone = true;
                 if (!nonblank(bone_value) || !contains_id(bones, bone_value) ||
