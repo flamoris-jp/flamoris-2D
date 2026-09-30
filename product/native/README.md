@@ -52,7 +52,7 @@ this phase. The checked conformance fixtures are generated from current JS by
 `node product/native/tests/check-temporal-session-conformance.mjs --write` and checked
 against JS in CI. Native and managed tests compare exact integer results.
 
-The native ABI is declared in `core/include/flamoris2d_core.h` (version 1.3).
+The native ABI is declared in `core/include/flamoris2d_core.h` (version 1.4).
 It uses C calling convention, fixed-size integers, an opaque engine handle and
 32-bit status codes. The DLL build exports its functions; native consumers import
 them through the same header. `fl2d_engine_create` transfers ownership of a handle to
@@ -282,4 +282,11 @@ re-import uses the ordinary Project snapshot inverse, logical identity check,
 affected-ID enumeration and before/after owner validation.
 `source-session-conformance.json` protects state/history parity and observable
 property order across typed node creation, source replacement, Undo/Redo and
-serialization. All 72 queries and runtime authority cutover remain pending.
+serialization. ABI 1.4 now adds 48 of the 72 readonly Product queries on this
+same session; see [the Query boundary](../../docs/native-query-migration.md).
+`query-conformance.json` protects values, Product exception messages, canonical
+lists, ancestor/pivot matrices, nullable selectors and complete session immutability,
+including outstanding prepared edits. Project validation reuses admission and
+retains the three existing warning messages/details. The remaining 24 queries
+include locale-sensitive lists/search and evaluation/export projections; runtime
+authority cutover remains pending.

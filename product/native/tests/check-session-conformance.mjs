@@ -6,6 +6,7 @@ import './check-temporal-session-conformance.mjs';
 import './check-transition-session-conformance.mjs';
 import './check-mesh-session-conformance.mjs';
 import './check-source-session-conformance.mjs';
+import './check-query-conformance.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createProject, createSceneNode, cloneProject } from '../../src/model/project.js';

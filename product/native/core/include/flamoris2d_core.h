@@ -40,7 +40,8 @@ enum {
     FL2D_REVISION_CONFLICT = 13,
     FL2D_SAVED_REVISION_INVALID = 14,
     FL2D_HISTORY_EMPTY = 15,
-    FL2D_REVISION_EXHAUSTED = 16
+    FL2D_REVISION_EXHAUSTED = 16,
+    FL2D_QUERY_UNSUPPORTED = 17
 };
 
 typedef struct fl2d_snapshot fl2d_snapshot;
@@ -103,6 +104,15 @@ FL2D_API void FL2D_CALL fl2d_prepared_destroy(fl2d_prepared* prepared);
 /* Last error code on this session, set by failed session operations; empty on success.
  * Caller-owned buffer rules match snapshot_string. */
 FL2D_API fl2d_status FL2D_CALL fl2d_session_error(const fl2d_session* session, char* buffer, uint32_t capacity, uint32_t* required);
+
+/* ABI 1.4: readonly Product Query on this session. Request is UTF-8 JSON
+ * {"name":string,"input":object?}, maximum 1 MiB. Result is {"value":...}
+ * or {"error":{"name":string,"message":string}} for a Product exception.
+ * Known queries pending native implementation return FL2D_QUERY_UNSUPPORTED.
+ * Output length may exceed Project size; required includes the terminating NUL.
+ * Calls, including sizing calls, never change state or the mutation error. */
+FL2D_API fl2d_status FL2D_CALL fl2d_session_query_json(const fl2d_session* session,
+    const uint8_t* request, uint32_t length, char* buffer, uint32_t capacity, uint32_t* required);
 
 typedef struct fl2d_frame_rate {
     int64_t numerator;

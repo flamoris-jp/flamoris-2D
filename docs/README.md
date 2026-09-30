@@ -21,6 +21,8 @@ Start with the [product overview](../README.md) or the detailed
 - [`repository-boundaries.md`](repository-boundaries.md) — Product / Staging / Test / History separation, testing and CI boundary
 - [`csharp-wpf-ui-migration.md`](csharp-wpf-ui-migration.md) — accepted WPF shell / JavaScript Product Host migration design; Phase 1 foundation is complete and Issue #96 / PR #101 carries the Source-through-Export production candidate
 - [`native-capability-map.md`](native-capability-map.md) — Issue #96 migration completion ledger and remaining release acceptance; this is the current capability-status authority for native migration
+- [`native-command-migration.md`](native-command-migration.md) — C++ typed Command coverage and migration scope
+- [`native-query-migration.md`](native-query-migration.md) — NativeSession readonly Query boundary and conformance
 - [`native-production-workflow.md`](native-production-workflow.md) — Nativeの素材読込から書き出し・保存再開までの制作手順と最終Windows確認
 - [`native-mesh-hands-on.md`](native-mesh-hands-on.md) — historical PR #100 proof boundary; superseded as the normal workflow by the production guide
 - [`research/rigging-tools.md`](research/rigging-tools.md) — reference research from Inochi2D/Inochi Creator, Live2D Cubism, Stretchy Studio, Iki, Godot, and Synfig

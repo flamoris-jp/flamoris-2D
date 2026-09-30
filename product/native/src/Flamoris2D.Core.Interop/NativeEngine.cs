@@ -21,6 +21,7 @@ public enum NativeStatus : int
     SavedRevisionInvalid = 14,
     HistoryEmpty = 15,
     RevisionExhausted = 16,
+    QueryUnsupported = 17,
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -79,6 +80,9 @@ internal static class NativeMethods
     internal static extern NativeStatus SessionHistory(NativeSession session, byte[]? buffer, uint capacity, out uint required);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_session_error")]
     internal static extern NativeStatus SessionError(NativeSession session, byte[]? buffer, uint capacity, out uint required);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_session_query_json")]
+    internal static extern NativeStatus SessionQuery(NativeSession session, byte[] request, uint length,
+        byte[]? buffer, uint capacity, out uint required);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_session_prepare")]
     internal static extern NativeStatus SessionPrepare(NativeSession session, byte[] commands, uint length,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string label, out IntPtr result);

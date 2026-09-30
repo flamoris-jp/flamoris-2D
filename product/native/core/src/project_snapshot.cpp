@@ -1,6 +1,7 @@
 #include "flamoris2d_core.h"
 #include "picojson.h"
 #include "js_text.h"
+#include "native_validation.h"
 
 #include <algorithm>
 #include <cmath>
@@ -20,7 +21,7 @@ using Object = picojson::object;
 using Array = picojson::array;
 
 namespace {
-struct Issue { std::string code, path, entity, severity; };
+struct Issue { std::string code, path, entity, severity, message; Value details; };
 struct Node {
     std::string id, kind, parent, name;
     bool null_parent = false, visible = false;
@@ -110,7 +111,11 @@ bool nonblank(const Value& value) {
     return false;
 }
 void add(Snapshot& s, const char* code, std::string path, std::string entity = {}, const char* severity = "error") {
-    s.issues.push_back({code, std::move(path), std::move(entity), severity});
+    s.issues.push_back({code, std::move(path), std::move(entity), severity, "", Value()});
+}
+void warn(Snapshot& s, const char* code, std::string path, const std::string& entity,
+    const char* message, Object details) {
+    s.issues.push_back({code,std::move(path),entity,"warning",message,Value(details)});
 }
 bool contains_id(const Value& values, const Value& id) {
     if (!values.is<Array>()) return false;
@@ -777,8 +782,10 @@ void validate_transition_domain(Snapshot& s, const Value& project, Register&& re
                 const double area = std::abs((coordinate(b, 0) - coordinate(a, 0)) *
                     (coordinate(c, 1) - coordinate(a, 1)) - (coordinate(b, 1) - coordinate(a, 1)) *
                     (coordinate(c, 0) - coordinate(a, 0))) / 2;
-                if (area <= 1e-8) add(s, "MESH_TOPOLOGY_TRIANGLE_ZERO_AREA", path + ".positions", id, "warning");
-                else if (area < 1e-4) add(s, "MESH_TOPOLOGY_TRIANGLE_NEAR_DEGENERATE", path + ".positions", id, "warning");
+                if (area <= 1e-8) warn(s, "MESH_TOPOLOGY_TRIANGLE_ZERO_AREA", path + ".positions", id,
+                    "MeshKeyform contains a zero-area triangle.", {{"triangleOffset",Value(static_cast<double>(offset))}});
+                else if (area < 1e-4) warn(s, "MESH_TOPOLOGY_TRIANGLE_NEAR_DEGENERATE", path + ".positions", id,
+                    "MeshKeyform contains a near-degenerate triangle.", {{"triangleOffset",Value(static_cast<double>(offset))},{"area",Value(area)}});
             }
         }
         std::string context = str(field(keyform, "topologyId")); context.push_back('\0');
@@ -1715,7 +1722,10 @@ void validate_animation_clips(Snapshot& s, const Value& project) {
                 kind != "OpacityTrack" && kind != "PresenceTrack" && kind != "DrawOrderTrack" &&
                 kind != "ClippingTrack" && kind != "TransformTrack" && kind != "BoneTrack" &&
                 kind != "DeformerTrack" && kind != "CameraTrack" && kind != "MeshDeformationTrack")) continue;
-            for (const auto& [channel_name, channel] : ordered_object(s, channels)) {
+            auto channel_names = channels.get<Object>().keys();
+            std::sort(channel_names.begin(),channel_names.end(),fl2d_text::less);
+            for (const auto& channel_name : channel_names) {
+                const auto& channel = channels.get<Object>().at(channel_name);
                 const Value& keys = field(channel, "keyframes");
                 if (!keys.is<Array>() || keys.get<Array>().empty()) continue;
                 Array ordered = keys.get<Array>();
@@ -1731,7 +1741,11 @@ void validate_animation_clips(Snapshot& s, const Value& project) {
                     kind == "OpacityTrack" || kind == "TransformTrack" || kind == "BoneTrack" ||
                     kind == "DeformerTrack" || kind == "CameraTrack";
                 if (!loop_value_equal(field(ordered.front(), "value"), field(ordered.back(), "value"), numeric))
-                    add(s, "ANIMATION_LOOP_ENDPOINT_MISMATCH", path + ".temporalProgramId", id, "warning");
+                    warn(s, "ANIMATION_LOOP_ENDPOINT_MISMATCH", path + ".temporalProgramId", id,
+                        "Loop endpoints differ; the seam is diagnosed and is not corrected.",
+                        {{"temporalProgramId",field(program,"id")},{"trackId",field(track,"trackId")},
+                        {"channel",Value(channel_name)},{"tolerance",Value(1e-9)},
+                        {"startValue",field(ordered.front(),"value")},{"endValue",field(ordered.back(),"value")}});
             }
         }
     }
@@ -2480,6 +2494,18 @@ fl2d_status copy(const std::string& value, char* buffer, uint32_t capacity, uint
     return FL2D_OK;
 }
 } // namespace
+
+Value fl2d_validation::admitted_result(const Value& project) {
+    Snapshot snapshot; validate(snapshot,project); Array issues;
+    for (const auto& issue : snapshot.issues) {
+        if (issue.severity != "warning" || issue.message.empty())
+            throw std::logic_error("Admitted Project contains an unexpected validation issue.");
+        issues.emplace_back(Object{{"code",Value(issue.code)},{"path",Value(issue.path)},
+            {"message",Value(issue.message)},{"entityId",issue.entity.empty() ? Value() : Value(issue.entity)},
+            {"severity",Value(issue.severity)},{"details",issue.details}});
+    }
+    return Value(Object{{"valid",Value(true)},{"issues",Value(issues)}});
+}
 
 struct fl2d_snapshot : Snapshot {};
 
