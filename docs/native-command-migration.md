@@ -1,10 +1,10 @@
 # Native command/query migration (#127)
 
-This checkpoint follows reviewed main `40ea56a` (#128). Production remains the JS Product Host until the explicit #118 cutover. WPF/MCP never dual-write. Native commands run in the same session, candidate validator, prepared commit and history path introduced by #123.
+This checkpoint follows reviewed main `577f303` (#129). Production remains the JS Product Host until the explicit #118 cutover. WPF/MCP never dual-write. Native commands run in the same session, candidate validator, prepared commit and history path introduced by #123.
 
 ## Command contract
 
-Validate every command envelope/payload in a batch before invoking its first domain handler, matching JS error precedence. Public execution rejects history-only command types; native Undo may replay them. A command returns one inverse plus an ordered list of affected stable IDs. The transaction deduplicates those IDs in first-seen order. Hierarchy changes synchronize a matching WarpDeformer parent. Binding deletion/restoration preserves collection index. Ordinary candidate validation owns cycle/reference rejection and failure is atomic. No generic property-path editing API is added.
+Validate every command envelope/payload in a batch before invoking its first domain handler, matching JS error precedence. Public execution rejects history-only command types; native Undo may replay them. A command returns one inverse plus an ordered list of affected stable IDs. The transaction deduplicates those IDs in first-seen order. Hierarchy changes synchronize a matching WarpDeformer parent. Binding and rig deletion/restoration preserves collection index. Bone rest/reparent operations reject dependent IK, authored poses, rigid/Skin bindings in Product order; Bone deletion also rejects rotation constraints. Warp topology changes reject authored keyforms. Warp removal lifts children and its inverse restores their ordered hierarchy and indexed points/keyforms. The existing candidate-admission rejection for a Warp with a Bone child remains atomic. Ordinary candidate validation owns cycle/reference rejection and failure is atomic. No generic property-path editing API is added.
 
 Source replacement and owner/program lifecycle commands must add the cross-state Temporal ownership rule before migration. Scene hierarchy and clipping cannot alter owner/program relationships. Source decode/import belongs with persistence/ingest; source.apply_psd_reimport still needs parity before authority cutover.
 
@@ -18,7 +18,7 @@ Source replacement and owner/program lifecycle commands must add the cross-state
 
 ## Current handler inventory
 
-155 JS handlers: 52 native, 103 pending. Status means native coverage; JS remains production authority for every handler. Internal/public classification comes from current commandSchemas/internalCommandSchemas.
+155 JS handlers: 74 native, 81 pending. Status means native coverage; JS remains production authority for every handler. Internal/public classification comes from current commandSchemas/internalCommandSchemas.
 
 | Command | Access | Native | JS source |
 | --- | --- | --- | --- |
@@ -27,17 +27,17 @@ Source replacement and owner/program lifecycle commands must add the cross-state
 | `animation.clip.remove` | public | pending | `animation-clip-command-handlers.js` |
 | `animation.clip.remove_internal` | history | pending | `animation-clip-command-handlers.js` |
 | `animation.clip.restore` | history | pending | `animation-clip-command-handlers.js` |
-| `bone.create` | public | pending | `bone-command-handlers.js` |
-| `bone.remove` | public | pending | `bone-command-handlers.js` |
-| `bone.remove_internal` | history | pending | `bone-command-handlers.js` |
-| `bone.restore` | history | pending | `bone-command-handlers.js` |
-| `bone.rename` | public | pending | `bone-command-handlers.js` |
-| `bone.set_rest` | public | pending | `bone-command-handlers.js` |
-| `bone.set_enabled` | public | pending | `bone-command-handlers.js` |
-| `bone.reparent` | public | pending | `bone-command-handlers.js` |
-| `bone.set_keyform` | public | pending | `bone-command-handlers.js` |
-| `bone.reset_keyform` | public | pending | `bone-command-handlers.js` |
-| `bone.remove_keyform_internal` | history | pending | `bone-command-handlers.js` |
+| `bone.create` | public | native | `bone-command-handlers.js` |
+| `bone.remove` | public | native | `bone-command-handlers.js` |
+| `bone.remove_internal` | history | native | `bone-command-handlers.js` |
+| `bone.restore` | history | native | `bone-command-handlers.js` |
+| `bone.rename` | public | native | `bone-command-handlers.js` |
+| `bone.set_rest` | public | native | `bone-command-handlers.js` |
+| `bone.set_enabled` | public | native | `bone-command-handlers.js` |
+| `bone.reparent` | public | native | `bone-command-handlers.js` |
+| `bone.set_keyform` | public | native | `bone-command-handlers.js` |
+| `bone.reset_keyform` | public | native | `bone-command-handlers.js` |
+| `bone.remove_keyform_internal` | history | native | `bone-command-handlers.js` |
 | `bone.create_rotation_constraint` | public | native | `bone-constraint-command-handlers.js` |
 | `bone.remove_rotation_constraint` | public | native | `bone-constraint-command-handlers.js` |
 | `bone.remove_rotation_constraint_internal` | history | native | `bone-constraint-command-handlers.js` |
@@ -166,17 +166,17 @@ Source replacement and owner/program lifecycle commands must add the cross-state
 | `bone.restore_two_bone_ik` | history | native | `two-bone-ik-command-handlers.js` |
 | `bone.set_two_bone_ik_enabled` | public | native | `two-bone-ik-command-handlers.js` |
 | `bone.set_two_bone_ik_bend_direction` | public | native | `two-bone-ik-command-handlers.js` |
-| `deformer.create_warp` | public | pending | `warp-deformer-command-handlers.js` |
-| `deformer.remove` | public | pending | `warp-deformer-command-handlers.js` |
-| `deformer.remove_internal` | history | pending | `warp-deformer-command-handlers.js` |
-| `deformer.restore` | history | pending | `warp-deformer-command-handlers.js` |
-| `deformer.rename` | public | pending | `warp-deformer-command-handlers.js` |
-| `deformer.set_grid` | public | pending | `warp-deformer-command-handlers.js` |
-| `deformer.set_keyform` | public | pending | `warp-deformer-command-handlers.js` |
-| `deformer.remove_keyform_internal` | history | pending | `warp-deformer-command-handlers.js` |
-| `deformer.move_control_points` | public | pending | `warp-deformer-command-handlers.js` |
-| `deformer.reset_control_points` | public | pending | `warp-deformer-command-handlers.js` |
-| `deformer.reparent_node` | public | pending | `warp-deformer-command-handlers.js` |
+| `deformer.create_warp` | public | native | `warp-deformer-command-handlers.js` |
+| `deformer.remove` | public | native | `warp-deformer-command-handlers.js` |
+| `deformer.remove_internal` | history | native | `warp-deformer-command-handlers.js` |
+| `deformer.restore` | history | native | `warp-deformer-command-handlers.js` |
+| `deformer.rename` | public | native | `warp-deformer-command-handlers.js` |
+| `deformer.set_grid` | public | native | `warp-deformer-command-handlers.js` |
+| `deformer.set_keyform` | public | native | `warp-deformer-command-handlers.js` |
+| `deformer.remove_keyform_internal` | history | native | `warp-deformer-command-handlers.js` |
+| `deformer.move_control_points` | public | native | `warp-deformer-command-handlers.js` |
+| `deformer.reset_control_points` | public | native | `warp-deformer-command-handlers.js` |
+| `deformer.reparent_node` | public | native | `warp-deformer-command-handlers.js` |
 
 ## Current query inventory
 

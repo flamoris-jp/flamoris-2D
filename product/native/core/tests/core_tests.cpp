@@ -293,7 +293,7 @@ int main() {
     assert(fl2d_normalize_frame_rate(engine, 1, 1, nullptr) == FL2D_INVALID_ARGUMENT);
     fl2d_engine_destroy(engine);
     check_project_snapshots();
-    for (const auto& input : {std::pair<const char*, bool>{FL2D_SESSION_FIXTURES, true}, {FL2D_RIG_FIXTURES, false}}) {
+    for (const auto& input : {std::pair<const char*, bool>{FL2D_SESSION_FIXTURES, true}, {FL2D_RIG_FIXTURES, false}, {FL2D_HIERARCHY_FIXTURES, false}}) {
         std::ifstream stream(input.first); assert(stream.good()); picojson::value fixture;
         assert(picojson::parse(fixture, stream).empty());
         check_session(fixture.get<picojson::object>(), input.second);

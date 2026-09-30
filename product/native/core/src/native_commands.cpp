@@ -267,7 +267,8 @@ Applied apply(Value& project, const Value& cmd) {
     const std::string type = field(cmd, "type").get<std::string>();
     const Value& payload = field(cmd, "payload");
     Applied rig_result;
-    if (apply_rig(project, type, payload, rig_result) || apply_samples(project, type, payload, rig_result)) return rig_result;
+    if (apply_bone_hierarchy(project, type, payload, rig_result) || apply_warp(project, type, payload, rig_result) ||
+        apply_rig(project, type, payload, rig_result) || apply_samples(project, type, payload, rig_result)) return rig_result;
     auto bad = [] { throw Failure{FL2D_COMMAND_INVALID, "command.payload_invalid"}; };
     auto fail = [](const char* code) { throw Failure{FL2D_COMMAND_INVALID, code}; };
     auto text = [&](const char* key) { return field(payload, key).get<std::string>(); };
