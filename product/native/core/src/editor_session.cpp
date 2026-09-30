@@ -72,12 +72,9 @@ fl2d_status validate_candidate(const Value& project) {
     return parse_project(reinterpret_cast<const uint8_t*>(text.data()), static_cast<uint32_t>(text.size()), ignored);
 }
 fl2d_status validate_transaction_candidate(const Value& before, const Value& after) {
-    // Product JS additionally validates temporal ownership across before/after.
-    // The current native command set changes only scene node name, visibility,
-    // and transform, so it cannot alter a program owner, track, or binding.
-    // Keep this two-state seam when those command families migrate.
-    (void)before;
-    return validate_candidate(after);
+    const auto status = validate_candidate(after);
+    if (status != FL2D_OK) return status;
+    return fl2d_commands::valid_temporal_ownership_change(before, after) ? FL2D_OK : FL2D_PROJECT_INVALID;
 }
 fl2d_status parse_commands(const uint8_t* bytes, uint32_t length, Array& commands) {
     if (!bytes || !length) return FL2D_COMMAND_INVALID;

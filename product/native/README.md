@@ -34,7 +34,7 @@ using the same command as the Native Shell Boundary workflow, then build and tes
 
 ```powershell
 npm ci --prefix product --workspaces=false --ignore-scripts
-node product/native/tests/check-temporal-conformance.mjs
+node product/native/tests/check-temporal-session-conformance.mjs
 node product/native/tests/check-project-conformance.mjs
 node product/native/tests/check-session-conformance.mjs
 dotnet build product/native/Flamoris2D.Native.sln -c Release
@@ -49,7 +49,7 @@ remains the only authoritative editing session. No WPF gesture or MCP command
 calls the C++ engine yet. The interop adapter and DLL are built and exercised by
 the solution and focused tests; the portable WPF package does not carry them in
 this phase. The checked conformance fixtures are generated from current JS by
-`node product/native/tests/check-temporal-conformance.mjs --write` and checked
+`node product/native/tests/check-temporal-session-conformance.mjs --write` and checked
 against JS in CI. Native and managed tests compare exact integer results.
 
 The native ABI is declared in `core/include/flamoris2d_core.h` (version 1.3).
@@ -253,3 +253,11 @@ hierarchy commands now use the same native session. `hierarchy-conformance.json`
 compares full Project/history/error/revision state for typed edits and Undo/Redo,
 including hierarchy cycles, dependency locks, topology compatibility, ordered
 child lifting/restoration, grid presets and atomic candidate rejection.
+
+Temporal programs/tracks/keyframes/events/regions, AnimationClip ownership and
+Sequence/ViewLane/ClipInstance edits now use native typed commands. Prepared
+transactions, Undo and Redo validate before/after Clip/Sequence ownership: owner
+creation/removal must include its program, and a surviving stable owner cannot
+reassign programs. `temporal-session-conformance.json` compares complete snapshots and
+history across successful atomic owner edits, lifecycle failures, time/channel
+checks, typed item edits, canonical ordering and schema preflight.

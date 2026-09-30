@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import './check-command-schemas.mjs';
 import './check-rig-conformance.mjs';
 import './check-hierarchy-conformance.mjs';
+import './check-temporal-session-conformance.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createProject, createSceneNode, cloneProject } from '../../src/model/project.js';
