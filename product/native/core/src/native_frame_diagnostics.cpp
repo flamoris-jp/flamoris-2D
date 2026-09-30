@@ -104,7 +104,7 @@ int sign(double n) { return n > 0 ? 1 : n < 0 ? -1 : 0; }
 std::string canonical_evidence(const Value& value) { return canonical_json(value); }
 Value sequence_diagnostic(const Value& id,const char* code,const Object& details) {
     const auto hash = fingerprint(Value(Object{{"sequenceId",id},{"code",Value(code)},{"details",Value(details)}}));
-    const std::map<std::string,std::string> messages{
+    const std::map<std::string,std::string> sequence_messages{
         {"ANIMATION_CLIP_TARGET_INCOMPATIBLE","Clip target does not remain the same compatible mapped source across the placement."},
         {"ANIMATION_TRACK_CONFLICT","Same-layer discrete animation contributions contain incompatible values."},
         {"ANIMATION_TOPOLOGY_INCOMPATIBLE","Mesh animation does not match the active evaluated topology."},
@@ -113,7 +113,7 @@ Value sequence_diagnostic(const Value& id,const char* code,const Object& details
     };
     Value canonical; const auto error = picojson::parse(canonical,canonical_json(Value(details))); if (!error.empty()) throw std::runtime_error(error);
     return Value(Object{{"key",Value(std::string(code)+"|"+text(id)+"|"+hash)},{"code",Value(code)},{"severity",Value("error")},
-        {"message",Value(messages.count(code) ? messages.at(code) : code)},{"sequenceId",id},{"details",canonical},{"evidenceFingerprint",Value(hash)}});
+        {"message",Value(sequence_messages.count(code) ? sequence_messages.at(code) : code)},{"sequenceId",id},{"details",canonical},{"evidenceFingerprint",Value(hash)}});
 }
 
 Value frame_diagnostic(const Value& owner, bool key_art, const char* code, const char* severity,
