@@ -1,20 +1,22 @@
 # Native command/query migration (#127)
 
-This checkpoint follows reviewed main `a6aace6` (#132). Production remains the JS Product Host until the explicit #118 cutover. WPF/MCP never dual-write. Native commands run in the same session, candidate validator, prepared commit and history path introduced by #123.
+This checkpoint follows reviewed main `bb361ec` (#133). Production remains the JS Product Host until the explicit #118 cutover. WPF/MCP never dual-write. Native commands run in the same session, candidate validator, prepared commit and history path introduced by #123.
 
 ## Command contract
 
 Validate every command envelope/payload in a batch before invoking its first domain handler, matching JS error precedence. Public execution rejects history-only command types; native Undo may replay them. A command returns one inverse plus an ordered list of affected stable IDs. The transaction deduplicates those IDs in first-seen order. Hierarchy changes synchronize a matching WarpDeformer parent. Binding and rig deletion/restoration preserves collection index. Bone rest/reparent operations reject dependent IK, authored poses, rigid/Skin bindings in Product order; Bone deletion also rejects rotation constraints. Warp topology changes reject authored keyforms. Warp removal lifts children and its inverse restores their ordered hierarchy and indexed points/keyforms. The existing candidate-admission rejection for a Warp with a Bone child remains atomic. Ordinary candidate validation owns cycle/reference rejection and failure is atomic. No generic property-path editing API is added.
 
-The next Temporal/Clip/Sequence checkpoint validates Project admission and then the before/after ownership lifecycle at the prepared transaction boundary, including Undo/Redo. Existing Sequence/AnimationClip owners cannot reassign programs, a new owner cannot adopt a program present before the transaction, and deleting an owner cannot retain its program. Creating/removing the owner and its program together is atomic; removing and recreating the same stable owner ID cannot bypass ownership immutability. Transition ownership keeps its current distinct Product contract. Failed prepare leaves Project/history/revisions unchanged; full project replacement remains admission rather than a transaction lifecycle change. This cross-state check must also cover future source replacement commands. Scene hierarchy and clipping cannot alter owner/program relationships. Source decode/import belongs with persistence/ingest; source.apply_psd_reimport still needs parity before authority cutover.
+The Temporal/Clip/Sequence checkpoint validates Project admission and then the before/after ownership lifecycle at the prepared transaction boundary, including Undo/Redo. Existing Sequence/AnimationClip owners cannot reassign programs, a new owner cannot adopt a program present before the transaction, and deleting an owner cannot retain its program. Creating/removing the owner and its program together is atomic; removing and recreating the same stable owner ID cannot bypass ownership immutability. Transition ownership keeps its current distinct Product contract. Failed prepare leaves Project/history/revisions unchanged; full project replacement remains admission rather than a transaction lifecycle change. Source replacement commands share this cross-state check. Scene hierarchy and clipping cannot alter owner/program relationships. Source decode/import belongs with persistence/ingest; typed source replacement now shares the ordinary guard.
 
 The Transition authoring checkpoint preserves typed KeyArt/SemanticSlot/Topology/Keyform/Transition lifecycle commands. Normalizers fill current Product defaults without adding a new persistent schema. Stable identity, mapping exclusivity, Skin/form topology locks and atomic topology mutation requirements retain Product error precedence. Transition part/diagnostic inverses preserve indices; candidate validation owns endpoint/topology/reference compatibility. Transition removal keeps its current independent program lifecycle contract.
 
 The mesh editing checkpoint uses typed Layout mutation contracts. Add/remove/subdivide/generated replacement update every associated Keyform position/UV array atomically and store a topology/keyform snapshot inverse. Skin locks vertex identity changes; form corrections lock destructive vertex removal/replacement. Labels, issued vtx_ IDs, triangle duplicates/area and explicit generated-mesh replacement consent keep current Product precedence. Omitted optional vertex metadata/sequence fields remain valid and defaults appear only when Product edits introduce them. Invalid intermediate domain objects may exist within a batch: checked geometry access and the domain exception boundary reject uncoded Product errors as project.invalid while preserving atomicity; they do not introduce validation between individual commands.
 
+PSD re-import keeps its current typed Project replacement contract: preserve logical Project ID, snapshot inverse, first-seen old/new scene node affected IDs, final admission and before/after Temporal ownership validation. JSON property order is observable in this contract and queries. The bounded private JSON value retains insertion order and ECMAScript numeric-key enumeration through parse/copy/mutation/serialization; this replaces the validation-only pointer order map. The vendored parser patch keeps the existing depth/size/UTF-8 boundary, including object depth, and its original license. These are private representation details, not new Project fields or a runtime JS dependency.
+
 ## Completion order
 
-1. Scene hierarchy and Clipping (this checkpoint).
+1. Scene hierarchy and Clipping.
 2. Mesh/topology/keyforms, Bone/Warp/Skin/constraints/corrections and deformation samples.
 3. Temporal, Transition, AnimationClip, Sequence and remaining queries.
 4. Native evaluated-frame/render/compositor; persistence/import; one-session WPF/MCP cutover.
@@ -22,7 +24,7 @@ The mesh editing checkpoint uses typed Layout mutation contracts. Add/remove/sub
 
 ## Current handler inventory
 
-155 JS handlers: 154 native, 1 pending. Status means native coverage; JS remains production authority for every handler. Internal/public classification comes from current commandSchemas/internalCommandSchemas.
+155 JS handlers: 155 native, 0 pending. Status means native coverage; JS remains production authority for every handler. Internal/public classification comes from current commandSchemas/internalCommandSchemas.
 
 | Command | Access | Native | JS source |
 | --- | --- | --- | --- |
@@ -82,7 +84,7 @@ The mesh editing checkpoint uses typed Layout mutation contracts. Add/remove/sub
 | `bone.remove_rigid_binding` | public | native | `rigid-bone-binding-command-handlers.js` |
 | `bone.remove_rigid_binding_internal` | history | native | `rigid-bone-binding-command-handlers.js` |
 | `bone.restore_rigid_binding` | history | native | `rigid-bone-binding-command-handlers.js` |
-| `source.apply_psd_reimport` | public | pending | `scene-command-handlers.js` |
+| `source.apply_psd_reimport` | public | native | `scene-command-handlers.js` |
 | `scene.rename_node` | public | native | `scene-command-handlers.js` |
 | `scene.set_transform` | public | native | `scene-command-handlers.js` |
 | `scene.set_visibility` | public | native | `scene-command-handlers.js` |

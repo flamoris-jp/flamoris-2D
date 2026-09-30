@@ -172,10 +172,10 @@ static void check_session(const picojson::object& root, bool full_admission) {
                 actual_error.c_str(), want.at("error").get<std::string>().c_str());
             assert(false);
         }
-        if (parsed(session_text(session)).serialize() != want.at("project").serialize()) {
+        if (parsed(session_text(session)) != want.at("project")) {
             fprintf(stderr, "project mismatch at step %zu (%s)\n", i, op.c_str()); assert(false);
         }
-        if (parsed(session_text(session, true)).serialize() != want.at("history").serialize()) {
+        if (parsed(session_text(session, true)) != want.at("history")) {
             fprintf(stderr, "history mismatch at step %zu (%s)\n", i, op.c_str()); assert(false);
         }
         fl2d_session_state state{};
@@ -293,7 +293,7 @@ int main() {
     assert(fl2d_normalize_frame_rate(engine, 1, 1, nullptr) == FL2D_INVALID_ARGUMENT);
     fl2d_engine_destroy(engine);
     check_project_snapshots();
-    for (const auto& input : {std::pair<const char*, bool>{FL2D_SESSION_FIXTURES, true}, {FL2D_RIG_FIXTURES, false}, {FL2D_HIERARCHY_FIXTURES, false}, {FL2D_TEMPORAL_FIXTURES, false}, {FL2D_TRANSITION_FIXTURES, false}, {FL2D_MESH_FIXTURES, false}}) {
+    for (const auto& input : {std::pair<const char*, bool>{FL2D_SESSION_FIXTURES, true}, {FL2D_RIG_FIXTURES, false}, {FL2D_HIERARCHY_FIXTURES, false}, {FL2D_TEMPORAL_FIXTURES, false}, {FL2D_TRANSITION_FIXTURES, false}, {FL2D_MESH_FIXTURES, false}, {FL2D_SOURCE_FIXTURES, false}}) {
         std::ifstream stream(input.first); assert(stream.good()); picojson::value fixture;
         assert(picojson::parse(fixture, stream).empty());
         check_session(fixture.get<picojson::object>(), input.second);
