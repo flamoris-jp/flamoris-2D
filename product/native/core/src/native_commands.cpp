@@ -2,7 +2,9 @@
 #include "js_text.h"
 #include <algorithm>
 #include <cmath>
+#include <new>
 #include <set>
+#include <stdexcept>
 namespace fl2d_commands {
 bool exact(const Value& value, std::initializer_list<const char*> required) {
     if (!value.is<Object>() || value.get<Object>().size() != required.size()) return false;
@@ -261,7 +263,7 @@ bool apply_samples(Value& project, const std::string& type, const Value& p, Appl
     }
     *it = next; sort_field(samples, "id"); result = {inverse, affected}; return true;
 }
-Applied apply(Value& project, const Value& cmd) {
+Applied apply_impl(Value& project, const Value& cmd) {
     if (!exact(cmd, {"type", "payload"}) || !field(cmd, "type").is<std::string>())
         throw Failure{FL2D_COMMAND_INVALID, "command.payload_invalid"};
     const std::string type = field(cmd, "type").get<std::string>();
@@ -270,7 +272,7 @@ Applied apply(Value& project, const Value& cmd) {
     if (apply_bone_hierarchy(project, type, payload, rig_result) || apply_warp(project, type, payload, rig_result) ||
         apply_rig(project, type, payload, rig_result) || apply_samples(project, type, payload, rig_result) ||
         apply_temporal(project, type, payload, rig_result) || apply_owners(project, type, payload, rig_result) ||
-        apply_transition(project, type, payload, rig_result)) return rig_result;
+        apply_transition(project, type, payload, rig_result) || apply_mesh(project, type, payload, rig_result)) return rig_result;
     auto bad = [] { throw Failure{FL2D_COMMAND_INVALID, "command.payload_invalid"}; };
     auto fail = [](const char* code) { throw Failure{FL2D_COMMAND_INVALID, code}; };
     auto text = [&](const char* key) { return field(payload, key).get<std::string>(); };
@@ -460,5 +462,14 @@ void assert_command(const Value& cmd, bool internal) {
     auto found = values.find(field(cmd, "type").get<std::string>());
     if (found == values.end() || (found->second.internal && !internal) || !matches_schema(field(cmd, "payload"), found->second.value))
         throw Failure{FL2D_COMMAND_INVALID, "command.payload_invalid"};
+}
+Applied apply(Value& project, const Value& cmd) {
+    try { return apply_impl(project, cmd); }
+    catch (const std::bad_alloc&) { throw; }
+    catch (const std::exception&) {
+        // A batch can contain an invalid intermediate domain object before its
+        // final candidate is validated. Match Product's uncoded TypeError path.
+        throw Failure{FL2D_PROJECT_INVALID, "project.invalid"};
+    }
 }
 }

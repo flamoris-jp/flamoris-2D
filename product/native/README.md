@@ -267,3 +267,10 @@ diagnostic authoring now run through native commands. Product normalizers,
 stable identity/mapping exclusivity, topology dependency locks and indexed
 inverses are preserved. `transition-session-conformance.json` compares full
 Project/history/error/revision state, including atomic failures and Undo/Redo.
+
+Typed Layout vertex/label/triangle/edge and generated-mesh commands update all
+associated Keyforms atomically. Snapshot inverses, issued vertex IDs, optional
+metadata, Skin/form locks, geometric checks and replacement consent retain
+Product behavior. `mesh-session-conformance.json` compares complete state and
+history across two KeyArts, shared-edge subdivision, Undo/Redo and rejection
+cases, including a malformed intermediate Keyform within a transaction.

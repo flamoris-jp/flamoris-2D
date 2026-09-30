@@ -1,6 +1,6 @@
 # Native command/query migration (#127)
 
-This checkpoint follows reviewed main `1611596` (#131). Production remains the JS Product Host until the explicit #118 cutover. WPF/MCP never dual-write. Native commands run in the same session, candidate validator, prepared commit and history path introduced by #123.
+This checkpoint follows reviewed main `a6aace6` (#132). Production remains the JS Product Host until the explicit #118 cutover. WPF/MCP never dual-write. Native commands run in the same session, candidate validator, prepared commit and history path introduced by #123.
 
 ## Command contract
 
@@ -9,6 +9,8 @@ Validate every command envelope/payload in a batch before invoking its first dom
 The next Temporal/Clip/Sequence checkpoint validates Project admission and then the before/after ownership lifecycle at the prepared transaction boundary, including Undo/Redo. Existing Sequence/AnimationClip owners cannot reassign programs, a new owner cannot adopt a program present before the transaction, and deleting an owner cannot retain its program. Creating/removing the owner and its program together is atomic; removing and recreating the same stable owner ID cannot bypass ownership immutability. Transition ownership keeps its current distinct Product contract. Failed prepare leaves Project/history/revisions unchanged; full project replacement remains admission rather than a transaction lifecycle change. This cross-state check must also cover future source replacement commands. Scene hierarchy and clipping cannot alter owner/program relationships. Source decode/import belongs with persistence/ingest; source.apply_psd_reimport still needs parity before authority cutover.
 
 The Transition authoring checkpoint preserves typed KeyArt/SemanticSlot/Topology/Keyform/Transition lifecycle commands. Normalizers fill current Product defaults without adding a new persistent schema. Stable identity, mapping exclusivity, Skin/form topology locks and atomic topology mutation requirements retain Product error precedence. Transition part/diagnostic inverses preserve indices; candidate validation owns endpoint/topology/reference compatibility. Transition removal keeps its current independent program lifecycle contract.
+
+The mesh editing checkpoint uses typed Layout mutation contracts. Add/remove/subdivide/generated replacement update every associated Keyform position/UV array atomically and store a topology/keyform snapshot inverse. Skin locks vertex identity changes; form corrections lock destructive vertex removal/replacement. Labels, issued vtx_ IDs, triangle duplicates/area and explicit generated-mesh replacement consent keep current Product precedence. Omitted optional vertex metadata/sequence fields remain valid and defaults appear only when Product edits introduce them. Invalid intermediate domain objects may exist within a batch: checked geometry access and the domain exception boundary reject uncoded Product errors as project.invalid while preserving atomicity; they do not introduce validation between individual commands.
 
 ## Completion order
 
@@ -20,7 +22,7 @@ The Transition authoring checkpoint preserves typed KeyArt/SemanticSlot/Topology
 
 ## Current handler inventory
 
-155 JS handlers: 145 native, 10 pending. Status means native coverage; JS remains production authority for every handler. Internal/public classification comes from current commandSchemas/internalCommandSchemas.
+155 JS handlers: 154 native, 1 pending. Status means native coverage; JS remains production authority for every handler. Internal/public classification comes from current commandSchemas/internalCommandSchemas.
 
 | Command | Access | Native | JS source |
 | --- | --- | --- | --- |
@@ -65,15 +67,15 @@ The Transition authoring checkpoint preserves typed KeyArt/SemanticSlot/Topology
 | `mesh_form.reset_keyform` | public | native | `mesh-form-correction-command-handlers.js` |
 | `mesh_form.remove_keyform_internal` | history | native | `mesh-form-correction-command-handlers.js` |
 | `mesh_form.restore_keyform` | history | native | `mesh-form-correction-command-handlers.js` |
-| `mesh_keyform.move_vertices` | public | pending | `mesh-topology-command-handlers.js` |
-| `mesh_topology.set_vertex_label` | public | pending | `mesh-topology-command-handlers.js` |
-| `mesh_topology.clear_vertex_label` | public | pending | `mesh-topology-command-handlers.js` |
-| `mesh_topology.add_vertex` | public | pending | `mesh-topology-command-handlers.js` |
-| `mesh_topology.remove_vertex` | public | pending | `mesh-topology-command-handlers.js` |
-| `mesh_topology.create_triangle` | public | pending | `mesh-topology-command-handlers.js` |
-| `mesh_topology.subdivide_edge` | public | pending | `mesh-topology-command-handlers.js` |
-| `mesh_topology.apply_generated_mesh` | public | pending | `mesh-topology-command-handlers.js` |
-| `mesh_topology.restore_snapshot` | history | pending | `mesh-topology-command-handlers.js` |
+| `mesh_keyform.move_vertices` | public | native | `mesh-topology-command-handlers.js` |
+| `mesh_topology.set_vertex_label` | public | native | `mesh-topology-command-handlers.js` |
+| `mesh_topology.clear_vertex_label` | public | native | `mesh-topology-command-handlers.js` |
+| `mesh_topology.add_vertex` | public | native | `mesh-topology-command-handlers.js` |
+| `mesh_topology.remove_vertex` | public | native | `mesh-topology-command-handlers.js` |
+| `mesh_topology.create_triangle` | public | native | `mesh-topology-command-handlers.js` |
+| `mesh_topology.subdivide_edge` | public | native | `mesh-topology-command-handlers.js` |
+| `mesh_topology.apply_generated_mesh` | public | native | `mesh-topology-command-handlers.js` |
+| `mesh_topology.restore_snapshot` | history | native | `mesh-topology-command-handlers.js` |
 | `bone.create_rigid_binding` | public | native | `rigid-bone-binding-command-handlers.js` |
 | `bone.set_rigid_binding_bone` | public | native | `rigid-bone-binding-command-handlers.js` |
 | `bone.set_rigid_binding_enabled` | public | native | `rigid-bone-binding-command-handlers.js` |
