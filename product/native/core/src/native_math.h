@@ -3,6 +3,8 @@
 #include <array>
 #include <cmath>
 #include <string>
+#include <map>
+#include <limits>
 #include <vector>
 
 namespace fl2d_math {
@@ -17,15 +19,17 @@ inline Affine local(const picojson::value& value) {
     const auto& p = t.at("position").get<picojson::object>();
     const auto& s = t.at("scale").get<picojson::object>();
     const auto& pivot = t.at("pivot").get<picojson::object>();
-    const double rotation = t.at("rotation").get<double>();
+    auto n = [](const picojson::value& v) { return v.is<double>() ? v.get<double>() : std::numeric_limits<double>::quiet_NaN(); };
+    const double rotation = n(t.at("rotation"));
     const double cosine = std::cos(rotation), sine = std::sin(rotation);
-    const double a = cosine*s.at("x").get<double>(), b = sine*s.at("x").get<double>();
-    const double c = -sine*s.at("y").get<double>(), d = cosine*s.at("y").get<double>();
-    const double x = pivot.at("x").get<double>(), y = pivot.at("y").get<double>();
-    return {a,b,c,d,p.at("x").get<double>()+x-a*x-c*y,
-        p.at("y").get<double>()+y-b*x-d*y};
+    const double a = cosine*n(s.at("x")), b = sine*n(s.at("x"));
+    const double c = -sine*n(s.at("y")), d = cosine*n(s.at("y"));
+    const double x = n(pivot.at("x")), y = n(pivot.at("y"));
+    return {a,b,c,d,n(p.at("x"))+x-a*x-c*y,
+        n(p.at("y"))+y-b*x-d*y};
 }
-inline Affine world(const picojson::value& project, const std::string& node_id) {
+inline Affine world(const picojson::value& project, const std::string& node_id,
+    const std::map<std::string,picojson::value>& overrides = {}) {
     const auto& nodes = project.get<picojson::object>().at("scene").get<picojson::object>()
         .at("nodes").get<picojson::object>();
     std::vector<const picojson::value*> ancestors;
@@ -35,9 +39,14 @@ inline Affine world(const picojson::value& project, const std::string& node_id) 
         const auto& parent = current->get<picojson::object>().at("parentId");
         current = parent.is<std::string>() ? &nodes.at(parent.get<std::string>()) : nullptr;
     }
-    Affine result = local(ancestors.back()->get<picojson::object>().at("transform"));
+    auto transform = [&](const picojson::value* node) -> const picojson::value& {
+        const auto& object = node->get<picojson::object>();
+        const auto id = object.at("id").get<std::string>(); const auto it = overrides.find(id);
+        return it == overrides.end() ? object.at("transform") : it->second;
+    };
+    Affine result = local(transform(ancestors.back()));
     for (size_t i = ancestors.size()-1; i > 0; --i)
-        result = multiply(result, local(ancestors[i-1]->get<picojson::object>().at("transform")));
+        result = multiply(result, local(transform(ancestors[i-1])));
     return result;
 }
 inline picojson::value json(const Affine& matrix) {

@@ -147,6 +147,12 @@ Value clip_projection(const Value& instance, uint64_t time, uint64_t duration) {
     result["rawLocalTick"] = Value(static_cast<double>(raw)); result["localTick"] = Value(static_cast<double>(local));
     return Value(result);
 }
+Value export_frame(const Value& plan,const Value& index) {
+    if (!safe(index) || index.get<double>() >= field(plan,"frameCount").get<double>()) range("Export frame index must be within the planned frame range.");
+    const auto& rate = field(plan,"frameRate");
+    return frame(static_cast<uint64_t>(index.get<double>()),static_cast<uint64_t>(field(rate,"numerator").get<double>()),static_cast<uint64_t>(field(rate,"denominator").get<double>()));
+}
+
 Value frame_plan(uint64_t duration, const Value& rate) {
     if (!duration || duration > fl2d_ticks::max_safe) range("Export durationTicks must be a positive safe integer.");
     const auto& numerator = field(rate,"numerator"); const auto& denominator = field(rate,"denominator");

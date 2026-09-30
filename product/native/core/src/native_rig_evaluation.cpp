@@ -149,22 +149,39 @@ Value warp_point(const Stage& s, const Value& p) {
     }
     return transform(s.from,output);
 }
-std::vector<Stage> stages(const Value& p, const Value& bone_id, const Value& art) {
+std::vector<std::string> ancestors(const Value& p,const Value& node_id) {
     const auto& nodes = field(field(p,"scene"),"nodes").get<Object>();
-    std::vector<std::string> ids; const Value* node = &nodes.at(bone_id.get<std::string>());
+    std::vector<std::string> ids; const Value* node = &nodes.at(node_id.get<std::string>());
     while (field(*node,"parentId").is<std::string>()) {
         node = &nodes.at(str(*node,"parentId"));
         if (field(*node,"kind") == Value("deformer")) ids.push_back(str(*node,"id"));
     }
-    std::reverse(ids.begin(),ids.end()); std::vector<Stage> result;
+    std::reverse(ids.begin(),ids.end()); return ids;
+}
+std::vector<Stage> stages(const Value& p, const Value& bone_id, const Value& art,
+    const std::map<std::string,Value>& overrides = {}, const Affine* geometry_world = nullptr, const Value& morph_to = Value(), std::set<std::string>* active_warps = nullptr) {
+    const auto ids = ancestors(p,bone_id); std::vector<Stage> result;
     for (const auto& id : ids) {
         const auto deformer = find(rig(p,"deformers"),Value(id)); Value keyform;
         for (const auto& k : rig(p,"warpDeformerKeyforms"))
             if (field(k,"deformerId") == Value(id) && field(k,"keyArtId") == art) { keyform = k; break; }
+        if (!morph_to.is<picojson::null>()) {
+            Value to; for (const auto& k : rig(p,"warpDeformerKeyforms")) if (field(k,"deformerId") == Value(id) && field(k,"keyArtId") == morph_to) { to = k; break; }
+            if (keyform.is<picojson::null>() || to.is<picojson::null>()) {
+                const bool missing_from = keyform.is<picojson::null>();
+                fail("DEFORMER_KEYFORM_MISSING",missing_from ? "Warp from keyform is missing or belongs to another deformer." : "Warp to keyform is missing or belongs to another deformer.",
+                    {{"deformerId",Value(id)},{"endpoint",Value(missing_from ? "from" : "to")}});
+            }
+        }
+        if (overrides.count(id)) keyform = overrides.at(id);
         if (keyform.is<picojson::null>()) fail("DEFORMER_KEYFORM_MISSING","WarpDeformer has no keyform for this Key Art.",
             {{"code",Value("DEFORMER_KEYFORM_MISSING")},{"deformerId",Value(id)},{"keyArtId",art},{"nodeId",bone_id},
              {"message",Value("WarpDeformer has no keyform for this Key Art.")},{"boneId",bone_id}});
-        const auto from = fl2d_math::world(p,id); Stage stage{deformer,from,inverse(from),{},{},false};
+        if (active_warps) active_warps->insert(id);
+        const auto document_world = fl2d_math::world(p,id);
+        const auto to = geometry_world ? fl2d_math::multiply(inverse(document_world),*geometry_world) : inverse(document_world);
+        const auto from = geometry_world ? inverse(to) : document_world;
+        Stage stage{deformer,from,to,{},{},false};
         const auto& bounds = field(deformer,"bounds");
         for (const auto& control_id : field(deformer,"controlPointIds").get<Array>()) {
             const auto control = find(rig(p,"warpControlPoints"),control_id);
@@ -207,7 +224,8 @@ Array spread(const Value& v) {
 }
 }
 
-Value bone_fk(const Value& p, const Value& art, bool projected, const std::map<std::string,Value>& overrides) {
+Value bone_fk(const Value& p, const Value& art, bool projected, const std::map<std::string,Value>& overrides,
+    const std::map<std::string,Value>& warp_overrides, const Value& morph_to, std::set<std::string>* active_warps) {
     const auto& nodes = field(field(p,"scene"),"nodes").get<Object>();
     Array bones = rig(p,"bones"); sort(bones,{"id"}); Array order; std::set<std::string> visited;
     // Iterative parent walk avoids stack growth for admitted deep hierarchies.
@@ -237,7 +255,7 @@ Value bone_fk(const Value& p, const Value& art, bool projected, const std::map<s
             if (projected) {
                 const Value* root = &nodes.at(id);
                 while (field(*root,"kind") == Value("bone")) root = &nodes.at(str(*root,"parentId"));
-                const auto world = fl2d_math::world(p,str(*root,"id")); const auto warp = stages(p,Value(id),art);
+                const auto world = fl2d_math::world(p,str(*root,"id")); const auto warp = stages(p,Value(id),art,warp_overrides,nullptr,morph_to,active_warps);
                 for (auto* point_value : {&head,&tip,&normal}) {
                     *point_value = transform(world,*point_value);
                     for (const auto& stage : warp) *point_value = warp_point(stage,*point_value);
@@ -361,20 +379,24 @@ Value skin(const Value& p, const Value& binding, const Value& art, const Value& 
         if (!positions.is<Array>() && !positions.is<std::string>()) throw fl2d_queries::Error{"TypeError","input.positions is not iterable"};
         return mesh_result(Value(spread(positions)),field(fk,"diagnostics").get<Array>());
     }
-    if (field(binding,"enabled") == Value(false)) return mesh_result(Value(spread(positions)));
     const auto topology = find(field(p,"meshTopologies").get<Array>(),field(binding,"topologyId"));
-    const auto& ids = field(topology,"vertexIds").get<Array>(); Array issues;
+    return skin_mesh(binding,topology,fk,positions,fl2d_math::world(p,str(binding,"targetNodeId")));
+}
+Value skin_mesh(const Value& binding, const Value& topology, const Value& fk, const Value& positions, const Affine& world) {
+    if (field(binding,"enabled") == Value(false)) return mesh_result(Value(spread(positions)));
+    const Array ids = field(topology,"vertexIds").is<Array>() ? field(topology,"vertexIds").get<Array>() : Array{}; Array issues;
     auto d = [&](const char* code,const char* message,Object extra = {}) {
-        Object fields{{"bindingId",field(binding,"id")},{"topologyId",field(topology,"id")},{"vertexId",Value()},{"boneId",Value()}};
+        Object fields{{"bindingId",field(binding,"id")},{"topologyId",topology.is<picojson::null>() ? field(binding,"topologyId") : field(topology,"id")},{"vertexId",Value()},{"boneId",Value()}};
         for (const auto& entry : extra) fields[entry.first] = entry.second;
         return diag(code,message,fields);
     };
     if (!positions.is<Array>() || !std::all_of(positions.get<Array>().begin(),positions.get<Array>().end(),finite))
         issues.push_back(d("SKIN_MESH_POSITION_INVALID","Skinning requires a flat finite mesh position array."));
+    if (topology.is<picojson::null>() || ids.empty()) issues.push_back(d("SKIN_TOPOLOGY_INVALID","Skinning requires unique stable MeshTopology vertex IDs."));
+    if (field(binding,"topologyId") != field(topology,"id")) issues.push_back(d("SKIN_BINDING_TOPOLOGY_MISMATCH","SkinBinding topology does not match the evaluated mesh topology.",{{"details",Value(Object{{"bindingTopologyId",field(binding,"topologyId")}})}}));
     const Value count = positions.is<Array>() ? Value(static_cast<double>(positions.get<Array>().size())) : positions.is<std::string>() ? Value(static_cast<double>(fl2d_text::utf16(positions.get<std::string>()).size())) : Value();
     if (count != Value(static_cast<double>(ids.size()*2))) issues.push_back(d("SKIN_MESH_POSITION_COUNT_MISMATCH","Skinning requires exactly two position values per stable topology vertex.",
         {{"details",Value(Object{{"positionCount",count},{"vertexCount",Value(static_cast<double>(ids.size()))}})}}));
-    const auto world = fl2d_math::world(p,str(binding,"targetNodeId"));
     const bool valid_world = std::all_of(world.begin(),world.end(),[](double x){return std::isfinite(x);}) && std::abs(world[0]*world[3]-world[1]*world[2]) >= 1e-12;
     if (!valid_world) issues.push_back(d("SKIN_GEOMETRY_TRANSFORM_INVALID","Skinning requires an invertible finite target world transform."));
     std::map<std::string,Affine> matrices;
@@ -385,6 +407,11 @@ Value skin(const Value& p, const Value& binding, const Value& art, const Value& 
         else matrices[str(pose,"boneId")] = valid_world ? fl2d_math::multiply(fl2d_math::multiply(inverse(world),affine(matrix)),world) : affine(matrix);
     }
     Array weights = field(binding,"vertexWeights").get<Array>(); sort(weights,{"vertexId"});
+    for (const auto& w : weights) if (std::find(ids.begin(),ids.end(),field(w,"vertexId")) == ids.end())
+        issues.push_back(d("SKIN_BINDING_VERTEX_MISSING","Skin weight references a stable vertex outside the evaluated MeshTopology.",{{"vertexId",field(w,"vertexId")}}));
+    Array ordered_ids = ids; std::sort(ordered_ids.begin(),ordered_ids.end(),[](const Value& a,const Value& b){return fl2d_text::less(a.get<std::string>(),b.get<std::string>());});
+    for (const auto& id : ordered_ids) if (find(weights,id,"vertexId").is<picojson::null>())
+        issues.push_back(d("SKIN_BINDING_VERTEX_MISSING","Enabled SkinBinding must weight every stable topology vertex.",{{"vertexId",id}}));
     for (const auto& w : weights) for (const auto& influence : field(w,"influences").get<Array>()) if (!matrices.count(str(influence,"boneId")))
         issues.push_back(d("SKIN_BONE_POSE_MISSING","Skin influence references a Bone without an evaluated FK pose.",{{"vertexId",field(w,"vertexId")},{"boneId",field(influence,"boneId")}}));
     if (!issues.empty()) { sort(issues,{"code","bindingId","topologyId","vertexId","boneId","message"}); return mesh_result(Value(spread(positions)),issues); }
@@ -401,5 +428,65 @@ Value skin(const Value& p, const Value& binding, const Value& art, const Value& 
         output.push_back(number(x)); output.push_back(number(y));
     }
     return mesh_result(Value(output));
+}
+
+Value warp_mesh(const Value& p, const Value& node_id, const Value& art, const Value& positions,
+    const Affine& world, const std::map<std::string,Value>& overrides, const Value& to_node, const Value& morph_to, std::set<std::string>* active_warps) {
+    try {
+        const auto ids = ancestors(p,node_id);
+        if (!morph_to.is<picojson::null>()) {
+            const auto to_ids = ancestors(p,to_node);
+            if (ids != to_ids) {
+                Array from_array,to_array; for (const auto& id : ids) from_array.push_back(Value(id)); for (const auto& id : to_ids) to_array.push_back(Value(id));
+                fail("DEFORMER_KEYFORM_INCOMPATIBLE","Morph endpoints do not share the same ancestor Warp sequence.",{{"fromAncestors",Value(from_array)},{"toAncestors",Value(to_array)}});
+            }
+        } else {
+            Array missing;
+            for (const auto& id : ids) {
+                bool exists = false; for (const auto& k : rig(p,"warpDeformerKeyforms")) if (field(k,"deformerId") == Value(id) && field(k,"keyArtId") == art) exists = true;
+                if (exists && active_warps) active_warps->insert(id);
+                if (!exists) missing.emplace_back(Object{{"code",Value("DEFORMER_KEYFORM_MISSING")},{"deformerId",Value(id)},{"keyArtId",art},{"nodeId",node_id},{"message",Value("WarpDeformer has no keyform for this Key Art.")}});
+            }
+            if (!missing.empty()) return mesh_result(positions,missing);
+        }
+        const auto warp = stages(p,node_id,art,overrides,&world,morph_to,active_warps); Array output;
+        const auto& input = positions.get<Array>();
+        for (size_t i = 0; i < input.size(); i += 2) {
+            auto value = point(input[i].is<double>() ? input[i].get<double>() : std::numeric_limits<double>::quiet_NaN(),input[i+1].is<double>() ? input[i+1].get<double>() : std::numeric_limits<double>::quiet_NaN());
+            for (const auto& stage : warp) value = warp_point(stage,value);
+            output.push_back(field(value,"x")); output.push_back(field(value,"y"));
+        }
+        return mesh_result(Value(output));
+    } catch (const EvaluationFailure& error) {
+        return mesh_result(positions,{Value(Object{{"code",Value(error.code)},{"message",Value(error.message)},{"details",error.details}})});
+    } catch (const fl2d_queries::Error& error) {
+        return mesh_result(positions,{Value(Object{{"code",Value("DEFORMER_CONTROL_POINT_INVALID")},{"message",Value(error.message)},{"details",Value(Object{})}})});
+    }
+}
+Value morph_rig(const Value& p, const Value& from_art, const Value& to_art, double weight) {
+    Object poses, warps; Array diagnostics;
+    for (const auto& bone : rig(p,"bones")) {
+        const auto from = delta(p,field(bone,"id"),from_art), to = delta(p,field(bone,"id"),to_art);
+        poses[str(bone,"id")] = weight == 0 ? from : weight == 1 ? to : Value(Object{{"x",number(lerp(num(from,"x"),num(to,"x"),weight))},
+            {"y",number(lerp(num(from,"y"),num(to,"y"),weight))},{"rotation",number(num(from,"rotation")+shortest(num(from,"rotation"),num(to,"rotation"))*weight)}});
+    }
+    for (const auto& deformer : rig(p,"deformers")) {
+        const auto id = field(deformer,"id"); Value from, to;
+        for (const auto& keyform : rig(p,"warpDeformerKeyforms")) if (field(keyform,"deformerId") == id) {
+            if (field(keyform,"keyArtId") == from_art) from = keyform;
+            if (field(keyform,"keyArtId") == to_art) to = keyform;
+        }
+        if (from.is<picojson::null>() || to.is<picojson::null>()) {
+            diagnostics.push_back(Value(Object{{"code",Value("DEFORMER_KEYFORM_MISSING")},{"message",Value(from.is<picojson::null>() ? "Warp from keyform is missing or belongs to another deformer." : "Warp to keyform is missing or belongs to another deformer.")},
+                {"details",Value(Object{{"deformerId",id},{"endpoint",Value(from.is<picojson::null>() ? "from" : "to")}})}})); continue;
+        }
+        Array points;
+        for (const auto& control_id : field(deformer,"controlPointIds").get<Array>()) {
+            const auto a = find(field(from,"controlPoints").get<Array>(),control_id,"controlPointId"), b = find(field(to,"controlPoints").get<Array>(),control_id,"controlPointId");
+            points.emplace_back(Object{{"controlPointId",control_id},{"x",number(lerp(num(a,"x"),num(b,"x"),weight))},{"y",number(lerp(num(a,"y"),num(b,"y"),weight))}});
+        }
+        warps[id.get<std::string>()] = Value(Object{{"deformerId",id},{"keyArtId",weight == 0 ? from_art : weight == 1 ? to_art : Value()},{"controlPoints",Value(points)}});
+    }
+    return Value(Object{{"poses",Value(poses)},{"warps",Value(warps)},{"diagnostics",Value(diagnostics)}});
 }
 }

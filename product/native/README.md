@@ -289,7 +289,7 @@ re-import uses the ordinary Project snapshot inverse, logical identity check,
 affected-ID enumeration and before/after owner validation.
 `source-session-conformance.json` protects state/history parity and observable
 property order across typed node creation, source replacement, Undo/Redo and
-serialization. ABI 1.4 now adds 68 of the 72 readonly Product queries on this
+serialization. ABI 1.4 now adds all 72 readonly Product queries on this
 same session; see [the Query boundary](../../docs/native-query-migration.md).
 `query-conformance.json` protects values, Product exception messages, canonical
 lists, ancestor/pivot matrices, nullable selectors and complete session immutability,
@@ -300,6 +300,7 @@ Admission uses the same exact Clip arithmetic. Export planning bounds sub-tick
 frames directly instead of iterating potentially billions of trailing candidates.
 Pinned ICU preserves locale-sensitive lists/search. The shared native rig evaluator
 adds Bone FK, projected IK inspection/solve, Skin and Form correction, including
-parent-first nested Warp evaluation. The four remaining queries are Transition
-evaluation/diagnostics, Sequence evaluation and export frame evaluation. Runtime
-authority cutover remains pending.
+parent-first nested Warp evaluation. All frame reads now share those same stages: Transition modes, resolved
+instance clipping, weighted composite groups, Sequence Clip mixing, camera/events
+and rational export frames. Diagnostic fingerprints and acknowledgements retain
+Product identity. Runtime authority cutover remains pending.

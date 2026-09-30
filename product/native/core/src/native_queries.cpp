@@ -4,6 +4,7 @@
 #include "native_validation.h"
 #include "native_temporal_evaluation.h"
 #include "native_rig_evaluation.h"
+#include "native_frame_evaluation.h"
 #include "native_locale.h"
 #include "js_text.h"
 #include <algorithm>
@@ -434,7 +435,29 @@ Value dispatch(const Value& p, Query id, const Value& input) {
     }
     case Query::mesh_get_keyform: return get(p,input,"meshKeyforms","keyformId","MeshKeyform");
     case Query::transition_get: return with_duration(p,get(p,input,"transitions","transitionId","Transition"));
+    case Query::transition_evaluate: {
+        const auto time = field(input,"timeTicks");
+        if (!time.is<double>() || !std::isfinite(time.get<double>()) || std::floor(time.get<double>()) != time.get<double>() || std::abs(time.get<double>()) > 9007199254740991.0)
+            throw Error{"RangeError","Transition timeTicks must be a safe integer."};
+        return fl2d_evaluation::transition_frame(p,get(p,input,"transitions","transitionId","Transition"),time.get<double>());
+    }
+    case Query::transition_get_diagnostics: return fl2d_evaluation::transition_diagnostics(p,get(p,input,"transitions","transitionId","Transition"));
     case Query::transition_get_authoring: return authoring(p,get(p,input,"transitions","transitionId","Transition"));
+    case Query::sequence_evaluate: {
+        const auto sequence = get(p,input,"sequences","sequenceId","Sequence"); const auto time = field(input,"timeTicks");
+        if (!time.is<double>()) throw Error{"RangeError","Sequence timeTicks must be within its owned TemporalProgram duration."};
+        return fl2d_evaluation::sequence_frame(p,sequence,time.get<double>());
+    }
+    case Query::export_evaluate_frame: {
+        const bool sequence = truthy(field(input,"sequenceId"));
+        auto normalized = input; if (!normalized.get<Object>().count("transitionId")) normalized.get<Object>()["transitionId"] = Value();
+        const auto owner = get(p,normalized,sequence ? "sequences" : "transitions",sequence ? "sequenceId" : "transitionId",sequence ? "Sequence" : "Transition");
+        const auto program = find(field(p,"temporalPrograms"),field(owner,"temporalProgramId"));
+        const auto plan = fl2d_evaluation::frame_plan(static_cast<uint64_t>(field(program,"durationTicks").get<double>()),field(input,"frameRate"));
+        const auto frame = fl2d_evaluation::export_frame(plan,field(input,"frameIndex"));
+        const auto evaluation = sequence ? fl2d_evaluation::sequence_frame(p,owner,field(frame,"timeTicks").get<double>()) : fl2d_evaluation::transition_frame(p,owner,field(frame,"timeTicks").get<double>());
+        return Value(Object{{"frame",frame},{"evaluation",evaluation},{sequence ? "evaluatedSequence" : "evaluatedTransition",evaluation}});
+    }
     case Query::sequence_get: return sequence_projection(p,get(p,input,"sequences","sequenceId","Sequence"));
     case Query::sequence_get_diagnostics:
         (void)get(p,input,"sequences","sequenceId","Sequence");
