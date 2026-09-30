@@ -3,6 +3,7 @@
 #include "native_math.h"
 #include "native_validation.h"
 #include "native_temporal_evaluation.h"
+#include "native_locale.h"
 #include "js_text.h"
 #include <algorithm>
 #include <charconv>
@@ -99,6 +100,13 @@ Array sorted(const Value& values, const char* key = "id") {
     Array result = values.get<Array>();
     std::stable_sort(result.begin(),result.end(),[&](const Value& a, const Value& b) {
         return fl2d_text::less(field(a,key).get<std::string>(),field(b,key).get<std::string>());
+    });
+    return result;
+}
+Array locale_sorted(const Value& values) {
+    Array result = values.get<Array>(); const fl2d_locale::Collator collator;
+    std::stable_sort(result.begin(),result.end(),[&](const Value& a, const Value& b) {
+        return collator.less(field(a,"id").get<std::string>(),field(b,"id").get<std::string>());
     });
     return result;
 }
@@ -264,6 +272,46 @@ Value authoring(const Value& p, Value transition) {
 }
 Value dispatch(const Value& p, Query id, const Value& input) {
     switch (id) {
+    case Query::clipping_list: return Value(locale_sorted(field(p,"clippingBindings")));
+    case Query::deformer_list: return Value(locale_sorted(collection(p,"rig.deformers")));
+    case Query::bone_list: {
+        auto values = locale_sorted(collection(p,"rig.bones"));
+        for (auto& value : values) value = bone_projection(p,std::move(value));
+        return Value(values);
+    }
+    case Query::bone_list_rotation_constraints: return Value(locale_sorted(collection(p,"rig.boneRotationConstraints")));
+    case Query::bone_list_two_bone_ik: return Value(locale_sorted(collection(p,"rig.twoBoneIkConstraints")));
+    case Query::bone_list_rigid_bindings: return Value(locale_sorted(collection(p,"rig.rigidBoneBindings")));
+    case Query::skin_list_bindings: return Value(locale_sorted(collection(p,"rig.skinBindings")));
+    case Query::mesh_list: return Value(locale_sorted(field(p,"meshes")));
+    case Query::mesh_list_topologies: {
+        auto values = locale_sorted(field(p,"meshTopologies"));
+        for (auto& value : values) value = topology_projection(p,std::move(value));
+        return Value(values);
+    }
+    case Query::mesh_form_list_keyforms: case Query::mesh_list_keyforms: {
+        Array result;
+        for (const auto& value : locale_sorted(field(p,id == Query::mesh_list_keyforms ? "meshKeyforms" : "meshFormCorrectionKeyforms"))) {
+            bool match = true;
+            for (const auto key : {"topologyId","keyArtId","semanticSlotId"})
+                if (truthy(field(input,key)) && field(value,key) != field(input,key)) match = false;
+            if (match) result.push_back(value);
+        }
+        return Value(result);
+    }
+    case Query::scene_search: {
+        const auto& text = field(input,"text");
+        const auto needle = fl2d_locale::lower(truthy(text) ? js_string(text) : ""); Array result;
+        for (const auto& key : nodes(p).keys()) {
+            const auto& n = nodes(p).at(key); const bool effective = visible(p,n);
+            if (field(input,"includeHidden") == Value(false) && !effective) continue;
+            const auto name = fl2d_locale::lower(field(n,"displayName").get<std::string>());
+            if (std::search(name.begin(),name.end(),needle.begin(),needle.end()) == name.end() && !needle.empty()) continue;
+            result.emplace_back(Object{{"id",field(n,"id")},{"displayName",field(n,"displayName")},
+                {"kind",field(n,"kind")},{"visible",field(n,"visible")},{"effectiveVisible",Value(effective)},{"locked",field(n,"locked")}});
+        }
+        return Value(result);
+    }
     case Query::project_validate: return fl2d_validation::admitted_result(p);
     case Query::project_get_render_settings: return field(p,"renderSettings");
     case Query::project_get_summary: {

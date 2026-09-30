@@ -8,6 +8,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Content Include="$(NativeCoreDll)" Link="Flamoris2D.Core.Native.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(NativeCoreBuildDir)/$(Configuration)/icuuc78.dll" Link="icuuc78.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(NativeCoreBuildDir)/$(Configuration)/icuin78.dll" Link="icuin78.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(NativeCoreBuildDir)/$(Configuration)/icudt78.dll" Link="icudt78.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(NativeCoreBuildDir)/$(Configuration)/ICU-LICENSE.txt" Link="ICU-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="BuildNativeCore" BeforeTargets="CoreCompile;GetCopyToOutputDirectoryItems" Condition="'$(OS)' == 'Windows_NT'">
     <Exec Command='cmake -S &quot;$(MSBuildProjectDirectory)/../../core&quot; -B &quot;$(NativeCoreBuildDir)&quot; -A x64 -DBUILD_TESTING=ON' />

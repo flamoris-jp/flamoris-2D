@@ -48,3 +48,16 @@ The superseded TypeScript MCP server/node/hono/zod runtime is no longer packaged
 The native Project snapshot parser vendors `picojson` by Kazuho Oku and
 Cybozu Labs under the BSD-2-Clause license. The full license is included at
 `core/third_party/picojson/LICENSE`.
+
+## Experimental native locale queries
+
+Core.Interop and its tests link ICU 78.3 (Unicode/ICU license) for Product locale
+collation and case conversion, matching Node 24.21.0's ICU version.
+Official source/release: https://github.com/unicode-org/icu/releases/tag/release-78.3 .
+The Windows build downloads `icu4c-78.3-Win64-MSVC2022.zip`, SHA256
+`446b671f9437227daa79e221d4521d75793f9ecd65ac44c06e34dd848f201ac2`.
+Its `icuuc78.dll`, `icuin78.dll`, `icudt78.dll` and original `LICENSE` (copied as
+`ICU-LICENSE.txt`) accompany the experimental build. Other platforms require an
+exact-version installation; source archive `icu4c-78.3-sources.tgz` SHA256 is
+`3a2e7a47604ba702f345878308e6fefeca612ee895cf4a5f222e7955fabfe0c0`.
+The current App/portable package does not reference Core.Interop.
