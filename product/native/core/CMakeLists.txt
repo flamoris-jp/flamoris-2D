@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.21)
 project(Flamoris2D.Core.Native LANGUAGES CXX)
 
+if(MSVC)
+  add_compile_options(/utf-8)
+endif()
+
 if(WIN32)
   if(POLICY CMP0135)
     cmake_policy(SET CMP0135 NEW)
