@@ -28,11 +28,7 @@ interop, one managed session lane, source codecs, typed desktop client, WPF app
 and shared MCP bridge. `product/packaging/` assembles that explicit project graph.
 See [renovation map](repository-renovation.md) for the file-level disposition.
 
-`product/src/`, `product/product-host/`, `product/desktop/` and the browser entry
-are compatibility/reference code (see `product/LEGACY.md`). The previous managed
-Host client/tests remain at their historical paths, excluded from the native
-solution and publish graph. They receive no new production responsibility.
-Colocated tests/fixtures and test-only npm dependencies are never runtime inputs.
+The retired JavaScript/Product Host/Electron implementation and its npm test graph have been removed. `product/native/` is the sole current Product implementation. Retained fixtures are those consumed directly by native or managed tests.
 
 ## 3. Production artifact boundary
 
@@ -40,8 +36,6 @@ App/Bridge MSBuild references and explicit Content items define production
 inputs. The package script also rejects JS/Node/Electron/Host content, checks all
 required native libraries/notices and records SHA256 sums. The package does not
 contain staging, root integration tests, history or private acceptance artwork.
-`legacy-reference-files.txt` is only the old shell's compatibility graph; it is
-not a production allowlist. Its import-closure test preserves the oracle.
 
 | Area | Owns | Must not own |
 | --- | --- | --- |
