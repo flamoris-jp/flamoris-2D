@@ -11,7 +11,7 @@ PSD・Cutworkの素材から、メッシュとリグで動きを付けてMVの�
 - **Animate a shot:** author reusable clips for motions such as blinking, breathing, or hair sway; place them on a sequence timeline and preview playback.
 - **Export and keep editing:** write PNG frame sequences or Windows MP4/H.264, save a `.fl2d` project, and reopen it with artwork and authored motion. Edits support Undo/Redo.
 
-**Native WPF status:** Source → Mesh → Rig → Deform → Animation → Preview → Export uses one C++ NativeSession shared by WPF and MCP. Final Windows CI/real-art acceptance and installer release remain gates. JS/Electron/Product Host are compatibility references outside the native runtime. Automatic flat-image part decomposition remains experimental/deferred.
+**Native WPF status:** Source → Mesh → Rig → Deform → Animation → Preview → Export uses one C++ NativeSession shared by WPF and MCP. The C++ migration is complete; follow-up defects and usability work are tracked as focused issues. Installer/release work remains separate. Automatic flat-image part decomposition remains experimental/deferred.
 
 [Native制作ガイド（日本語）](docs/native-production-workflow.md) · [Try/build the native candidate](#run-the-native-windows-candidate) · [Capabilities and status](docs/product-status.md) · [Implementation evidence](docs/native-capability-map.md) · [Design docs](docs/README.md)
 
@@ -21,16 +21,9 @@ FLAMORIS 2D focuses on short animated shots, rather than the full scope of a DAW
 
 The [Native Shell Boundary workflow](https://github.com/flamoris-jp/flamoris-2D/actions/workflows/native-shell-ci.yml) uploads `flamoris2d-native-production-candidate-win-x64` only for successful manual (`workflow_dispatch`) runs, with three-day artifact retention. PR checks build and test the candidate but do not publish a download. If an artifact is available, extract the whole directory and run `Flamoris2D.exe` on Windows x64; otherwise use the [Windows development build instructions](product/native/README.md#build-and-tests).
 
-On Windows x64 with the .NET 10 SDK, CMake and Visual Studio C++ Build Tools, run `./product/packaging/publish-windows.ps1` from the repository root to build the same candidate locally in `artifacts/package/Flamoris2D-win-x64/`. The candidate bundles the self-contained .NET 10 runtime, C++ core/compositor, ICU, native source codecs and pinned LGPL shared FFmpeg. Keep the package directory intact. It does not install itself or replace the current Electron file association.
+On Windows x64 with the .NET 10 SDK, CMake and Visual Studio C++ Build Tools, run `./product/packaging/publish-windows.ps1` from the repository root to build the same candidate locally in `artifacts/package/Flamoris2D-win-x64/`. The candidate bundles the self-contained .NET 10 runtime, C++ core/compositor, ICU, native source codecs and pinned LGPL shared FFmpeg. Keep the package directory intact. It does not install itself or change `.fl2d` file association.
 
 For development builds and the full native workflow, see [`product/native/README.md`](product/native/README.md) and [`docs/native-production-workflow.md`](docs/native-production-workflow.md).
-
-## Compatibility references
-
-The previous JS/Electron/browser code is test-only reference during the cutover.
-See [`product/LEGACY.md`](product/LEGACY.md) and the
-[renovation map](docs/repository-renovation.md). Node is needed only to run the
-JS oracle tests, never to build, publish or run the native application.
 
 ## Repository boundaries
 
