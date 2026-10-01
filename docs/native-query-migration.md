@@ -19,8 +19,9 @@ Successful interchange returns caller-owned, NUL-terminated UTF-8 JSON:
 for a Product query exception. Unknown query names use the existing JS error.
 Known queries awaiting implementation return `FL2D_QUERY_UNSUPPORTED`; they must
 never silently fall back to a second authority. Malformed interchange returns a
-C status. Query outputs can be larger than the admitted 1 MiB Project; consumers
-use the reported buffer length, with the existing serialized-call requirement.
+C status. Live session Project/query interchange is bounded to 128 MiB; the older immutable
+snapshot proof retains its separate 1 MiB limit. Consumers use the reported
+buffer length, with the existing serialized-call requirement.
 
 Queries never write Project, revisions, saved revision, undo/redo/history,
 prepared-handle generation or the session's mutation error. This includes
@@ -49,7 +50,7 @@ and Transition authoring. Full Project validation shares admission and retains
 zero-area/near-degenerate triangle and loop seam warnings, including message and
 details. The sealed inventory marks the remaining 24 names explicitly pending.
 
-## Temporal evaluation checkpoint
+## Historical temporal evaluation checkpoint
 
 Temporal sampling is shared native math for later Transition/Sequence evaluation:
 step/linear/60-step Bezier, sparse object interpolation and signed shortest-arc
@@ -81,9 +82,9 @@ The Temporal checkpoint raises coverage to 51/72 queries. All eleven typed track
 families, all three interpolation kinds, signed half-turns, sparse weight maps,
 empty channels, events and inclusive regions are sampled. Tick/frame results are
 exact at safe-integer extremes; sampled channels and matrices retain the stated
-platform-math tolerance. Production authority and physical acceptance remain pending.
+platform-math tolerance. At that checkpoint authority cutover was pending; ADR 0012 now supplies it. Physical acceptance remains pending.
 
-## Locale reads
+## Locale reads (historical checkpoint)
 
 The twelve locale-sensitive list/search queries preserve their existing Product
 semantics through ICU 78.3, matching the pinned Node 24 runtime. Windows uses the
@@ -113,7 +114,8 @@ decomposed IDs, disabled bindings, filter coercion, embedded NUL, astral text,
 POSIX/C fallback and numeric-key node enumeration. Every locale group also retains
 the existing buffer, history, pending-edit and mutation-error immutability checks.
 The nine remaining queries evaluate rig/skin/form, Transition, Sequence and
-individual export frames; production authority and physical acceptance remain pending.
+individual export frames. Later checkpoints complete those queries and ADR 0012
+supplies authority cutover; physical acceptance remains pending.
 
 Upstream references: [ICU 78.3](https://github.com/unicode-org/icu/releases/tag/release-78.3),
 [collation](https://unicode-org.github.io/icu/userguide/collation/), and

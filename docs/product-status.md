@@ -48,7 +48,7 @@ Phase 5 flat-image part decomposition remains an experimental/deferred input-sim
 - PSD import/re-import and Cutwork `.flimg` v1/v2 source-art import with document-coordinate placement
 - native WPF production candidate; previous shells retained as compatibility references
 - portable native candidate does not change an existing installed `.fl2d` association
-- typed MCP-ready command/query boundaries with one shared EditorSession authority
+- typed MCP-ready command/query boundaries with one shared C++ NativeSession authority
 
 ### Mesh and Key Art authoring
 

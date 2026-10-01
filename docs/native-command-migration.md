@@ -188,7 +188,7 @@ PSD re-import keeps its current typed Project replacement contract: preserve log
 
 72 JS query handlers: 72 native and 0 pending. See the current
 [Query migration boundary](native-query-migration.md) and sealed native inventory
-for implementation status; JS remains production authority pending cutover.
+for implementation status; the C++ session now serves WPF and MCP, and JS is reference-only.
 
 - `project.get_render_settings`
 - `project.get_summary`
