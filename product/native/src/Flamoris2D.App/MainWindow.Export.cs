@@ -2,7 +2,7 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
-using Flamoris.Flamoris2D.ProductHost;
+using Flamoris.Flamoris2D.Native.Client;
 using Flamoris.Flamoris2D.Rendering;
 using Microsoft.Win32;
 
@@ -19,7 +19,7 @@ public partial class MainWindow
     private string? _exportPanelKey;
     private void ConfigureExportContext()
     {if(_editingContext==EditingContext.Export){AuthoringPanel.Visibility=Visibility.Visible;_=RefreshRigSurfaceAsync();}}
-    private async Task RefreshExportAsync(ProductHostClient client)
+    private async Task RefreshExportAsync(NativeSessionClient client)
     {
         if(_editingContext!=EditingContext.Export||_exportBusy)return;
         var key=$"{client.DocumentToken}/{_renderChoice?.Id}";

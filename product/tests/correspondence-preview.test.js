@@ -257,7 +257,7 @@ test("correspondence controller is DOM-independent and production allowlisted", 
   const [source, rendererSource, allowlist] = await Promise.all([
     readFile(new URL("../src/ui/correspondence-preview-controller.js", import.meta.url), "utf8"),
     readFile(new URL("../src/ui/viewport-renderer.js", import.meta.url), "utf8"),
-    readFile(new URL("../production-files.txt", import.meta.url), "utf8"),
+    readFile(new URL("../legacy-reference-files.txt", import.meta.url), "utf8"),
   ]);
   assert.doesNotMatch(source, /\bdocument\b|\bwindow\b|session\.project/);
   assert.match(source, /mesh_keyform\.move_vertices/);

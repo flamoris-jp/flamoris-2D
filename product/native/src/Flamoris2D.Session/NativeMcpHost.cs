@@ -9,14 +9,15 @@ namespace Flamoris.Flamoris2D.Session;
 public sealed class NativeMcpHost : IMcpHost, IDisposable
 {
     private readonly NativeWorkspace workspace;
+    private readonly string? expectedDocumentToken;
     private readonly CancellationTokenSource lease=new();
     private readonly JsonElement catalog;
     private volatile bool invalidated;
     public HostSnapshot Snapshot {get;private set;}=new("flamoris.2d","0.4.0","","",0,false);
     public event Action? Invalidating;
-    public NativeMcpHost(NativeWorkspace workspace)
+    public NativeMcpHost(NativeWorkspace workspace,string? expectedDocumentToken=null)
     {
-        this.workspace=workspace;
+        this.workspace=workspace;this.expectedDocumentToken=expectedDocumentToken;
         using var stream=typeof(NativeMcpHost).Assembly.GetManifestResourceStream("Flamoris2D.LiveCatalog")!;
         using var json=JsonDocument.Parse(stream);catalog=json.RootElement.Clone();
         workspace.Changed+=WorkspaceChanged;
@@ -29,7 +30,7 @@ public sealed class NativeMcpHost : IMcpHost, IDisposable
     public Task<T> InvokeAsync<T>(Func<T> action,CancellationToken token)=>workspace.InvokeAsync(w=>
     {
         if(invalidated) throw new McpFault(McpErrors.HostUnavailable);
-        var s=w.Snapshot; Snapshot=new("flamoris.2d","0.4.0",s.RuntimeId,s.DocumentToken,s.Revision);
+        var s=w.Snapshot;if(expectedDocumentToken is not null && s.DocumentToken!=expectedDocumentToken)throw new McpFault(McpErrors.HostUnavailable); Snapshot=new("flamoris.2d","0.4.0",s.RuntimeId,s.DocumentToken,s.Revision);
         token.ThrowIfCancellationRequested();return action();
     },token);
     public IEnumerable<HostTool> Tools()
@@ -67,7 +68,7 @@ public sealed class NativeMcpHost : IMcpHost, IDisposable
     public static JsonElement WorkspaceProjection(NativeWorkspace workspace)
     {
         var state=workspace.Snapshot.State;
-        return JsonSerializer.SerializeToElement(new {summary=workspace.Query("project.get_summary"),tree=workspace.Query("scene.get_tree",JsonSerializer.SerializeToElement(new {includeHidden=true})),canUndo=state.UndoDepth>0,canRedo=state.RedoDepth>0,isDirty=state.Dirty!=0,editorRevision=state.CurrentRevision,savedRevision=state.SavedRevision,
+        return JsonSerializer.SerializeToElement(new {summary=workspace.Query("project.get_summary"),tree=workspace.Query("scene.get_tree",JsonSerializer.SerializeToElement(new {includeHidden=true})),canUndo=state.UndoDepth>0,canRedo=state.RedoDepth>0,isDirty=state.Dirty!=0,editorRevision=state.CurrentRevision,savedRevision=state.SavedRevision,lineageId=workspace.LineageId,
             keyArts=workspace.Query("keyart.list"),transitions=workspace.Query("transition.list"),sequences=workspace.Query("sequence.list")});
     }
     private static void Reject()=>throw new McpFault(McpErrors.InvalidRequest);

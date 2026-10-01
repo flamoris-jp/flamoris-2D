@@ -47,6 +47,7 @@ public sealed partial class NativeWorkspace : IAsyncDisposable
     private void AssertLane() {if(invocation.Value!=invocationEpoch) throw new InvalidOperationException("Native session access requires the shared workspace lane.");}
     private NativeSession Session {get {AssertLane();return session??throw new WorkspaceException("document.required");}}
     public JsonElement Project => Parse(Session.ProjectJson());
+    public string LineageId {get {AssertLane();return lineageId;}}
     public JsonElement History => Parse(Session.HistoryJson());
     public IReadOnlyDictionary<string,WorkspaceArtwork> Artwork {get {AssertLane();return artwork;}}
     public JsonElement Query(string name,JsonElement input=default)=>Session.Query(name,input);
@@ -106,8 +107,9 @@ public sealed partial class NativeWorkspace : IAsyncDisposable
     {
         if(status!=NativeStatus.Ok) throw new WorkspaceException(session?.ErrorCode() is {Length:>0} code?code:$"native.{status}");
     }
-    public Task<WorkspaceSnapshot> NewAsync(string name,int width,int height,CancellationToken token=default)=>InvokeAsync(w=>
+    public Task<WorkspaceSnapshot> NewAsync(string name,int width,int height,CancellationToken token=default,string? expectedToken=null,long? expectedRevision=null)=>InvokeAsync(w=>
     {
+        if(w.session is not null && expectedToken is not null)w.AssertCurrent(expectedToken,expectedRevision??w.revision);
         if(string.IsNullOrWhiteSpace(name) || width<=0 || height<=0) throw new WorkspaceException("document.canvas_invalid");
         var source=NativeDocument.SourceProject(JsonSerializer.SerializeToElement(new {kind="blank",source=new {width,height},options=new {projectName=name}}));
         w.Replace(source.GetProperty("project"),EmptyArtwork(),null,false,null,null,token);return w.Snapshot;

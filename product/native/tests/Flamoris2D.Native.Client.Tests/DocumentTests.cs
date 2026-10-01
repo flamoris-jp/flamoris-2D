@@ -1,6 +1,6 @@
 using System.Text;
 using System.Text.Json;
-using Flamoris.Flamoris2D.ProductHost;
+using Flamoris.Flamoris2D.Native.Client;
 
 internal static class DocumentTests
 {
@@ -12,7 +12,7 @@ internal static class DocumentTests
         try
         {
             var path = Path.Combine(directory, "shot.fl2d");
-            await using var client = new ProductHostClient(); await client.StartAsync(hostPath);
+            await using var client = new NativeSessionClient(); await client.StartAsync();
             await client.CreateSessionAsync("保存テスト", 64, 64);
             var root = (await client.GetSceneTreeAsync()).Payload.GetProperty("id").GetString()!;
             await client.RenameNodeAsync(root, "saved state");

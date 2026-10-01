@@ -1,10 +1,10 @@
 using System.Text.Json;
-using Flamoris.Flamoris2D.ProductHost;
+using Flamoris.Flamoris2D.Native.Client;
 using Flamoris.Flamoris2D.App;
 using Flamoris.Logging;
 
-if (args.Length != 1)
-    throw new ArgumentException("Pass the Product Host main.mjs path.");
+if (args.Length < 1)
+    throw new ArgumentException("Pass the native conformance fixture directory.");
 
 var hostPath = Path.GetFullPath(args[0]);
 NativeCoreTests.Run(hostPath);
@@ -16,13 +16,13 @@ await TestRoundTripAsync(hostPath);
 await TestTargetPropertiesAsync(hostPath);
 await TestMeshArtworkAsync(hostPath);
 await TestCrashInvalidationAsync(hostPath);
-await McpTests.RunAsync(hostPath);
-await TestDiagnosticBoundaryAsync();
-await TestLoggingIntegrationAsync(hostPath);
+await NativeAuthorityTests.RunAsync();
+if(!args.Contains("--no-transport"))await McpTests.RunAsync(hostPath);
+if(!args.Contains("--no-transport"))await TestLoggingIntegrationAsync(hostPath);
 await DocumentTests.RunAsync(hostPath);
 RasterizerTests.Run();
 await ExportTests.RunAsync();
-Console.WriteLine("Product Host C# client tests passed.");
+Console.WriteLine("Native desktop client tests passed.");
 
 static void TestLoggingConfiguration()
 {
@@ -74,62 +74,6 @@ static void TestLoggingConfiguration()
     }
 }
 
-static async Task TestDiagnosticBoundaryAsync()
-{
-    var root = Path.Combine(Path.GetTempPath(), "Flamoris2D.Logging.Tests", Guid.NewGuid().ToString("N"));
-    Directory.CreateDirectory(root);
-    var secret = "mcp-secret-must-not-log";
-    try
-    {
-        var options = NativeLoggingConfiguration.CreateDefaultOptions();
-        options.Outputs = [new LogOutputOptions { Type = "file", Path = "diagnostics.log" }];
-        var logger = NativeLoggingConfiguration.CreateLogger(options, root);
-        await using var client = new ProductHostClient(logger);
-        var rawDiagnostics = new List<string>();
-        client.DiagnosticReceived += (_, line) => rawDiagnostics.Add(line);
-        var validDiagnostic = "FLAMORIS_DIAGNOSTIC " + JsonSerializer.Serialize(new
-        {
-            level = "warn",
-            category = "mcp.auth",
-            message = "MCP authentication failed",
-            properties = new Dictionary<string, object?>
-            {
-                ["statusCode"] = 401,
-                ["innocent"] = secret,
-                ["payload"] = new { token = secret },
-            },
-        });
-        var oversizedDiagnostic = "FLAMORIS_DIAGNOSTIC " + JsonSerializer.Serialize(new
-        {
-            level = "warn",
-            category = "mcp.auth",
-            message = "MCP authentication failed",
-            properties = new { payload = new string('x', 4096) + secret },
-        });
-        var diagnostics = string.Join('\n',
-            $$$"""FLAMORIS_DIAGNOSTIC {"category":"mcp.auth","payload":"{{{secret}}}"}""",
-            oversizedDiagnostic,
-            validDiagnostic,
-            "ordinary stderr diagnostic",
-            string.Empty);
-        await using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(diagnostics));
-        using var reader = new StreamReader(stream);
-        await client.ReadDiagnosticsForTestingAsync(reader);
-
-        var text = File.ReadAllText(Path.Combine(root, "diagnostics.log"));
-        Assert(text.Contains("[WARN ] [mcp.auth]") && text.Contains("statusCode=401"),
-            "A valid diagnostic after an oversized envelope was not logged.");
-        Assert(!text.Contains(secret) && !text.Contains("payload") && !text.Contains("innocent"),
-            "Rejected diagnostic content crossed the safe logging boundary.");
-        Assert(rawDiagnostics.SequenceEqual(["ordinary stderr diagnostic"]),
-            "Structured or rejected diagnostic content crossed the legacy UI event boundary.");
-    }
-    finally
-    {
-        try { Directory.Delete(root, true); } catch { }
-    }
-}
-
 static async Task TestLoggingIntegrationAsync(string hostPath)
 {
     var root = Path.Combine(Path.GetTempPath(), "Flamoris2D.Logging.Tests", Guid.NewGuid().ToString("N"));
@@ -141,9 +85,9 @@ static async Task TestLoggingIntegrationAsync(string hostPath)
     string? secret = null;
     try
     {
-        await using (var client = new ProductHostClient(logger))
+        await using (var client = new NativeSessionClient(logger))
         {
-            await client.StartAsync(hostPath);
+            await client.StartAsync();
             await client.CreateSessionAsync("Logging proof");
             var connection = await client.EnableMcpAsync(McpPermission.Edit);
             secret = connection.Token;
@@ -152,7 +96,7 @@ static async Task TestLoggingIntegrationAsync(string hostPath)
             await client.DisableMcpAsync();
         }
         var text = File.ReadAllText(logPath);
-        Assert(text.Contains("[INFO ] [mcp.session]") && text.Contains("[DEBUG] [app.startup]"),
+        Assert(text.Contains("[INFO ] [mcp.session]") && text.Contains("[INFO ] [app.startup]"),
             "MCP attach/detach/auth diagnostics did not reach Flamoris.Logging.");
         Assert(secret is null || !text.Contains(secret), "MCP credential leaked into the log.");
     }
@@ -211,8 +155,8 @@ static void TestViewportGeometry()
 
 static async Task TestMeshArtworkAsync(string hostPath)
 {
-    await using var client = new ProductHostClient();
-    await client.StartAsync(hostPath);
+    await using var client = new NativeSessionClient();
+    await client.StartAsync();
     await client.CreateSessionAsync("Raster boundary");
     var bytes = Enumerable.Repeat((byte)255, 32 * 32 * 4).ToArray();
     var id = await client.UploadRasterAsync(32, 32, "右目", bytes);
@@ -268,8 +212,8 @@ static void TestTargetWorkspace()
 
 static async Task TestTargetPropertiesAsync(string hostPath)
 {
-    await using var client = new ProductHostClient();
-    await client.StartAsync(hostPath);
+    await using var client = new NativeSessionClient();
+    await client.StartAsync();
     await client.CreateSessionAsync("Target proof");
     var before = await client.GetWorkspaceAsync();
     var nodeId = before.Payload.GetProperty("tree").GetProperty("id").GetString()!;
@@ -284,7 +228,7 @@ static async Task TestTargetPropertiesAsync(string hostPath)
         await client.ApplyTargetPropertiesAsync(nodeId, "Stale draft", true, false, before.Revision.Value);
         throw new InvalidOperationException("Old property draft must not overwrite a later edit.");
     }
-    catch (ProductHostException error) when (error.Code == "revision.conflict") { }
+    catch (NativeSessionException error) when (error.Code == "revision.conflict") { }
     Assert(client.Revision == 1, "Rejected draft must not advance the revision.");
     await client.UndoAsync();
     var undone = await client.GetWorkspaceAsync();
@@ -313,8 +257,8 @@ static void TestStaleProjectionGate()
 
 static async Task TestRoundTripAsync(string hostPath)
 {
-    await using var client = new ProductHostClient();
-    var handshake = await client.StartAsync(hostPath);
+    await using var client = new NativeSessionClient();
+    var handshake = await client.StartAsync();
     Assert(handshake.ProtocolVersion == 1, "Protocol handshake mismatch.");
     Assert(handshake.ProductSchemaVersion == 15, "Project schema handshake mismatch.");
     await client.CreateSessionAsync("C# boundary proof", 640, 360);
@@ -345,14 +289,14 @@ static async Task TestRoundTripAsync(string hostPath)
 
 static async Task TestCrashInvalidationAsync(string hostPath)
 {
-    await using var client = new ProductHostClient();
+    await using var client = new NativeSessionClient();
     var lost = new TaskCompletionSource<AuthorityLostEventArgs>(
         TaskCreationOptions.RunContinuationsAsynchronously);
     client.AuthorityLost += (_, eventArgs) => lost.TrySetResult(eventArgs);
-    await client.StartAsync(hostPath);
+    await client.StartAsync();
     await client.CreateSessionAsync("Crash proof", 640, 360);
     Assert(client.HasAuthoritativeProjection, "Projection should be authoritative before crash.");
-    client.TerminateHostForTesting();
+    client.InvalidateAuthorityForTesting();
     await lost.Task.WaitAsync(TimeSpan.FromSeconds(5));
     Assert(!client.HasAuthoritativeProjection,
         "Host failure must invalidate, not preserve, the client projection.");

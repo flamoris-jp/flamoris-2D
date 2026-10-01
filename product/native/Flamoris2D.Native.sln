@@ -1,13 +1,13 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flamoris2D.ProductHost.Client", "src\Flamoris2D.ProductHost.Client\Flamoris2D.ProductHost.Client.csproj", "{3CF7085D-3D75-4B52-B285-9E2C54A8B16C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flamoris2D.Native.Client", "src\Flamoris2D.Native.Client\Flamoris2D.Native.Client.csproj", "{3CF7085D-3D75-4B52-B285-9E2C54A8B16C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flamoris2D.App", "src\Flamoris2D.App\Flamoris2D.App.csproj", "{7D63CE05-0AF5-4FC9-A86E-B8EF0EE86B23}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flamoris2D.ProductHost.Client.Tests", "tests\Flamoris2D.ProductHost.Client.Tests\Flamoris2D.ProductHost.Client.Tests.csproj", "{BCC6326C-CF31-490B-B98C-FEF2236B2C6F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flamoris2D.Native.Client.Tests", "tests\Flamoris2D.Native.Client.Tests\Flamoris2D.Native.Client.Tests.csproj", "{BCC6326C-CF31-490B-B98C-FEF2236B2C6F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flamoris2D.Bridge", "src\Flamoris2D.Bridge\Flamoris2D.Bridge.csproj", "{482E9B66-73FD-4540-ACF4-3321C60D2490}"
 EndProject

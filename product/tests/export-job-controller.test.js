@@ -165,7 +165,7 @@ test("export job controller is DOM-independent and packaged as production core",
   assert.doesNotMatch(source, /\bdocument\b|\bwindow\b|HTMLElement|EditorSession/);
 
   const productionFiles = await readFile(
-    new URL("../production-files.txt", import.meta.url),
+    new URL("../legacy-reference-files.txt", import.meta.url),
     "utf8",
   );
   assert.match(productionFiles, /^src\/core\/export-job-controller\.js$/m);

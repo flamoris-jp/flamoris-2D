@@ -2,7 +2,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using Flamoris.Flamoris2D.ProductHost;
+using Flamoris.Flamoris2D.Native.Client;
 namespace Flamoris.Flamoris2D.App;
 public partial class MainWindow
 {
@@ -37,7 +37,7 @@ public partial class MainWindow
         catch(Exception error){StatusText.Text=$"編集できませんでした: {error.Message}";}
         finally{SetMeshBusy(false);}
     }
-    private async Task RefreshKeyStateAsync(ProductHostClient client)
+    private async Task RefreshKeyStateAsync(NativeSessionClient client)
     {
         var active=_editingContext is EditingContext.Source or EditingContext.Mesh or EditingContext.Deform;
         KeyStatePanel.Visibility=active?Visibility.Visible:Visibility.Collapsed;if(!active)return;

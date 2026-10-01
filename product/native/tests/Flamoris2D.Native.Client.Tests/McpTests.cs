@@ -1,6 +1,6 @@
 using System.IO.Pipes;
 using System.Text.Json;
-using Flamoris.Flamoris2D.ProductHost;
+using Flamoris.Flamoris2D.Native.Client;
 using ModelContextProtocol.Client;
 
 internal static class McpTests
@@ -29,8 +29,8 @@ internal static class McpTests
     }
     internal static async Task RunAsync(string hostPath)
     {
-        await using var host = new ProductHostClient();
-        await host.StartAsync(hostPath);
+        await using var host = new NativeSessionClient();
+        await host.StartAsync();
         await host.CreateSessionAsync("Core integration");
         var root = (await host.GetSceneTreeAsync()).Payload.GetProperty("id").GetString()!;
         var connection = await host.EnableMcpAsync(McpPermission.Edit);
@@ -50,7 +50,7 @@ internal static class McpTests
             Check((await host.GetSceneTreeAsync()).Payload.GetProperty("displayName").GetString() == "MCP", "WPF missed MCP edit.");
             var conflict = await probe.CallToolAsync("command.scene.rename_node", Arguments(context, new { payload = new { nodeId = root, displayName = "stale" } }));
             Check(conflict.IsError == true, "Stale revision accepted.");
-            await host.UndoAsync(); await host.GetWorkspaceAsync();
+            await host.GetWorkspaceAsync(); await host.UndoAsync(); await host.GetWorkspaceAsync();
             context = await Context(probe);
             Check((await probe.CallToolAsync("live.redo", Arguments(context, new { }))).IsError != true, "Shared redo failed.");
             await host.GetWorkspaceAsync();
@@ -75,7 +75,7 @@ internal static class McpTests
             await Context(probe);
             var lost = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             host.AuthorityLost += (_, _) => lost.TrySetResult();
-            host.BreakControlChannelForTesting();
+            host.InvalidateAuthorityForTesting();
             await lost.Task.WaitAsync(TimeSpan.FromSeconds(8));
             Check(!host.IsRunning && host.DocumentToken is null && host.McpStatus?.Enabled != true, "Control loss left an MCP-only editor.");
         }

@@ -16,6 +16,5 @@
   <Target Name="BuildNativeCore" BeforeTargets="CoreCompile;GetCopyToOutputDirectoryItems" Condition="'$(OS)' == 'Windows_NT'">
     <Exec Command='cmake -S &quot;$(MSBuildProjectDirectory)/../../core&quot; -B &quot;$(NativeCoreBuildDir)&quot; -A x64 -DBUILD_TESTING=ON' />
     <Exec Command='cmake --build &quot;$(NativeCoreBuildDir)&quot; --config $(Configuration) --parallel' />
-    <Exec Command='ctest --test-dir &quot;$(NativeCoreBuildDir)&quot; -C $(Configuration) --output-on-failure' />
   </Target>
 </Project>

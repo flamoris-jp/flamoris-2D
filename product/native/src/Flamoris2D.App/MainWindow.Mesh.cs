@@ -7,7 +7,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
-using Flamoris.Flamoris2D.ProductHost;
+using Flamoris.Flamoris2D.Native.Client;
 
 namespace Flamoris.Flamoris2D.App;
 
@@ -99,7 +99,7 @@ public partial class MainWindow
         }
     }
 
-    private async Task RefreshMeshAsync(ProductHostClient client)
+    private async Task RefreshMeshAsync(NativeSessionClient client)
     {
         if (!_meshReady || !client.HasAuthoritativeProjection) return;
         var token = client.DocumentToken!;

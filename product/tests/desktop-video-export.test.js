@@ -286,7 +286,7 @@ test("Desktop MP4 export adapter is packaged and contains no direct filesystem/p
   assert.doesNotMatch(source, /node:fs|node:child_process|\bspawn\s*\(/);
 
   const productionFiles = await readFile(
-    new URL("../production-files.txt", import.meta.url),
+    new URL("../legacy-reference-files.txt", import.meta.url),
     "utf8",
   );
   assert.match(productionFiles, /^src\/ui\/desktop-video-export\.js$/m);

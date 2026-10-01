@@ -4,7 +4,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using Flamoris.Flamoris2D.ProductHost;
+using Flamoris.Flamoris2D.Native.Client;
 
 namespace Flamoris.Flamoris2D.App;
 
@@ -76,7 +76,7 @@ public sealed partial class MeshViewport : FrameworkElement
         ClipToBounds = true;
         LostMouseCapture += (_, _) => Cancel();
     }
-    public void Apply(ProductHostResponse response, IReadOnlyList<ArtworkProjection> artwork, string? nodeId)
+    public void Apply(NativeSessionResponse response, IReadOnlyList<ArtworkProjection> artwork, string? nodeId)
     {
         if (DocumentToken == response.DocumentToken && response.Revision < Revision)
             throw new StaleProjectionException(response.Revision ?? -1, Revision);

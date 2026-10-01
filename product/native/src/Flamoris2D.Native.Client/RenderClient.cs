@@ -1,11 +1,11 @@
-namespace Flamoris.Flamoris2D.ProductHost;
+namespace Flamoris.Flamoris2D.Native.Client;
 
 public sealed record LayoutRenderPreview(string KeyformId, double[] Positions);
 public sealed record RigRenderPreview(RigContext Context,RigEdit Edit);
 
-public sealed partial class ProductHostClient
+public sealed partial class NativeSessionClient
 {
-    public Task<ProductHostResponse> ProjectRenderAsync(string? keyArtId = null, string? transitionId = null,
+    public Task<NativeSessionResponse> ProjectRenderAsync(string? keyArtId = null, string? transitionId = null,
         string? sequenceId = null, long timeTicks = 0, CancellationToken cancellationToken = default,
         LayoutRenderPreview? layoutPreview = null, long? expectedRevision = null, PlaybackSample? playback = null, RigRenderPreview? rigPreview = null) =>
         SendAsync("render.project", new { keyArtId, transitionId, sequenceId, timeTicks,

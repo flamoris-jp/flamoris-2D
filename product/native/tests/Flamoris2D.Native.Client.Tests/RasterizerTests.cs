@@ -40,6 +40,7 @@ internal static class RasterizerTests
             try { EvaluatedRasterizer.Render(Projection(4),textures,4,4,cancellation.Token); throw new InvalidOperationException("Cancellation ignored."); }
             catch(OperationCanceledException) { }
         }
+        if(!OperatingSystem.IsWindows())return;
         using var direct = new Direct3DRenderer(software:true);
         foreach(var projection in new[]{Projection(4,.5),Projection(4,1,true),Projection(4,1,false,true)})
         {

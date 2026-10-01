@@ -2,7 +2,7 @@ using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text.Json;
 
-namespace Flamoris.Flamoris2D.ProductHost;
+namespace Flamoris.Flamoris2D.Native.Client;
 
 public sealed record RecoveryMetadata(int Version, DocumentIdentity Identity, long ByteLength, string? SourcePath);
 public sealed record RecoveryEntry(string Path, RecoveryMetadata? Metadata, string? Error)
@@ -55,7 +55,7 @@ public sealed class NativeRecoveryStore(string directory, long maximumBytes = 10
             !Guid.TryParse(m.Identity.SnapshotId, out _) || string.IsNullOrWhiteSpace(m.Identity.DocumentToken) ||
             m.Identity.Revision < 0 || m.Identity.EditorRevision < 0 ||
             !DateTimeOffset.TryParse(m.Identity.Timestamp, out _) || m.ByteLength <= 0 ||
-            m.ByteLength > ProductHostClient.MaximumDocumentBytes || stream.Length != 4L + length + m.ByteLength + 32)
+            m.ByteLength > NativeSessionClient.MaximumDocumentBytes || stream.Length != 4L + length + m.ByteLength + 32)
             throw new InvalidDataException("Unsupported or incomplete Recovery snapshot.");
         return m;
     }

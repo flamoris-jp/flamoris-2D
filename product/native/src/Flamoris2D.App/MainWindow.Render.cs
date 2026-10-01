@@ -4,7 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using Flamoris.Flamoris2D.ProductHost;
+using Flamoris.Flamoris2D.Native.Client;
 using Flamoris.Flamoris2D.Rendering;
 
 namespace Flamoris.Flamoris2D.App;
@@ -96,7 +96,7 @@ public partial class MainWindow
         _pendingLayoutPreview = null; _pendingRigPreview=null; _renderTextures.Clear(); _lastRenderKey = null; _renderChoice = null;
         MeshCanvas.ClearEvaluatedFrame();
     }
-    private async Task RefreshEvaluatedFrameAsync(ProductHostClient client, LayoutRenderPreview? preview = null, RigRenderPreview? rigPreview = null)
+    private async Task RefreshEvaluatedFrameAsync(NativeSessionClient client, LayoutRenderPreview? preview = null, RigRenderPreview? rigPreview = null)
     {
         if (_renderChoice is not { } choice || !client.HasAuthoritativeProjection) { MeshCanvas.ClearEvaluatedFrame(); return; }
         if ((preview is not null || rigPreview is not null) && choice.Kind != "keyArt") return;

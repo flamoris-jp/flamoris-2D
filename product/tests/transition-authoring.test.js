@@ -369,7 +369,7 @@ test("authoring view consumes query projections without reading Project directly
 
 test("Transition authoring runtime modules remain in the production allowlist", async () => {
   const allowlist = await readFile(
-    new URL("../production-files.txt", import.meta.url),
+    new URL("../legacy-reference-files.txt", import.meta.url),
     "utf8",
   );
   assert.match(allowlist, /^src\/ui\/transition-authoring-controller\.js$/m);

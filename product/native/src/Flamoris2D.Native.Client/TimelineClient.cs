@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace Flamoris.Flamoris2D.ProductHost;
+namespace Flamoris.Flamoris2D.Native.Client;
 
 public sealed record TimelineContext(string? SequenceId = null,string? ClipId = null,string? TrackId = null,
     string? Channel = null,string? KeyframeId = null,string? TrackKind = null,long TimeTicks = 0,string? TransitionId = null)
@@ -54,10 +54,10 @@ public sealed class TimelineEdit
     public static TimelineEdit InterpolateKey(string trackId,string channel,string keyframeId,string kind,double x1=0,double y1=0,double x2=1,double y2=1)=>new("key.interpolation",new {trackId,channel,keyframeId,kind,controls=new {x1,y1,x2,y2}});
 }
 public sealed record PlaybackSample(long StartTicks,double ElapsedMilliseconds,bool Loop);
-public sealed partial class ProductHostClient
+public sealed partial class NativeSessionClient
 {
-    public Task<ProductHostResponse> GetTimelineAsync(TimelineContext context,CancellationToken cancellationToken=default)=>
+    public Task<NativeSessionResponse> GetTimelineAsync(TimelineContext context,CancellationToken cancellationToken=default)=>
         SendAsync("timeline.projection",context.Wire,false,true,cancellationToken);
-    public Task<ProductHostResponse> EditTimelineAsync(TimelineContext context,TimelineEdit edit,long revision,CancellationToken cancellationToken=default)=>
+    public Task<NativeSessionResponse> EditTimelineAsync(TimelineContext context,TimelineEdit edit,long revision,CancellationToken cancellationToken=default)=>
         SendAsync("timeline.tool",new {context=context.Wire,tool=edit.Tool,input=edit.Input},true,true,cancellationToken,revision);
 }

@@ -4,13 +4,13 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AssemblyName>Flamoris2D.ProductHost.Client.Tests</AssemblyName>
+    <AssemblyName>Flamoris2D.Native.Client.Tests</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\src\Flamoris2D.App\TargetWorkspace.cs" Link="TargetWorkspace.cs" />
     <Compile Include="..\..\src\Flamoris2D.App\ViewportGeometry.cs" Link="ViewportGeometry.cs" />
     <ProjectReference Include="..\..\src\Flamoris2D.Rendering\Flamoris2D.Rendering.csproj" />
     <ProjectReference Include="..\..\src\Flamoris2D.Core.Interop\Flamoris2D.Core.Interop.csproj" />
-    <ProjectReference Include="..\..\src\Flamoris2D.ProductHost.Client\Flamoris2D.ProductHost.Client.csproj" />
+    <ProjectReference Include="..\..\src\Flamoris2D.Native.Client\Flamoris2D.Native.Client.csproj" />
   </ItemGroup>
 </Project>

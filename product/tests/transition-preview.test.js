@@ -503,7 +503,7 @@ test("actual renderer path uses evaluator opacity, appearance and composite weig
 
 test("diagnostics runtime modules are packaged and keep the Query/controller boundary", async () => {
   const [allowlist, projection, controller, view] = await Promise.all([
-    readFile(new URL("../production-files.txt", import.meta.url), "utf8"),
+    readFile(new URL("../legacy-reference-files.txt", import.meta.url), "utf8"),
     readFile(new URL("../src/ui/transition-diagnostics-projection.js", import.meta.url), "utf8"),
     readFile(new URL("../src/ui/transition-diagnostics-controller.js", import.meta.url), "utf8"),
     readFile(new URL("../src/ui/transition-diagnostics-view.js", import.meta.url), "utf8"),

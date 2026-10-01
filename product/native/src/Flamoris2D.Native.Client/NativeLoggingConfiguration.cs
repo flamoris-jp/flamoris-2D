@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Flamoris.Logging;
 
-namespace Flamoris.Flamoris2D.ProductHost;
+namespace Flamoris.Flamoris2D.Native.Client;
 
 public static class NativeLoggingConfiguration
 {

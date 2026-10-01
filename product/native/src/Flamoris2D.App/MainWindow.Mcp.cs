@@ -1,5 +1,5 @@
 using System.IO;
-using Flamoris.Flamoris2D.ProductHost;
+using Flamoris.Flamoris2D.Native.Client;
 using Flamoris.Mcp.Wpf;
 using CorePermission = Flamoris.Mcp.Core.McpPermission;
 
@@ -36,7 +36,7 @@ public partial class MainWindow
         _mcpUi?.Invalidate();
         _mcpUi?.Refresh();
     }
-    private Task RefreshMcpStatusAsync(ProductHostClient client)
+    private Task RefreshMcpStatusAsync(NativeSessionClient client)
     {
         if (ReferenceEquals(client, _client)) { _mcpUi?.Refresh(); _mcpUi?.NotifyHostReady(); }
         return Task.CompletedTask;

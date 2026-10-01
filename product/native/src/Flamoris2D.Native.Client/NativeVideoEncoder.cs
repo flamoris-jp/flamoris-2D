@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 
-namespace Flamoris.Flamoris2D.ProductHost;
+namespace Flamoris.Flamoris2D.Native.Client;
 
 public sealed record EncoderResult(int ExitCode,string StandardOutput,string StandardError);
 
@@ -25,7 +25,7 @@ public static class NativeVideoEncoder
         await process.WaitForExitAsync(CancellationToken.None);var result=new EncoderResult(process.ExitCode,await stdout,await stderr);
         cancellationToken.ThrowIfCancellationRequested();return result;
     }
-    public static async Task ProbeAsync(ProductHostClient client,string executable,CancellationToken cancellationToken)
+    public static async Task ProbeAsync(NativeSessionClient client,string executable,CancellationToken cancellationToken)
     {
         using var timeout=CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);timeout.CancelAfter(TimeSpan.FromSeconds(20));
         var values=new List<string>();

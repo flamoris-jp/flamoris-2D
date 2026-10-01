@@ -1,4 +1,4 @@
-namespace Flamoris.Flamoris2D.ProductHost;
+namespace Flamoris.Flamoris2D.Native.Client;
 
 public sealed record RigContext(string? NodeId = null, string? KeyArtId = null, string? BoneId = null,
     string? DeformerId = null, string? BindingId = null, string? KeyformId = null)
@@ -55,10 +55,10 @@ public sealed class RigEdit
     public static RigEdit FormMove(string[] vertexIds,double x,double y) => new("form.move",new {vertexIds,x,y});
     public static RigEdit ResetForm() => new("form.reset",new {});
 }
-public sealed partial class ProductHostClient
+public sealed partial class NativeSessionClient
 {
-    public Task<ProductHostResponse> GetRigAsync(RigContext context,CancellationToken cancellationToken=default) =>
+    public Task<NativeSessionResponse> GetRigAsync(RigContext context,CancellationToken cancellationToken=default) =>
         SendAsync("rig.projection",context.Wire,false,true,cancellationToken);
-    public Task<ProductHostResponse> EditRigAsync(RigContext context,RigEdit edit,long revision,CancellationToken cancellationToken=default) =>
+    public Task<NativeSessionResponse> EditRigAsync(RigContext context,RigEdit edit,long revision,CancellationToken cancellationToken=default) =>
         SendAsync("rig.tool",new {context=context.Wire,tool=edit.Tool,input=edit.Input},true,true,cancellationToken,revision);
 }

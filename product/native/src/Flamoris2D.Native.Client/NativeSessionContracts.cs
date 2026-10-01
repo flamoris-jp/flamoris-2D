@@ -1,14 +1,14 @@
 using System.Text.Json;
 
-namespace Flamoris.Flamoris2D.ProductHost;
+namespace Flamoris.Flamoris2D.Native.Client;
 
-public sealed record ProductHostHandshake(
+public sealed record NativeSessionHandshake(
     int ProtocolVersion,
     int ProductSchemaVersion,
     int McpSchemaVersion,
     string RuntimeVersion);
 
-public sealed record ProductHostResponse(
+public sealed record NativeSessionResponse(
     string RequestId,
     string? DocumentToken,
     long? Revision,
@@ -21,9 +21,9 @@ public sealed record DocumentChangedEventArgs(
 
 public sealed record AuthorityLostEventArgs(string Reason, Exception? Error);
 
-public sealed class ProductHostException : Exception
+public sealed class NativeSessionException : Exception
 {
-    public ProductHostException(string message, string code, JsonElement details, bool retryable)
+    public NativeSessionException(string message, string code, JsonElement details, bool retryable)
         : base(message)
     {
         Code = code;

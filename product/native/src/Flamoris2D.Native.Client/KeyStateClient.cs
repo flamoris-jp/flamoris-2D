@@ -1,5 +1,5 @@
 using System.Text.Json;
-namespace Flamoris.Flamoris2D.ProductHost;
+namespace Flamoris.Flamoris2D.Native.Client;
 public sealed record KeyStateContext(string? KeyArtId=null,string? TransitionId=null,string? SemanticSlotId=null,string? NodeId=null)
 {internal object Wire=>new {keyArtId=KeyArtId,transitionId=TransitionId,semanticSlotId=SemanticSlotId,nodeId=NodeId};}
 public sealed record CorrespondencePin(string VertexId,double X,double Y)
@@ -41,10 +41,10 @@ public sealed class KeyStateEdit
     public static KeyStateEdit RemoveSample(string sampleId)=>new("sample.remove",new {sampleId});
     public static KeyStateEdit RemoveMeshTarget(string meshId)=>new("sample.removeTarget",new {meshId});
 }
-public sealed partial class ProductHostClient
+public sealed partial class NativeSessionClient
 {
-    public Task<ProductHostResponse> GetKeyStateAsync(KeyStateContext context)=>SendAsync("keyState.projection",context.Wire,false,true,CancellationToken.None);
-    public Task<ProductHostResponse> EditKeyStateAsync(KeyStateContext context,KeyStateEdit edit,long revision)=>SendAsync("keyState.tool",new {context=context.Wire,tool=edit.Tool,input=edit.Input},true,true,CancellationToken.None,revision);
-    public Task<ProductHostResponse> SolveCorrespondenceAsync(KeyStateContext context,CorrespondencePin[] pins,string preset,bool reverse,long revision)=>
+    public Task<NativeSessionResponse> GetKeyStateAsync(KeyStateContext context)=>SendAsync("keyState.projection",context.Wire,false,true,CancellationToken.None);
+    public Task<NativeSessionResponse> EditKeyStateAsync(KeyStateContext context,KeyStateEdit edit,long revision)=>SendAsync("keyState.tool",new {context=context.Wire,tool=edit.Tool,input=edit.Input},true,true,CancellationToken.None,revision);
+    public Task<NativeSessionResponse> SolveCorrespondenceAsync(KeyStateContext context,CorrespondencePin[] pins,string preset,bool reverse,long revision)=>
         SendAsync("keyState.correspondence",new {context=context.Wire,input=new {pins=pins.Select(p=>p.Wire),preset,reverse}},true,true,CancellationToken.None,revision);
 }

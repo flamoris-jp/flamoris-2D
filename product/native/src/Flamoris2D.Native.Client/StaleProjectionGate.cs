@@ -1,4 +1,4 @@
-namespace Flamoris.Flamoris2D.ProductHost;
+namespace Flamoris.Flamoris2D.Native.Client;
 
 public sealed class StaleProjectionGate
 {

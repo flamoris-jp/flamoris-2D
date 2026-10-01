@@ -6,7 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
-using Flamoris.Flamoris2D.ProductHost;
+using Flamoris.Flamoris2D.Native.Client;
 using Flamoris.Logging;
 
 namespace Flamoris.Flamoris2D.App;
@@ -18,7 +18,7 @@ public partial class MainWindow : Window, IAsyncDisposable
     private readonly bool _autoConnect;
     private readonly FlamorisLogger _logger;
     private readonly LoggingOptions _loggingOptions;
-    private ProductHostClient? _client;
+    private NativeSessionClient? _client;
     private EditingContext _editingContext = EditingContext.Source;
     private bool _closingAfterShutdown;
     private bool _disposed;
@@ -65,22 +65,16 @@ public partial class MainWindow : Window, IAsyncDisposable
         SetBusy("編集エンジンを起動しています…");
         RecoveryBanner.Visibility = Visibility.Collapsed;
         if (_client is not null) await _client.DisposeAsync();
-        _client = new ProductHostClient(_logger);
+        _client = new NativeSessionClient(_logger);
         _client.AuthorityLost += Client_AuthorityLost;
         _client.DocumentChanged += Client_DocumentChanged;
         _client.McpStatusChanged += Client_McpStatusChanged;
-        _client.DiagnosticReceived += (_, message) =>
-            Dispatcher.InvokeAsync(() => StatusText.Text = message);
         try
         {
-            var hostPath = Path.Combine(AppContext.BaseDirectory, "ProductHost", "main.mjs");
-            var nodePath = Environment.GetEnvironmentVariable("FLAMORIS_NODE_PATH");
-            var bundledNode = Path.Combine(AppContext.BaseDirectory,"runtime","node.exe");
-            if(string.IsNullOrWhiteSpace(nodePath)&&File.Exists(bundledNode))nodePath=bundledNode;
-            var handshake = await _client.StartAsync(hostPath, nodePath);
+            var handshake = await _client.StartAsync();
             HostStatusIndicator.Fill = Brushes.SeaGreen;
             HostStatusText.Text = "接続済み";
-            HostStatusText.ToolTip = $"Product Host · protocol {handshake.ProtocolVersion} · schema {handshake.ProductSchemaVersion}";
+            HostStatusText.ToolTip = $"NativeSession · ABI {handshake.ProtocolVersion} · schema {handshake.ProductSchemaVersion}";
             if (createDocument)
             {
                 await _client.CreateSessionAsync("名称未設定", 1920, 1080);
@@ -92,8 +86,8 @@ public partial class MainWindow : Window, IAsyncDisposable
         }
         catch (Exception error)
         {
-            _logger.Error("app.startup", "Product Host startup failed", error);
-            ShowAuthorityLost($"Product Hostを起動できませんでした: {error.Message}");
+            _logger.Error("app.startup", "Native authority startup failed", error);
+            ShowAuthorityLost($"Native authorityを起動できませんでした: {error.Message}");
         }
     }
 
@@ -146,7 +140,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         {
             StatusText.Text = "古いQuery応答を破棄しました。最新revisionを再取得します。";
         }
-        catch (ProductHostException error) when (error.Code == "revision.conflict")
+        catch (NativeSessionException error) when (error.Code == "revision.conflict")
         {
             StatusText.Text = "revision競合を検出しました。authoritative projectionを再取得してください。";
         }
@@ -413,7 +407,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         await MutateTargetAsync(() => _client.SetTargetLockedAsync(target.Id, !target.Locked, revision));
     }
 
-    private async Task MutateTargetAsync(Func<Task<ProductHostResponse>> mutate)
+    private async Task MutateTargetAsync(Func<Task<NativeSessionResponse>> mutate)
     {
         if (_targetMutationPending || _meshBusy || _client?.HasAuthoritativeProjection != true) return;
         _targetMutationPending = true;
@@ -426,7 +420,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             MeshCanvas.Focus();
             StatusText.Text = "対象の変更を確定しました。選択対象は維持しています。";
         }
-        catch (ProductHostException error) when (error.Code == "revision.conflict")
+        catch (NativeSessionException error) when (error.Code == "revision.conflict")
         {
             MeshCanvas.Focus();
             await RefreshProjectionAsync();

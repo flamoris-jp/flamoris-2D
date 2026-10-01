@@ -1,4 +1,4 @@
-namespace Flamoris.Flamoris2D.ProductHost;
+namespace Flamoris.Flamoris2D.Native.Client;
 
 // OS storage adapter only. The bytes are produced/validated by Product Host.
 public static class AtomicDocumentFile
