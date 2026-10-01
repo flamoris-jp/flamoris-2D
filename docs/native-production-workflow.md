@@ -187,3 +187,16 @@ PSD更新は「PSDを再取込・照合…」で差分と対応を確認して�
 MCPの編集許可に保存・素材取込・ファイル操作は含まれません。
 接続キーを引数、設定、ログ、Project、profileへ保存しないでください。
 リモート/LAN、ブラウザー、クラウド直結、tunnel-client自動管理は今回の対象外です。
+
+## 配布候補の作成
+
+WindowsでPowerShell 7、.NET 10 SDK、Git、CMake、Visual Studio C++ Build Toolsを用意し、リポジトリルートで実行します。
+
+```powershell
+git pull --ff-only
+./product/packaging/publish-windows.ps1
+```
+
+`artifacts/windows/FLAMORIS-2D-win-x64/`、同名のZIPとinventoryを生成します。
+ZIPが通常の配布候補です。`SHA256SUMS.txt`、ライセンス・notices、MCP bridgeを同梱します。
+詳細は[共通Windows配布契約](windows-packaging.md)を参照してください。
