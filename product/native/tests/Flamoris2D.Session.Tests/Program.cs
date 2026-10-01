@@ -44,6 +44,16 @@ foreach(string path in args)
         if(meshed.GetProperty("state").GetProperty("topology").GetProperty("vertexIds").GetArrayLength()!=9)throw new Exception("Native Mesh compiler failed.");
         await workspace.InvokeAsync(w=>w.Undo());if(await workspace.InvokeAsync(w=>w.Project.GetRawText())!=unmeshed)throw new Exception("Native Mesh Undo failed.");await workspace.InvokeAsync(w=>w.Redo());
         if((await workspace.InvokeAsync(w=>w.Render(keyArtId:w.Project.GetProperty("keyArts")[0].GetProperty("id").GetString()))).GetProperty("plan").GetProperty("renderInstanceCount").GetInt32()==0)throw new Exception("Meshed native source cannot render.");
+        string artId=await workspace.InvokeAsync(w=>w.Project.GetProperty("keyArts")[0].GetProperty("id").GetString()!);
+        await workspace.InvokeAsync(w=>w.ExecutePlan(w.CompileRig(Json(new {nodeId=editable,keyArtId=artId}),"bone.create",Json(new {displayName="native Bone",length=2}))));
+        string boneId=await workspace.InvokeAsync(w=>w.Query("bone.list")[0].GetProperty("id").GetString()!);
+        var rigContext=Json(new {nodeId=editable,keyArtId=artId,boneId});
+        await workspace.InvokeAsync(w=>w.ExecutePlan(w.CompileRig(rigContext,"bone.pose",Json(new {x=0,y=0,rotation=.2}))));
+        string posed=await workspace.InvokeAsync(w=>w.Project.GetRawText());
+        var rigPreview=await workspace.InvokeAsync(w=>w.CompileRig(rigContext,"bone.pose",Json(new {x=0,y=0,rotation=.5})));
+        var projected=await workspace.InvokeAsync(w=>w.QueryPreview(rigPreview.GetProperty("commands"),"native.rig_state",rigContext));
+        if(projected.GetProperty("bone").GetProperty("keyform").GetProperty("localDelta").GetProperty("rotation").GetDouble()!=.5 || await workspace.InvokeAsync(w=>w.Project.GetRawText())!=posed)throw new Exception("Rig preview changed native authority.");
+        await workspace.InvokeAsync(w=>w.Undo());await workspace.InvokeAsync(w=>w.Redo());if(await workspace.InvokeAsync(w=>w.Project.GetRawText())!=posed)throw new Exception("Rig Undo/Redo differed.");
         var receipt=await workspace.InvokeAsync(w=>w.PrepareSave("copy"));var before=await workspace.InvokeAsync(w=>w.Artwork.Values.OrderBy(a=>a.NodeId).Select(a=>Convert.ToBase64String(a.Rgba.Span)).ToArray());
         await workspace.OpenAsync(receipt.Bytes.ToArray());var after=await workspace.InvokeAsync(w=>w.Artwork.Values.OrderBy(a=>a.NodeId).Select(a=>Convert.ToBase64String(a.Rgba.Span)).ToArray());if(!before.SequenceEqual(after))throw new Exception("Source artwork save/reopen mismatch.");
         root=await workspace.InvokeAsync(w=>w.Project.GetProperty("scene").GetProperty("rootId").GetString()!);

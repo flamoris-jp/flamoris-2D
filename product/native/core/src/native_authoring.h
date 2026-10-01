@@ -58,6 +58,8 @@ struct Ids {
     return Value(s.str());
   }
 };
+Value rig_state(const Value &project, const Value &context);
+Value rig_tool(const Value &project, const Value &input);
 Value mesh_state(const Value &project, const Value &input, bool strict = false);
 Value mesh_tool(const Value &project, const Value &input);
 } // namespace fl2d_authoring

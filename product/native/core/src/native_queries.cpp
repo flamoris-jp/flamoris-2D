@@ -493,6 +493,8 @@ Value dispatch(const Value& p, Query id, const Value& input) {
 }
 Value query(const Value& project, const std::string& name, const Value& input) {
     try {
+        if(name=="native.rig_state")return Value(Object{{"value",fl2d_authoring::rig_state(project,input)}});
+        if(name=="native.rig_tool")return Value(Object{{"value",fl2d_authoring::rig_tool(project,input)}});
         if(name=="native.mesh_state")return Value(Object{{"value",fl2d_authoring::mesh_state(project,input)}});
     if(name=="native.mesh_tool")return Value(Object{{"value",fl2d_authoring::mesh_tool(project,input)}});
     if(name=="native.render_plan")return Value(Object{{"value",fl2d_render::plan(field(input,"frame"),field(input,"artwork"))}});
