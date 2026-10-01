@@ -18,9 +18,7 @@ inspection, never an independently editable C# Project.
 
 ## Implementation and evidence
 
-Paths below are relative to `product/native/`. JS conformance generators and
-fixtures under `tests/` remain a development-only oracle; production does not
-load JS, fixture files, Node, Product Host or Electron.
+Paths below are relative to `product/native/`. Native C++/managed tests and retained JSON fixtures are the regression authority. The retired JavaScript/Product Host/Electron implementation is no longer present.
 
 | Capability | Production owner | Regression evidence |
 | --- | --- | --- |
@@ -54,9 +52,7 @@ playback, paths/dialogs, manual external MCP and PNG/MP4 visual output. Installe
 signing, update/uninstall and default association remain a separate release decision.
 The portable application does not modify an existing installed association.
 
-Legacy JS/Electron/Host code remains available for compatibility/reference only
-until the relevant parity and Windows evidence permits deletion. It receives no
-new production responsibilities and is never a native runtime fallback.
+The legacy JavaScript/Electron/Product Host implementation was removed after the native application built and launched successfully on physical Windows. Regressions are fixed directly in the native product.
 
 See [renovation map](repository-renovation.md), [ADR 0012](decisions/0012-native-session-cutover.md),
 [production guide](native-production-workflow.md) and
