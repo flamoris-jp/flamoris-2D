@@ -2,8 +2,8 @@
 
 The portable candidate contains a self-contained .NET 10 Windows desktop runtime,
 the C++ editing/evaluation core and Direct3D11 compositor. JavaScript, Electron,
-Node, Product Host and npm decoder dependencies are excluded from the application
-and bridge publish inputs. The retained JS oracle is test-only.
+Node, Product Host and npm decoder dependencies are not part of the current product
+or repository runtime/tooling graph.
 
 - FFmpeg N-126947-g45f3fecca9, Windows x64 LGPL shared distribution:
   https://github.com/BtbN/FFmpeg-Builds/releases/tag/autobuild-2026-09-28-13-06 .
