@@ -401,7 +401,7 @@ static_assert(sizeof(fl2d_status) == sizeof(int32_t), "ABI status must be 32-bit
 
 int main() {
     int32_t major = 0, minor = -1;
-    assert(fl2d_abi_version(&major, &minor) == FL2D_OK && major == 1 && minor == 4);
+    assert(fl2d_abi_version(&major, &minor) == FL2D_OK && major == 1 && minor == 5);
     assert(fl2d_abi_version(nullptr, &minor) == FL2D_INVALID_ARGUMENT);
     fl2d_engine* engine = nullptr;
     assert(fl2d_engine_create(&engine) == FL2D_OK && engine);

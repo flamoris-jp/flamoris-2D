@@ -114,6 +114,18 @@ FL2D_API fl2d_status FL2D_CALL fl2d_session_error(const fl2d_session* session, c
 FL2D_API fl2d_status FL2D_CALL fl2d_session_query_json(const fl2d_session* session,
     const uint8_t* request, uint32_t length, char* buffer, uint32_t capacity, uint32_t* required);
 
+/* ABI 1.5: format-v1 persistence. Inputs and envelope outputs are bounded at
+ * 128 MiB; the embedded Project still uses the existing snapshot limit.
+ * Parsing returns {value:{project,metadata,renderAssets}} or {error:{code,details}}.
+ * Serialization reads this session only and accepts {now,createdAt,modifiedAt,renderAssets}.
+ * now is supplied by the storage adapter, never read from a hidden native clock.
+ * Both sizing and copy calls are readonly and must run on the session lane. */
+#define FL2D_DOCUMENT_MAX_BYTES 134217728u
+FL2D_API fl2d_status FL2D_CALL fl2d_document_parse_json(const uint8_t* bytes, uint32_t length,
+    char* buffer, uint32_t capacity, uint32_t* required);
+FL2D_API fl2d_status FL2D_CALL fl2d_session_document_json(const fl2d_session* session,
+    const uint8_t* options, uint32_t length, char* buffer, uint32_t capacity, uint32_t* required);
+
 typedef struct fl2d_frame_rate {
     int64_t numerator;
     int64_t denominator;

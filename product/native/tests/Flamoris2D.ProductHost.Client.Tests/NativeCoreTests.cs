@@ -6,7 +6,7 @@ internal static class NativeCoreTests
     public static void Run(string hostPath)
     {
         if (!OperatingSystem.IsWindows()) return;
-        if (NativeEngine.Version() != (1, 4)) throw new Exception("Unexpected native ABI version.");
+        if (NativeEngine.Version() != (1, 5)) throw new Exception("Unexpected native ABI version.");
         var path = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(hostPath)!,
             "../native/tests/temporal-conformance.json"));
         using var document = JsonDocument.Parse(File.ReadAllText(path));
