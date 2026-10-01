@@ -1,0 +1,1596 @@
+[
+  {
+    "plan": {
+      "batches": [
+        {
+          "kind": "instance",
+          "drawOrder": -10,
+          "renderInstances": [
+            {
+              "renderInstanceId": "sequence_proof:hold_a:slot_background:from",
+              "sourceNodeId": "background",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  0,
+                  0,
+                  64,
+                  0,
+                  0,
+                  64
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "background_a",
+                  "sourceNodeId": "background",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 1
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": -10,
+              "clipping": null
+            }
+          ]
+        },
+        {
+          "kind": "instance",
+          "drawOrder": 0,
+          "renderInstances": [
+            {
+              "renderInstanceId": "sequence_proof:hold_a:slot_body:from",
+              "sourceNodeId": "slot_body_a",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  6.893987459221105,
+                  10.86443488764002,
+                  11.877995990734203,
+                  9.964861417794156,
+                  8.37027732933876,
+                  16.26533043148656
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "body_a",
+                  "sourceNodeId": "slot_body_a",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 1
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": 0,
+              "clipping": null
+            }
+          ]
+        },
+        {
+          "kind": "instance",
+          "drawOrder": 1,
+          "renderInstances": [
+            {
+              "renderInstanceId": "sequence_proof:hold_a:slot_mask:from",
+              "sourceNodeId": "slot_mask_a",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  20,
+                  12,
+                  25,
+                  12,
+                  21,
+                  20
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "mask_a",
+                  "sourceNodeId": "slot_mask_a",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 1
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": 1,
+              "clipping": null
+            }
+          ]
+        },
+        {
+          "kind": "instance",
+          "drawOrder": 2,
+          "renderInstances": [
+            {
+              "renderInstanceId": "sequence_proof:hold_a:slot_eye:from",
+              "sourceNodeId": "slot_eye_a",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  14,
+                  11,
+                  19,
+                  11,
+                  15,
+                  18
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "eye_a",
+                  "sourceNodeId": "slot_eye_a",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 1
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": 2,
+              "clipping": {
+                "sourceRenderInstanceId": "sequence_proof:hold_a:slot_mask:from",
+                "mode": "inside"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "instance",
+          "drawOrder": 3,
+          "renderInstances": [
+            {
+              "renderInstanceId": "sequence_proof:hold_a:slot_hair:from",
+              "sourceNodeId": "slot_hair_a",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  26,
+                  13,
+                  31,
+                  13,
+                  27,
+                  22
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "hair_a",
+                  "sourceNodeId": "slot_hair_a",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 1
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": 3,
+              "clipping": null
+            }
+          ]
+        }
+      ],
+      "unsupportedReasons": [],
+      "renderInstanceCount": 5,
+      "camera": {
+        "positionX": 0,
+        "positionY": 0,
+        "rotation": 0,
+        "scale": 1
+      }
+    },
+    "maskSourceIds": [
+      "sequence_proof:hold_a:slot_mask:from"
+    ],
+    "contributions": {
+      "sequence_proof:hold_a:slot_background:from": 1,
+      "sequence_proof:hold_a:slot_body:from": 1,
+      "sequence_proof:hold_a:slot_mask:from": 1,
+      "sequence_proof:hold_a:slot_eye:from": 1,
+      "sequence_proof:hold_a:slot_hair:from": 1
+    },
+    "diagnostics": [],
+    "canvas": {
+      "width": 64,
+      "height": 64
+    },
+    "timeTicks": 0
+  },
+  {
+    "plan": {
+      "batches": [
+        {
+          "kind": "instance",
+          "drawOrder": -10,
+          "renderInstances": [
+            {
+              "renderInstanceId": "transition_ab:slot_background:morph",
+              "sourceNodeId": "background",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  0,
+                  0,
+                  64,
+                  0,
+                  0,
+                  64
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "background_a",
+                  "sourceNodeId": "background",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 0.5
+                },
+                {
+                  "appearanceId": "background_b",
+                  "sourceNodeId": "background",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 0.5
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": -10,
+              "clipping": null
+            }
+          ]
+        },
+        {
+          "kind": "instance",
+          "drawOrder": 0,
+          "renderInstances": [
+            {
+              "renderInstanceId": "transition_ab:slot_body:morph",
+              "sourceNodeId": "slot_body_a",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                -0.75
+              ],
+              "mesh": {
+                "positions": [
+                  12.416297878204949,
+                  11.167659974234887,
+                  16.680372789250114,
+                  12.492208508975175,
+                  11.28434045696629,
+                  16.993822696079828
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "body_a",
+                  "sourceNodeId": "slot_body_a",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 0.5
+                },
+                {
+                  "appearanceId": "body_b",
+                  "sourceNodeId": "slot_body_b",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 0.5
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": 0,
+              "clipping": null
+            }
+          ]
+        },
+        {
+          "kind": "instance",
+          "drawOrder": 1,
+          "renderInstances": [
+            {
+              "renderInstanceId": "transition_ab:slot_mask:morph",
+              "sourceNodeId": "slot_mask_a",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  20.675584336121872,
+                  13.25,
+                  26.09830069045226,
+                  13.75,
+                  21.76218092441559,
+                  21.25
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "mask_a",
+                  "sourceNodeId": "slot_mask_a",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 0.5
+                },
+                {
+                  "appearanceId": "mask_b",
+                  "sourceNodeId": "slot_mask_b",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 0.5
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": 1,
+              "clipping": null
+            }
+          ]
+        },
+        {
+          "kind": "instance",
+          "drawOrder": 2,
+          "renderInstances": [
+            {
+              "renderInstanceId": "transition_ab:slot_eye:morph",
+              "sourceNodeId": "slot_eye_a",
+              "transform": [
+                1,
+                0,
+                0,
+                0.7098717324332637,
+                0,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  14.759577512741089,
+                  12.25,
+                  20.177365559670662,
+                  12.75,
+                  15.808487044440376,
+                  19.25
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "eye_a",
+                  "sourceNodeId": "slot_eye_a",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 0.5
+                },
+                {
+                  "appearanceId": "eye_b",
+                  "sourceNodeId": "slot_eye_b",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 0.5
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": 2,
+              "clipping": {
+                "sourceRenderInstanceId": "transition_ab:slot_mask:morph",
+                "mode": "inside"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "instance",
+          "drawOrder": 3,
+          "renderInstances": [
+            {
+              "renderInstanceId": "transition_ab:slot_hair:morph",
+              "sourceNodeId": "slot_hair_a",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  26.598548769950867,
+                  14.25,
+                  32.02619343168206,
+                  14.75,
+                  27.729790025287205,
+                  23.25
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "hair_a",
+                  "sourceNodeId": "slot_hair_a",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 0.5
+                },
+                {
+                  "appearanceId": "hair_b",
+                  "sourceNodeId": "slot_hair_b",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 0.5
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": 3,
+              "clipping": null
+            }
+          ]
+        }
+      ],
+      "unsupportedReasons": [],
+      "renderInstanceCount": 5,
+      "camera": {
+        "positionX": 0,
+        "positionY": 0,
+        "rotation": 0,
+        "scale": 1
+      }
+    },
+    "maskSourceIds": [
+      "transition_ab:slot_mask:morph"
+    ],
+    "contributions": {
+      "transition_ab:slot_background:morph": 1,
+      "transition_ab:slot_body:morph": 1,
+      "transition_ab:slot_mask:morph": 1,
+      "transition_ab:slot_eye:morph": 1,
+      "transition_ab:slot_hair:morph": 1
+    },
+    "diagnostics": [
+      {
+        "key": "TRANSITION_CLIPPING_RENDER_UNSUPPORTED|transition_ab|slot_eye|-|c6ffab61",
+        "code": "TRANSITION_CLIPPING_RENDER_UNSUPPORTED",
+        "severity": "warning",
+        "message": "The evaluator produced clipping state that the current renderer cannot rasterize.",
+        "transitionId": "transition_ab",
+        "semanticSlotId": "slot_eye",
+        "details": {},
+        "evidenceFingerprint": "c6ffab61",
+        "acknowledged": false
+      }
+    ],
+    "canvas": {
+      "width": 64,
+      "height": 64
+    },
+    "timeTicks": 150000
+  },
+  {
+    "plan": {
+      "batches": [
+        {
+          "kind": "instance",
+          "drawOrder": -10,
+          "renderInstances": [
+            {
+              "renderInstanceId": "transition_bc:slot_background:morph",
+              "sourceNodeId": "background",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                1,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  0,
+                  0,
+                  64,
+                  0,
+                  0,
+                  64
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "background_b",
+                  "sourceNodeId": "background",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 0.5
+                },
+                {
+                  "appearanceId": "background_c",
+                  "sourceNodeId": "background",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 0.5
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": -10,
+              "clipping": null
+            }
+          ]
+        },
+        {
+          "kind": "instance",
+          "drawOrder": 0,
+          "renderInstances": [
+            {
+              "renderInstanceId": "transition_bc:slot_body:morph",
+              "sourceNodeId": "slot_body_b",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                -0.25
+              ],
+              "mesh": {
+                "positions": [
+                  9.95187342117365,
+                  13.847665937338988,
+                  15.813470942006411,
+                  15.64161439607689,
+                  9.95132816334405,
+                  19.50336936419815
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "body_b",
+                  "sourceNodeId": "slot_body_b",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 0.5
+                },
+                {
+                  "appearanceId": "body_c",
+                  "sourceNodeId": "slot_body_c",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 0.5
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": 0,
+              "clipping": null
+            }
+          ]
+        },
+        {
+          "kind": "instance",
+          "drawOrder": 1,
+          "renderInstances": [
+            {
+              "renderInstanceId": "transition_bc:slot_mask:morph",
+              "sourceNodeId": "slot_mask_b",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  20.205561131238937,
+                  15.75,
+                  26.635681718587875,
+                  17.25,
+                  21.290912618239716,
+                  23.75
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "mask_b",
+                  "sourceNodeId": "slot_mask_b",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 0.5
+                },
+                {
+                  "appearanceId": "mask_c",
+                  "sourceNodeId": "slot_mask_c",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 0.5
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": 1,
+              "clipping": null
+            }
+          ]
+        },
+        {
+          "kind": "instance",
+          "drawOrder": 2,
+          "renderInstances": [
+            {
+              "renderInstanceId": "transition_bc:slot_eye:morph",
+              "sourceNodeId": "slot_eye_b",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  14.283332208792368,
+                  14.75,
+                  20.70446690917015,
+                  16.25,
+                  15.331290811300276,
+                  21.75
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "eye_b",
+                  "sourceNodeId": "slot_eye_b",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 0.5
+                },
+                {
+                  "appearanceId": "eye_c",
+                  "sourceNodeId": "slot_eye_c",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 0.5
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": 2,
+              "clipping": {
+                "sourceRenderInstanceId": "transition_bc:slot_mask:morph",
+                "mode": "inside"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "instance",
+          "drawOrder": 3,
+          "renderInstances": [
+            {
+              "renderInstanceId": "transition_bc:slot_hair:morph",
+              "sourceNodeId": "slot_hair_b",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  26.13474686940511,
+                  16.75,
+                  32.573853343725204,
+                  18.25,
+                  27.264448056618374,
+                  25.75
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "hair_b",
+                  "sourceNodeId": "slot_hair_b",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 0.5
+                },
+                {
+                  "appearanceId": "hair_c",
+                  "sourceNodeId": "slot_hair_c",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 0.5
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": 3,
+              "clipping": null
+            }
+          ]
+        }
+      ],
+      "unsupportedReasons": [],
+      "renderInstanceCount": 5,
+      "camera": {
+        "positionX": 0,
+        "positionY": 0,
+        "rotation": 0,
+        "scale": 1
+      }
+    },
+    "maskSourceIds": [
+      "transition_bc:slot_mask:morph"
+    ],
+    "contributions": {
+      "transition_bc:slot_background:morph": 1,
+      "transition_bc:slot_body:morph": 1,
+      "transition_bc:slot_mask:morph": 1,
+      "transition_bc:slot_eye:morph": 1,
+      "transition_bc:slot_hair:morph": 1
+    },
+    "diagnostics": [
+      {
+        "key": "TRANSITION_CLIPPING_RENDER_UNSUPPORTED|transition_bc|slot_eye|-|d99965fd",
+        "code": "TRANSITION_CLIPPING_RENDER_UNSUPPORTED",
+        "severity": "warning",
+        "message": "The evaluator produced clipping state that the current renderer cannot rasterize.",
+        "transitionId": "transition_bc",
+        "semanticSlotId": "slot_eye",
+        "details": {},
+        "evidenceFingerprint": "d99965fd",
+        "acknowledged": false
+      }
+    ],
+    "canvas": {
+      "width": 64,
+      "height": 64
+    },
+    "timeTicks": 350000
+  },
+  {
+    "plan": {
+      "batches": [
+        {
+          "kind": "instance",
+          "drawOrder": -10,
+          "renderInstances": [
+            {
+              "renderInstanceId": "sequence_proof:view_proof_2:slot_background:from",
+              "sourceNodeId": "background",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  0,
+                  0,
+                  64,
+                  0,
+                  0,
+                  64
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "background_c",
+                  "sourceNodeId": "background",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 1
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": -10,
+              "clipping": null
+            }
+          ]
+        },
+        {
+          "kind": "instance",
+          "drawOrder": 0,
+          "renderInstances": [
+            {
+              "renderInstanceId": "sequence_proof:view_proof_2:slot_body:from",
+              "sourceNodeId": "slot_body_c",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                -0.75
+              ],
+              "mesh": {
+                "positions": [
+                  9.187579928083348,
+                  14.553189795571923,
+                  15.12226035837043,
+                  17.45210281565671,
+                  8.631206174813492,
+                  20.382515283294577
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "body_c",
+                  "sourceNodeId": "slot_body_c",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 1
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": 0,
+              "clipping": null
+            }
+          ]
+        },
+        {
+          "kind": "instance",
+          "drawOrder": 1,
+          "renderInstances": [
+            {
+              "renderInstanceId": "sequence_proof:view_proof_2:slot_mask:from",
+              "sourceNodeId": "slot_mask_c",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  18.737415737575958,
+                  17,
+                  25.67081864674886,
+                  19,
+                  19.816347757975265,
+                  25
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "mask_c",
+                  "sourceNodeId": "slot_mask_c",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 1
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": 1,
+              "clipping": null
+            }
+          ]
+        },
+        {
+          "kind": "instance",
+          "drawOrder": 2,
+          "renderInstances": [
+            {
+              "renderInstanceId": "sequence_proof:view_proof_2:slot_eye:from",
+              "sourceNodeId": "slot_eye_c",
+              "transform": [
+                1,
+                0,
+                0,
+                0.7098717324332637,
+                0,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  12.812800963719686,
+                  16,
+                  19.735189543830025,
+                  18,
+                  13.855211787753634,
+                  23
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "eye_c",
+                  "sourceNodeId": "slot_eye_c",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 1
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": 2,
+              "clipping": {
+                "sourceRenderInstanceId": "sequence_proof:view_proof_2:slot_mask:from",
+                "mode": "inside"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "instance",
+          "drawOrder": 3,
+          "renderInstances": [
+            {
+              "renderInstanceId": "sequence_proof:view_proof_2:slot_hair:from",
+              "sourceNodeId": "slot_hair_c",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  24.668986929787533,
+                  18,
+                  31.61340416802301,
+                  20,
+                  25.791396564907497,
+                  27
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "hair_c",
+                  "sourceNodeId": "slot_hair_c",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 1
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": 3,
+              "clipping": null
+            }
+          ]
+        }
+      ],
+      "unsupportedReasons": [],
+      "renderInstanceCount": 5,
+      "camera": {
+        "positionX": 0,
+        "positionY": 0,
+        "rotation": 0,
+        "scale": 1
+      }
+    },
+    "maskSourceIds": [
+      "sequence_proof:view_proof_2:slot_mask:from"
+    ],
+    "contributions": {
+      "sequence_proof:view_proof_2:slot_background:from": 1,
+      "sequence_proof:view_proof_2:slot_body:from": 1,
+      "sequence_proof:view_proof_2:slot_mask:from": 1,
+      "sequence_proof:view_proof_2:slot_eye:from": 1,
+      "sequence_proof:view_proof_2:slot_hair:from": 1
+    },
+    "diagnostics": [],
+    "canvas": {
+      "width": 64,
+      "height": 64
+    },
+    "timeTicks": 450000
+  },
+  {
+    "plan": {
+      "batches": [
+        {
+          "kind": "instance",
+          "drawOrder": -10,
+          "renderInstances": [
+            {
+              "renderInstanceId": "sequence_proof:view_proof_2:slot_background:from",
+              "sourceNodeId": "background",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  0,
+                  0,
+                  64,
+                  0,
+                  0,
+                  64
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "background_c",
+                  "sourceNodeId": "background",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 1
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": -10,
+              "clipping": null
+            }
+          ]
+        },
+        {
+          "kind": "instance",
+          "drawOrder": 0,
+          "renderInstances": [
+            {
+              "renderInstanceId": "sequence_proof:view_proof_2:slot_body:from",
+              "sourceNodeId": "slot_body_c",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                -0.000024999999999941735
+              ],
+              "mesh": {
+                "positions": [
+                  6.502383521958373,
+                  15.654433495493466,
+                  13.75918609091675,
+                  16.94362046275755,
+                  7.881841991318758,
+                  21.121754405951005
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "body_c",
+                  "sourceNodeId": "slot_body_c",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 1
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": 0,
+              "clipping": null
+            }
+          ]
+        },
+        {
+          "kind": "instance",
+          "drawOrder": 1,
+          "renderInstances": [
+            {
+              "renderInstanceId": "sequence_proof:view_proof_2:slot_mask:from",
+              "sourceNodeId": "slot_mask_c",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  18.999994952863197,
+                  17,
+                  25.999993678787067,
+                  19.000000000000004,
+                  19.999996488440782,
+                  25
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "mask_c",
+                  "sourceNodeId": "slot_mask_c",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 1
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": 1,
+              "clipping": null
+            }
+          ]
+        },
+        {
+          "kind": "instance",
+          "drawOrder": 2,
+          "renderInstances": [
+            {
+              "renderInstanceId": "sequence_proof:view_proof_2:slot_eye:from",
+              "sourceNodeId": "slot_eye_c",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  12.999996400347046,
+                  16,
+                  19.999994912376465,
+                  18.000000000000004,
+                  13.99999722669568,
+                  23
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "eye_c",
+                  "sourceNodeId": "slot_eye_c",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 1
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": 2,
+              "clipping": {
+                "sourceRenderInstanceId": "sequence_proof:view_proof_2:slot_mask:from",
+                "mode": "inside"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "instance",
+          "drawOrder": 3,
+          "renderInstances": [
+            {
+              "renderInstanceId": "sequence_proof:view_proof_2:slot_hair:from",
+              "sourceNodeId": "slot_hair_c",
+              "transform": [
+                1,
+                0,
+                0,
+                1,
+                0,
+                0
+              ],
+              "mesh": {
+                "positions": [
+                  24.99999364047058,
+                  18.000000000000004,
+                  31.999992580288897,
+                  20.000000000000004,
+                  25.99999602036833,
+                  27
+                ],
+                "indices": [
+                  0,
+                  1,
+                  2
+                ]
+              },
+              "appearanceSamples": [
+                {
+                  "appearanceId": "hair_c",
+                  "sourceNodeId": "slot_hair_c",
+                  "uvs": [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    1
+                  ],
+                  "weight": 1
+                }
+              ],
+              "opacity": 1,
+              "drawOrder": 3,
+              "clipping": null
+            }
+          ]
+        }
+      ],
+      "unsupportedReasons": [],
+      "renderInstanceCount": 5,
+      "camera": {
+        "positionX": 0,
+        "positionY": 0,
+        "rotation": 0,
+        "scale": 1
+      }
+    },
+    "maskSourceIds": [
+      "sequence_proof:view_proof_2:slot_mask:from"
+    ],
+    "contributions": {
+      "sequence_proof:view_proof_2:slot_background:from": 1,
+      "sequence_proof:view_proof_2:slot_body:from": 1,
+      "sequence_proof:view_proof_2:slot_mask:from": 1,
+      "sequence_proof:view_proof_2:slot_eye:from": 1,
+      "sequence_proof:view_proof_2:slot_hair:from": 1
+    },
+    "diagnostics": [],
+    "canvas": {
+      "width": 64,
+      "height": 64
+    },
+    "timeTicks": 599999
+  }
+]

@@ -8,17 +8,9 @@ on:
       - "product/native/**"
       - "product/packaging/**"
       - "docs/native-production-workflow.md"
-      - "product/product-host/**"
-      - "product/src/**"
-      - "product/tests/product-host.test.js"
-      - "product/tests/native-*.test.js"
-      - "product/tests/production-manifest.test.js"
-      - "product/package.json"
-      - "product/package-lock.json"
       - "LICENSE"
       - ".github/workflows/native-shell-ci.yml"
   workflow_dispatch:
-
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -26,7 +18,6 @@ concurrency:
 
 permissions:
   contents: read
-
 
 jobs:
   windows-native-boundary:
@@ -37,38 +28,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Set up Node 24
-        uses: actions/setup-node@v5
-        with:
-          node-version: "24.21.0"
 
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
 
-      - name: Install locked JS reference test dependencies
-        run: npm ci --prefix product --workspaces=false --ignore-scripts
-
-      - name: Legacy JS oracle protocol tests
-        run: node --test product/tests/product-host.test.js product/tests/native-mesh-host.test.js product/tests/native-document-host.test.js product/tests/native-source-host.test.js product/tests/native-render-projection.test.js product/tests/native-rig-host.test.js product/tests/native-timeline-host.test.js product/tests/native-export-host.test.js product/tests/native-key-state-host.test.js product/tests/native-live-mcp.test.js product/tests/production-manifest.test.js
-
-      - name: Verify native conformance fixtures against Product JS
+      - name: Stage production test fixtures
+        shell: pwsh
         run: |
-          node product/native/tests/check-temporal-conformance.mjs
-          node product/native/tests/check-project-conformance.mjs
-          node product/native/tests/check-session-conformance.mjs
-          node product/native/tests/check-document-conformance.mjs
-          node product/native/tests/check-source-ingest-conformance.mjs
-          node product/native/tests/check-source-codec-conformance.mjs
-          node product/native/tests/check-psd-codec-conformance.mjs
-          node product/native/tests/check-live-catalog.mjs
-          node product/native/tests/check-render-plan-conformance.mjs
-          node product/native/tests/check-mesh-authoring-conformance.mjs
-          node product/native/tests/check-rig-authoring-conformance.mjs
-          node product/native/tests/check-timeline-authoring-conformance.mjs
-          node product/native/tests/check-key-state-authoring-conformance.mjs
-          node product/native/tests/check-export-authoring-conformance.mjs
+          $source = Join-Path $env:GITHUB_WORKSPACE 'product/native/tests/fixtures/production'
+          New-Item -ItemType Directory -Force -Path $env:FLAMORIS_RENDER_FIXTURE_DIR | Out-Null
+          foreach ($name in @('production-render-projections.json', 'production-render-textures.json', 'native-production-source.psd', 'native-production-source.flimg')) {
+            $fixture = Join-Path $source $name
+            if (!(Test-Path -LiteralPath $fixture -PathType Leaf)) { throw "Required production test fixture missing: $fixture" }
+            Copy-Item -LiteralPath $fixture -Destination $env:FLAMORIS_RENDER_FIXTURE_DIR
+          }
 
       - name: Build native solution
         run: dotnet build product/native/Flamoris2D.Native.sln -c Release
@@ -97,7 +72,7 @@ jobs:
         run: |
           $package = Join-Path $env:GITHUB_WORKSPACE 'artifacts/package/Flamoris2D-win-x64'
           $env:FLAMORIS_TEST_FFMPEG = Join-Path $package 'ffmpeg/bin/ffmpeg.exe'
-          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+          $env:PATH = "$env:SystemRoot\\System32;$env:SystemRoot"
           $process = Start-Process (Join-Path $package 'Flamoris2D.exe') -ArgumentList '--smoke-test' -PassThru -Wait -NoNewWindow
           if ($process.ExitCode -ne 0) { throw "Packaged WPF smoke failed: $($process.ExitCode)" }
 

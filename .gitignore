@@ -16,6 +16,7 @@ coverage/
 *.psb
 !staging/fixtures/*.psd
 !staging/fixtures/*.psb
+!product/native/tests/fixtures/production/native-production-source.psd
 *.flamoris2d.autosave
 
 # Native build intermediates and outputs

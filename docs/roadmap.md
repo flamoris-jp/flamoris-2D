@@ -24,7 +24,7 @@ MCP/AI readiness remains an architectural constraint from the beginning, not a l
 
 ## Current checkpoint
 
-The Phase 1-8 production core is implemented. The native WPF migration has advanced beyond shell proof: The #118/#142 Source-through-Export candidate now uses one C++ NativeSession shared by WPF and MCP; the earlier Host architecture is compatibility reference.
+The Phase 1-8 production core is implemented. The #118/#142 migration is complete: Source-through-Export uses one C++ NativeSession shared by WPF and MCP, and the earlier Host implementation has been removed.
 
 Implemented production architecture includes:
 
@@ -72,7 +72,7 @@ The current Product CI and Native Shell Boundary protect the unified runtime. Au
 - verify 100/125/150/200% DPI behavior on the real Windows machine
 - inspect light/dark artwork overlay contrast and dense timeline navigation
 - Save, close, reopen and continue editing in normal use
-- review release cutover / installer / association and legacy-source deletion conditions
+- review release cutover / installer / association conditions
 
 Issue #78 remains the broader post-Phase-8 packaged-Windows QA checklist. Issue #79 remains the Production Robustness / Internal Beta umbrella. Recovery/artwork evidence from #97/#98 is preserved; physical acceptance is still required.
 
