@@ -40,6 +40,13 @@ public static class NativeDocument
         var input = JsonSerializer.SerializeToUtf8Bytes(request);
         return Read((byte[]? b, uint c, out uint r) => NativeMethods.SourceProject(input, checked((uint)input.Length), b, c, out r));
     }
+    public static JsonElement GenerateMesh(int width,int height,byte[] rgba,JsonElement request)
+    {
+        ArgumentNullException.ThrowIfNull(rgba);
+        if(width<=0 || height<=0 || width>16384 || height>16384 || (long)width*height>100000000 || (long)width*height*4!=rgba.LongLength)throw new ArgumentException("Invalid mesh source raster.");
+        var input=JsonSerializer.SerializeToUtf8Bytes(request);
+        return Read((byte[]? b,uint c,out uint r)=>NativeMethods.GenerateMesh((uint)width,(uint)height,rgba,(uint)rgba.Length,input,checked((uint)input.Length),b,c,out r));
+    }
     public static JsonElement Serialize(NativeSession session, JsonElement options)
     {
         ArgumentNullException.ThrowIfNull(session);

@@ -62,6 +62,7 @@ jobs:
           node product/native/tests/check-psd-codec-conformance.mjs
           node product/native/tests/check-live-catalog.mjs
           node product/native/tests/check-render-plan-conformance.mjs
+          node product/native/tests/check-mesh-authoring-conformance.mjs
 
       - name: Build native solution
         run: dotnet build product/native/Flamoris2D.Native.sln -c Release

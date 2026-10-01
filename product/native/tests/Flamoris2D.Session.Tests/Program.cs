@@ -35,6 +35,15 @@ foreach(string path in args)
         if((await workspace.InvokeAsync(w=>w.Snapshot)).State.Dirty==0)throw new Exception("Imported source was marked clean.");
         var render=await workspace.InvokeAsync(w=>w.Render(keyArtId:w.Project.GetProperty("keyArts")[0].GetProperty("id").GetString()));
         if(render.GetProperty("plan").GetProperty("renderInstanceCount").GetInt32()==0)throw new Exception("Imported source has no native render instances.");
+        var editable=await workspace.InvokeAsync(w=>w.Artwork.Values.First(a=>w.Query("scene.get_node",Json(new {nodeId=a.NodeId})).GetProperty("effectiveVisible").GetBoolean()).NodeId);
+        var capture=await workspace.InvokeAsync(w=>w.Snapshot);
+        var generated=await workspace.GenerateMeshAsync(editable,"grid",2,2,Json(new {}),capture.DocumentToken,capture.Revision);
+        string unmeshed=await workspace.InvokeAsync(w=>w.Project.GetRawText());
+        await workspace.InvokeAsync(w=>w.ExecutePlan(w.CompileMesh(editable,null,null,"structure","topology.automesh",Json(new {candidate=generated.GetProperty("candidate"),replaceExisting=false}))));
+        var meshed=await workspace.InvokeAsync(w=>w.Mesh(editable));
+        if(meshed.GetProperty("state").GetProperty("topology").GetProperty("vertexIds").GetArrayLength()!=9)throw new Exception("Native Mesh compiler failed.");
+        await workspace.InvokeAsync(w=>w.Undo());if(await workspace.InvokeAsync(w=>w.Project.GetRawText())!=unmeshed)throw new Exception("Native Mesh Undo failed.");await workspace.InvokeAsync(w=>w.Redo());
+        if((await workspace.InvokeAsync(w=>w.Render(keyArtId:w.Project.GetProperty("keyArts")[0].GetProperty("id").GetString()))).GetProperty("plan").GetProperty("renderInstanceCount").GetInt32()==0)throw new Exception("Meshed native source cannot render.");
         var receipt=await workspace.InvokeAsync(w=>w.PrepareSave("copy"));var before=await workspace.InvokeAsync(w=>w.Artwork.Values.OrderBy(a=>a.NodeId).Select(a=>Convert.ToBase64String(a.Rgba.Span)).ToArray());
         await workspace.OpenAsync(receipt.Bytes.ToArray());var after=await workspace.InvokeAsync(w=>w.Artwork.Values.OrderBy(a=>a.NodeId).Select(a=>Convert.ToBase64String(a.Rgba.Span)).ToArray());if(!before.SequenceEqual(after))throw new Exception("Source artwork save/reopen mismatch.");
         root=await workspace.InvokeAsync(w=>w.Project.GetProperty("scene").GetProperty("rootId").GetString()!);

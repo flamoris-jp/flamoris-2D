@@ -136,6 +136,14 @@ FL2D_API fl2d_status FL2D_CALL fl2d_session_document_json(const fl2d_session* se
 FL2D_API fl2d_status FL2D_CALL fl2d_source_project_json(const uint8_t* bytes, uint32_t length,
     char* buffer, uint32_t capacity, uint32_t* required);
 
+/* Readonly Grid/Contour authoring candidate from immutable RGBA8 pixels.
+ * byte_length must equal width*height*4; dimensions and work are bounded.
+ * Request {kind,columns,rows,left,top,settings} is at most 1 MiB.
+ * No session state is read or changed. Result follows the document envelope. */
+FL2D_API fl2d_status FL2D_CALL fl2d_generate_mesh_json(uint32_t width,uint32_t height,
+    const uint8_t* rgba,uint32_t byte_length,const uint8_t* request,uint32_t length,
+    char* buffer,uint32_t capacity,uint32_t* required);
+
 typedef struct fl2d_frame_rate {
     int64_t numerator;
     int64_t denominator;

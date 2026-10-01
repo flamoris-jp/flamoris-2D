@@ -51,6 +51,10 @@ internal static class NativeMethods
     internal static extern NativeStatus PreparedQuery(NativePrepared prepared, byte[] input, uint length,
         byte[]? buffer, uint capacity, out uint required);
 
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_generate_mesh_json")]
+    internal static extern NativeStatus GenerateMesh(uint width,uint height,byte[] rgba,uint byteLength,byte[] input,uint length,
+        byte[]? buffer,uint capacity,out uint required);
+
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_source_project_json")]
     internal static extern NativeStatus SourceProject(byte[] input, uint length,
         byte[]? buffer, uint capacity, out uint required);

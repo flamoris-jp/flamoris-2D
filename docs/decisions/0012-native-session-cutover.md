@@ -35,3 +35,5 @@ fallback or editing authority after cutover.
 
 Windows visual/DPI/input/artwork acceptance remains human work. Code completion
 must not claim that those checks were performed.
+
+Mesh UI intent compilation, Grid and Contour AutoMesh are native readonly operations. The compiler produces ordinary transactions, never a second authority. Layout and topology contexts, stable global vertex IDs, keyform ownership, locked/hidden admission and explicit replacement remain the existing Product rules. Raster generation uses immutable RGBA8 inputs; cancellation and revision checks happen before apply. Native bounds replace the old worker termination safeguard: 262,144 contour edges, 16,384 boundary vertices, 32,768 support points and 50 million geometry work steps. Exceeding these limits reports an error and never changes the document.
