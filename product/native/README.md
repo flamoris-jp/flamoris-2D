@@ -15,8 +15,8 @@ directories together. Node, Electron and Product Host are absent. The portable
 candidate does not install itself or change `.fl2d` associations.
 
 The [Native Shell Boundary workflow](https://github.com/flamoris-jp/flamoris-2D/actions/workflows/native-shell-ci.yml)
-uploads `FLAMORIS-2D-win-x64` after successful manual
-runs with three-day retention. PR checks build/test without uploading a package.
+uploads the accepted ZIP and inventory as `FLAMORIS-2D-win-x64` after successful
+PR/manual runs, with three-day retention.
 Use the [Japanese production guide](../../docs/native-production-workflow.md).
 
 ## Build and tests
