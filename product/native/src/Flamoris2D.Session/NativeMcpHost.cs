@@ -10,14 +10,15 @@ public sealed class NativeMcpHost : IMcpHost, IDisposable
 {
     private readonly NativeWorkspace workspace;
     private readonly string? expectedDocumentToken;
+    private readonly McpPermission permission;
     private readonly CancellationTokenSource lease=new();
     private readonly JsonElement catalog;
     private volatile bool invalidated;
     public HostSnapshot Snapshot {get;private set;}=new("flamoris.2d","0.4.0","","",0,false);
     public event Action? Invalidating;
-    public NativeMcpHost(NativeWorkspace workspace,string? expectedDocumentToken=null)
+    public NativeMcpHost(NativeWorkspace workspace,string? expectedDocumentToken=null,McpPermission permission=McpPermission.Edit)
     {
-        this.workspace=workspace;this.expectedDocumentToken=expectedDocumentToken;
+        this.workspace=workspace;this.expectedDocumentToken=expectedDocumentToken;this.permission=permission;
         using var stream=typeof(NativeMcpHost).Assembly.GetManifestResourceStream("Flamoris2D.LiveCatalog")!;
         using var json=JsonDocument.Parse(stream);catalog=json.RootElement.Clone();
         workspace.Changed+=WorkspaceChanged;
@@ -49,14 +50,18 @@ public sealed class NativeMcpHost : IMcpHost, IDisposable
                         try
                         {
                             workspace.AssertCurrent(Snapshot.DocumentToken,Snapshot.Revision);
-                            if(name=="live.context") return WorkspaceProjection(workspace);
                             if(name=="live.dispositions") return catalog.GetProperty("dispositions");
-                            if(name.StartsWith("query.",StringComparison.Ordinal)) return workspace.Query(name[6..],input.GetProperty("input"));
-                            if(name=="live.undo") return workspace.Undo(cancellation.Token);
-                            if(name=="live.redo") return workspace.Redo(cancellation.Token);
-                            if(name=="live.transaction") return workspace.Execute(input.GetProperty("commands"),input.GetProperty("label").GetString()!,cancellation.Token);
-                            if(name.StartsWith("command.",StringComparison.Ordinal)) return workspace.Execute(JsonSerializer.SerializeToElement(new[]{new {type=name[8..],payload=input.GetProperty("payload")}}),"MCP: "+name[8..],cancellation.Token);
-                            throw new McpFault(McpErrors.InvalidRequest);
+                            JsonElement result;
+                            if(name=="live.context") result=WorkspaceProjection(workspace);
+                            else if(name.StartsWith("query.",StringComparison.Ordinal)) result=workspace.Query(name[6..],input.GetProperty("input"));
+                            else if(name=="live.undo") result=workspace.Undo(cancellation.Token);
+                            else if(name=="live.redo") result=workspace.Redo(cancellation.Token);
+                            else if(name=="live.transaction") result=workspace.Execute(input.GetProperty("commands"),input.GetProperty("label").GetString()!,cancellation.Token);
+                            else if(name.StartsWith("command.",StringComparison.Ordinal)) result=workspace.Execute(JsonSerializer.SerializeToElement(new[]{new {type=name[8..],payload=input.GetProperty("payload")}}),"MCP: "+name[8..],cancellation.Token);
+                            else throw new McpFault(McpErrors.InvalidRequest);
+                            if(readOnly && System.Text.Encoding.UTF8.GetByteCount(result.GetRawText())>1024*1024)throw new McpFault("mcp.result_too_large");
+                            var current=workspace.Snapshot;
+                            return JsonSerializer.SerializeToElement(new {documentToken=current.DocumentToken,revision=current.Revision,permission=permission==McpPermission.Edit?"edit":"read-only",result});
                         }
                         catch(WorkspaceException e) {throw new McpFault(e.Code);}
                         catch(Flamoris.Flamoris2D.Core.Interop.NativeQueryException) {throw new McpFault(McpErrors.InvalidRequest);}

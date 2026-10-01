@@ -62,7 +62,7 @@ public sealed partial class NativeSessionClient
             await _workspace.InvokeAsync(w=>{if(w.Snapshot.DocumentToken!=expectedToken)throw new McpFault(McpErrors.HostUnavailable);return true;},cancellationToken);
             if (epoch != Interlocked.Read(ref _mcpEpoch)) throw new McpFault(McpErrors.Cancelled);
             _mcpPermission = permission;
-            var host = new NativeMcpHost(_workspace,expectedToken);
+            var host = new NativeMcpHost(_workspace,expectedToken,permission==McpPermission.Edit?CorePermission.Edit:CorePermission.ReadOnly);
             _mcpHost = host;
             var options = new McpOptions { MaxRequestBytes = 4 * 1024 * 1024, MaxConcurrentRequests = 4 };
             var boundary = new McpBoundary(host, host.Tools(), options, new McpDiagnostics(_logger ?? Flamoris.Logging.FlamorisLogger.Create(new Flamoris.Logging.LoggingOptions { Level = "error" })));

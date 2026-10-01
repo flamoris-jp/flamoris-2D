@@ -46,7 +46,7 @@ test('native production uses one workspace and has no JS/Node/Host build inputs'
   assert.match(app, /Flamoris2D.Native.Client/);
   assert.match(client, /ProjectReference Include="..\/Flamoris2D.Session\/Flamoris2D.Session.csproj"/);
   assert.match(authority, /NativeWorkspace _workspace=new\(\)/);
-  assert.match(mcp, /new NativeMcpHost\(_workspace,expectedToken\)/);
+  assert.match(mcp, /new NativeMcpHost\(_workspace,expectedToken,/);
   for (const source of [app, client, startup, authority, mcp])
     assert.doesNotMatch(source, /ProductHost|main\.mjs|node\.exe|FLAMORIS_NODE_PATH|ProcessStartInfo|HttpClient/);
   assert.doesNotMatch(publish, /npm ci|Get-Command node|Copy-Item \$node/);

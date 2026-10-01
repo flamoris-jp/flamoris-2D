@@ -27,6 +27,7 @@ internal static class NativeAuthorityTests
         var stale = Guard();
         var changed = await boundary.InvokeAsync(grant, "command.scene.rename_node",
             Json(new { payload = new { nodeId = root, displayName = "MCP native" } }), stale);
+        Check(changed.Value?.GetProperty("revision").GetInt64() == client.Revision && changed.Value?.GetProperty("permission").GetString() == "edit", "Live MCP response envelope changed.");
         Check(!changed.IsError && client.Revision == before + 1, "MCP did not use the desktop native revision.");
         Check(!client.HasAuthoritativeProjection, "MCP edit left the UI projection current.");
         try { await client.UndoAsync(); throw new Exception("Stale UI command accepted."); }
@@ -37,7 +38,7 @@ internal static class NativeAuthorityTests
         Check(!(await boundary.InvokeAsync(grant, "live.redo", Json(new { }), Guard())).IsError, "Native shared Redo failed.");
         await client.GetWorkspaceAsync(); await client.RenameNodeAsync(root, "Desktop native");
         var query = await boundary.InvokeAsync(grant, "query.scene.get_node", Json(new { input = new { nodeId = root } }), null);
-        Check(query.Value!.Value.GetProperty("displayName").GetString() == "Desktop native", "MCP missed desktop command.");
+        Check(query.Value!.Value.GetProperty("result").GetProperty("displayName").GetString() == "Desktop native", "MCP missed desktop command.");
         // Queued requests and replacement share one lane; revocation must never hold that lane while waiting on it.
         var requests = Enumerable.Range(0, 16).Select(_ => boundary.InvokeAsync(grant, "query.scene.get_node", Json(new { input = new { nodeId = root } }), null)).ToArray();
         await client.CreateSessionAsync("Replacement");
