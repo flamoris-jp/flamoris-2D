@@ -73,14 +73,9 @@ exact version (`-DICU_ROOT=/path/to/icu`). The C++ D3D11 compositor owns devices
 textures/masks and readback; WPF only maps viewport/DPI/output resolution.
 Third-party provenance is in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
 
-## Compatibility oracle
+## Validation authority
 
-Node 24.21.0 is a development-only fixture oracle. `npm ci --prefix product
---workspaces=false --ignore-scripts` installs its locked test dependencies.
-`npm test` and `tests/check-*-conformance.mjs` compare old behavior with native
-fixtures. Nothing under legacy JS/Host/Electron, tests, staging or history is a
-native runtime input. Keep the old source until physical acceptance permits
-its deletion; see [`../LEGACY.md`](../LEGACY.md).
+Native C++/managed tests and packaged Windows smoke are the authoritative regression checks. JSON fixtures under `tests/` are retained where they are consumed directly by native or managed tests. The retired JavaScript/Product Host/Electron implementation is no longer part of the repository.
 
 ## Live MCP
 
