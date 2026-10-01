@@ -1,4 +1,4 @@
-name: Native Shell Boundary
+name: Windows Portable Package
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ on:
       - "docs/windows-packaging.md"
       - "docs/native-production-workflow.md"
       - "LICENSE"
-      - ".github/workflows/native-shell-ci.yml"
+      - ".github/workflows/windows-package.yml"
   workflow_dispatch:
 
 concurrency:

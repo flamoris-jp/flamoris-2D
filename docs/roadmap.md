@@ -64,7 +64,7 @@ PSD import
 -> Cutwork .flimg import
 ```
 
-The current Product CI and Native Shell Boundary protect the unified runtime. Automated evidence does not replace human/physical acceptance:
+The current Windows Portable Package workflow protects the unified runtime. Automated evidence does not replace human/physical acceptance:
 
 - use real FLAMORIS artwork/project data rather than synthetic fixtures
 - inspect actual deformation/compositing and exported motion
