@@ -359,7 +359,7 @@ test("Warp authoring stays DOM-independent, command-based, and production packag
   const [controller, overlay, manifest] = await Promise.all([
     readFile(new URL("../src/ui/deformer-authoring-controller.js", import.meta.url), "utf8"),
     readFile(new URL("../src/ui/deformer-viewport-overlay.js", import.meta.url), "utf8"),
-    readFile(new URL("../production-files.txt", import.meta.url), "utf8"),
+    readFile(new URL("../legacy-reference-files.txt", import.meta.url), "utf8"),
   ]);
   assert.doesNotMatch(controller, /\bdocument\b|\bwindow\b|HTMLElement|session\.project/);
   assert.match(controller, /deformer\.move_control_points/);

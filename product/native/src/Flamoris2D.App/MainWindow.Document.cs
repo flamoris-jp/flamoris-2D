@@ -4,7 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using Microsoft.Win32;
-using Flamoris.Flamoris2D.ProductHost;
+using Flamoris.Flamoris2D.Native.Client;
 
 namespace Flamoris.Flamoris2D.App;
 

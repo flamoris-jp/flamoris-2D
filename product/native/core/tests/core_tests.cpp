@@ -391,7 +391,23 @@ static void check_queries(const char* path) {
         assert(fl2d_session_query_json(nullptr,&byte,1,nullptr,0,&required) == FL2D_INVALID_ARGUMENT);
         assert(fl2d_session_query_json(session,&byte,1,nullptr,0,nullptr) == FL2D_INVALID_ARGUMENT);
         untouched();
-        assert(fl2d_prepared_commit(pending) == FL2D_OK); fl2d_prepared_destroy(pending);
+        const auto preview_request = Value(Object{{"name",Value("project.get_summary")}}).serialize();
+        auto preview_bytes = reinterpret_cast<const uint8_t*>(preview_request.data());
+        uint32_t preview_length = 0;
+        assert(fl2d_prepared_query_json(pending,preview_bytes,static_cast<uint32_t>(preview_request.size()),nullptr,0,&preview_length) == FL2D_BUFFER_TOO_SMALL);
+        std::vector<char> preview_buffer(preview_length);
+        assert(fl2d_prepared_query_json(pending,preview_bytes,static_cast<uint32_t>(preview_request.size()),preview_buffer.data(),preview_length,&preview_length) == FL2D_OK);
+        untouched();
+        assert(fl2d_prepared_commit(pending) == FL2D_OK);
+        assert(fl2d_prepared_query_json(pending,preview_bytes,static_cast<uint32_t>(preview_request.size()),nullptr,0,&preview_length) == FL2D_INVALID_ARGUMENT && preview_length==0);
+        fl2d_prepared_destroy(pending);
+        fl2d_prepared* stale_preview = nullptr;
+        assert(fl2d_session_prepare(session,reinterpret_cast<const uint8_t*>(command.data()),static_cast<uint32_t>(command.size()),"stale preview",&stale_preview) == FL2D_OK);
+        assert(fl2d_session_replace(session,reinterpret_cast<const uint8_t*>(input.data()),static_cast<uint32_t>(input.size()),1) == FL2D_OK);
+        assert(fl2d_prepared_query_json(stale_preview,preview_bytes,static_cast<uint32_t>(preview_request.size()),nullptr,0,&preview_length) == FL2D_REVISION_CONFLICT);
+        fl2d_session_destroy(session); session = nullptr;
+        assert(fl2d_prepared_query_json(stale_preview,preview_bytes,static_cast<uint32_t>(preview_request.size()),nullptr,0,&preview_length) == FL2D_REVISION_CONFLICT);
+        fl2d_prepared_destroy(stale_preview);
         fl2d_session_destroy(session);
         locale_status = U_ZERO_ERROR; uloc_setDefault(original_locale.c_str(),&locale_status); assert(U_SUCCESS(locale_status));
     }
@@ -401,7 +417,7 @@ static_assert(sizeof(fl2d_status) == sizeof(int32_t), "ABI status must be 32-bit
 
 int main() {
     int32_t major = 0, minor = -1;
-    assert(fl2d_abi_version(&major, &minor) == FL2D_OK && major == 1 && minor == 4);
+    assert(fl2d_abi_version(&major, &minor) == FL2D_OK && major == 1 && minor == 5);
     assert(fl2d_abi_version(nullptr, &minor) == FL2D_INVALID_ARGUMENT);
     fl2d_engine* engine = nullptr;
     assert(fl2d_engine_create(&engine) == FL2D_OK && engine);

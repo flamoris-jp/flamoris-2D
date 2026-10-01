@@ -1,6 +1,6 @@
 # Native command/query migration (#127)
 
-This checkpoint follows reviewed main `bb361ec` (#133). Production remains the JS Product Host until the explicit #118 cutover. WPF/MCP never dual-write. Native commands run in the same session, candidate validator, prepared commit and history path introduced by #123.
+The #118/#142 production candidate routes WPF/MCP through one NativeWorkspace and C++ NativeSession (ADR 0012). JS Product Host is now compatibility reference only. WPF/MCP never dual-write. Native commands run in the same session, candidate validator, prepared commit and history path introduced by #123.
 
 ## Command contract
 
@@ -24,7 +24,7 @@ PSD re-import keeps its current typed Project replacement contract: preserve log
 
 ## Current handler inventory
 
-155 JS handlers: 155 native, 0 pending. Status means native coverage; JS remains production authority for every handler. Internal/public classification comes from current commandSchemas/internalCommandSchemas.
+155 JS handlers: 155 native, 0 pending. Status means native coverage; C++ is the production authority and JS is compatibility reference only. Internal/public classification comes from current commandSchemas/internalCommandSchemas.
 
 | Command | Access | Native | JS source |
 | --- | --- | --- | --- |
@@ -188,7 +188,7 @@ PSD re-import keeps its current typed Project replacement contract: preserve log
 
 72 JS query handlers: 72 native and 0 pending. See the current
 [Query migration boundary](native-query-migration.md) and sealed native inventory
-for implementation status; JS remains production authority pending cutover.
+for implementation status; the C++ session now serves WPF and MCP, and JS is reference-only.
 
 - `project.get_render_settings`
 - `project.get_summary`

@@ -17,9 +17,11 @@ test("native migration ledger covers every public Product command and query", as
     for (const row of rows) {
       assert.match(row, /\| (migrated|superseded|intentionally deferred) \|$/);
       assert.match(row, /src\/(commands|queries)\//);
+      assert.match(row, /core\/src\/[a-z_]+\.cpp/);
     }
   }
   for (const gate of ["G1", "G2", "G3", "G4", "G5"])
     assert.ok(ledger.includes(`${gate} —`), `Missing decision gate ${gate}`);
-  assert.match(ledger, /Electron stays/);
+  assert.match(ledger, /JS\/Electron\/Host code remains available for compatibility\/reference only/);
+  assert.match(ledger, /never a native runtime fallback/);
 });

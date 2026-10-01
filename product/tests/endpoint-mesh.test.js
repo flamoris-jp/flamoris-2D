@@ -200,6 +200,6 @@ test("endpoint controller is DOM-free and never directly reads or writes session
   assert.doesNotMatch(source, /\bdocument\b|\bwindow\b|session\.project/);
   assert.match(source, /session\.query\("mesh\.list_topologies"\)/);
   assert.match(source, /session\.executeTransaction/);
-  const allowlist = await readFile(new URL("../production-files.txt", import.meta.url), "utf8");
+  const allowlist = await readFile(new URL("../legacy-reference-files.txt", import.meta.url), "utf8");
   assert.match(allowlist, /^src\/ui\/endpoint-mesh-controller\.js$/m);
 });

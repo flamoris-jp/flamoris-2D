@@ -1,0 +1,194 @@
+using System.Text.Json;
+using Flamoris.Flamoris2D.Session;
+using Flamoris.Mcp.Core;
+
+static JsonElement Json(object v)=>JsonSerializer.SerializeToElement(v);
+await using var workspace=new NativeWorkspace();int events=0;workspace.Changed+=_=>events++;
+var initial=await workspace.NewAsync("Native",1920,1080);string root=await workspace.InvokeAsync(w=>w.Project.GetProperty("scene").GetProperty("rootId").GetString()!);
+// An idle lane must still run native work off a WPF-like caller/context.
+var uiSnapshot=await FromUiThread(caller=>workspace.InvokeAsync(w=>
+{
+    if(Environment.CurrentManagedThreadId==caller || SynchronizationContext.Current is not null)throw new Exception("Native work ran on the UI caller/context.");
+    _=w.Project;return w.Snapshot;
+}));
+if(uiSnapshot.DocumentToken!=initial.DocumentToken)throw new Exception("Worker lost workspace authority.");
+// Callbacks release the lane and revoke native access even when they throw.
+Task<JsonElement>? escaped=null;
+using(var resume=new ManualResetEventSlim())
+{
+    try
+    {
+        await FromUiThread(caller=>workspace.InvokeAsync<int>(w=>
+        {
+            if(Environment.CurrentManagedThreadId==caller)throw new Exception("Throwing callback ran on UI.");
+            escaped=Task.Run(()=>{resume.Wait();return w.Project;});
+            throw new WorkspaceException("test.callback_failure");
+        }));
+        throw new Exception("Callback exception was swallowed.");
+    }
+    catch(WorkspaceException e)when(e.Code=="test.callback_failure"){}
+    finally{resume.Set();}
+    try{await escaped!;throw new Exception("Failed callback leaked native access.");}catch(InvalidOperationException){}
+}
+if((await workspace.InvokeAsync(w=>w.Snapshot)).DocumentToken!=initial.DocumentToken)throw new Exception("Failed callback did not release lane.");
+// Cancellation while another callback owns the lane never invokes the waiter.
+using(var entered=new ManualResetEventSlim())
+using(var release=new ManualResetEventSlim())
+using(var cancelledWaiter=new CancellationTokenSource())
+{
+    var holding=workspace.InvokeAsync(w=>{entered.Set();if(!release.Wait(TimeSpan.FromSeconds(10)))throw new Exception("Lane test timed out.");return w.Snapshot;});
+    try
+    {
+        if(!entered.Wait(TimeSpan.FromSeconds(10)))throw new Exception("Worker did not enter lane.");
+        var waiting=workspace.InvokeAsync<int>(_=>throw new Exception("Cancelled waiter ran."),cancelledWaiter.Token);
+        cancelledWaiter.Cancel();
+        try{await waiting;throw new Exception("Cancelled lane wait succeeded.");}catch(OperationCanceledException){}
+    }
+    finally{release.Set();await holding;}
+}
+JsonElement Rename(string name)=>Json(new[]{new {type="scene.rename_node",payload=new {nodeId=root,displayName=name}}});
+await workspace.InvokeAsync(w=>w.Execute(Rename("first"),"first"));
+var save=await workspace.InvokeAsync(w=>w.PrepareSave("save"));
+await workspace.InvokeAsync(w=>w.Execute(Rename("second"),"second"));
+await workspace.InvokeAsync(w=>w.AcknowledgeSave(save.ReceiptId!));
+if((await workspace.InvokeAsync(w=>w.Snapshot)).State.Dirty==0) throw new Exception("Concurrent edit was marked saved.");
+await workspace.InvokeAsync(w=>w.Undo());
+if((await workspace.InvokeAsync(w=>w.Snapshot)).State.Dirty!=0) throw new Exception("Undo did not return to captured save point.");
+await workspace.InvokeAsync(w=>w.Redo());
+using(var cancelled=new CancellationTokenSource()) {cancelled.Cancel();try {await workspace.InvokeAsync(w=>w.Execute(Rename("cancelled"),"cancelled",cancelled.Token));throw new Exception("Cancellation ignored.");}catch(OperationCanceledException) {}}
+if((await workspace.InvokeAsync(w=>w.Snapshot)).State.CurrentRevision!=2) throw new Exception("Cancelled prepare changed native revision.");
+await workspace.OpenAsync(save.Bytes.ToArray());
+if((await workspace.InvokeAsync(w=>w.Project.GetProperty("scene").GetProperty("nodes").GetProperty(root).GetProperty("displayName").GetString()))!="first") throw new Exception("Save/reopen mismatch.");
+try {await workspace.InvokeAsync(w=>{w.AssertCurrent(initial.DocumentToken,0);return true;});throw new Exception("Old authority token accepted.");}catch(WorkspaceException e) when(e.Code=="document.conflict") {}
+var beforePreview=await workspace.InvokeAsync(w=>w.Snapshot);
+var preview=await workspace.InvokeAsync(w=>w.QueryPreview(Rename("preview"),"scene.get_node",Json(new {nodeId=root})));
+if(preview.GetProperty("displayName").GetString()!="preview" || (await workspace.InvokeAsync(w=>w.Snapshot)).State.CurrentRevision!=beforePreview.State.CurrentRevision || await workspace.InvokeAsync(w=>w.Query("scene.get_node",Json(new {nodeId=root})).GetProperty("displayName").GetString())=="preview")throw new Exception("Prepared preview mutated native authority.");
+// Concurrent UI/MCP-style callbacks serialize into the same native history.
+await Task.WhenAll(Enumerable.Range(0,12).Select(i=>workspace.InvokeAsync(w=>w.Execute(Rename("lane-"+i),"lane"))));
+if((await workspace.InvokeAsync(w=>w.Snapshot)).State.UndoDepth!=12) throw new Exception("Shared lane lost edits.");
+try {_=workspace.Project;throw new Exception("Native handle escaped the lane.");}catch(InvalidOperationException) {}
+foreach(string path in args)
+{
+    using var fixtures=JsonDocument.Parse(File.ReadAllBytes(path));
+    foreach(var fixture in fixtures.RootElement.EnumerateArray())
+    {
+        string kind=path.Contains("psd-")?"psd":"flimg";await workspace.ImportAsync(Convert.FromBase64String(fixture.GetProperty("archive").GetString()!),kind,"portrait."+kind);
+        if((await workspace.InvokeAsync(w=>w.Snapshot)).State.Dirty==0)throw new Exception("Imported source was marked clean.");
+        var render=await workspace.InvokeAsync(w=>w.Render(keyArtId:w.Project.GetProperty("keyArts")[0].GetProperty("id").GetString()));
+        if(render.GetProperty("plan").GetProperty("renderInstanceCount").GetInt32()==0)throw new Exception("Imported source has no native render instances.");
+        var editable=await workspace.InvokeAsync(w=>w.Artwork.Values.First(a=>w.Query("scene.get_node",Json(new {nodeId=a.NodeId})).GetProperty("effectiveVisible").GetBoolean()).NodeId);
+        var capture=await workspace.InvokeAsync(w=>w.Snapshot);
+        var generated=await workspace.GenerateMeshAsync(editable,"grid",2,2,Json(new {}),capture.DocumentToken,capture.Revision);
+        string unmeshed=await workspace.InvokeAsync(w=>w.Project.GetRawText());
+        await workspace.InvokeAsync(w=>w.ExecutePlan(w.CompileMesh(editable,null,null,"structure","topology.automesh",Json(new {candidate=generated.GetProperty("candidate"),replaceExisting=false}))));
+        var meshed=await workspace.InvokeAsync(w=>w.Mesh(editable));
+        if(meshed.GetProperty("state").GetProperty("topology").GetProperty("vertexIds").GetArrayLength()!=9)throw new Exception("Native Mesh compiler failed.");
+        await workspace.InvokeAsync(w=>w.Undo());if(await workspace.InvokeAsync(w=>w.Project.GetRawText())!=unmeshed)throw new Exception("Native Mesh Undo failed.");await workspace.InvokeAsync(w=>w.Redo());
+        if((await workspace.InvokeAsync(w=>w.Render(keyArtId:w.Project.GetProperty("keyArts")[0].GetProperty("id").GetString()))).GetProperty("plan").GetProperty("renderInstanceCount").GetInt32()==0)throw new Exception("Meshed native source cannot render.");
+        string artId=await workspace.InvokeAsync(w=>w.Project.GetProperty("keyArts")[0].GetProperty("id").GetString()!);
+        await workspace.InvokeAsync(w=>w.ExecutePlan(w.CompileRig(Json(new {nodeId=editable,keyArtId=artId}),"bone.create",Json(new {displayName="native Bone",length=2}))));
+        string boneId=await workspace.InvokeAsync(w=>w.Query("bone.list")[0].GetProperty("id").GetString()!);
+        var rigContext=Json(new {nodeId=editable,keyArtId=artId,boneId});
+        await workspace.InvokeAsync(w=>w.ExecutePlan(w.CompileRig(rigContext,"bone.pose",Json(new {x=0,y=0,rotation=.2}))));
+        string posed=await workspace.InvokeAsync(w=>w.Project.GetRawText());
+        var rigPreview=await workspace.InvokeAsync(w=>w.CompileRig(rigContext,"bone.pose",Json(new {x=0,y=0,rotation=.5})));
+        var projected=await workspace.InvokeAsync(w=>w.QueryPreview(rigPreview.GetProperty("commands"),"native.rig_state",rigContext));
+        if(projected.GetProperty("bone").GetProperty("keyform").GetProperty("localDelta").GetProperty("rotation").GetDouble()!=.5 || await workspace.InvokeAsync(w=>w.Project.GetRawText())!=posed)throw new Exception("Rig preview changed native authority.");
+        await workspace.InvokeAsync(w=>w.Undo());await workspace.InvokeAsync(w=>w.Redo());if(await workspace.InvokeAsync(w=>w.Project.GetRawText())!=posed)throw new Exception("Rig Undo/Redo differed.");
+        var receipt=await workspace.InvokeAsync(w=>w.PrepareSave("copy"));var before=await workspace.InvokeAsync(w=>w.Artwork.Values.OrderBy(a=>a.NodeId).Select(a=>Convert.ToBase64String(a.Rgba.Span)).ToArray());
+        await workspace.OpenAsync(receipt.Bytes.ToArray());var after=await workspace.InvokeAsync(w=>w.Artwork.Values.OrderBy(a=>a.NodeId).Select(a=>Convert.ToBase64String(a.Rgba.Span)).ToArray());if(!before.SequenceEqual(after))throw new Exception("Source artwork save/reopen mismatch.");
+        root=await workspace.InvokeAsync(w=>w.Project.GetProperty("scene").GetProperty("rootId").GetString()!);
+        await workspace.InvokeAsync(w=>w.Execute(Rename("branch"),"branch"));await workspace.InvokeAsync(w=>w.Undo());await workspace.InvokeAsync(w=>w.Execute(Rename("new branch"),"branch"));
+        if((await workspace.InvokeAsync(w=>w.Snapshot)).State.RedoDepth!=0)throw new Exception("Native branch retained redo.");
+        await workspace.InvokeAsync(w=>w.Undo());await workspace.InvokeAsync(w=>w.Redo());
+        if(!(await workspace.InvokeAsync(w=>w.Artwork.Values.OrderBy(a=>a.NodeId).Select(a=>Convert.ToBase64String(a.Rgba.Span)).ToArray())).SequenceEqual(before))throw new Exception("Artwork history was lost.");
+    }
+}
+using(var fixtures=JsonDocument.Parse(File.ReadAllBytes(args[1])))
+{
+    var bytes=Convert.FromBase64String(fixtures.RootElement[0].GetProperty("archive").GetString()!);
+    await workspace.ImportAsync(bytes,"psd","before.psd");
+    root=await workspace.InvokeAsync(w=>w.Project.GetProperty("scene").GetProperty("rootId").GetString()!);
+    var before=await workspace.InvokeAsync(w=>w.Artwork.Values.Select(a=>a.Id).ToArray());
+    var review=await workspace.AnalyzeSourceAsync(bytes,"after.psd");string reviewId=review.GetProperty("id").GetString()!;
+    if(!review.GetProperty("canApply").GetBoolean())throw new Exception("Native PSD reimport unexpectedly ambiguous.");
+    await workspace.InvokeAsync(w=>w.ApplySourceReview(reviewId));
+    await workspace.InvokeAsync(w=>w.Undo());if(!(await workspace.InvokeAsync(w=>w.Artwork.Values.Select(a=>a.Id).ToArray())).SequenceEqual(before))throw new Exception("Reimport Undo lost original artwork handles.");
+    await workspace.InvokeAsync(w=>w.Redo());
+    var stale=await workspace.AnalyzeSourceAsync(bytes,"stale.psd");await workspace.InvokeAsync(w=>w.Execute(Rename("edit"),"edit"));
+    try {await workspace.InvokeAsync(w=>w.ApplySourceReview(stale.GetProperty("id").GetString()!));throw new Exception("Stale reimport review applied.");}catch(WorkspaceException e) when(e.Code=="source.review_stale") {}
+}
+// Native Key State compilation shares persistence/history with every adapter.
+await workspace.InvokeAsync(w=>
+{
+    var art=w.Query("keyart.list",Json(new {}))[0].GetProperty("id").GetString()!;
+    var before=w.Project.GetRawText();
+    var duplicate=w.ExecutePlan(w.CompileKeyState(Json(new {keyArtId=art}),"keyart.duplicate",Json(new {displayName="native duplicate"})));
+    if(w.KeyState(Json(new {keyArtId=duplicate.GetProperty("keyArtId").GetString()})).GetProperty("selectedKeyArt").GetProperty("displayName").GetString()!="native duplicate")throw new Exception("Native Key State projection lost duplicate.");
+    var after=w.Project.GetRawText();w.Undo();if(w.Project.GetRawText()!=before)throw new Exception("Key State Undo differs.");w.Redo();if(w.Project.GetRawText()!=after)throw new Exception("Key State Redo differs.");return true;
+});
+// Timeline intents compile in C++ and enter the same native undo history.
+await workspace.InvokeAsync(w=>
+{
+    var art=w.Query("keyart.list",Json(new {}))[0].GetProperty("id").GetString()!;
+    var result=w.ExecutePlan(w.CompileTimeline(Json(new {}),"sequence.create",Json(new {displayName="native sequence",keyArtId=art,durationSeconds=2})));
+    var sequenceId=result.GetProperty("sequenceId").GetString()!;
+    var context=Json(new {sequenceId});
+    var track=w.ExecutePlan(w.CompileTimeline(context,"track.add",Json(new {kind="CameraTrack",target=new {cameraId="main"}}))).GetProperty("trackId").GetString()!;
+    w.ExecutePlan(w.CompileTimeline(context,"key.add",Json(new {trackId=track,channel="positionX",timeTicks=0,value=5})));
+    if(w.Timeline(context).GetProperty("tracks").GetArrayLength()!=1)throw new Exception("Native timeline projection lost track.");
+    var before=w.Project.GetRawText();w.Undo();w.Redo();if(w.Project.GetRawText()!=before)throw new Exception("Timeline Undo/Redo differs.");
+    var canvas=w.Project.GetProperty("canvas");var export=Json(new {sequenceId,width=canvas.GetProperty("width").GetInt32(),height=canvas.GetProperty("height").GetInt32(),frameRate=new {numerator=24,denominator=1},video=false,frameIndex=0});
+    if(w.ExportPlan(export).GetProperty("frameCount").GetInt32()!=48 || w.ExportFrame(export).GetProperty("fileName").GetString()!="frame_000001.png")throw new Exception("Native export plan/frame differs.");
+    if(w.Encoder(Json(new {frameDirectory="frames",outputPath="shot.mp4",frameCount=48,frameRate=new {numerator=24,denominator=1}})).GetProperty("args").EnumerateArray().All(a=>a.GetString()!="h264_mf"))throw new Exception("Native encoder lost MF profile.");
+    var sample=w.Playback(Json(new {sequenceId,playback=new {startTicks=0,elapsedMilliseconds=2500,mode="loop"}}));
+    if(sample.GetProperty("timeTicks").GetInt64()!=60000||!sample.GetProperty("playing").GetBoolean())throw new Exception("Native playback differs.");
+    return true;
+});
+// PNG proof bootstrap is validated before replacement and never becomes saveable.
+var proofGuard=await workspace.InvokeAsync(w=>w.Snapshot);
+await workspace.HandsOnAsync([new HandsOnArtwork(Guid.NewGuid().ToString(),"proof",2,2,new byte[]{255,0,0,255,255,0,0,255,255,0,0,255,255,0,0,255})],proofGuard.DocumentToken,proofGuard.Revision);
+await workspace.InvokeAsync(w=>
+{
+    if(!w.ProofOnly||w.Project.GetProperty("meshKeyforms").GetArrayLength()!=1)throw new Exception("Native proof bootstrap failed.");
+    var art=w.Query("keyart.list",Json(new {}))[0].GetProperty("id").GetString()!;
+    if(w.Render(art).GetProperty("artwork").GetArrayLength()!=1)throw new Exception("Native proof render lost artwork.");
+    var project=w.Project.GetRawText();w.Undo();w.Redo();if(w.Project.GetRawText()!=project)throw new Exception("Proof Undo/Redo differs.");
+    try{w.PrepareSave("save");throw new Exception("Proof session became saveable.");}catch(WorkspaceException e)when(e.Code=="document.proof_only"){}
+    return true;
+});
+root=await workspace.InvokeAsync(w=>w.Project.GetProperty("scene").GetProperty("rootId").GetString()!);
+// Exercise the shared Core boundary, not a mock Product dispatcher.
+using(var host=new NativeMcpHost(workspace))
+using(var boundary=new McpBoundary(host,host.Tools(),new McpOptions(),new McpDiagnostics(Flamoris.Logging.FlamorisLogger.Create(new Flamoris.Logging.LoggingOptions {Level="error"}))))
+{
+    var grant=await boundary.EnableAsync(McpPermission.Edit);
+    var snapshot=await workspace.InvokeAsync(w=>w.Snapshot);
+    var guard=new RequestGuard(snapshot.RuntimeId,snapshot.DocumentToken,snapshot.Revision);
+    var changed=await boundary.InvokeAsync(grant,"command.scene.rename_node",Json(new {payload=new {nodeId=root,displayName="MCP"}}),guard);
+    if(changed.IsError)throw new Exception("Native MCP edit failed: "+changed.Error);
+    if(await workspace.InvokeAsync(w=>w.Query("scene.get_node",Json(new {nodeId=root})).GetProperty("displayName").GetString())!="MCP")throw new Exception("UI did not see MCP edit.");
+    var stale=await boundary.InvokeAsync(grant,"command.scene.rename_node",Json(new {payload=new {nodeId=root,displayName="stale"}}),guard);
+    if(!stale.IsError)throw new Exception("MCP stale guard accepted.");
+    await workspace.InvokeAsync(w=>w.Undo());snapshot=await workspace.InvokeAsync(w=>w.Snapshot);
+    var redo=await boundary.InvokeAsync(grant,"live.redo",Json(new {}),new(snapshot.RuntimeId,snapshot.DocumentToken,snapshot.Revision));if(redo.IsError)throw new Exception("Shared native redo failed: "+redo.Error);
+    var invalid=await boundary.InvokeAsync(grant,"query.scene.get_node",Json(new {input=new {nodeId=root,unknown=true}}),null);if(!invalid.IsError)throw new Exception("Unknown MCP payload field accepted.");
+    if(boundary.Tools.Keys.Any(n=>n.Contains("apply_psd_reimport") || n.Contains("restore_internal")))throw new Exception("Private source operation exposed.");
+    var readOnly=await boundary.EnableAsync(McpPermission.ReadOnly);
+    snapshot=await workspace.InvokeAsync(w=>w.Snapshot);
+    if(!(await boundary.InvokeAsync(readOnly,"live.undo",Json(new {}),new(snapshot.RuntimeId,snapshot.DocumentToken,snapshot.Revision))).IsError)throw new Exception("Read-only MCP edit accepted.");
+    await workspace.NewAsync("replacement",64,64);if(readOnly.IsActive)throw new Exception("Replaced document retained MCP grant.");
+}
+Console.WriteLine($"Native workspace: shared lane, cancellation, revision guards, save acknowledgement, Undo/Redo and source reopen passed ({events} changes).");
+
+static Task<T> FromUiThread<T>(Func<int,Task<T>> action)
+{
+    var completion=new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+    var thread=new Thread(()=>
+    {
+        SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
+        try{completion.SetResult(action(Environment.CurrentManagedThreadId).GetAwaiter().GetResult());}
+        catch(Exception e){completion.SetException(e);}
+    }){IsBackground=true};
+    thread.Start();return completion.Task.WaitAsync(TimeSpan.FromSeconds(10));
+}

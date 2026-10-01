@@ -207,7 +207,7 @@ test("weight and form controllers are DOM-independent and production packaged", 
   ];
   const [sources, manifest] = await Promise.all([
     Promise.all(files.map((path) => readFile(new URL(path, import.meta.url), "utf8"))),
-    readFile(new URL("../production-files.txt", import.meta.url), "utf8"),
+    readFile(new URL("../legacy-reference-files.txt", import.meta.url), "utf8"),
   ]);
   for (const source of sources) assert.doesNotMatch(source, /document\.|window\./);
   for (const path of files) assert.match(manifest, new RegExp(path.split("/").at(-1).replace(".", "\\.")));

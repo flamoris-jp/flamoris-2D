@@ -116,7 +116,7 @@ test("coincident source constraints and position count mismatch do not silently 
 test("solver core is DOM-independent and part of production allowlist", async () => {
   const [source, allowlist] = await Promise.all([
     readFile(new URL("../src/core/correspondence-solver.js", import.meta.url), "utf8"),
-    readFile(new URL("../production-files.txt", import.meta.url), "utf8"),
+    readFile(new URL("../legacy-reference-files.txt", import.meta.url), "utf8"),
   ]);
   assert.doesNotMatch(source, /\bdocument\b|\bwindow\b|session\.|EditorSession/);
   assert.match(allowlist, /^src\/core\/correspondence-solver\.js$/m);

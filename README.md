@@ -11,7 +11,7 @@ PSD・Cutworkの素材から、メッシュとリグで動きを付けてMVの�
 - **Animate a shot:** author reusable clips for motions such as blinking, breathing, or hair sway; place them on a sequence timeline and preview playback.
 - **Export and keep editing:** write PNG frame sequences or Windows MP4/H.264, save a `.fl2d` project, and reopen it with artwork and authored motion. Edits support Undo/Redo.
 
-**Native WPF status:** the Source → Mesh → Rig → Deform → Animation → Preview → Export workflow is implemented as a production candidate. Final real-art Windows acceptance and release cutover remain open; **Electron is still the default installed/released shell**. Automatic flat-image part decomposition remains experimental/deferred.
+**Native WPF status:** Source → Mesh → Rig → Deform → Animation → Preview → Export uses one C++ NativeSession shared by WPF and MCP. Final Windows CI/real-art acceptance and installer release remain gates. JS/Electron/Product Host are compatibility references outside the native runtime. Automatic flat-image part decomposition remains experimental/deferred.
 
 [Native制作ガイド（日本語）](docs/native-production-workflow.md) · [Try/build the native candidate](#run-the-native-windows-candidate) · [Capabilities and status](docs/product-status.md) · [Implementation evidence](docs/native-capability-map.md) · [Design docs](docs/README.md)
 
@@ -21,47 +21,16 @@ FLAMORIS 2D focuses on short animated shots, rather than the full scope of a DAW
 
 The [Native Shell Boundary workflow](https://github.com/flamoris-jp/flamoris-2D/actions/workflows/native-shell-ci.yml) uploads `flamoris2d-native-production-candidate-win-x64` only for successful manual (`workflow_dispatch`) runs, with three-day artifact retention. PR checks build and test the candidate but do not publish a download. If an artifact is available, extract the whole directory and run `Flamoris2D.exe` on Windows x64; otherwise use the [Windows development build instructions](product/native/README.md#build-and-tests).
 
-On Windows x64 with the .NET 10 SDK and Node 24.21.0, run `./product/packaging/publish-windows.ps1` from the repository root to build the same candidate locally in `artifacts/package/Flamoris2D-win-x64/`. The candidate bundles the self-contained .NET 10 runtime, Node 24.21.0, the reviewed Product Host graph, PSD decoder, and pinned LGPL shared FFmpeg. Keep the package directory intact. It does not install itself or replace the current Electron file association.
+On Windows x64 with the .NET 10 SDK, CMake and Visual Studio C++ Build Tools, run `./product/packaging/publish-windows.ps1` from the repository root to build the same candidate locally in `artifacts/package/Flamoris2D-win-x64/`. The candidate bundles the self-contained .NET 10 runtime, C++ core/compositor, ICU, native source codecs and pinned LGPL shared FFmpeg. Keep the package directory intact. It does not install itself or replace the current Electron file association.
 
 For development builds and the full native workflow, see [`product/native/README.md`](product/native/README.md) and [`docs/native-production-workflow.md`](docs/native-production-workflow.md).
 
-## Run the current Electron Windows Desktop
+## Compatibility references
 
-From the repository root:
-
-```powershell
-npm ci
-npm test
-npm run desktop
-```
-
-Create an unpacked Windows app:
-
-```powershell
-npm run desktop:pack
-```
-
-Create an NSIS installer:
-
-```powershell
-npm run desktop:dist
-```
-
-Electron remains the default release until the native retirement/cutover criteria pass.
-
-## Run browser shell
-
-From the repository root:
-
-```powershell
-npm ci
-npm test
-npm start
-```
-
-Open `http://127.0.0.1:4173`.
-
-The browser shell remains a development-compatible adapter, not the native production target.
+The previous JS/Electron/browser code is test-only reference during the cutover.
+See [`product/LEGACY.md`](product/LEGACY.md) and the
+[renovation map](docs/repository-renovation.md). Node is needed only to run the
+JS oracle tests, never to build, publish or run the native application.
 
 ## Repository boundaries
 
@@ -84,7 +53,7 @@ See `AGENTS.md` and `docs/repository-boundaries.md`.
 - `TemporalProgram` is shared by Transitions, Sequences, and AnimationClips rather than duplicated into parallel timing models.
 - Stable IDs, not display names or array positions, are authoritative for Scene, mesh, rig, and animation targets.
 - Major visual changes are represented by Key Arts; reusable ordinary motion is layered through AnimationClips.
-- WPF gestures, headless/MCP operations, and tests converge on one authoritative JavaScript `EditorSession` through the Product Host.
+- WPF gestures, MCP operations and native tests converge on one C++ `NativeSession`; C# projections and immutable artwork do not own an editable Project or separate history.
 - Preview, PNG, and MP4 source frames share the same evaluated semantics and native compositor in the production candidate.
 - The renderer consumes final evaluated geometry/compositing state and remains unaware of Sequence/Clip/Bone authoring semantics.
 - Persistent mutations go through deterministic Commands / Transactions and remain Undo/Redo-safe.
@@ -128,10 +97,10 @@ The original v0.3 prototype snapshot remains preserved on `prototype/psd-import-
 
 ## Native live MCP
 
-Native live MCP uses Core 1.1.0 and a packaged stdio bridge over an authenticated same-user named pipe, attached to the running Native
-editor's **same EditorSession and Undo/Redo history**. `MCP / AI` offers Read only /
-Edit, connection copy, activity and revocation. Current protocol 2026-07-28 uses
-official SDK 2.0.0; file/import/save capabilities stay Native-only.
+Native live MCP uses Core/Wpf 1.2.0 and a packaged stdio bridge over an authenticated same-user named pipe, attached to the running Native
+editor's **same NativeSession and Undo/Redo history**. `MCP / AI` offers Connect / Stop / Settings, with Read only /
+Edit permissions and manual connection by default. Current protocol 2026-07-28 uses
+official SDK 2.2.0; file/import/save capabilities stay Native-only.
 See [connection and hands-on guide](docs/native-production-workflow.md),
 [MCP design](docs/mcp-design.md), and [ADR 0011](docs/decisions/0011-mcp-core-migration.md).
 

@@ -1,4 +1,6 @@
 #include "native_queries.h"
+#include "native_render_plan.h"
+#include "native_authoring.h"
 #include "native_commands.h"
 #include "native_math.h"
 #include "native_validation.h"
@@ -491,6 +493,22 @@ Value dispatch(const Value& p, Query id, const Value& input) {
 }
 Value query(const Value& project, const std::string& name, const Value& input) {
     try {
+        if(name=="native.export_settings")return Value(Object{{"value",fl2d_authoring::export_settings(project)}});
+        if(name=="native.export_plan")return Value(Object{{"value",fl2d_authoring::export_plan(project,input)}});
+        if(name=="native.export_frame")return Value(Object{{"value",fl2d_authoring::export_frame(project,input)}});
+        if(name=="native.encoder")return Value(Object{{"value",fl2d_authoring::encoder_contract(input)}});
+        if(name=="native.key_state")return Value(Object{{"value",fl2d_authoring::key_state(project,input)}});
+        if(name=="native.key_state_tool")return Value(Object{{"value",fl2d_authoring::key_state_tool(project,input)}});
+        if(name=="native.correspondence")return Value(Object{{"value",fl2d_authoring::correspondence_state(project,input)}});
+        if(name=="native.timeline_state")return Value(Object{{"value",fl2d_authoring::timeline_state(project,input)}});
+        if(name=="native.timeline_tool")return Value(Object{{"value",fl2d_authoring::timeline_tool(project,input)}});
+        if(name=="native.playback_tick")return Value(Object{{"value",fl2d_authoring::playback_tick(project,input)}});
+        if(name=="native.rig_state")return Value(Object{{"value",fl2d_authoring::rig_state(project,input)}});
+        if(name=="native.rig_tool")return Value(Object{{"value",fl2d_authoring::rig_tool(project,input)}});
+        if(name=="native.mesh_state")return Value(Object{{"value",fl2d_authoring::mesh_state(project,input)}});
+    if(name=="native.mesh_tool")return Value(Object{{"value",fl2d_authoring::mesh_tool(project,input)}});
+    if(name=="native.render_plan")return Value(Object{{"value",fl2d_render::plan(field(input,"frame"),field(input,"artwork"))}});
+        if(name=="native.render_frame")return Value(Object{{"value",fl2d_render::projection(project,input)}});
         const auto found = queries.find(name);
         if (found == queries.end()) throw Error{"Error","Unknown query "+name+"."};
         if (!found->second.implemented) throw Unsupported{};

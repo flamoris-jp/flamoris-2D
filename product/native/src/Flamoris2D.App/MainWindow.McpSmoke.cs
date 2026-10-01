@@ -1,6 +1,6 @@
 using ModelContextProtocol.Client;
 using System.Text.Json;
-using Flamoris.Flamoris2D.ProductHost;
+using Flamoris.Flamoris2D.Native.Client;
 
 namespace Flamoris.Flamoris2D.App;
 

@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
-using Flamoris.Flamoris2D.ProductHost;
+using Flamoris.Flamoris2D.Native.Client;
 
 namespace Flamoris.Flamoris2D.App;
 
@@ -85,7 +85,7 @@ public partial class MainWindow
         _rigContext=((FrameworkElement)sender).Tag!.ToString()!;_rigTool="選択";
         _rigPanelKey=null;_contextDraft=false;_selectedControlPoints.Clear();MeshCanvas.Cancel();ConfigureRigContext();
     }
-    private async Task RefreshRigAsync(ProductHostClient client)
+    private async Task RefreshRigAsync(NativeSessionClient client)
     {
         if(_editingContext is not (EditingContext.Rig or EditingContext.Deform))return;
         var context=CurrentRigContext();

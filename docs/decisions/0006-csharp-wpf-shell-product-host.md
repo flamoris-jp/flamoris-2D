@@ -1,5 +1,9 @@
 # ADR 0006: C# WPF shell with a versioned JavaScript Product Host
 
+> Historical Host-backed shell design, superseded for runtime authority and
+> packaging by [ADR 0012](0012-native-session-cutover.md) and #142. The original design below
+> remains reference; it does not authorize a JS/Node production fallback.
+
 Status: accepted by PR #93; Phase 1 implementation tracked by Issue #94
 
 Primary design: [`../csharp-wpf-ui-migration.md`](../csharp-wpf-ui-migration.md)

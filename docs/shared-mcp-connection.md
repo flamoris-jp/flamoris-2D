@@ -2,9 +2,8 @@
 
 This app consumes `Flamoris.Mcp.Core` and `Flamoris.Mcp.Wpf` 1.2.0.
 The common implementation lives in flamoris-jp/flamoris-mcp-core#13; the server
-counterpart is flamoris-jp/flamoris-mcp-hub#16. Release Core/Wpf first, then merge
-this consumer. The PR's CI explicitly checks out the reviewed Core candidate and
-sets `FlamorisMcpSourceRoot`; ordinary released builds use NuGet.
+counterpart is flamoris-jp/flamoris-mcp-hub#16. The production solution consumes the released NuGet packages; no Core source
+checkout or `FlamorisMcpSourceRoot` is required.
 
 MCP / AI contains only Connect..., Stop, Settings... in the current UI language.
 Connection always confirms the selected method and previous permission. Settings
@@ -35,7 +34,7 @@ reconnect until a new explicit connection; auto-connect runs when a document is 
   configured WSS endpoint. No desktop LAN listener is created.
 - Only connection and successful edits show centered Chipsy; verify actual scale
   and timing by eye. Queries, errors and cancellation must not show it.
-- Verify the bottom-right indicator is the only MCP connection indicator, while the separate upper Product Host status remains; the mouse cursor is unchanged.
+- Verify the bottom-right indicator is the only MCP connection indicator, while the separate upper native authority status remains; the mouse cursor is unchanged.
 - Stop, document replacement and exit revoke the previous client. Hub loss leaves
   manual editing and history intact and never replays a mutation.
 

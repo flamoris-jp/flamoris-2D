@@ -8,6 +8,8 @@ using fl2d_commands::Value;
 using fl2d_commands::Object;
 using fl2d_commands::Array;
 // Pure projections of the existing session snapshot, shared by frame evaluation.
+Value authoring_point(const Value& project,const Value& node_id,const Value& key_art,const Value& document_point,bool bone_pose=false,bool parent_local=false);
+Value deformer_lattice(const Value& project,const Value& deformer,const Value& key_art,const Value& control_points);
 Value bone_fk(const Value& project, const Value& key_art, bool projected = false,
     const std::map<std::string, Value>& pose_overrides = {},
     const std::map<std::string, Value>& warp_overrides = {}, const Value& morph_to = Value(), std::set<std::string>* active_warps = nullptr);

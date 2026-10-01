@@ -5,7 +5,10 @@ Start with the [product overview](../README.md) or the detailed
 
 ## Current design set
 
-- [`basic-design.md`](basic-design.md) — foundational domain/product design. Its browser/WebGL shell notes are historical where they conflict with the accepted native migration; current shell/rendering authority is the WPF migration design plus ADRs 0006–0009.
+- [`repository-renovation.md`](repository-renovation.md) — #142 inventory and native/legacy responsibility boundaries
+- [`decisions/0012-native-session-cutover.md`](decisions/0012-native-session-cutover.md) — one C++ NativeSession, persistence/source ingest and WPF/MCP cutover
+
+- [`basic-design.md`](basic-design.md) — foundational domain/product design. Its browser/WebGL shell notes are historical; current shell/authority is WPF plus ADR 0012 and the native capability map.
 - [`feature-matrix.md`](feature-matrix.md) — early prioritized feature inventory and backlog reference, not current implementation status. Use the native capability ledger and roadmap for shipped/migrated/deferred disposition.
 - [`roadmap.md`](roadmap.md) — current dependency-driven implementation phases, native migration checkpoint, and acceptance criteria
 - [`phase6-clipping-group-deformer.md`](phase6-clipping-group-deformer.md) — Phase 6 clipping, Warp/Lattice Deformer, evaluation order, and authoring contract
@@ -19,8 +22,8 @@ Start with the [product overview](../README.md) or the detailed
 - [`key-art-transition.md`](key-art-transition.md) — multi-Key-Art A→B→C transition model
 - [`mcp-design.md`](mcp-design.md) — MCP-ready command/transaction architecture
 - [`repository-boundaries.md`](repository-boundaries.md) — Product / Staging / Test / History separation, testing and CI boundary
-- [`csharp-wpf-ui-migration.md`](csharp-wpf-ui-migration.md) — accepted WPF shell / JavaScript Product Host migration design; Phase 1 foundation is complete and Issue #96 / PR #101 carries the Source-through-Export production candidate
-- [`native-capability-map.md`](native-capability-map.md) — Issue #96 migration completion ledger and remaining release acceptance; this is the current capability-status authority for native migration
+- [`csharp-wpf-ui-migration.md`](csharp-wpf-ui-migration.md) — historical WPF/JavaScript Host migration design, superseded for runtime by ADR 0012
+- [`native-capability-map.md`](native-capability-map.md) — current C++ production capability map, implementation owners, evidence and remaining Windows acceptance
 - [`native-command-migration.md`](native-command-migration.md) — C++ typed Command coverage and migration scope
 - [`native-query-migration.md`](native-query-migration.md) — NativeSession readonly Query boundary and conformance
 - [`native-production-workflow.md`](native-production-workflow.md) — Nativeの素材読込から書き出し・保存再開までの制作手順と最終Windows確認
@@ -28,7 +31,7 @@ Start with the [product overview](../README.md) or the detailed
 - [`research/rigging-tools.md`](research/rigging-tools.md) — reference research from Inochi2D/Inochi Creator, Live2D Cubism, Stretchy Studio, Iki, Godot, and Synfig
 - [`research/key-art-transition-research.md`](research/key-art-transition-research.md) — correspondence/morphing research notes
 - [`reviews/phase1c-implementation-20260831.md`](reviews/phase1c-implementation-20260831.md) — historical Phase 1C implementation coverage and manual acceptance record
-- [`reviews/issue-94-native-foundation.md`](reviews/issue-94-native-foundation.md) — Phase 1 Product Host/WPF foundation review; later production migration state is tracked by #96 / PR #101
+- [`reviews/issue-94-native-foundation.md`](reviews/issue-94-native-foundation.md) — Phase 1 Product Host/WPF foundation review; current native state is tracked by #118/#142 and the capability map
 
 Repository-wide AI/automation rules live at [`../AGENTS.md`](../AGENTS.md).
 
@@ -39,7 +42,7 @@ Repository-wide AI/automation rules live at [`../AGENTS.md`](../AGENTS.md).
 - [`decisions/0003-mesh-layout-vs-deform-mode.md`](decisions/0003-mesh-layout-vs-deform-mode.md) — separate Mesh Layout (位置決め) from Deform (変形), including topology/Key-Art/MCP implications
 - [`decisions/0004-project-files-recovery-and-psd-reimport.md`](decisions/0004-project-files-recovery-and-psd-reimport.md) — `.fl2d`, save points, Preferences/Recovery, reviewed PSD re-import, and the minimal headless boundary
 - [`decisions/0005-windows-desktop-shell.md`](decisions/0005-windows-desktop-shell.md) — Electron Windows shell, native file semantics, Recovery storage, Recent Files, and security boundary; remains release history until native cutover
-- [`decisions/0006-csharp-wpf-shell-product-host.md`](decisions/0006-csharp-wpf-shell-product-host.md) — accepted WPF shell with a versioned out-of-process JavaScript Product Host
+- [`decisions/0006-csharp-wpf-shell-product-host.md`](decisions/0006-csharp-wpf-shell-product-host.md) — historical WPF/JS Host design, superseded for runtime by ADR 0012
 - [`decisions/0007-native-recovery-lifecycle.md`](decisions/0007-native-recovery-lifecycle.md) — accepted native Recovery lineage/save acknowledgement implementation contract; final PR/Windows acceptance remains open
 - [`decisions/0008-native-renderer-selection.md`](decisions/0008-native-renderer-selection.md) — measured D3D11 hardware/WARP native renderer choice and bounded artifact policy
 - [`decisions/0009-native-mesh-animation-identity.md`](decisions/0009-native-mesh-animation-identity.md) — expose the existing mesh animation identity through ordinary Commands
@@ -51,11 +54,11 @@ For questions such as “is this feature implemented now?”, prefer documents i
 
 1. [`native-capability-map.md`](native-capability-map.md) for native migration capability disposition and evidence;
 2. [`roadmap.md`](roadmap.md) for current phase/gate status;
-3. accepted ADRs 0006–0009 for current native architectural decisions;
+3. ADR 0012 for current native authority, with retained domain/recovery/rendering decisions;
 4. phase-specific normative design documents for domain semantics;
 5. older reviews/drafts only as historical context.
 
-PR #101 is merged; final real-art Windows acceptance of the native production candidate remains open. Electron remains the default installed/released shell until the explicit retirement/cutover criteria pass.
+The #118/#142 unified native candidate keeps final real-art Windows acceptance open. JS/Electron/Host are compatibility reference outside production. Installer/default association is a separate release decision.
 
 ## Earlier draft
 

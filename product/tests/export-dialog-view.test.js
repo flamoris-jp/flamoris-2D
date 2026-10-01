@@ -15,7 +15,7 @@ test("Export dialog stays a thin Desktop/UI composition over existing export fou
   assert.doesNotMatch(source, /session\.execute|executeTransaction|Undo|Redo/);
 
   const productionFiles = await readFile(
-    new URL("../production-files.txt", import.meta.url),
+    new URL("../legacy-reference-files.txt", import.meta.url),
     "utf8",
   );
   assert.match(productionFiles, /^src\/core\/export-settings\.js$/m);

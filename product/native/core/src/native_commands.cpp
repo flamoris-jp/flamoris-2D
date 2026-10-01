@@ -1,4 +1,5 @@
 #include "native_commands.h"
+#include "native_validation.h"
 #include "js_text.h"
 #include <algorithm>
 #include <cmath>
@@ -410,19 +411,7 @@ const std::map<std::string, CompiledSchema>& schemas() {
     return result;
 }
 bool schema_project(const Value& value) {
-    const auto text = value.serialize();
-    if (text.size() > FL2D_SNAPSHOT_MAX_BYTES) return false;
-    fl2d_snapshot* snapshot = nullptr;
-    if (fl2d_snapshot_load(reinterpret_cast<const uint8_t*>(text.data()), static_cast<uint32_t>(text.size()), &snapshot) != FL2D_OK) return false;
-    int32_t schema; double width, height; uint32_t nodes, count;
-    auto status = fl2d_snapshot_summary(snapshot, &schema, &width, &height, &nodes, &count);
-    bool valid = status == FL2D_OK;
-    for (uint32_t i = 0; valid && i < count; ++i) {
-        char severity[16]; uint32_t required;
-        valid = fl2d_snapshot_issue_string(snapshot, i, "severity", severity, sizeof(severity), &required) == FL2D_OK && std::string(severity) != "error";
-    }
-    fl2d_snapshot_destroy(snapshot);
-    return valid;
+    return value.serialize().size()<=FL2D_DOCUMENT_MAX_BYTES && fl2d_validation::valid_project(value);
 }
 bool matches_schema(const Value& value, const Value& schema) {
     const auto& type = field(schema, "type");

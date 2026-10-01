@@ -1,6 +1,6 @@
 # FLAMORIS 2D Repository Boundaries
 
-Status: proposed
+Status: native production candidate boundary (#118/#142), pending PR review
 
 This document adapts the useful Product / Staging / Test / History separation used by `flamoris-net/flamoris-george` to FLAMORIS 2D.
 
@@ -23,81 +23,35 @@ The directories may be introduced incrementally, but their dependency direction 
 
 ## 2. Product
 
-`product/` contains everything required to run/build the actual FLAMORIS 2D editor and its production-capable headless core.
+Native production lives under `product/native/`: C++ core/renderer, narrow
+interop, one managed session lane, source codecs, typed desktop client, WPF app
+and shared MCP bridge. `product/packaging/` assembles that explicit project graph.
+See [renovation map](repository-renovation.md) for the file-level disposition.
 
-Expected internal shape:
+`product/src/`, `product/product-host/`, `product/desktop/` and the browser entry
+are compatibility/reference code (see `product/LEGACY.md`). The previous managed
+Host client/tests remain at their historical paths, excluded from the native
+solution and publish graph. They receive no new production responsibility.
+Colocated tests/fixtures and test-only npm dependencies are never runtime inputs.
 
-```text
-product/
-├── package.json
-├── production-files.txt      # or equivalent explicit build allowlist
-├── src/
-│   ├── model/
-│   ├── core/
-│   ├── commands/
-│   ├── io/
-│   ├── renderer/
-│   ├── ui/
-│   └── integrations/
-│       └── mcp/              # when MCP becomes a Product feature
-└── tests/                    # deterministic local unit tests if kept close
-```
+## 3. Production artifact boundary
 
-Product rules:
-
-- Product runtime must not import `staging/`, root `test/`, or `history/`.
-- Browser editor startup must not require staging PSDs or reference screenshots.
-- MCP is Product only when it is a supported integration over the normal command/query core.
-- AI/MCP may not bypass project validation or mutate project state outside the Command/Transaction API.
-- Product unit tests, if colocated, are development-only and excluded from production artifacts.
-
-## 3. Production artifact allowlist
-
-Release/build inputs should be explicit.
-
-George uses `product/production-files.txt` as an allowlist. FLAMORIS 2D should use the same principle, though the exact mechanism may be a file list or a build system with equally explicit inputs.
-
-Reason:
-
-```text
-repository contains
-  Product
-  tests
-  staging fixtures
-  screenshots
-  historical prototype data
-
-release artifact contains
-  only Product-required content
-```
-
-This prevents accidental packaging of real PSD fixtures, test-only code, local handoff files, or historical assets.
-
-Before the first distributable build, add an automated check that the production artifact is derived only from the approved Product boundary.
-
-The current Electron build includes `desktop/**/*`, `src/**/*`, the entry
-HTML, the Product package manifest, and the required `ag-psd` runtime files.
-`production-files.txt` is the reviewed responsibility manifest for that
-boundary; a deterministic test verifies that its relative import graph is
-closed and that every listed file exists. The Electron glob and the manifest
-are intentionally not claimed to be the same mechanism yet. Making the build
-consume the manifest should be a separate packaging change, with a packaged
-application smoke test, rather than an incidental refactor.
-
-## 3.1 Runtime responsibility map
+App/Bridge MSBuild references and explicit Content items define production
+inputs. The package script also rejects JS/Node/Electron/Host content, checks all
+required native libraries/notices and records SHA256 sums. The package does not
+contain staging, root integration tests, history or private acceptance artwork.
+`legacy-reference-files.txt` is only the old shell's compatibility graph; it is
+not a production allowlist. Its import-closure test preserves the oracle.
 
 | Area | Owns | Must not own |
 | --- | --- | --- |
-| `model/` | Persistent Project data and validation | DOM, filesystem, transient authoring selection |
-| `commands/`, `queries/` | The mutation/read boundary used by UI and MCP | Parallel persistent state or renderer policy |
-| `core/` | Canonical temporal/Transition evaluation and shared deterministic rendering/export orchestration | Viewport state, native dialogs, filesystem paths |
-| `ui/` | Transient controllers/views, viewport input/camera state, and Desktop bridge adapters | Direct filesystem/process access or persistent Project mutation outside commands |
-| `desktop/`, `src/desktop/` | Trusted Electron lifecycle, IPC validation, native dialogs, filesystem/session ownership, and FFmpeg process ownership | Transition evaluation or UI-only persistence |
-
-The browser bootstrap in `src/app.js` constructs and wires these
-responsibilities. Viewport camera geometry is isolated in
-`ui/viewport-camera-controller.js`; evaluated composition semantics remain in
-`core/shared-composition-renderer.js` and are shared by preview and export.
+| `native/core/` | Native Project, commands/queries/history, persistence, source conversion, authoring and evaluation | WPF/DOM, filesystem paths, viewport state |
+| `native/renderer/` | D3D11 compositing/textures/readback | Animation authoring or alternate Project |
+| `native/src/Flamoris2D.Core.Interop/` | Opaque handles and immutable interchange | Editable managed Project |
+| `native/src/Flamoris2D.Session/` | Serialized shared workspace, receipts and immutable asset lifetime | Separate Undo/Redo or MCP document |
+| `native/src/Flamoris2D.Source.Codecs/` | Decode immutable source candidates | Persistent editing/reconciliation authority |
+| WPF/Native.Client/Rendering | UI, OS I/O, guarded typed intents and viewport mapping | JS fallback or direct managed Project edits |
+| MCP Bridge/Core adapter | Transport/grants and typed commands on the same workspace | Source filesystem/import/save/process authority |
 
 ## 4. Staging
 

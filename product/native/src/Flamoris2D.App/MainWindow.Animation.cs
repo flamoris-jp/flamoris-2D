@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
-using Flamoris.Flamoris2D.ProductHost;
+using Flamoris.Flamoris2D.Native.Client;
 
 namespace Flamoris.Flamoris2D.App;
 
@@ -81,7 +81,7 @@ public partial class MainWindow
         if(!animated)StopPlayback();
         if(_editingContext==EditingContext.Animation){AuthoringPanel.Visibility=Visibility.Visible;_=RefreshRigSurfaceAsync();}
     }
-    private async Task RefreshTimelineAsync(ProductHostClient client)
+    private async Task RefreshTimelineAsync(NativeSessionClient client)
     {
         if(_editingContext!=EditingContext.Animation)return;
         var context=CurrentTimelineContext();var response=await client.GetTimelineAsync(context);

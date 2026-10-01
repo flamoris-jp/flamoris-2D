@@ -229,7 +229,7 @@ test("child creation rename and validated reparent use normal Commands", () => {
 test("Bone authoring controller is DOM-independent and production packaged", async () => {
   const [source, manifest] = await Promise.all([
     readFile(new URL("../src/ui/bone-authoring-controller.js", import.meta.url), "utf8"),
-    readFile(new URL("../production-files.txt", import.meta.url), "utf8"),
+    readFile(new URL("../legacy-reference-files.txt", import.meta.url), "utf8"),
   ]);
   assert.equal(source.includes("document."), false);
   assert.equal(source.includes("window."), false);

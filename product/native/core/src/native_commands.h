@@ -16,6 +16,8 @@ inline const Value& field(const Value& value, const std::string& key) {
     auto it = object.find(key);
     return it == object.end() ? missing : it->second;
 }
+Array canonical_influences(const Value& values);
+Array canonical_offsets(const Value& values);
 void assert_command(const Value& command, bool allow_internal);
 Applied apply(Value& project, const Value& command);
 bool apply_bone_hierarchy(Value& project, const std::string& type, const Value& payload, Applied& result);

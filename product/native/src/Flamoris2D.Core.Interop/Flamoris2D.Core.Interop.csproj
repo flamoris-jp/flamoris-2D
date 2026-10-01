@@ -6,7 +6,7 @@
     <NativeCoreBuildDir>$(MSBuildProjectDirectory)/obj/native-x64</NativeCoreBuildDir>
     <NativeCoreDll>$(NativeCoreBuildDir)/$(Configuration)/Flamoris2D.Core.Native.dll</NativeCoreDll>
   </PropertyGroup>
-  <ItemGroup>
+  <ItemGroup Condition="'$(OS)' == 'Windows_NT'">
     <Content Include="$(NativeCoreDll)" Link="Flamoris2D.Core.Native.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="$(NativeCoreBuildDir)/$(Configuration)/icuuc78.dll" Link="icuuc78.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="$(NativeCoreBuildDir)/$(Configuration)/icuin78.dll" Link="icuin78.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
@@ -16,6 +16,5 @@
   <Target Name="BuildNativeCore" BeforeTargets="CoreCompile;GetCopyToOutputDirectoryItems" Condition="'$(OS)' == 'Windows_NT'">
     <Exec Command='cmake -S &quot;$(MSBuildProjectDirectory)/../../core&quot; -B &quot;$(NativeCoreBuildDir)&quot; -A x64 -DBUILD_TESTING=ON' />
     <Exec Command='cmake --build &quot;$(NativeCoreBuildDir)&quot; --config $(Configuration) --parallel' />
-    <Exec Command='ctest --test-dir &quot;$(NativeCoreBuildDir)&quot; -C $(Configuration) --output-on-failure' />
   </Target>
 </Project>

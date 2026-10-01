@@ -81,7 +81,7 @@ test("mirror helper/controller are DOM-independent and production packaged", asy
   const [helper, controller, manifest] = await Promise.all([
     readFile(new URL("../src/core/bone-mirror-helper.js", import.meta.url), "utf8"),
     readFile(new URL("../src/ui/bone-mirror-authoring-controller.js", import.meta.url), "utf8"),
-    readFile(new URL("../production-files.txt", import.meta.url), "utf8"),
+    readFile(new URL("../legacy-reference-files.txt", import.meta.url), "utf8"),
   ]);
   assert.doesNotMatch(helper + controller, /\bdocument\b|\bwindow\b|HTMLElement/);
   assert.doesNotMatch(helper + controller, /left|right/i);

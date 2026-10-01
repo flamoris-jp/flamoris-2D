@@ -47,6 +47,25 @@ internal static class NativeMethods
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_abi_version")]
     internal static extern NativeStatus AbiVersion(out int major, out int minor);
 
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_prepared_query_json")]
+    internal static extern NativeStatus PreparedQuery(NativePrepared prepared, byte[] input, uint length,
+        byte[]? buffer, uint capacity, out uint required);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_generate_mesh_json")]
+    internal static extern NativeStatus GenerateMesh(uint width,uint height,byte[] rgba,uint byteLength,byte[] input,uint length,
+        byte[]? buffer,uint capacity,out uint required);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_source_project_json")]
+    internal static extern NativeStatus SourceProject(byte[] input, uint length,
+        byte[]? buffer, uint capacity, out uint required);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_document_parse_json")]
+    internal static extern NativeStatus DocumentParse(byte[] input, uint length,
+        byte[]? buffer, uint capacity, out uint required);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_session_document_json")]
+    internal static extern NativeStatus SessionDocument(NativeSession session, byte[] options, uint length,
+        byte[]? buffer, uint capacity, out uint required);
+
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_engine_create")]
     internal static extern NativeStatus Create(out IntPtr handle);
 

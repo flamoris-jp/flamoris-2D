@@ -1,5 +1,5 @@
 using System.IO;
-using Flamoris.Flamoris2D.ProductHost;
+using Flamoris.Flamoris2D.Native.Client;
 using Flamoris.Mcp.Wpf;
 using CorePermission = Flamoris.Mcp.Core.McpPermission;
 
@@ -19,7 +19,7 @@ public partial class MainWindow
     }
     private async Task<McpDesktopAttachment> AttachMcp(CorePermission permission)
     {
-        var client = _client ?? throw new InvalidOperationException("Product Host unavailable.");
+        var client = _client ?? throw new InvalidOperationException("Native editing authority unavailable.");
         _mcpConnection = await client.EnableMcpAsync(permission == CorePermission.Edit ? McpPermission.Edit : McpPermission.ReadOnly,
             startLocalEndpoint: false);
         return new(client.LiveMcpBoundary!, client.LiveMcpGrant!, async () => { await client.DisableMcpAsync(); });
@@ -36,7 +36,7 @@ public partial class MainWindow
         _mcpUi?.Invalidate();
         _mcpUi?.Refresh();
     }
-    private Task RefreshMcpStatusAsync(ProductHostClient client)
+    private Task RefreshMcpStatusAsync(NativeSessionClient client)
     {
         if (ReferenceEquals(client, _client)) { _mcpUi?.Refresh(); _mcpUi?.NotifyHostReady(); }
         return Task.CompletedTask;

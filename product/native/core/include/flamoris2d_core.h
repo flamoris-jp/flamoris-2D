@@ -74,7 +74,7 @@ FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_node_state(const fl2d_snapshot* sna
 FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_issue_string(const fl2d_snapshot* snapshot,
     uint32_t index, const char* field, char* buffer, uint32_t capacity, uint32_t* required);
 
-/* ABI 1.3: experimental session. UTF-8 input is copied (maximum 1 MiB).
+/* ABI 1.3: authoritative session. UTF-8 input is copied (maximum 128 MiB).
  * The command document is a JSON array of existing Product command envelopes.
  * Session calls must be serialized by the caller. A prepared handle is one-shot;
  * destroy it even after commit. Destroying its session invalidates it safely.
@@ -100,6 +100,10 @@ FL2D_API fl2d_status FL2D_CALL fl2d_session_prepare(fl2d_session* session, const
 FL2D_API fl2d_status FL2D_CALL fl2d_session_prepare_undo(fl2d_session* session, fl2d_prepared** result);
 FL2D_API fl2d_status FL2D_CALL fl2d_session_prepare_redo(fl2d_session* session, fl2d_prepared** result);
 FL2D_API fl2d_status FL2D_CALL fl2d_prepared_commit(fl2d_prepared* prepared);
+/* Read a disposable validated candidate without committing Project/history.
+ * Rejects consumed, stale or orphaned preparations. */
+FL2D_API fl2d_status FL2D_CALL fl2d_prepared_query_json(const fl2d_prepared* prepared,
+    const uint8_t* request,uint32_t length,char* buffer,uint32_t capacity,uint32_t* required);
 FL2D_API void FL2D_CALL fl2d_prepared_destroy(fl2d_prepared* prepared);
 /* Last error code on this session, set by failed session operations; empty on success.
  * Caller-owned buffer rules match snapshot_string. */
@@ -113,6 +117,32 @@ FL2D_API fl2d_status FL2D_CALL fl2d_session_error(const fl2d_session* session, c
  * Calls, including sizing calls, never change state or the mutation error. */
 FL2D_API fl2d_status FL2D_CALL fl2d_session_query_json(const fl2d_session* session,
     const uint8_t* request, uint32_t length, char* buffer, uint32_t capacity, uint32_t* required);
+
+/* ABI 1.5: format-v1 persistence. Inputs and envelope outputs are bounded at
+ * 128 MiB including the embedded Project. Proof snapshots retain their 1 MiB limit.
+ * Parsing returns {value:{project,metadata,renderAssets}} or {error:{code,details}}.
+ * Serialization reads this session only and accepts {now,createdAt,modifiedAt,renderAssets}.
+ * now is supplied by the storage adapter, never read from a hidden native clock.
+ * Both sizing and copy calls are readonly and must run on the session lane. */
+#define FL2D_DOCUMENT_MAX_BYTES 134217728u
+FL2D_API fl2d_status FL2D_CALL fl2d_document_parse_json(const uint8_t* bytes, uint32_t length,
+    char* buffer, uint32_t capacity, uint32_t* required);
+FL2D_API fl2d_status FL2D_CALL fl2d_session_document_json(const fl2d_session* session,
+    const uint8_t* options, uint32_t length, char* buffer, uint32_t capacity, uint32_t* required);
+
+/* Immutable source-to-Project conversion. Decoder candidates are
+ * {kind:"psd"|"flimg",source:object,options:{fileName,projectName,importedAt}}.
+ * This does not attach or edit a session. Raster decoding/validation precedes it. */
+FL2D_API fl2d_status FL2D_CALL fl2d_source_project_json(const uint8_t* bytes, uint32_t length,
+    char* buffer, uint32_t capacity, uint32_t* required);
+
+/* Readonly Grid/Contour authoring candidate from immutable RGBA8 pixels.
+ * byte_length must equal width*height*4; dimensions and work are bounded.
+ * Request {kind,columns,rows,left,top,settings} is at most 1 MiB.
+ * No session state is read or changed. Result follows the document envelope. */
+FL2D_API fl2d_status FL2D_CALL fl2d_generate_mesh_json(uint32_t width,uint32_t height,
+    const uint8_t* rgba,uint32_t byte_length,const uint8_t* request,uint32_t length,
+    char* buffer,uint32_t capacity,uint32_t* required);
 
 typedef struct fl2d_frame_rate {
     int64_t numerator;

@@ -292,6 +292,43 @@ Value bone_fk(const Value& p, const Value& art, bool projected, const std::map<s
     return Value(Object{{"poses",Value(results)},{"diagnostics",Value(diagnostics)}});
 }
 
+Value authoring_point(const Value& p,const Value& node_id,const Value& art,const Value& document_point,bool bone_pose,bool parent_local) {
+    if(!finite_point(document_point))throw fl2d_queries::Error{"TypeError","Document point must be finite."};
+    try {
+        if(bone_pose) {
+            if(!art.is<std::string>())throw fl2d_queries::Error{"Error","Select an active Key Art before posing a Bone."};
+            const auto zero=Value(Object{{"x",Value(0.0)},{"y",Value(0.0)},{"rotation",Value(0.0)}});
+            const auto fk=bone_fk(p,art,true,{{node_id.get<std::string>(),zero}});
+            const auto& issues=field(fk,"diagnostics").get<Array>();if(!issues.empty()){std::string message;for(const auto& d:issues){if(!message.empty())message+='\n';message+=str(d,"message");}throw fl2d_queries::Error{"Error",message};}
+            const auto pose=find(field(fk,"poses").get<Array>(),node_id,"boneId");
+            if(pose.is<picojson::null>())throw fl2d_queries::Error{"Error","Selected Bone was not produced by FK evaluation."};
+            return transform(inverse(affine(field(pose,"poseMatrix"))),document_point);
+        }
+        const auto resolved=stages(p,node_id,art);auto value=document_point;
+        for(auto it=resolved.rbegin();it!=resolved.rend();++it){auto reversed=*it;std::swap(reversed.base,reversed.authored);value=transform(reversed.from,map_lattice(reversed,transform(reversed.to,value)));}
+        const auto& node=field(field(field(p,"scene"),"nodes"),node_id.get<std::string>());
+        const auto local_node=parent_local?field(node,"parentId"):node_id;
+        return transform(inverse(fl2d_math::world(p,local_node.get<std::string>())),value);
+    } catch(const EvaluationFailure& issue) {throw fl2d_queries::Error{"Error",issue.message};}
+}
+Value deformer_lattice(const Value& p,const Value& deformer,const Value& art,const Value& control_points) {
+    Array output,diagnostics;
+    if(!art.is<std::string>())return Value(Object{{"documentPositions",Value(output)},{"diagnostics",Value(diagnostics)}});
+    try {
+        const auto parent_stages=stages(p,field(deformer,"id"),art);
+        const auto world=fl2d_math::world(p,str(deformer,"id"));
+        for(const auto& id:field(deformer,"controlPointIds").get<Array>()) {
+            auto point_value=transform(world,find(control_points.get<Array>(),id,"controlPointId"));
+            for(const auto& stage:parent_stages)point_value=warp_point(stage,point_value);
+            point_value.get<Object>()["controlPointId"]=id;output.push_back(point_value);
+        }
+    } catch(const EvaluationFailure& issue) {
+        Object d{{"code",Value(issue.code)},{"message",Value(issue.message)},{"deformerId",field(issue.details,"deformerId")},{"nodeId",field(deformer,"id")},{"keyArtId",art}};
+        diagnostics.emplace_back(d);output.clear();
+    }
+    return Value(Object{{"documentPositions",Value(output)},{"diagnostics",Value(diagnostics)}});
+}
+
 Value ik_chain(const Value& p, const Value& id, const Value& art) {
     const auto constraint = find(rig(p,"twoBoneIkConstraints"),id);
     if (constraint.is<picojson::null>()) return Value(Object{{"chain",Value()},{"diagnostics",Value(Array{diag("TWO_BONE_IK_NOT_FOUND","TwoBoneIkConstraint does not exist.",{{"details",Value(Object{{"constraintId",id}})}})})}});

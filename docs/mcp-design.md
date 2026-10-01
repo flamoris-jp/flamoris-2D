@@ -5,15 +5,16 @@ Status: current live contract below; original sections retain the MCP-first desi
 
 ## Live MCP attachment (Issue #107)
 
-Current contract: [ADR 0011](decisions/0011-mcp-core-migration.md), superseding the
+Current contract: [ADR 0012](decisions/0012-native-session-cutover.md) for native authority and [ADR 0011](decisions/0011-mcp-core-migration.md) for shared transport, superseding the
 historical HTTP transport in [ADR 0010](decisions/0010-native-live-mcp.md).
 
 External MCP client → packaged `mcp/Flamoris.Mcp.Bridge.exe` → authenticated,
-same-user local named pipe → `Flamoris.Mcp.Core 1.1.0` → Native Product Host adapter
-→ the same Node EditorSession, Project and source-artwork Undo/Redo history.
+same-user local named pipe → `Flamoris.Mcp.Core 1.2.0` → `NativeMcpHost`
+→ the same `NativeWorkspace` / C++ NativeSession and source-artwork history.
 
-Manual connection is disabled by default. `MCP / AI` offers Read only / Edit,
-Disable, credential rotation and explicit connection copy. The copied entry starts
+Manual connection is disabled by default. `MCP / AI` offers Connect / Stop /
+Settings; settings retain Read only / Edit permission. Connection copy explicitly
+exports a transient capability. The copied entry starts
 the bridge with `--pipe <name>` and passes the transient capability only through
 `FLAMORIS_MCP_CAPABILITY`. Do not save that capability in application settings,
 project data, command arguments, logs or provider profile files. Only explicit
@@ -46,51 +47,43 @@ access, process/eval and internal restore commands remain excluded. Edit is neve
 filesystem authority. WPF observes the usual `document.changed` events; one MCP
 transaction is one normal history unit. Revision conflict never silently rebases.
 
-### Cross-process serialization and lifetime
+### Shared native serialization and lifetime
 
-The adapter reserves the existing Product Host serialization lane for each Core
-snapshot/read/commit callback. WPF and other MCP work wait on that same queue.
-The snapshot is read at the real authority, and Product Host validates the
-reservation, runtime, document, revision and permission again before dispatch.
-The existing EditorSession `beforeCommit` hook checks revocation and a monotonic
-reservation deadline before installing any prepared transaction or history change.
-The ordinary Product transaction/history preparation is separate from its small
-atomic commit closure. After preparation, C# rechecks the request token before
-sending commit acknowledgement. Cancel/timeout drops that draft without touching
-Project or source-art history. WPF uses the same methods synchronously. No second
-session, Product Host, document authority or history exists in C# or bridge.
+`NativeMcpHost` enters the same `NativeWorkspace.InvokeAsync` lane as WPF.
+C++ `NativeSession` is the only Project/revision/history authority. Core reads
+attachment guards at that lane and holds its commit guard around preparation
+and commit. Native transactions/history prepare separately; cancellation and
+revocation are rechecked before committing. Failed preparation never changes
+Project or retained artwork. A lost response after commit is ambiguous: query
+before retrying rather than replaying the edit.
 
-Each reservation is bounded to five seconds including queue wait, with at most
-8 pending reservations; release/cancel/disable bypass queued work. Core allows
-4 active requests, bounds frames to 4 MiB and depth 64, and applies its 15-second
-request deadline. Query results are capped at 1 MiB before control-channel serialization.
-A started partial frame is bounded by Core; healthy idle time
-has no idle expiration. Synchronous preparation is not preempted mid-instruction;
-its draft cannot commit until C# acknowledges the still-live request. Revocation
-and deadline are rechecked at the final atomic commit, including Undo/Redo.
-A response lost after commit remains ambiguous; query before retrying, never replay.
+Core bounds concurrent requests to 4, request frames to 4 MiB and the transport
+request deadline to 15 seconds. Product query results are capped at 1 MiB.
+Synchronous native preparation is not preempted mid-instruction; its commit is
+still subject to the cancellation/lease check. No Host reservation or IPC
+acknowledgement exists in this runtime.
 
-Document replacement revokes at the Product Host before installing the replacement.
-Native attachment then invalidates the Core grant. Disable revokes at Node before
-Core endpoint cleanup. Control-channel loss terminates the owned Host and revokes
-Core before publishing authority loss. Every enable rotates pipe/capability.
+Document replacement invalidates the document lease and Core grant in the same
+workspace lane. Disable revokes before endpoint cleanup; shutdown cancels the
+client lifetime and disposes the workspace. Every enable rotates the capability.
+Prepared candidates and immutable JSON/raster projections are not editable
+Project mirrors. Artwork restoration follows native Undo/Redo revision identity.
 
 ### Protocol, status and package
 
-Core's official C# SDK owns MCP stdio protocol/version negotiation (modern
-2026-07-28 and legacy initialization tested by the shared bridge integration).
-The Node MCP HTTP server, HTTP bearer configuration and Node SDK runtime are removed.
-The private raster/document bulk channel remains a separate Native capability.
+Core/Wpf 1.2.0 owns stdio/named-pipe transport and shared connection UI. The official
+C# SDK owns protocol negotiation. `Flamoris.Mcp.Bridge.exe` has no session or
+filesystem editing capability. Node/JS/Product Host are excluded from runtime.
 
-The status is green for an authenticated connected bridge and red otherwise, with
-text distinguishing disabled, waiting and connected. Foreground activity uses
-Core's activity projection, a Chipsy indicator and temporary wait cursor; completion,
-cancellation, disconnection and shutdown restore the current host cursor.
+The status is green for an authenticated connected bridge and red otherwise,
+with text distinguishing disabled, waiting and connected. Foreground activity
+uses Core's projection, Chipsy and temporary wait cursor. Shared UI offers
+Connect/Stop/Settings, manual by default; credentials remain transient.
 
-Existing Windows CI publishes the matching self-contained bridge, exercises an
-official client, and runs the packaged WPF Mesh/transaction/Undo smoke. Node tests
-protect authority reservations and source-art history. Physical Windows checks
-still cover manual client configuration, Ctrl+Z/Ctrl+Y, real artwork and DPI.
+Native session/desktop tests cover shared revision/history, stale guards,
+cancellation, concurrent replacement and read-only/revoked grants. Windows CI
+adds the actual bridge transport and packaged WPF workflow. Physical checks
+still cover manual client configuration, real artwork, input and DPI.
 
 ## 1. Principle
 
