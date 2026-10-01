@@ -5,7 +5,7 @@ Start with the [product overview](../README.md) or the detailed
 
 ## Current design set
 
-- [`repository-renovation.md`](repository-renovation.md) — #142 inventory and native/legacy responsibility boundaries
+- [`repository-renovation.md`](repository-renovation.md) — #142 native convergence record and cleanup boundary
 - [`decisions/0012-native-session-cutover.md`](decisions/0012-native-session-cutover.md) — one C++ NativeSession, persistence/source ingest and WPF/MCP cutover
 
 - [`basic-design.md`](basic-design.md) — foundational domain/product design. Its browser/WebGL shell notes are historical; current shell/authority is WPF plus ADR 0012 and the native capability map.
@@ -58,7 +58,7 @@ For questions such as “is this feature implemented now?”, prefer documents i
 4. phase-specific normative design documents for domain semantics;
 5. older reviews/drafts only as historical context.
 
-The #118/#142 unified native candidate keeps final real-art Windows acceptance open. JS/Electron/Host are compatibility reference outside production. Installer/default association is a separate release decision.
+The #118/#142 migration is complete and the superseded JS/Electron/Product Host implementation has been removed. Remaining product defects and usability work are tracked separately. Installer/default association remains a separate release decision.
 
 ## Earlier draft
 
