@@ -135,9 +135,9 @@ struct fl2d_prepared {
     bool used = false, empty = false;
 };
 
-extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_session_query_json(const fl2d_session* session,
-    const uint8_t* bytes, uint32_t length, char* buffer, uint32_t capacity, uint32_t* required) {
-    if (!session || !required) return FL2D_INVALID_ARGUMENT;
+namespace {
+fl2d_status query_json(const Value& project,const uint8_t* bytes,uint32_t length,char* buffer,uint32_t capacity,uint32_t* required) {
+    if(!required)return FL2D_INVALID_ARGUMENT;
     *required = 0;
     try {
         Value request;
@@ -148,11 +148,21 @@ extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_session_query_json(const fl2d_ses
         for (const auto& [key,value] : object) { (void)value; if (key != "name" && key != "input") return FL2D_INVALID_ARGUMENT; }
         const Value input = object.count("input") ? object.at("input") : Value(Object{});
         if (!input.is<Object>()) return FL2D_INVALID_ARGUMENT;
-        return copy(fl2d_queries::query(session->state->project,field(request,"name").get<std::string>(),input).serialize(),
+        return copy(fl2d_queries::query(project,field(request,"name").get<std::string>(),input).serialize(),
             buffer,capacity,required);
     } catch (const fl2d_queries::Unsupported&) { return FL2D_QUERY_UNSUPPORTED; }
       catch (const std::bad_alloc&) { return FL2D_OUT_OF_MEMORY; }
       catch (...) { return FL2D_INTERNAL_ERROR; }
+}
+}
+extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_session_query_json(const fl2d_session* session,const uint8_t* bytes,uint32_t length,char* buffer,uint32_t capacity,uint32_t* required) {
+    return session?query_json(session->state->project,bytes,length,buffer,capacity,required):FL2D_INVALID_ARGUMENT;
+}
+extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_prepared_query_json(const fl2d_prepared* prepared,const uint8_t* bytes,uint32_t length,char* buffer,uint32_t capacity,uint32_t* required) {
+    if(!prepared || !required || prepared->used || !prepared->next)return FL2D_INVALID_ARGUMENT;
+    *required=0;const auto live=prepared->owner.lock();
+    if(!live || live->generation!=prepared->generation || live->current!=prepared->revision || live->counter!=prepared->counter)return FL2D_REVISION_CONFLICT;
+    return query_json(prepared->next->project,bytes,length,buffer,capacity,required);
 }
 
 extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_session_create(const uint8_t* bytes, uint32_t length, fl2d_session** result) {

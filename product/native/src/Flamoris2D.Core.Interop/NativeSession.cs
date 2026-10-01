@@ -26,6 +26,16 @@ public sealed class NativePrepared : SafeHandle
         if (pointer == IntPtr.Zero) throw new InvalidOperationException("Native prepared edit returned null.");
         var result = new NativePrepared(); result.SetHandle(pointer); return result;
     }
+    public JsonElement Query(string name,JsonElement input=default)
+    {
+        if(IsClosed || IsInvalid)throw new ObjectDisposedException(nameof(NativePrepared));
+        if(input.ValueKind==JsonValueKind.Undefined)input=JsonSerializer.SerializeToElement(new {});
+        var request=JsonSerializer.SerializeToUtf8Bytes(new {name,input});
+        var response=NativeSession.Read((byte[]? b,uint c,out uint r)=>NativeMethods.PreparedQuery(this,request,(uint)request.Length,b,c,out r),NativeDocument.MaximumBytes+1);
+        using var json=JsonDocument.Parse(response,new JsonDocumentOptions {MaxDepth=4096});
+        if(json.RootElement.TryGetProperty("error",out var error))throw new NativeQueryException(error.GetProperty("name").GetString()!,error.GetProperty("message").GetString()!);
+        return json.RootElement.GetProperty("value").Clone();
+    }
     public NativeStatus Commit()
     {
         if (IsClosed || IsInvalid) throw new ObjectDisposedException(nameof(NativePrepared));
@@ -67,8 +77,8 @@ public sealed class NativeSession : SafeHandle
         return result;
     }
     public NativeStatus MarkSaved(long revision) { EnsureOpen(); return NativeMethods.SessionMarkSaved(this, revision); }
-    private delegate NativeStatus StringQuery(byte[]? buffer, uint capacity, out uint required);
-    private static string Read(StringQuery query, uint maximum = NativeSnapshot.MaxBytes + 1)
+    internal delegate NativeStatus StringQuery(byte[]? buffer, uint capacity, out uint required);
+    internal static string Read(StringQuery query, uint maximum = NativeSnapshot.MaxBytes + 1)
     {
         var status = query(null, 0, out var length);
         if (status == NativeStatus.QueryUnsupported) throw new NotSupportedException("Product query awaits native implementation.");

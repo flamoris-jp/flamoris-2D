@@ -50,6 +50,16 @@ public sealed partial class NativeWorkspace : IAsyncDisposable
     public JsonElement History => Parse(Session.HistoryJson());
     public IReadOnlyDictionary<string,WorkspaceArtwork> Artwork {get {AssertLane();return artwork;}}
     public JsonElement Query(string name,JsonElement input=default)=>Session.Query(name,input);
+    public JsonElement QueryPreview(JsonElement commands,string name,JsonElement input,CancellationToken token=default)
+    {
+        Check(Session.TryPrepare(JsonSerializer.SerializeToUtf8Bytes(commands),"Preview",out var prepared));
+        using(prepared) {token.ThrowIfCancellationRequested();var result=prepared!.Query(name,input);token.ThrowIfCancellationRequested();return result;}
+    }
+    public JsonElement Render(string? keyArtId=null,string? transitionId=null,string? sequenceId=null,long timeTicks=0,JsonElement previewCommands=default,CancellationToken token=default)
+    {
+        var input=JsonSerializer.SerializeToElement(new {keyArtId,transitionId,sequenceId,timeTicks,artwork=Artwork.Values.Select(a=>new {id=a.Id,nodeId=a.NodeId,width=a.Width,height=a.Height,byteLength=a.Rgba.Length})});
+        return previewCommands.ValueKind==JsonValueKind.Array && previewCommands.GetArrayLength()>0?QueryPreview(previewCommands,"native.render_frame",input,token):Query("native.render_frame",input);
+    }
     public void AssertCurrent(string token,long expectedRevision)
     {
         AssertLane();if(token!=documentToken) throw new WorkspaceException("document.conflict");
@@ -144,6 +154,7 @@ public sealed partial class NativeWorkspace : IAsyncDisposable
     }
     public SaveCandidate PrepareSave(string operation)
     {
+        AssertLane();
         if(operation is not ("save" or "saveAs" or "incremental" or "copy" or "recovery")) throw new WorkspaceException("document.receipt_invalid");
         foreach(var id in saves.Where(s=>s.Value.Expires<=DateTimeOffset.UtcNow).Select(s=>s.Key).ToArray()) saves.Remove(id);
         bool intentional=operation is not ("copy" or "recovery");if(intentional && saves.Values.Any(s=>s.Candidate.ReceiptId is not null)) throw new WorkspaceException("document.save_busy");
@@ -155,12 +166,13 @@ public sealed partial class NativeWorkspace : IAsyncDisposable
     }
     public SaveCleanup AcknowledgeSave(string receiptId)
     {
+        AssertLane();
         var receipt=saves.Values.FirstOrDefault(s=>s.Candidate.ReceiptId==receiptId);
         if(receipt.Candidate is null || receipt.Expires<=DateTimeOffset.UtcNow || receipt.Candidate.Identity.DocumentToken!=documentToken) throw new WorkspaceException("document.receipt_invalid");
         Check(Session.MarkSaved(receipt.Candidate.Identity.EditorRevision));modifiedAt=receipt.ModifiedAt;saves.Remove(receipt.Candidate.Id);
         var cleanup=new SaveCleanup(lineageId,documentToken,receipt.Candidate.Identity.Revision,restoredSnapshotId);restoredSnapshotId=null;return cleanup;
     }
-    public SaveCandidate GetSave(string id,string token) {if(token!=documentToken || !saves.TryGetValue(id,out var entry) || entry.Expires<=DateTimeOffset.UtcNow) throw new WorkspaceException("document.receipt_invalid");return entry.Candidate;}
+    public SaveCandidate GetSave(string id,string token) {AssertLane();if(token!=documentToken || !saves.TryGetValue(id,out var entry) || entry.Expires<=DateTimeOffset.UtcNow) throw new WorkspaceException("document.receipt_invalid");return entry.Candidate;}
     public void ReleaseSave(string id) {AssertLane();saves.Remove(id);}
     private static string Now()=>DateTimeOffset.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'");
     private static string? Metadata(JsonElement? value,string key)=>value is {} m && m.ValueKind==JsonValueKind.Object && m.TryGetProperty(key,out var p) && p.ValueKind==JsonValueKind.String?p.GetString():null;

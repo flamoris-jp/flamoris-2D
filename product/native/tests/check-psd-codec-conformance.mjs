@@ -13,5 +13,5 @@ for(const compress of [false,true]) {
  cases.push({name:compress?'ZIP PSD':'RLE PSD',archive:Buffer.from(archive).toString('base64'),children:decoded.children.map(tree)});
 }
 const output=JSON.stringify(cases)+'\n',path=new URL('./psd-codec-conformance.json',import.meta.url);
-if(process.argv.includes('--write')) writeFileSync(path,output);else if(readFileSync(path,'utf8')!==output) throw Error('PSD codec oracle drift');
+if(process.argv.includes('--write')) writeFileSync(path,output);else if(readFileSync(path,'utf8').replace(/\r\n/g,'\n')!==output) throw Error('PSD codec oracle drift');
 console.log(`PSD codec conformance: ${cases.length} files`);

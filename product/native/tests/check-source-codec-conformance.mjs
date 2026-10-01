@@ -175,5 +175,5 @@ for(const [name,options] of [['base',{}],['soft parts',{layers:[part(PART_A,[64,
  cases.push({name,archive:Buffer.from(f.archive).toString('base64'),images:Object.fromEntries(imported.renderAssets.map(a=>[a.cutworkLayerId,{width:a.width,height:a.height,rgba:[...a.rgba]}]))});
 }
 const output=JSON.stringify(cases)+'\n', path=new URL('./source-codec-conformance.json',import.meta.url);
-if(process.argv.includes('--write')) writeFileSync(path,output); else if(readFileSync(path,'utf8')!==output) throw Error('Source codec oracle drift');
+if(process.argv.includes('--write')) writeFileSync(path,output); else if(readFileSync(path,'utf8').replace(/\r\n/g,'\n')!==output) throw Error('Source codec oracle drift');
 console.log(`Source codec conformance: ${cases.length} archives`);

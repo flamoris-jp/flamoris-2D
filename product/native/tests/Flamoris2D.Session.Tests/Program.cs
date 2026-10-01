@@ -19,6 +19,9 @@ if((await workspace.InvokeAsync(w=>w.Snapshot)).State.CurrentRevision!=2) throw 
 await workspace.OpenAsync(save.Bytes.ToArray());
 if((await workspace.InvokeAsync(w=>w.Project.GetProperty("scene").GetProperty("nodes").GetProperty(root).GetProperty("displayName").GetString()))!="first") throw new Exception("Save/reopen mismatch.");
 try {await workspace.InvokeAsync(w=>{w.AssertCurrent(initial.DocumentToken,0);return true;});throw new Exception("Old authority token accepted.");}catch(WorkspaceException e) when(e.Code=="document.conflict") {}
+var beforePreview=await workspace.InvokeAsync(w=>w.Snapshot);
+var preview=await workspace.InvokeAsync(w=>w.QueryPreview(Rename("preview"),"scene.get_node",Json(new {nodeId=root})));
+if(preview.GetProperty("displayName").GetString()!="preview" || (await workspace.InvokeAsync(w=>w.Snapshot)).State.CurrentRevision!=beforePreview.State.CurrentRevision || await workspace.InvokeAsync(w=>w.Query("scene.get_node",Json(new {nodeId=root})).GetProperty("displayName").GetString())=="preview")throw new Exception("Prepared preview mutated native authority.");
 // Concurrent UI/MCP-style callbacks serialize into the same native history.
 await Task.WhenAll(Enumerable.Range(0,12).Select(i=>workspace.InvokeAsync(w=>w.Execute(Rename("lane-"+i),"lane"))));
 if((await workspace.InvokeAsync(w=>w.Snapshot)).State.UndoDepth!=12) throw new Exception("Shared lane lost edits.");
@@ -29,6 +32,9 @@ foreach(string path in args)
     foreach(var fixture in fixtures.RootElement.EnumerateArray())
     {
         string kind=path.Contains("psd-")?"psd":"flimg";await workspace.ImportAsync(Convert.FromBase64String(fixture.GetProperty("archive").GetString()!),kind,"portrait."+kind);
+        if((await workspace.InvokeAsync(w=>w.Snapshot)).State.Dirty==0)throw new Exception("Imported source was marked clean.");
+        var render=await workspace.InvokeAsync(w=>w.Render(keyArtId:w.Project.GetProperty("keyArts")[0].GetProperty("id").GetString()));
+        if(render.GetProperty("plan").GetProperty("renderInstanceCount").GetInt32()==0)throw new Exception("Imported source has no native render instances.");
         var receipt=await workspace.InvokeAsync(w=>w.PrepareSave("copy"));var before=await workspace.InvokeAsync(w=>w.Artwork.Values.OrderBy(a=>a.NodeId).Select(a=>Convert.ToBase64String(a.Rgba.Span)).ToArray());
         await workspace.OpenAsync(receipt.Bytes.ToArray());var after=await workspace.InvokeAsync(w=>w.Artwork.Values.OrderBy(a=>a.NodeId).Select(a=>Convert.ToBase64String(a.Rgba.Span)).ToArray());if(!before.SequenceEqual(after))throw new Exception("Source artwork save/reopen mismatch.");
         root=await workspace.InvokeAsync(w=>w.Project.GetProperty("scene").GetProperty("rootId").GetString()!);

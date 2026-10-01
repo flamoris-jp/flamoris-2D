@@ -20,6 +20,12 @@ own its transport, capabilities and permission checks. Preparation is separate
 from commit so cancellation and revision guards are rechecked before mutation.
 No mutable C# Project/history implementation or second MCP session is introduced.
 
+C++ produces evaluated render batches, camera projection and the clipping alpha
+surface dependency plan. WPF applies only viewport/DPI/output-resolution mapping
+and hands immutable textures to the existing native D3D11 backend. Gesture
+previews query a disposable native prepared candidate; they never replace or
+commit the live Project while a pointer is moving.
+
 Source decoders produce immutable candidates; source conversion/reconciliation
 and typed commits belong to C++. Retained artwork follows native source history.
 Production packaging will remove Product Host and Node only when its replacement

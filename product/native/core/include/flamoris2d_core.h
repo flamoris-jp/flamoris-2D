@@ -100,6 +100,10 @@ FL2D_API fl2d_status FL2D_CALL fl2d_session_prepare(fl2d_session* session, const
 FL2D_API fl2d_status FL2D_CALL fl2d_session_prepare_undo(fl2d_session* session, fl2d_prepared** result);
 FL2D_API fl2d_status FL2D_CALL fl2d_session_prepare_redo(fl2d_session* session, fl2d_prepared** result);
 FL2D_API fl2d_status FL2D_CALL fl2d_prepared_commit(fl2d_prepared* prepared);
+/* Read a disposable validated candidate without committing Project/history.
+ * Rejects consumed, stale or orphaned preparations. */
+FL2D_API fl2d_status FL2D_CALL fl2d_prepared_query_json(const fl2d_prepared* prepared,
+    const uint8_t* request,uint32_t length,char* buffer,uint32_t capacity,uint32_t* required);
 FL2D_API void FL2D_CALL fl2d_prepared_destroy(fl2d_prepared* prepared);
 /* Last error code on this session, set by failed session operations; empty on success.
  * Caller-owned buffer rules match snapshot_string. */
