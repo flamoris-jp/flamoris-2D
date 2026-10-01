@@ -130,31 +130,24 @@ public sealed partial class NativeWorkspace : IAsyncDisposable
         var decoded=await Task.Run(()=>kind=="psd"?PsdCodec.Decode(bytes,token):kind=="flimg"?FlimgCodec.Decode(bytes,token):throw new WorkspaceException("source.kind_invalid"),token).ConfigureAwait(false);
         var converted=await Task.Run(()=>NativeDocument.SourceProject(JsonSerializer.SerializeToElement(new {kind,source=decoded.Description,options=new {fileName,projectName=fileName,importedAt=Now()}})),token).ConfigureAwait(false);
         var project=converted.GetProperty("project"); var candidate=BuildSourceArtwork(project,converted.GetProperty("bindings"),decoded,kind,token);
-        return await InvokeAsync(w=>{if(w.session is not null)w.AssertCurrent(expectedToken??guard.Token,expectedRevision??guard.Revision);w.Replace(project,candidate,null,true,null,null,token);w.IncludeSourceParts(token);return w.Snapshot;},token).ConfigureAwait(false);
+        return await InvokeAsync(w=>{if(w.session is not null)w.AssertCurrent(expectedToken??guard.Token,expectedRevision??guard.Revision);w.Replace(project,candidate,null,true,null,null,token);w.IncludeSourceParts(CancellationToken.None);return w.Snapshot;},token).ConfigureAwait(false);
     }
     private void IncludeSourceParts(CancellationToken token)
     {
-        var project=Project;var nodes=project.GetProperty("scene").GetProperty("nodes");var slots=project.GetProperty("semanticSlots");var commands=new List<object>();
-        foreach(var art in project.GetProperty("keyArts").EnumerateArray())foreach(var member in art.GetProperty("members").EnumerateArray())
-        {
-            string nodeId=member.GetProperty("nodeId").GetString()!,keyArtId=art.GetProperty("id").GetString()!;
-            if(nodes.GetProperty(nodeId).GetProperty("kind").GetString()!="part" || slots.EnumerateArray().Any(s=>s.GetProperty("mappings").EnumerateArray().Any(m=>m.GetProperty("keyArtId").GetString()==keyArtId && m.GetProperty("nodeId").GetString()==nodeId)))continue;
-            commands.Add(new {type="semantic_slot.create",payload=new {semanticSlot=new {id="slot_"+Guid.NewGuid(),displayName=nodes.GetProperty(nodeId).GetProperty("displayName").GetString(),role=(string?)null,metadata=new {},mappings=new[]{new {keyArtId,nodeId}}}}});
-        }
-        if(commands.Count>0)Execute(JsonSerializer.SerializeToElement(commands),"Include source parts in Key Art composition",token);
+        ExecutePlan(CompileKeyState(JsonSerializer.SerializeToElement(new {}),"source.include",JsonSerializer.SerializeToElement(new {})),token);
     }
     private void Replace(JsonElement project,IReadOnlyDictionary<string,WorkspaceArtwork> candidate,JsonElement? metadata,bool dirty,string? lineage,string? restored,CancellationToken token)
     {
         token.ThrowIfCancellationRequested();var bytes=JsonSerializer.SerializeToUtf8Bytes(project);
         if(session is null) {Check(NativeSession.TryCreate(bytes,out var created));session=created;if(dirty) Check(Session.Replace(bytes,false));}
         else Check(Session.Replace(bytes,!dirty));
-        documentToken=Guid.NewGuid().ToString();revision=0;lineageId=lineage??Guid.NewGuid().ToString();restoredSnapshotId=restored;
+        proofOnly=false;documentToken=Guid.NewGuid().ToString();revision=0;lineageId=lineage??Guid.NewGuid().ToString();restoredSnapshotId=restored;
         string now=Now(); createdAt=Metadata(metadata,"createdAt")??now;modifiedAt=Metadata(metadata,"modifiedAt")??now;
         artwork=candidate;sourceReview=null;orphanRecords=[];artworkHistory.Clear();artworkHistory[0]=candidate;saves.Clear();Publish("replace");
     }
     public SaveCandidate PrepareSave(string operation)
     {
-        AssertLane();
+        AssertLane();if(proofOnly)throw new WorkspaceException("document.proof_only");
         if(operation is not ("save" or "saveAs" or "incremental" or "copy" or "recovery")) throw new WorkspaceException("document.receipt_invalid");
         foreach(var id in saves.Where(s=>s.Value.Expires<=DateTimeOffset.UtcNow).Select(s=>s.Key).ToArray()) saves.Remove(id);
         bool intentional=operation is not ("copy" or "recovery");if(intentional && saves.Values.Any(s=>s.Candidate.ReceiptId is not null)) throw new WorkspaceException("document.save_busy");

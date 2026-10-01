@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';import {syncBuiltinESMExports} from 'node:module';let handsSequence=0;crypto.randomUUID=()=>`00000000-0000-4000-8000-${String(++handsSequence).padStart(12,'0')}`;syncBuiltinESMExports();
+import {createHandsOnProject} from '../../product-host/mesh-hands-on.mjs';
 import {readFile,writeFile} from 'node:fs/promises';
 import {createProjectFromPsd} from '../../src/io/psd-project.js';
 import {PsdReimportReview} from '../../src/io/psd-reimport-review.js';
@@ -47,6 +49,13 @@ for(const [name,oldLayers,newLayers] of [
   const row=review.rows[0],before=structuredClone(review.rows);review.keepExisting(row.id);recordReview(name+' keep',review,'change',before,{rowId:row.id,action:'keep'});
   const rows=structuredClone(review.rows);review.resetToAuto(row.id);recordReview(name+' auto',review,'change',rows,{rowId:row.id,action:'auto'});
  }
+}
+for(const assets of [[{id:'image-a',name:'素材',width:3,height:2}],[{id:'image-a',name:'素材',width:3,height:2},{id:'image-b',name:'second',width:2,height:4}]]){
+ handsSequence=0;const built=createHandsOnProject(assets);let allocated=0;const ids=new Map();const normalize=value=>JSON.parse(JSON.stringify(value).replace(/([a-z]+)_([0-9a-f-]{36})/g,(all,kind)=>{if(!ids.has(all))ids.set(all,`${kind}_hands_fixture_${String(++allocated).padStart(4,'0')}`);return ids.get(all);}));
+ // Traverse actual ID allocation order (Project, root, KeyArt, parts).
+ for(const v of [built.project.id,built.project.scene.rootId,built.project.keyArts[0].id,...built.bindings.keys()])normalize(v);
+ const project=normalize(built.project),bindings=[...built.bindings].map(([nodeId,assetId])=>({nodeId:normalize(nodeId),assetId}));
+ cases.push({name:'hands-on-'+assets.length,request:{kind:'hands-on',assets,options:{idNamespace:'hands_fixture'}},expected:{project,bindings,initialProject:project,bootstrapPlans:[]}});
 }
 if(process.argv.includes('--write'))await writeFile(file,JSON.stringify(cases)+'\n');else assert.deepEqual(JSON.parse(await readFile(file,'utf8')),cases);
 console.log(`Source ingest conversion: ${cases.length} cases match current JS.`);

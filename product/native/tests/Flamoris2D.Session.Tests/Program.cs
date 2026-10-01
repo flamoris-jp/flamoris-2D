@@ -77,6 +77,15 @@ using(var fixtures=JsonDocument.Parse(File.ReadAllBytes(args[1])))
     var stale=await workspace.AnalyzeSourceAsync(bytes,"stale.psd");await workspace.InvokeAsync(w=>w.Execute(Rename("edit"),"edit"));
     try {await workspace.InvokeAsync(w=>w.ApplySourceReview(stale.GetProperty("id").GetString()!));throw new Exception("Stale reimport review applied.");}catch(WorkspaceException e) when(e.Code=="source.review_stale") {}
 }
+// Native Key State compilation shares persistence/history with every adapter.
+await workspace.InvokeAsync(w=>
+{
+    var art=w.Query("keyart.list",Json(new {}))[0].GetProperty("id").GetString()!;
+    var before=w.Project.GetRawText();
+    var duplicate=w.ExecutePlan(w.CompileKeyState(Json(new {keyArtId=art}),"keyart.duplicate",Json(new {displayName="native duplicate"})));
+    if(w.KeyState(Json(new {keyArtId=duplicate.GetProperty("keyArtId").GetString()})).GetProperty("selectedKeyArt").GetProperty("displayName").GetString()!="native duplicate")throw new Exception("Native Key State projection lost duplicate.");
+    var after=w.Project.GetRawText();w.Undo();if(w.Project.GetRawText()!=before)throw new Exception("Key State Undo differs.");w.Redo();if(w.Project.GetRawText()!=after)throw new Exception("Key State Redo differs.");return true;
+});
 // Timeline intents compile in C++ and enter the same native undo history.
 await workspace.InvokeAsync(w=>
 {
@@ -88,10 +97,26 @@ await workspace.InvokeAsync(w=>
     w.ExecutePlan(w.CompileTimeline(context,"key.add",Json(new {trackId=track,channel="positionX",timeTicks=0,value=5})));
     if(w.Timeline(context).GetProperty("tracks").GetArrayLength()!=1)throw new Exception("Native timeline projection lost track.");
     var before=w.Project.GetRawText();w.Undo();w.Redo();if(w.Project.GetRawText()!=before)throw new Exception("Timeline Undo/Redo differs.");
+    var canvas=w.Project.GetProperty("canvas");var export=Json(new {sequenceId,width=canvas.GetProperty("width").GetInt32(),height=canvas.GetProperty("height").GetInt32(),frameRate=new {numerator=24,denominator=1},video=false,frameIndex=0});
+    if(w.ExportPlan(export).GetProperty("frameCount").GetInt32()!=48 || w.ExportFrame(export).GetProperty("fileName").GetString()!="frame_000001.png")throw new Exception("Native export plan/frame differs.");
+    if(w.Encoder(Json(new {frameDirectory="frames",outputPath="shot.mp4",frameCount=48,frameRate=new {numerator=24,denominator=1}})).GetProperty("args").EnumerateArray().All(a=>a.GetString()!="h264_mf"))throw new Exception("Native encoder lost MF profile.");
     var sample=w.Playback(Json(new {sequenceId,playback=new {startTicks=0,elapsedMilliseconds=2500,mode="loop"}}));
     if(sample.GetProperty("timeTicks").GetInt64()!=60000||!sample.GetProperty("playing").GetBoolean())throw new Exception("Native playback differs.");
     return true;
 });
+// PNG proof bootstrap is validated before replacement and never becomes saveable.
+var proofGuard=await workspace.InvokeAsync(w=>w.Snapshot);
+await workspace.HandsOnAsync([new HandsOnArtwork(Guid.NewGuid().ToString(),"proof",2,2,new byte[]{255,0,0,255,255,0,0,255,255,0,0,255,255,0,0,255})],proofGuard.DocumentToken,proofGuard.Revision);
+await workspace.InvokeAsync(w=>
+{
+    if(!w.ProofOnly||w.Project.GetProperty("meshKeyforms").GetArrayLength()!=1)throw new Exception("Native proof bootstrap failed.");
+    var art=w.Query("keyart.list",Json(new {}))[0].GetProperty("id").GetString()!;
+    if(w.Render(art).GetProperty("artwork").GetArrayLength()!=1)throw new Exception("Native proof render lost artwork.");
+    var project=w.Project.GetRawText();w.Undo();w.Redo();if(w.Project.GetRawText()!=project)throw new Exception("Proof Undo/Redo differs.");
+    try{w.PrepareSave("save");throw new Exception("Proof session became saveable.");}catch(WorkspaceException e)when(e.Code=="document.proof_only"){}
+    return true;
+});
+root=await workspace.InvokeAsync(w=>w.Project.GetProperty("scene").GetProperty("rootId").GetString()!);
 // Exercise the shared Core boundary, not a mock Product dispatcher.
 using(var host=new NativeMcpHost(workspace))
 using(var boundary=new McpBoundary(host,host.Tools(),new McpOptions(),new McpDiagnostics(Flamoris.Logging.FlamorisLogger.Create(new Flamoris.Logging.LoggingOptions {Level="error"}))))

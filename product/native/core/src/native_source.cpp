@@ -1,5 +1,6 @@
 #include "flamoris2d_core.h"
 #include "native_commands.h"
+#include "native_authoring.h"
 #include "native_source_review.h"
 #include "native_locale.h"
 #include <algorithm>
@@ -8,6 +9,8 @@
 #include <iomanip>
 #include <memory>
 #include <sstream>
+#include <cmath>
+#include <set>
 
 namespace {
 using namespace fl2d_commands;
@@ -50,6 +53,14 @@ std::string encoded(const std::string& input) {
     }return out;
 }
 std::string js_identity(const Value& v) {return v.is<std::string>()?v.get<std::string>():v.serialize();}
+Value hands_on(const Value& request) {
+    const auto& assets=field(request,"assets");if(!assets.is<Array>()||assets.get<Array>().empty())throw std::invalid_argument("Select at least one PNG artwork.");if(assets.get<Array>().size()>16)throw std::invalid_argument("Invalid artwork selection.");
+    double width=0,height=0;std::set<std::string> used;
+    for(const auto& asset:assets.get<Array>()){const auto id=text(field(asset,"id"));const auto w=number(field(asset,"width")),h=number(field(asset,"height"));if(id.empty()||!used.insert(id).second||w<=0||h<=0||w>16384||h>16384||std::trunc(w)!=w||std::trunc(h)!=h)throw std::invalid_argument("Invalid artwork selection.");width=std::max(width,w);height=std::max(height,h);}
+    auto prefix=text(field(field(request,"options"),"idNamespace"));if(prefix.empty())prefix="hands_on";if(prefix.size()>128)throw std::invalid_argument("Invalid artwork namespace.");Ids ids{prefix};auto p=project("Mesh体験 — 保存されません",width,height,ids);const auto root=text(field(field(p,"scene"),"rootId")),art=ids.next("keyart");auto& nodes=p.get<Object>().at("scene").get<Object>().at("nodes").get<Object>();Array members,bindings;unsigned order=0;
+    for(const auto& asset:assets.get<Array>()){auto id=ids.next("node");auto bounds=Value(Object{{"left",Value(0.0)},{"top",Value(0.0)},{"right",field(asset,"width")},{"bottom",field(asset,"height")}});nodes[id]=node(id,text(field(asset,"name")),root,false,Value(),true,1,"normal",bounds);nodes[root].get<Object>().at("children").get<Array>().emplace_back(id);members.emplace_back(Object{{"nodeId",Value(id)},{"appearanceId",Value("raster:"+text(field(asset,"id")))},{"opacity",Value(1.0)},{"presence",Value("present")},{"drawOrder",Value(static_cast<double>(order++))},{"clipping",Value(Object{{"sourceNodeId",Value()}})}});bindings.emplace_back(Object{{"nodeId",Value(id)},{"assetId",field(asset,"id")}});}
+    p.get<Object>()["keyArts"]=Value(Array{Value(Object{{"id",Value(art)},{"displayName",Value("読み込んだ素材")},{"rootNodeId",Value(root)},{"members",Value(members)},{"metadata",Value(Object{})}})});auto initial=p;Array plans;for(size_t index=0;index<assets.get<Array>().size();++index){const auto& asset=assets.get<Array>()[index];if(field(asset,"candidate").is<Object>()){auto compiled=fl2d_authoring::mesh_tool(p,Value(Object{{"nodeId",field(bindings[index],"nodeId")},{"context",Value("structure")},{"tool",Value("topology.automesh")},{"input",Value(Object{{"candidate",field(asset,"candidate")}})},{"idNamespace",Value(prefix+"_mesh_"+std::to_string(index))}}));plans.push_back(compiled);for(const auto& c:field(compiled,"commands").get<Array>()){fl2d_commands::assert_command(c,false);fl2d_commands::apply(p,c);}}}return Value(Object{{"project",p},{"bindings",Value(bindings)},{"initialProject",initial},{"bootstrapPlans",Value(plans)}});
+}
 Value psd(const Value& request) {
     const auto& source=field(request,"source"),&options=field(request,"options");
     const auto file=field(options,"fileName").is<std::string>()?text(field(options,"fileName")):"source.psd";
@@ -160,9 +171,9 @@ extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_source_project_json(const uint8_t
         try{(void)fl2d_locale::utf16(source);}catch(const std::bad_alloc&){throw;}catch(...){return FL2D_INVALID_UTF8;}
         Value request;std::string error;const auto end=picojson::parse(request,source.begin(),source.end(),&error);
         if(!error.empty() || end!=source.end())return FL2D_MALFORMED_JSON;
-        const auto kind=text(field(request,"kind"));if(kind!="psd" && kind!="flimg" && kind!="blank" && kind!="psd-review")return FL2D_INVALID_ARGUMENT;
+        const auto kind=text(field(request,"kind"));if(kind!="psd" && kind!="flimg" && kind!="blank" && kind!="psd-review" && kind!="hands-on")return FL2D_INVALID_ARGUMENT;
         Ids blank_ids{"project"};
-        const auto candidate=kind=="psd-review"?fl2d_sources::review(request):kind=="blank"?Value(Object{{"project",project(text(field(field(request,"options"),"projectName")),number(field(field(request,"source"),"width")),number(field(field(request,"source"),"height")),blank_ids)},{"bindings",Value(Array{})}}):kind=="psd"?psd(request):cutwork(request);
+        const auto candidate=kind=="hands-on"?hands_on(request):kind=="psd-review"?fl2d_sources::review(request):kind=="blank"?Value(Object{{"project",project(text(field(field(request,"options"),"projectName")),number(field(field(request,"source"),"width")),number(field(field(request,"source"),"height")),blank_ids)},{"bindings",Value(Array{})}}):kind=="psd"?psd(request):cutwork(request);
         const auto json=field(candidate,"project").serialize();fl2d_session* raw=nullptr;
         const auto status=field(candidate,"project").is<picojson::null>()?FL2D_OK:fl2d_session_create(reinterpret_cast<const uint8_t*>(json.data()),static_cast<uint32_t>(json.size()),&raw);
         const std::unique_ptr<fl2d_session,decltype(&fl2d_session_destroy)> session(raw,fl2d_session_destroy);

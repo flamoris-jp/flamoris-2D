@@ -14,7 +14,7 @@ public sealed partial class NativeWorkspace
             var node=Query("scene.get_node",JsonSerializer.SerializeToElement(new {nodeId=a.NodeId}));
             return new {id=a.Id,nodeId=a.NodeId,width=a.Width,height=a.Height,byteLength=a.Rgba.Length,visible=node.GetProperty("effectiveVisible"),locked=node.GetProperty("locked"),bounds=node.GetProperty("bounds"),worldTransform=node.GetProperty("worldTransform"),left=a.Left,top=a.Top};
         }).ToArray();
-        return JsonSerializer.SerializeToElement(new {state,artwork=images,proofOnly=false,diagnostics=Array.Empty<object>()});
+        return JsonSerializer.SerializeToElement(new {state,artwork=images,proofOnly=ProofOnly,diagnostics=Array.Empty<object>()});
     }
     public JsonElement CompileMesh(string nodeId,string? keyformId,string? keyArtId,string context,string tool,JsonElement input)=>
         Query("native.mesh_tool",JsonSerializer.SerializeToElement(new {nodeId,keyformId,keyArtId,context,tool,input,idNamespace=Guid.NewGuid().ToString("N")}));

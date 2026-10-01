@@ -58,6 +58,13 @@ struct Ids {
     return Value(s.str());
   }
 };
+Value export_settings(const Value &project);
+Value export_plan(const Value &project, const Value &input);
+Value export_frame(const Value &project, const Value &input);
+Value encoder_contract(const Value &input);
+Value key_state(const Value &project, const Value &context);
+Value key_state_tool(const Value &project, const Value &input);
+Value correspondence_state(const Value &project, const Value &input);
 Value timeline_state(const Value &project, const Value &context);
 Value transition_diagnostics(const Value &id, const Value &validation,
                              const Value &evaluation, const Value &failure);
