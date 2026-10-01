@@ -399,7 +399,7 @@ static void check_queries(const char* path) {
         assert(fl2d_prepared_query_json(pending,preview_bytes,static_cast<uint32_t>(preview_request.size()),preview_buffer.data(),preview_length,&preview_length) == FL2D_OK);
         untouched();
         assert(fl2d_prepared_commit(pending) == FL2D_OK);
-        assert(fl2d_prepared_query_json(pending,preview_bytes,static_cast<uint32_t>(preview_request.size()),nullptr,0,&preview_length) == FL2D_INVALID_ARGUMENT);
+        assert(fl2d_prepared_query_json(pending,preview_bytes,static_cast<uint32_t>(preview_request.size()),nullptr,0,&preview_length) == FL2D_INVALID_ARGUMENT && preview_length==0);
         fl2d_prepared_destroy(pending);
         fl2d_prepared* stale_preview = nullptr;
         assert(fl2d_session_prepare(session,reinterpret_cast<const uint8_t*>(command.data()),static_cast<uint32_t>(command.size()),"stale preview",&stale_preview) == FL2D_OK);

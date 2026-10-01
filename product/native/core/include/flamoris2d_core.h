@@ -74,7 +74,7 @@ FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_node_state(const fl2d_snapshot* sna
 FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_issue_string(const fl2d_snapshot* snapshot,
     uint32_t index, const char* field, char* buffer, uint32_t capacity, uint32_t* required);
 
-/* ABI 1.3: experimental session. UTF-8 input is copied (maximum 1 MiB).
+/* ABI 1.3: authoritative session. UTF-8 input is copied (maximum 128 MiB).
  * The command document is a JSON array of existing Product command envelopes.
  * Session calls must be serialized by the caller. A prepared handle is one-shot;
  * destroy it even after commit. Destroying its session invalidates it safely.
@@ -119,7 +119,7 @@ FL2D_API fl2d_status FL2D_CALL fl2d_session_query_json(const fl2d_session* sessi
     const uint8_t* request, uint32_t length, char* buffer, uint32_t capacity, uint32_t* required);
 
 /* ABI 1.5: format-v1 persistence. Inputs and envelope outputs are bounded at
- * 128 MiB; the embedded Project still uses the existing snapshot limit.
+ * 128 MiB including the embedded Project. Proof snapshots retain their 1 MiB limit.
  * Parsing returns {value:{project,metadata,renderAssets}} or {error:{code,details}}.
  * Serialization reads this session only and accepts {now,createdAt,modifiedAt,renderAssets}.
  * now is supplied by the storage adapter, never read from a hidden native clock.

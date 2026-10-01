@@ -159,8 +159,10 @@ extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_session_query_json(const fl2d_ses
     return session?query_json(session->state->project,bytes,length,buffer,capacity,required):FL2D_INVALID_ARGUMENT;
 }
 extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_prepared_query_json(const fl2d_prepared* prepared,const uint8_t* bytes,uint32_t length,char* buffer,uint32_t capacity,uint32_t* required) {
-    if(!prepared || !required || prepared->used || !prepared->next)return FL2D_INVALID_ARGUMENT;
-    *required=0;const auto live=prepared->owner.lock();
+    if(!required)return FL2D_INVALID_ARGUMENT;
+    *required=0;
+    if(!prepared || prepared->used || !prepared->next)return FL2D_INVALID_ARGUMENT;
+    const auto live=prepared->owner.lock();
     if(!live || live->generation!=prepared->generation || live->current!=prepared->revision || live->counter!=prepared->counter)return FL2D_REVISION_CONFLICT;
     return query_json(prepared->next->project,bytes,length,buffer,capacity,required);
 }

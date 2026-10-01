@@ -5,6 +5,14 @@ using Flamoris.Flamoris2D.Native.Client;
 internal static class DocumentTests
 {
     private static void Check(bool ok, string message) { if (!ok) throw new InvalidOperationException(message); }
+    private sealed class PendingInput : MemoryStream
+    {
+        internal readonly TaskCompletionSource Started=new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer,CancellationToken token=default)
+        {
+            Started.TrySetResult();await Task.Delay(Timeout.Infinite,token);return 0;
+        }
+    }
     public static async Task RunAsync(string hostPath)
     {
         var directory = Path.Combine(Path.GetTempPath(), "flamoris-document-test-" + Guid.NewGuid().ToString("N"));
@@ -77,6 +85,19 @@ internal static class DocumentTests
             catch (IOException) { }
             await client.ReleaseDocumentAsync(snapshot.Id, snapshot.Identity.DocumentToken, snapshot.Identity.Revision);
             Check(!Directory.EnumerateFiles(directory, "*.tmp", SearchOption.AllDirectories).Any(), "Temporary files leaked.");
+            var legacy = System.Text.Json.Nodes.JsonNode.Parse(original)!.AsObject(); legacy["createdAt"] = 1;
+            var legacyBytes = Encoding.UTF8.GetBytes(legacy.ToJsonString());
+            using(var source = new MemoryStream(legacyBytes)) await client.OpenDocumentAsync(source, source.Length);
+            var normalized = await client.SerializeAsync();
+            using(var document = JsonDocument.Parse(normalized.Payload.GetProperty("document").GetString()!))
+                Check(document.RootElement.GetProperty("createdAt").GetString() == "1970-01-01T00:00:00.001Z", "Legacy timestamp lost through the desktop adapter.");
+            using(var pending = new PendingInput())
+            {
+                var open = client.OpenDocumentAsync(pending, 16); await pending.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                await client.ShutdownAsync();
+                try { await open.WaitAsync(TimeSpan.FromSeconds(5)); throw new Exception("Shutdown left a pending document read alive."); }
+                catch(OperationCanceledException) { }
+            }
             Console.WriteLine("Document/recovery/atomic-write integration tests passed.");
         }
         finally { Directory.Delete(directory, recursive: true); }

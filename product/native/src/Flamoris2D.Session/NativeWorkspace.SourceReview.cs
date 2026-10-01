@@ -21,8 +21,7 @@ public sealed partial class NativeWorkspace
         return await InvokeAsync(w=>
         {
             w.AssertCurrent(guard.Snapshot.DocumentToken,guard.Snapshot.Revision);token.ThrowIfCancellationRequested();
-            long retained=w.artworkHistory.Values.SelectMany(a=>a.Values).DistinctBy(a=>a.Id).Sum(a=>(long)a.Rgba.Length);
-            if(retained+images.Values.Sum(a=>(long)a.Rgba.Length)>512L*1024*1024)throw new WorkspaceException("document.artwork_invalid");
+            w.CheckArtworkBudget(images);
             w.sourceReview=new(Guid.NewGuid().ToString(),guard.Snapshot.DocumentToken,guard.Snapshot.Revision,DateTimeOffset.UtcNow.AddMinutes(10),guard.Project,project,projection,images);return w.SourceReviewProjection();
         },token).ConfigureAwait(false);
     }

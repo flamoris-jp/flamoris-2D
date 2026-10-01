@@ -282,6 +282,9 @@ Value generate(uint32_t width, uint32_t height, const uint8_t *rgba,
                         {"diagnostics", Value(Array{d})}});
   };
   const size_t pixels = static_cast<size_t>(width) * height;
+  if (pixels > 16777216)
+    error("AutoMesh raster exceeds the bounded native work budget.");
+  Work work;
   std::vector<uint8_t> mask(pixels), seen(pixels);
   size_t visible = 0;
   const int alpha =
@@ -294,20 +297,21 @@ Value generate(uint32_t width, uint32_t height, const uint8_t *rgba,
     return failed(diagnostic("AUTOMESH_NO_VISIBLE_ALPHA",
                              "No pixels meet the alpha threshold."));
   size_t components = 0;
-  std::vector<size_t> queue;
+  std::vector<uint32_t> queue;
   for (size_t start = 0; start < pixels; ++start) {
     if (!mask[start] || seen[start])
       continue;
     ++components;
     queue.clear();
-    queue.push_back(start);
+    queue.push_back(static_cast<uint32_t>(start));
     seen[start] = 1;
     for (size_t cursor = 0; cursor < queue.size(); ++cursor) {
-      auto i = queue[cursor], x = i % width, y = i / width;
+      work.advance();
+      const size_t i = queue[cursor], x = i % width, y = i / width;
       auto visit = [&](size_t n) {
         if (mask[n] && !seen[n]) {
           seen[n] = 1;
-          queue.push_back(n);
+          queue.push_back(static_cast<uint32_t>(n));
         }
       };
       if (x > 0)
@@ -327,7 +331,7 @@ Value generate(uint32_t width, uint32_t height, const uint8_t *rgba,
         {{"componentCount", Value(static_cast<double>(components))}}));
   // Release flood-fill storage before constructing the contour graph.
   std::vector<uint8_t>().swap(seen);
-  std::vector<size_t>().swap(queue);
+  std::vector<uint32_t>().swap(queue);
   std::map<std::string, std::vector<Point>> outgoing;
   std::map<std::string, std::pair<Point, Point>> unused;
   size_t edge_count = 0;
@@ -391,7 +395,7 @@ Value generate(uint32_t width, uint32_t height, const uint8_t *rgba,
         diagnostic("AUTOMESH_CONTOUR_TOO_SMALL",
                    "The visible contour is too small to triangulate.",
                    {{"visibleCount", Value(static_cast<double>(visible))}}));
-  Work work;
+
   const auto raw = bounds(contour);
   const double shortest = std::max(
                    1.0, std::min(raw.maxX - raw.minX, raw.maxY - raw.minY)),
@@ -417,8 +421,10 @@ Value generate(uint32_t width, uint32_t height, const uint8_t *rgba,
     const auto count = static_cast<size_t>(
         std::ceil(std::hypot(b.x - a.x, b.y - a.y) / maximum));
     for (size_t step = 1; step < count; ++step) {
-      vertices.push_back(
-          {a.x + (b.x - a.x) * static_cast<double>(step) / static_cast<double>(count), a.y + (b.y - a.y) * static_cast<double>(step) / static_cast<double>(count)});
+      vertices.push_back({a.x + (b.x - a.x) * static_cast<double>(step) /
+                                    static_cast<double>(count),
+                          a.y + (b.y - a.y) * static_cast<double>(step) /
+                                    static_cast<double>(count)});
       kinds.emplace_back("boundary");
     }
     if (vertices.size() > 16384)

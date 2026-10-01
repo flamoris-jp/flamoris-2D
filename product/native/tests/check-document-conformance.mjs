@@ -30,9 +30,19 @@ for(const [name,change] of [
 ]) {const d=structuredClone(envelope);change(d);add(name,d);}
 const malformed13=structuredClone(basic);malformed13.schemaVersion=13;malformed13.sequences=null;add('malformed-13-sequences',malformed13);
 const malformed14=structuredClone(basic);malformed14.schemaVersion=14;malformed14.animation.deformationSamples=[{}];add('malformed-14-samples',malformed14);
+for (const [name, value] of [
+ ['epoch', 1], ['epoch-negative', -1.9], ['iso-offset', '2026-10-01T03:04:05.123456+09:30'],
+ ['date-only', '2026-10-01'], ['date-overflow', '2026-02-31'], ['expanded-year', '+010000-01-01T00:00:00Z'],
+ ['date-max', '+275760-09-13T00:00:00.000Z'], ['zone-invalid', '2026-10-01T00:00:00+25:00'],
+ ['date-beyond-max', '+275760-09-13T00:00:00.001Z'], ['negative-zero-year', '-000000-01-01T00:00:00Z'],
+]) { const d=structuredClone(envelope); d.createdAt=value; add('timestamp-'+name,d); }
 const serialize=[];
 const options={now,createdAt:now,modifiedAt:now,renderAssets:assets};
 serialize.push({name:'basic',project:basic,options,expected:createFl2dDocument(basic,{...options,now:()=>new Date(now)})});
+for (const createdAt of [1, -1.9, '2026-10-01T03:04:05.123456+09:30', '2026-10-01', '2026-02-31', '+010000-01-01T00:00:00Z']) {
+ const value={...options, createdAt};
+ serialize.push({name:'normalize-'+String(createdAt),project:basic,options:value,expected:createFl2dDocument(basic,{...value,now:()=>new Date(now)})});
+}
 const seen=new Set([JSON.stringify(basic)]);
 for(const filename of ['project-conformance.json','rig-conformance.json','hierarchy-conformance.json','mesh-session-conformance.json','temporal-session-conformance.json','transition-session-conformance.json','query-conformance-3.json']) {
   const input=JSON.parse(await readFile(new URL(filename,import.meta.url),'utf8'));let count=0;

@@ -18,5 +18,22 @@ int main() {
         picojson::value actual;assert(picojson::parse(actual,std::string(buffer.data(),size-1)).empty());
         if(actual.get<picojson::object>().at("value")!=test.at("expected")){fprintf(stderr,"source differs: %s\n",test.at("name").get<std::string>().c_str());assert(false);}
     }
+    // Restoring an automatic mapping must reject an imported layer already
+    // claimed by another manual row, just like the JS review's mutateRow.
+    for(const auto& item:fixtures.get<picojson::array>()) {
+        const auto& test=item.get<picojson::object>();
+        if(test.at("name")!=picojson::value("add-missing analyze"))continue;
+        auto request=test.at("request");auto rows=test.at("expected").get<picojson::object>().at("rows");
+        auto& entries=rows.get<picojson::array>();assert(entries.size()==2);
+        const auto imported=entries[0].get<picojson::object>().at("importedNodeId");
+        entries[0].get<picojson::object>()["action"]=picojson::value("ignore");
+        entries[1].get<picojson::object>()["action"]=picojson::value("update");
+        entries[1].get<picojson::object>()["importedNodeId"]=imported;
+        auto& source=request.get<picojson::object>().at("source").get<picojson::object>();
+        source["rows"]=rows;source["change"]=picojson::value(picojson::object{{"rowId",entries[0].get<picojson::object>().at("id")},{"action",picojson::value("auto")}});
+        request.get<picojson::object>().at("options").get<picojson::object>()["operation"]=picojson::value("change");
+        const auto json=request.serialize();uint32_t required=123;
+        assert(fl2d_source_project_json(reinterpret_cast<const uint8_t*>(json.data()),static_cast<uint32_t>(json.size()),nullptr,0,&required)==FL2D_INVALID_ARGUMENT && required==0);
+    }
     puts("Native source candidate conformance passed.");
 }

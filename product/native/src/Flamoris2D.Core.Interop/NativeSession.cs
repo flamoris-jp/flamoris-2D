@@ -100,7 +100,7 @@ public sealed class NativeSession : SafeHandle
         if (input.ValueKind != JsonValueKind.Object) throw new ArgumentException("Query input must be an object.", nameof(input));
         var request = JsonSerializer.SerializeToUtf8Bytes(new { name, input });
         var response = Read((byte[]? b, uint c, out uint r) =>
-            NativeMethods.SessionQuery(this, request, (uint)request.Length, b, c, out r), int.MaxValue);
+            NativeMethods.SessionQuery(this, request, (uint)request.Length, b, c, out r), NativeDocument.MaximumBytes+1);
         using var document = JsonDocument.Parse(response, new JsonDocumentOptions { MaxDepth = 4096 });
         if (document.RootElement.TryGetProperty("error", out var error))
             throw new NativeQueryException(error.GetProperty("name").GetString()!, error.GetProperty("message").GetString()!);
