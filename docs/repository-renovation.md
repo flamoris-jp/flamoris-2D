@@ -22,16 +22,9 @@ it does not add a parallel core. Candidate changes remain subject to PR review.
 | `product/native/src/Flamoris2D.Bridge/` | Keep | Shared MCP Core stdio/named-pipe transport; no document/session ownership |
 | `product/packaging/` | Adapt | Native-only package allowlist and packaged launch check |
 | `product/native/tests/` | Keep | Native/managed tests and deterministic compatibility fixtures |
-| `product/src/`, `product/product-host/`, `product/desktop/`, `product/index.html` | Legacy reference | JS model/session, controllers, Host and Electron/browser shell; no production inputs or feature development |
-| `product/native/src/Flamoris2D.ProductHost.Client/`, `product/native/tests/Flamoris2D.ProductHost.Client.Tests/` | Legacy reference | Previous IPC client/tests; excluded from native solution and package |
-| `product/tests/`, `product/scripts/`, npm manifests | Compatibility tests | Old JS oracle and package-boundary checks, development only |
 | `staging/`, `test/`, `history/` | Preserve boundaries | Acceptance fixtures, integration tests and historical material; never runtime dependencies |
 
-Keep legacy source at its existing paths until physical Windows acceptance: moving
-its entire relative-import graph adds no authority separation and risks losing
-the compatibility oracle. `product/LEGACY.md` marks that boundary. The production
-solution's project references and native packaging inputs enforce separation.
-Delete legacy implementations only after their parity and artwork evidence passes.
+Physical Windows has confirmed that the native application builds and launches. The migration was therefore closed and the superseded JavaScript/Product Host/Electron implementation and JS oracle were removed under #145. Further defects are fixed directly in the native product rather than by restoring a parallel authority.
 
 ## Authority and lifetime
 
@@ -58,8 +51,7 @@ document replacement revokes attachment to the old document.
 5. At the unified-path milestone run all native conformance, source/managed
    session tests, JS oracle regression and the available package boundary checks.
 6. Windows CI proves WPF/D3D11 build, named-pipe transport and packaged smoke.
-   Human acceptance still covers actual artwork, DPI, pointer feel, GPU/playback,
-   file dialogs, manual external MCP and PNG/MP4 visual output.
+   Human use continues as ordinary product QA; defects become focused issues.
 
 No schema/timebase/stable-ID redesign, UI redesign or new repository is needed.
 Retain format-v1 `.fl2d`, schema 15 and 120000 ticks/second. ADR 0012 specifies
