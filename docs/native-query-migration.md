@@ -2,7 +2,7 @@
 
 All 72 Product queries and additional native authoring/render-plan queries run
 on the same C++ NativeSession used by WPF/MCP in #118/#142 (ADR 0012).
-`product/src/queries/project.js` is the compatibility oracle, outside runtime.
+Native query tests and retained fixtures are the regression authority; the former JavaScript query implementation has been removed.
 
 ## Boundary
 
