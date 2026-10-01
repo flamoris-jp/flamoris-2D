@@ -7,6 +7,8 @@ on:
     paths:
       - "product/native/**"
       - "product/packaging/**"
+      - "test/packaging/**"
+      - "docs/windows-packaging.md"
       - "docs/native-production-workflow.md"
       - "LICENSE"
       - ".github/workflows/native-shell-ci.yml"
@@ -56,31 +58,37 @@ jobs:
           dotnet run --project product/native/tests/Flamoris2D.Source.Codecs.Tests -c Release --no-build -- product/native/tests/source-codec-conformance.json product/native/tests/psd-codec-conformance.json
           dotnet run --project product/native/tests/Flamoris2D.Session.Tests -c Release --no-build -- product/native/tests/source-codec-conformance.json product/native/tests/psd-codec-conformance.json
 
+      - name: Portable archive integrity contracts
+        shell: pwsh
+        run: ./test/packaging/portable-package.Tests.ps1
+
       - name: Build portable Windows candidate
         shell: pwsh
         run: |
           ./product/packaging/publish-windows.ps1
-          "FLAMORIS_TEST_FFMPEG=$env:GITHUB_WORKSPACE/artifacts/package/Flamoris2D-win-x64/ffmpeg/bin/ffmpeg.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "FLAMORIS_TEST_FFMPEG=$env:GITHUB_WORKSPACE/artifacts/windows/FLAMORIS-2D-win-x64/ffmpeg/bin/ffmpeg.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Native desktop/MCP client tests
         env:
-          FLAMORIS_TEST_BRIDGE: ${{ github.workspace }}/artifacts/package/Flamoris2D-win-x64/mcp/Flamoris.Mcp.Bridge.exe
+          FLAMORIS_TEST_BRIDGE: ${{ github.workspace }}/artifacts/windows/FLAMORIS-2D-win-x64/mcp/Flamoris.Mcp.Bridge.exe
         run: dotnet run --project product/native/tests/Flamoris2D.Native.Client.Tests -c Release --no-build -- product/native/tests
 
       - name: Packaged WPF production smoke without developer runtimes on PATH
         shell: pwsh
         run: |
-          $package = Join-Path $env:GITHUB_WORKSPACE 'artifacts/package/Flamoris2D-win-x64'
+          $package = Join-Path $env:GITHUB_WORKSPACE 'artifacts/windows/FLAMORIS-2D-win-x64'
           $env:FLAMORIS_TEST_FFMPEG = Join-Path $package 'ffmpeg/bin/ffmpeg.exe'
           $env:PATH = "$env:SystemRoot\\System32;$env:SystemRoot"
           $process = Start-Process (Join-Path $package 'Flamoris2D.exe') -ArgumentList '--smoke-test' -PassThru -Wait -NoNewWindow
           if ($process.ExitCode -ne 0) { throw "Packaged WPF smoke failed: $($process.ExitCode)" }
 
       - name: Upload native candidate
-        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: flamoris2d-native-production-candidate-win-x64
-          path: artifacts/package/Flamoris2D-win-x64
+          name: FLAMORIS-2D-win-x64
+          path: |
+            artifacts/windows/FLAMORIS-2D-win-x64.zip
+            artifacts/windows/FLAMORIS-2D-win-x64.inventory.json
           if-no-files-found: error
+          compression-level: 0
           retention-days: 3

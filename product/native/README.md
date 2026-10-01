@@ -15,8 +15,8 @@ directories together. Node, Electron and Product Host are absent. The portable
 candidate does not install itself or change `.fl2d` associations.
 
 The [Native Shell Boundary workflow](https://github.com/flamoris-jp/flamoris-2D/actions/workflows/native-shell-ci.yml)
-uploads `flamoris2d-native-production-candidate-win-x64` after successful manual
-runs with three-day retention. PR checks build/test without uploading a package.
+uploads the accepted ZIP and inventory as `FLAMORIS-2D-win-x64` after successful
+PR/manual runs, with three-day retention.
 Use the [Japanese production guide](../../docs/native-production-workflow.md).
 
 ## Build and tests
@@ -39,8 +39,8 @@ Build the portable app/bridge and pinned LGPL shared FFmpeg from the repository 
 ./product/packaging/publish-windows.ps1
 ```
 
-Output: `artifacts/package/Flamoris2D-win-x64/`. The script verifies required
-libraries, rejects legacy runtime content and records every file in `SHA256SUMS.txt`.
+Output: `artifacts/windows/FLAMORIS-2D-win-x64/`. The script verifies required
+libraries, rejects development/legacy runtime content and writes `SHA256SUMS.txt` (excluding itself). The matching ZIP and inventory are beside the package; see [Windows packaging](../../docs/windows-packaging.md).
 For full Windows client/bridge tests set `FLAMORIS_TEST_BRIDGE` to the published
 `mcp/Flamoris.Mcp.Bridge.exe` and run:
 

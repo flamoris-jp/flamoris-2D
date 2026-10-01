@@ -16,10 +16,10 @@ or repository runtime/tooling graph.
   link FFmpeg into the application. Export accepts the existing Product LGPL-only
   `h264_mf` encoder contract. The executable can be selected in Export settings.
 - .NET: https://github.com/dotnet/runtime and https://github.com/dotnet/wpf .
-  Runtime notices accompany the self-contained publish output.
+  `DOTNET-LICENSE.txt` and `DOTNET-ThirdPartyNotices.txt` are copied from the publishing SDK; runtime notices accompany the self-contained publish output.
 - The native renderer links Windows Direct3D11 and the system shader compiler.
 
-`SHA256SUMS.txt` records each packaged file after assembly. The CI smoke launches
+`SHA256SUMS.txt` records each packaged file except itself after assembly. The external inventory also covers the checksum file, and ZIP contents are verified against it. The CI smoke launches
 this exact directory with Node/.NET removed from PATH and exports a real H.264
 video using the packaged encoder. Installer, signing, update and default file
 association policy remain part of the separately reviewed release cutover.
