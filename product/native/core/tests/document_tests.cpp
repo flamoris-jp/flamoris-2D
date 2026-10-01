@@ -44,6 +44,22 @@ int main() {
         assert(reopened.get<Object>().at("value").get<Object>().at("project")==expected);
         fl2d_session_destroy(session);
     }
+    // A real Project can exceed the original 1 MiB proof snapshot bound.
+    // The session/document path shares validation without inheriting that proof limit.
+    auto large=fixtures.get<Object>().at("serialize").get<picojson::array>().front().get<Object>().at("project");
+    large.get<Object>()["metadata"]=Value(std::string(FL2D_SNAPSHOT_MAX_BYTES+1,'x'));
+    const auto large_json=large.serialize();fl2d_session* large_session=nullptr;
+    assert(fl2d_session_create(reinterpret_cast<const uint8_t*>(large_json.data()),static_cast<uint32_t>(large_json.size()),&large_session)==FL2D_OK);
+    const auto root=large.get<Object>().at("scene").get<Object>().at("rootId");
+    const auto command=Value(picojson::array{Value(Object{{"type",Value("scene.rename_node")},{"payload",Value(Object{{"nodeId",root},{"displayName",Value("large project")}})}})}).serialize();
+    fl2d_prepared* prepared=nullptr;
+    assert(fl2d_session_prepare(large_session,reinterpret_cast<const uint8_t*>(command.data()),static_cast<uint32_t>(command.size()),"large",&prepared)==FL2D_OK);
+    assert(fl2d_prepared_commit(prepared)==FL2D_OK);fl2d_prepared_destroy(prepared);
+    const auto options=fixtures.get<Object>().at("serialize").get<picojson::array>().front().get<Object>().at("options").serialize();
+    const auto saved=read([&](char* b,uint32_t c,uint32_t* n){return fl2d_session_document_json(large_session,reinterpret_cast<const uint8_t*>(options.data()),static_cast<uint32_t>(options.size()),b,c,n);}).get<Object>().at("value").serialize();
+    const auto reopened=read([&](char* b,uint32_t c,uint32_t* n){return fl2d_document_parse_json(reinterpret_cast<const uint8_t*>(saved.data()),static_cast<uint32_t>(saved.size()),b,c,n);});
+    assert(reopened.get<Object>().at("value").get<Object>().at("project").get<Object>().at("metadata")==large.get<Object>().at("metadata"));
+    fl2d_session_destroy(large_session);
     uint32_t size=123;const uint8_t invalid[]={0xc0,0xaf};
     assert(fl2d_document_parse_json(invalid,2,nullptr,0,&size)==FL2D_INVALID_UTF8 && size==0);
     assert(fl2d_document_parse_json(invalid,FL2D_DOCUMENT_MAX_BYTES+1,nullptr,0,&size)==FL2D_INPUT_TOO_LARGE);

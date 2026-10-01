@@ -2508,6 +2508,20 @@ Value fl2d_validation::admitted_result(const Value& project) {
     return Value(Object{{"valid",Value(true)},{"issues",Value(issues)}});
 }
 
+bool fl2d_validation::valid_project(const Value& project) {
+    Snapshot snapshot; validate(snapshot,project);
+    return std::none_of(snapshot.issues.begin(),snapshot.issues.end(),[](const auto& issue){return issue.severity=="error";});
+}
+fl2d_status fl2d_validation::parse_project(const uint8_t* bytes,uint32_t length,Value& parsed) {
+    if(length>FL2D_DOCUMENT_MAX_BYTES)return FL2D_INPUT_TOO_LARGE;
+    if(!bytes || !length)return FL2D_INVALID_ARGUMENT;
+    if(!utf8(bytes,length))return FL2D_INVALID_UTF8;
+    std::string json(reinterpret_cast<const char*>(bytes),length),error;
+    auto end=picojson::parse(parsed,json.begin(),json.end(),&error);
+    if(!error.empty() || (end!=json.end() && json.find_first_not_of(" \t\r\n",static_cast<size_t>(end-json.begin()))!=std::string::npos))return FL2D_MALFORMED_JSON;
+    return valid_project(parsed)?FL2D_OK:FL2D_PROJECT_INVALID;
+}
+
 struct fl2d_snapshot : Snapshot {};
 
 extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_snapshot_load(const uint8_t* bytes, uint32_t length, fl2d_snapshot** result) {

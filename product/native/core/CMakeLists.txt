@@ -23,7 +23,7 @@ else()
   set(fl2d_icu_libraries ICU::uc ICU::i18n)
 endif()
 
-add_library(Flamoris2D.Core.Native SHARED src/flamoris2d_core.cpp src/project_snapshot.cpp src/editor_session.cpp src/native_commands.cpp src/native_document.cpp src/native_source.cpp src/rig_hierarchy_commands.cpp src/temporal_commands.cpp src/transition_commands.cpp src/mesh_commands.cpp src/native_queries.cpp src/native_temporal_evaluation.cpp src/native_rig_evaluation.cpp src/native_frame_diagnostics.cpp src/native_transition_evaluation.cpp src/native_sequence_evaluation.cpp)
+add_library(Flamoris2D.Core.Native SHARED src/flamoris2d_core.cpp src/project_snapshot.cpp src/editor_session.cpp src/native_commands.cpp src/native_document.cpp src/native_source.cpp src/native_source_review.cpp src/rig_hierarchy_commands.cpp src/temporal_commands.cpp src/transition_commands.cpp src/mesh_commands.cpp src/native_queries.cpp src/native_temporal_evaluation.cpp src/native_rig_evaluation.cpp src/native_frame_diagnostics.cpp src/native_transition_evaluation.cpp src/native_sequence_evaluation.cpp)
 target_compile_features(Flamoris2D.Core.Native PRIVATE cxx_std_17)
 target_compile_definitions(Flamoris2D.Core.Native PRIVATE FL2D_CORE_BUILD)
 target_include_directories(Flamoris2D.Core.Native PUBLIC include)

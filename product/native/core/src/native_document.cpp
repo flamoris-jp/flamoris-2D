@@ -53,7 +53,7 @@ static bool timestamp(const Value& v) {
 }
 static void validate(const Value& project) {
     const auto json = project.serialize();
-    if (json.size() > FL2D_SNAPSHOT_MAX_BYTES) fail("input.too_large");
+    if (json.size() > FL2D_DOCUMENT_MAX_BYTES) fail("input.too_large");
     fl2d_session* raw = nullptr;
     const auto status = fl2d_session_create(reinterpret_cast<const uint8_t*>(json.data()), static_cast<uint32_t>(json.size()), &raw);
     std::unique_ptr<fl2d_session, decltype(&fl2d_session_destroy)> candidate(raw, fl2d_session_destroy);

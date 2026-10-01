@@ -2,6 +2,7 @@
 #include "picojson.h"
 #include "native_commands.h"
 #include "native_queries.h"
+#include "native_validation.h"
 
 #include <algorithm>
 #include <cmath>
@@ -43,32 +44,14 @@ fl2d_status copy(const std::string& value, char* buffer, uint32_t capacity, uint
     std::memcpy(buffer, value.c_str(), *required);
     return FL2D_OK;
 }
-// Snapshot admission is the single native Project validation path, including
-// the interchange size, encoding and JSON syntax gates.
-fl2d_status parse_project(const uint8_t* bytes, uint32_t length, Value& project) {
-    fl2d_snapshot* snapshot = nullptr;
-    auto status = fl2d_snapshot_load(bytes, length, &snapshot);
-    if (status != FL2D_OK) return status;
-    int32_t schema; double width, height; uint32_t nodes, issues;
-    status = fl2d_snapshot_summary(snapshot, &schema, &width, &height, &nodes, &issues);
-    if (status != FL2D_OK) { fl2d_snapshot_destroy(snapshot); return status; }
-    for (uint32_t i = 0; i < issues; ++i) {
-        char severity[16]; uint32_t required = 0;
-        status = fl2d_snapshot_issue_string(snapshot, i, "severity", severity, sizeof(severity), &required);
-        if (status != FL2D_OK || std::strcmp(severity, "error") == 0) {
-            fl2d_snapshot_destroy(snapshot);
-            return status == FL2D_OK ? FL2D_PROJECT_INVALID : status;
-        }
-    }
-    fl2d_snapshot_destroy(snapshot);
-    std::string source(reinterpret_cast<const char*>(bytes), length), error;
-    auto end = picojson::parse(project, source.begin(), source.end(), &error);
-    if (!error.empty() || end != source.end()) return FL2D_MALFORMED_JSON;
-    return FL2D_OK;
+// The same validator admits snapshots, documents and command candidates.
+// Product sessions accept the bounded document size, beyond the small proof snapshot ABI.
+fl2d_status parse_project(const uint8_t* bytes,uint32_t length,Value& project) {
+    return fl2d_validation::parse_project(bytes,length,project);
 }
 fl2d_status validate_candidate(const Value& project) {
     const auto text = project.serialize();
-    if (text.size() > FL2D_SNAPSHOT_MAX_BYTES) return FL2D_INPUT_TOO_LARGE;
+    if (text.size() > FL2D_DOCUMENT_MAX_BYTES) return FL2D_INPUT_TOO_LARGE;
     Value ignored;
     return parse_project(reinterpret_cast<const uint8_t*>(text.data()), static_cast<uint32_t>(text.size()), ignored);
 }
@@ -77,9 +60,9 @@ fl2d_status validate_transaction_candidate(const Value& before, const Value& aft
     if (status != FL2D_OK) return status;
     return fl2d_commands::valid_temporal_ownership_change(before, after) ? FL2D_OK : FL2D_PROJECT_INVALID;
 }
-fl2d_status parse_interchange(const uint8_t* bytes, uint32_t length, Value& parsed) {
+fl2d_status parse_interchange(const uint8_t* bytes, uint32_t length, Value& parsed, uint32_t maximum=FL2D_SNAPSHOT_MAX_BYTES) {
     if (!bytes || !length) return FL2D_INVALID_ARGUMENT;
-    if (length > FL2D_SNAPSHOT_MAX_BYTES) return FL2D_INPUT_TOO_LARGE;
+    if (length > maximum) return FL2D_INPUT_TOO_LARGE;
     // Reuse the snapshot parser's UTF-8 gate for command interchange below by
     // checking byte sequences before parsing (picojson does not enforce UTF-8).
     for (uint32_t i = 0; i < length;) {
@@ -99,7 +82,7 @@ fl2d_status parse_interchange(const uint8_t* bytes, uint32_t length, Value& pars
 }
 fl2d_status parse_commands(const uint8_t* bytes, uint32_t length, Array& commands) {
     Value parsed;
-    const auto status = parse_interchange(bytes, length, parsed);
+    const auto status = parse_interchange(bytes, length, parsed, FL2D_DOCUMENT_MAX_BYTES);
     if (status == FL2D_INVALID_ARGUMENT || status == FL2D_MALFORMED_JSON) return FL2D_COMMAND_INVALID;
     if (status != FL2D_OK) return status;
     if (!parsed.is<Array>()) return FL2D_COMMAND_INVALID;

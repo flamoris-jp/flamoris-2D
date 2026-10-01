@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFile,writeFile} from 'node:fs/promises';
 import {createProjectFromPsd} from '../../src/io/psd-project.js';
+import {PsdReimportReview} from '../../src/io/psd-reimport-review.js';
 import {createProjectFromCutworkFlimg} from '../../src/io/cutwork-flimg-project.js';
 const file=new URL('./source-ingest-conformance.json',import.meta.url);
 const options={fileName:'愛乃.psd',projectName:'愛乃',importedAt:'2026-10-01T03:00:00.000Z'};
@@ -22,5 +23,30 @@ const decoded=structuredClone(source);decoded.original.pixels=Uint8Array.from(so
 const converted=createProjectFromCutworkFlimg(decoded,options);
 const bindings=converted.renderAssets.map(r=>({nodeId:r.nodeId,layerId:r.cutworkLayerId,sourceKey:r.sourceKey,left:r.left,top:r.top,width:r.width,height:r.height}));
 cases.push({name:'cutwork-v2',request:{kind:'flimg',source,options},expected:{project:converted.project,bindings,result:converted.result}});
+function projection(review) {return {canApply:review.canApply,summary:review.summary,rows:review.rows.map(row=>({...structuredClone(row),displayName:review.currentProject.scene.nodes[row.currentNodeId]?.displayName||review.importedProject.scene.nodes[row.importedNodeId]?.displayName||'未対応レイヤー',choices:Object.values(review.importedProject.scene.nodes).filter(n=>review.isCompatibleImportedNode(row,n.id)).map(n=>({id:n.id,displayName:n.displayName}))}))};}
+function recordReview(name,review,operation='analyze',beforeRows=undefined,change=undefined) {
+ const expected=operation==='build'?(()=>{const result=review.buildResult();return {project:result.project,importedNodeAssignments:Object.fromEntries(result.importedNodeAssignments)};})():projection(review);
+ cases.push({name,request:{kind:'psd-review',source:{currentProject:review.currentProject,importedProject:review.importedProject,...(beforeRows?{rows:beforeRows}:{}),...(change?{change}:{})},options:{operation}},expected});
+}
+const layer=(id,name,x=0)=>({id,name,left:x,top:0,right:x+2,bottom:2,opacity:1,rasterFingerprint:'fnv1a32:2x2:00000000'});
+for(const [name,oldLayers,newLayers] of [
+ ['same',[layer(1,'A')],[layer(1,'A')]],
+ ['changed',[layer(1,'A')],[{...layer(1,'new name',1),hidden:true}]],
+ ['add-missing',[layer(1,'A')],[layer(2,'B')]],
+ ['ambiguous',[{...layer(1,'Eye'),id:undefined},{...layer(2,'Eye'),id:undefined}],[{...layer(1,'Eye'),id:undefined},{...layer(2,'Eye'),id:undefined}]],
+ ['group-add',[layer(1,'A')],[{id:5,name:'Group',children:[layer(1,'A'),layer(3,'B')]}]]
+]) {
+ const current=createProjectFromPsd({width:20,height:20,children:oldLayers},options),imported=createProjectFromPsd({width:30,height:30,children:newLayers},options);
+ const authored=Object.values(current.scene.nodes).find(n=>n.kind==='part');authored.transform.position.x=37;
+ const review=new PsdReimportReview(current,null,{importedProject:imported});recordReview(name+' analyze',review);
+ if(name==='ambiguous') {
+  for(const row of review.rows) {const before=structuredClone(review.rows),target=row.candidateImportedNodeIds[0];review.setMatch(row.id,target);recordReview(name+' match '+row.id,review,'change',before,{rowId:row.id,action:'match',importedNodeId:target});}
+ }
+ if(review.canApply)recordReview(name+' build',review,'build',structuredClone(review.rows));
+ if(name==='changed') {
+  const row=review.rows[0],before=structuredClone(review.rows);review.keepExisting(row.id);recordReview(name+' keep',review,'change',before,{rowId:row.id,action:'keep'});
+  const rows=structuredClone(review.rows);review.resetToAuto(row.id);recordReview(name+' auto',review,'change',rows,{rowId:row.id,action:'auto'});
+ }
+}
 if(process.argv.includes('--write'))await writeFile(file,JSON.stringify(cases)+'\n');else assert.deepEqual(JSON.parse(await readFile(file,'utf8')),cases);
 console.log(`Source ingest conversion: ${cases.length} cases match current JS.`);

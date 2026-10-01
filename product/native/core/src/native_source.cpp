@@ -1,5 +1,6 @@
 #include "flamoris2d_core.h"
 #include "native_commands.h"
+#include "native_source_review.h"
 #include "native_locale.h"
 #include <algorithm>
 #include <cstring>
@@ -153,19 +154,20 @@ Value cutwork(const Value& request) {
 
 extern "C" FL2D_API fl2d_status FL2D_CALL fl2d_source_project_json(const uint8_t* bytes,uint32_t length,char* buffer,uint32_t capacity,uint32_t* required) {
     if(!bytes || !length || !required)return FL2D_INVALID_ARGUMENT;
-    *required=0;if(length>FL2D_SNAPSHOT_MAX_BYTES)return FL2D_INPUT_TOO_LARGE;
+    *required=0;if(length>FL2D_DOCUMENT_MAX_BYTES)return FL2D_INPUT_TOO_LARGE;
     try {
         const std::string source(reinterpret_cast<const char*>(bytes),length);
         try{(void)fl2d_locale::utf16(source);}catch(const std::bad_alloc&){throw;}catch(...){return FL2D_INVALID_UTF8;}
         Value request;std::string error;const auto end=picojson::parse(request,source.begin(),source.end(),&error);
         if(!error.empty() || end!=source.end())return FL2D_MALFORMED_JSON;
-        const auto kind=text(field(request,"kind"));if(kind!="psd" && kind!="flimg")return FL2D_INVALID_ARGUMENT;
-        const auto candidate=kind=="psd"?psd(request):cutwork(request);
+        const auto kind=text(field(request,"kind"));if(kind!="psd" && kind!="flimg" && kind!="blank" && kind!="psd-review")return FL2D_INVALID_ARGUMENT;
+        Ids blank_ids{"project"};
+        const auto candidate=kind=="psd-review"?fl2d_sources::review(request):kind=="blank"?Value(Object{{"project",project(text(field(field(request,"options"),"projectName")),number(field(field(request,"source"),"width")),number(field(field(request,"source"),"height")),blank_ids)},{"bindings",Value(Array{})}}):kind=="psd"?psd(request):cutwork(request);
         const auto json=field(candidate,"project").serialize();fl2d_session* raw=nullptr;
-        const auto status=fl2d_session_create(reinterpret_cast<const uint8_t*>(json.data()),static_cast<uint32_t>(json.size()),&raw);
+        const auto status=field(candidate,"project").is<picojson::null>()?FL2D_OK:fl2d_session_create(reinterpret_cast<const uint8_t*>(json.data()),static_cast<uint32_t>(json.size()),&raw);
         const std::unique_ptr<fl2d_session,decltype(&fl2d_session_destroy)> session(raw,fl2d_session_destroy);
         if(status!=FL2D_OK)return status;
-        const auto output=Value(Object{{"value",candidate}}).serialize();if(output.size()>=FL2D_SNAPSHOT_MAX_BYTES)return FL2D_INPUT_TOO_LARGE;
+        const auto output=Value(Object{{"value",candidate}}).serialize();if(output.size()>=FL2D_DOCUMENT_MAX_BYTES)return FL2D_INPUT_TOO_LARGE;
         *required=static_cast<uint32_t>(output.size()+1);if(!buffer || capacity<*required)return FL2D_BUFFER_TOO_SMALL;
         std::memcpy(buffer,output.c_str(),*required);return FL2D_OK;
     }catch(const std::bad_alloc&){return FL2D_OUT_OF_MEMORY;}catch(...){return FL2D_INVALID_ARGUMENT;}

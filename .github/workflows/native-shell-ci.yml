@@ -56,9 +56,19 @@ jobs:
           node product/native/tests/check-temporal-conformance.mjs
           node product/native/tests/check-project-conformance.mjs
           node product/native/tests/check-session-conformance.mjs
+          node product/native/tests/check-document-conformance.mjs
+          node product/native/tests/check-source-ingest-conformance.mjs
+          node product/native/tests/check-source-codec-conformance.mjs
+          node product/native/tests/check-psd-codec-conformance.mjs
+          node product/native/tests/check-live-catalog.mjs
 
       - name: Build native solution
         run: dotnet build product/native/Flamoris2D.Native.sln -c Release
+
+      - name: Source codecs and native session adapters
+        run: |
+          dotnet run --project product/native/tests/Flamoris2D.Source.Codecs.Tests -c Release --no-build -- product/native/tests/source-codec-conformance.json product/native/tests/psd-codec-conformance.json
+          dotnet run --project product/native/tests/Flamoris2D.Session.Tests -c Release --no-build -- product/native/tests/source-codec-conformance.json product/native/tests/psd-codec-conformance.json
 
       - name: Build portable Windows candidate
         shell: pwsh

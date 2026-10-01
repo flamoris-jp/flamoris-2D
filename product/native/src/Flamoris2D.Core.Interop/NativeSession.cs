@@ -80,8 +80,8 @@ public sealed class NativeSession : SafeHandle
             throw new InvalidOperationException($"Native query: {status}");
         return new UTF8Encoding(false, true).GetString(buffer, 0, buffer.Length - 1);
     }
-    public string ProjectJson() { EnsureOpen(); return Read((byte[]? b, uint c, out uint r) => NativeMethods.SessionProject(this, b, c, out r)); }
-    public string HistoryJson() { EnsureOpen(); return Read((byte[]? b, uint c, out uint r) => NativeMethods.SessionHistory(this, b, c, out r)); }
+    public string ProjectJson() { EnsureOpen(); return Read((byte[]? b, uint c, out uint r) => NativeMethods.SessionProject(this, b, c, out r), NativeDocument.MaximumBytes + 1); }
+    public string HistoryJson() { EnsureOpen(); return Read((byte[]? b, uint c, out uint r) => NativeMethods.SessionHistory(this, b, c, out r), NativeDocument.MaximumBytes + 1); }
     public string ErrorCode() { EnsureOpen(); return Read((byte[]? b, uint c, out uint r) => NativeMethods.SessionError(this, b, c, out r)); }
     public JsonElement Query(string name, JsonElement input = default)
     {
