@@ -1,314 +1,91 @@
 # FLAMORIS 2D Native production candidate
 
-The .NET 10/WPF editor now connects the production Source → Mesh → Rig → Deform →
-Animation → Preview → Export workflow to the existing authoritative JavaScript Product.
-Start with the [Japanese production guide](../../docs/native-production-workflow.md).
-The [completion ledger](../../docs/native-capability-map.md) records every production
-capability and public Command/Query disposition against the implementation on current
-`main`. PR #101 is merged; final real-art Windows acceptance and release cutover
-remain open.
+The .NET 10/WPF shell and live MCP share one C++ `NativeSession` through the
+serialized `NativeWorkspace` lane. C++ owns Project, commands/queries, validation,
+history, revision, `.fl2d` migration/serialization, source reconciliation,
+authoring, evaluation and rendering. C# owns UI, OS files, immutable decoded
+artwork and the shared MCP transport adapter. See [capability map](../../docs/native-capability-map.md),
+[renovation map](../../docs/repository-renovation.md) and [ADR 0012](../../docs/decisions/0012-native-session-cutover.md).
 
 ## Run the portable candidate
 
+Extract the entire package and run `Flamoris2D.exe` on Windows x64. Keep its C++
+core/compositor, ICU libraries, self-contained .NET runtime, `mcp/` and `ffmpeg/`
+directories together. Node, Electron and Product Host are absent. The portable
+candidate does not install itself or change `.fl2d` associations.
+
 The [Native Shell Boundary workflow](https://github.com/flamoris-jp/flamoris-2D/actions/workflows/native-shell-ci.yml)
-uploads `flamoris2d-native-production-candidate-win-x64` only after successful manual
-(`workflow_dispatch`) runs; artifacts expire after three days. PR checks build/test
-the package without uploading it. Download an available manual-run artifact, or
-build it locally with `./product/packaging/publish-windows.ps1` if none is available. Extract the entire directory and run
-`Flamoris2D.exe` on Windows x64. The package includes a self-contained .NET 10 runtime,
-Node 24.21.0, the exact Product Host/worker dependency graph, pinned PSD decoder and
-pinned LGPL shared FFmpeg distribution. Keep these files beside the executable.
-No developer runtime installation or command prompt is required. The candidate does
-not register `.fl2d` or replace the installed Electron version.
+uploads `flamoris2d-native-production-candidate-win-x64` after successful manual
+runs with three-day retention. PR checks build/test without uploading a package.
+Use the [Japanese production guide](../../docs/native-production-workflow.md).
 
 ## Build and tests
 
-Development prerequisites: Windows 10/11 x64, .NET 10 SDK, Node 24,
-CMake 3.21+ and Visual Studio or Build Tools with the Desktop development
-with C++ workload and Windows SDK. The C++ library is built for x64 in both
-Debug and Release by the existing `dotnet build` solution command. Its native
-unit executable is run with CTest during that build.
-`NuGet.config` uses public nuget.org packages without GitHub authentication. From the repository
-root, install the locked Product dependencies (including development dependencies),
-using the same command as the Native Shell Boundary workflow, then build and test:
+Windows 10/11 x64 prerequisites: .NET 10 SDK, CMake 3.21+, Visual Studio or Build
+Tools with Desktop development with C++ and a Windows SDK. Public nuget.org
+provides shared FLAMORIS packages; no GitHub credentials or Node install is needed.
 
 ```powershell
-npm ci --prefix product --workspaces=false --ignore-scripts
-node product/native/tests/check-temporal-session-conformance.mjs
-node product/native/tests/check-project-conformance.mjs
-node product/native/tests/check-session-conformance.mjs
 dotnet build product/native/Flamoris2D.Native.sln -c Release
-dotnet run --project product/native/tests/Flamoris2D.ProductHost.Client.Tests -c Release --no-build -- product/product-host/main.mjs
-dotnet run --project product/native/src/Flamoris2D.App -c Release --no-build -- --smoke-test
-dotnet run --project product/native/src/Flamoris2D.App -c Release
+ctest --test-dir product/native/src/Flamoris2D.Core.Interop/obj/native-x64 -C Release --output-on-failure
+dotnet run --project product/native/tests/Flamoris2D.Source.Codecs.Tests -c Release --no-build -- product/native/tests/source-codec-conformance.json product/native/tests/psd-codec-conformance.json
+dotnet run --project product/native/tests/Flamoris2D.Session.Tests -c Release --no-build -- product/native/tests/source-codec-conformance.json product/native/tests/psd-codec-conformance.json
+dotnet run --project product/native/src/Flamoris2D.App/Flamoris2D.App.csproj -c Release --no-build
 ```
 
-Phase 1 of [#118](https://github.com/flamoris-jp/flamoris-2D/issues/118)
-adds `Flamoris2D.Core.Native.dll` and a managed adapter. The JS Product Host
-remains the only authoritative editing session. No WPF gesture or MCP command
-calls the C++ engine yet. The interop adapter and DLL are built and exercised by
-the solution and focused tests; the portable WPF package does not carry them in
-this phase. The checked conformance fixtures are generated from current JS by
-`node product/native/tests/check-temporal-session-conformance.mjs --write` and checked
-against JS in CI. Native and managed tests compare exact integer results.
-
-The selected preview/export compositor is now `Flamoris2D.Renderer.Native.dll`.
-C++ owns its D3D11 device, shaders, texture cache, masks, weighted groups and BGRA
-readback. `Direct3DRenderer` is the serialized managed interop adapter; hardware
-and WARP share the same path. The renderer DLL and `LICENSE-picojson.txt` accompany
-the portable package. This ownership transfer does not switch editing authority:
-the JS Product Host remains the authoritative session, and the experimental Core
-DLL remains outside the package.
-
-The native ABI is declared in `core/include/flamoris2d_core.h` (version 1.4).
-It uses C calling convention, fixed-size integers, an opaque engine handle and
-32-bit status codes. The DLL build exports its functions; native consumers import
-them through the same header. `fl2d_engine_create` transfers ownership of a handle to
-the caller; destroy it once with `fl2d_engine_destroy` (C# uses `SafeHandle`).
-Null output pointers and invalid arguments return `FL2D_INVALID_ARGUMENT`.
-The Phase 1 frame-rate primitive exchanges no strings or allocated buffers. Do not reuse a pointer after
-destroying it. The first primitive reduces a positive rational frame rate using
-the same safe-integer limits and GCD behavior as Product JS; it is a stable
-timebase input with existing deterministic Product tests, and introduces no
-Project state or separate history. Extending this contract requires version
-negotiation before changing existing entry points.
-
-Phase 1B (#121) adds an immutable schema-15 Project snapshot via a UTF-8 JSON
-interchange boundary. `fl2d_snapshot_load` copies at most 1 MiB of caller-owned
-bytes; the caller destroys its returned handle once. Malformed JSON, invalid
-UTF-8 and oversized data have distinct status codes. Native snapshot strings
-are copied into caller-owned buffers: query `required` (including the NUL byte),
-then provide that capacity. C# uses `SafeHandle`. The C++ representation retains
-project identity, canvas, scene node IDs/hierarchy, transform, visibility, opacity and validation issues;
-it records presence of unsupported mesh/rig/animation and other domain sections
-without treating those payloads as native authority. JSON is only an interchange
-format, not the native internal model. Native validation follows
-`product/src/model/validation.js` and is tested against JS-generated fixtures.
-The base schema-15 checks now include animation shape, global IDs in both
-animation collections, display names, and scene reachability/cycles. Native
-validation also covers the basic AnimationClip checks, mesh deformation sample
-references/offsets, bone rotation and two-bone IK constraints, and rigid bone
-binding references/conflicts, mesh form corrections, Bone rest/pose checks, and
-WarpDeformer grids/control points, and SkinBinding influence/weight checks.
-The #125 implementation covers the current schema-15 `validateProject` call
-path, including temporal tracks/ownership, transition and topology constraints,
-clipping bindings and evaluated cycles, Sequence/ClipInstance endpoint compatibility,
-rig/deformer/skin/correction constraints, global IDs and loop endpoint warnings.
-The fixture generator compares the complete diagnostic multiset of code, path,
-entity ID and severity; only message text and diagnostic details are outside this
-ABI contract. All 134 checked Projects are generated or re-evaluated by current JS,
-including populated rigs/animation, cross-domain collisions, multi-error inputs,
-one-tick clipping cycles, disabled bindings, semantic source resolution and
-incompatible endpoint selections. Synthetic domain Projects retained from the
-existing Product tests live in `tests/validation-domain-projects.json`; they are
-regression inputs, never a second source of expected diagnostics.
-
-For a common KeyArt, both JS endpoint paths invoke the same `endpointPartState`
-with the selected MeshKeyform and no animation override. Native endpoint comparison
-uses these generating selections (including opposite-only absent slots), since
-render instance IDs are removed from the JS signature. Clipping validation projects
-render-instance identity, presence and source dependencies at the same sampled ticks;
-it resolves exact node references before semantic fallback and suppresses ambiguous
-sources. This validation projection is not a production renderer. Later renderer
-migration must reuse or replace this logic with the native evaluated-frame path.
-
-JSON property insertion order is preserved during validation (with ECMAScript's
-integer-key ordering), because it affects which occurrence is reported as a duplicate
-ID or semantic label. `projectJson` in the fixture preserves that interchange order
-for C++ tests; the adjacent parsed `project` supports managed queries and inspection.
-Issue ordering itself is normalized only by tests. The existing 1 MiB UTF-8 input
-limit remains in force. Parity evidence concerns JSON schema-15 Projects with string
-stable IDs; malformed inputs for which JS throws are not represented as an invented
-JS diagnostic set. Native parsing remains bounded and rejects malformed interchange.
-
-Native node queries use stable `node.id`
-even when a mismatched `scene.nodes` key produces a validation issue. JS `EditorSession`
-remains the sole editing authority, including WPF/MCP mutations, Undo/Redo and
-save. The DLL still is not in the portable WPF package.
-
-Phase 1C (#123) adds a test-only native EditorSession owning its own Project
-state. It accepts the existing Product command envelope for `scene.rename_node`,
-`scene.set_visibility`, and complete `scene.set_transform` (node-local). A
-transaction validates its commands and candidate Project before a one-shot,
-revision-qualified commit; its inverse list is replayed in reverse order for
-Undo. Redo replays the original commands. `revisionCounter` is monotonic,
-`currentRevision` follows the selected history entry, and `savedRevision` is
-independent; the limit is the JS safe integer maximum. Replacement resets
-history and invalidates pending prepares. A prepared handle uses a weak session
-reference so destroying the session makes it unusable; callers must destroy
-both handles. Callers serialize access to one session. C# uses `SafeHandle`.
-
-The ABI exposes fixed-width session state, stable-ID node queries, caller-owned
-UTF-8 project/history/error buffers, and deterministic statuses. Project and
-history JSON are inspection projections; the session's native parsed state is
-owned exclusively by its handle. Snapshot validation is the shared native path
-for session creation, replacement and transaction candidates. Warning-only
-diagnostics do not reject a session; errors do. The supplementary `session_shape`
-validator has been removed. Every Project fixture also checks session admission;
-every rejected fixture verifies atomic replacement against the existing session,
-history and revision state. Existing transaction/Undo/Redo/prepared-commit scenarios
-remain protected by the JS-generated session fixture. Managed diagnostics expose
-severity alongside code/path/entity ID. Native before/after transaction validation has a
-dedicated seam, including cross-state TemporalProgram ownership. All 155 Product
-command handlers are native; 63/72 readonly queries are implemented. The
-conformance fixture is generated from the current JS `EditorSession` and covers
-transactions, atomic failure, Undo/Redo, stale and one-shot prepared edits,
-save/dirty lineage, and replacement. Check it with
-`node product/native/tests/check-session-conformance.mjs`, or regenerate
-intentionally with `--write`.
-
-Locale list/search queries link ICU 78.3, matching the pinned Product Node runtime.
-Windows CMake fetches the official Win64 MSVC2022 archive with a pinned SHA256 and
-copies its three DLLs plus license beside the experimental core. Other platforms
-require exactly ICU 78.3 (`-DICU_ROOT=/path/to/icu` for a custom installation; make
-its shared libraries available to the loader). The query conformance corpus uses
-explicit en-US/ja-JP/sv-SE/tr-TR oracle locales without adding a Product locale API.
-See [native-query-migration](../../docs/native-query-migration.md).
-
-**The WPF/MCP Product Host remains the only production editing authority.** The
-native DLL is excluded from the portable package. The next step is to extend
-native command/query coverage, evaluation and rendering, prove save/load parity, then
-explicitly switch WPF/MCP to the one native session before retiring JS/Node.
-
-The bounded JSON parser is the vendored BSD-2-Clause `picojson` header
-(upstream commit `111c9be5188f7350c2eac9ddaedd8cca3d7bf394`) under
-`core/third_party/picojson/`, with its license alongside it. The documented
-[private C++17 patch](core/third_party/picojson/FLAMORIS.md) retains ECMAScript
-property order through copies/mutations and enforces object depth consistently. Its built-in depth
-limit and the explicit size/UTF-8 gate protect the host boundary. Regenerate
-the checked project fixtures deliberately with
-`node product/native/tests/check-project-conformance.mjs --write`.
-
-`ProductHost.files.props` is the explicit native source allowlist: main Host and both
-workers, closed over their relative import graph. Build dependencies include no tests,
-private artwork, Electron, index.html or DOM view modules. Existing pure JavaScript
-controllers/evaluators remain authoritative. The package graph is protected by
-`product/tests/production-manifest.test.js`. The local packaging script and CI assemble the same runtimes/notices,
-records packaged SHA256 values and launches the published executable with developer
-Node/.NET absent from PATH. `THIRD-PARTY-NOTICES.md` records upstream provenance.
-
-With `FLAMORIS_RENDER_FIXTURE_DIR` set, native Host tests produce synthetic PSD/flimg and
-canonical renderer fixtures. The WPF smoke then authors an eight-second shot, exports
-240 PNGs plus real H.264 (`FLAMORIS_TEST_FFMPEG`), saves/reopens/resumes, exercises reimport
-and Key State/Transition editing, and checks source-frame parity. Fixtures are never
-copied into the runtime package. Without that variable the ordinary boundary/input
-smoke still runs, and does not claim the extended production fixture passed.
-
-## Authority and acceptance
-
-WPF gestures send typed commands/transactions to one EditorSession. Immutable
-revision-tagged projections and local drafts are not a C# Project or second history.
-Canonical render plans drive D3D11 hardware/WARP; coalesced command-draft previews do
-not mutate history. Save uses immutable Host bytes and a revision-qualified receipt
-acknowledged only after durable atomic write. Recovery cleanup is lineage/snapshot
-scoped. See ADRs 0007–0009 for the implementation decisions and measured limits.
-
-Final physical Windows checks cover real user artwork, 100/125/150/200% DPI, focus,
-pointer feel, overlay contrast, discoverability and file-dialog/save behavior. The
-portable smoke does not prove a signed installer, association, update/uninstall, live
-external MCP attachment, or Electron retirement. Those accepted release gates remain
-open; Electron stays until the migration design's stop conditions pass.
-
-## Live MCP (Issue #107)
-
-The `MCP / AI` menu enables a document-scoped Core 1.1.0 named-pipe endpoint.
-Manual connection is disabled by default. Connection copy starts the matching
-`mcp/Flamoris.Mcp.Bridge.exe`; capability travels only in
-`FLAMORIS_MCP_CAPABILITY`. See [workflow](../../docs/native-production-workflow.md),
-[wire contract](../../docs/mcp-design.md) and [ADR 0011](../../docs/decisions/0011-mcp-core-migration.md).
-The bridge owns no Product Host, Project or history. Node remains editing authority.
-
-Use the shared prerequisites and locked dependency installation in
-[Build and tests](#build-and-tests). Both the client and bridge consume
-`Flamoris.Mcp.Core 1.1.0`; no DLL is vendored.
-
-For a portable candidate, run this from the repository root with .NET 10 SDK and Node 24.21.0 installed:
+Build the portable app/bridge and pinned LGPL shared FFmpeg from the repository root:
 
 ```powershell
 ./product/packaging/publish-windows.ps1
 ```
 
-The script installs locked Product dependencies when needed, downloads the pinned LGPL FFmpeg archive and verifies its SHA256, then publishes the bridge and app with Node and notices to `artifacts/package/Flamoris2D-win-x64/`. CI uses this same script. The native runtime decodes
-the canonical Chipsy sheet to a PNG display cache with the packaged FFmpeg. The
-original WebP remains byte-identical in `mcp-assets/`; WPF selects row 7/column 0.
-The cache and sheet are runtime artifacts, not committed derivatives. Development
-builds without the cache retain activity text and cursor.
+Output: `artifacts/package/Flamoris2D-win-x64/`. The script verifies required
+libraries, rejects legacy runtime content and records every file in `SHA256SUMS.txt`.
+For full Windows client/bridge tests set `FLAMORIS_TEST_BRIDGE` to the published
+`mcp/Flamoris.Mcp.Bridge.exe` and run:
 
-Set `FLAMORIS_TEST_BRIDGE` to the published executable before running the C# client
-suite. The existing Windows gate exercises official-client transport and the
-packaged WPF smoke verifies visible Mesh changes, automatic refresh and shared
-Undo/Redo before continuing Source→Export→Save/reopen. Node MCP HTTP dependencies
-are absent from the Native package. The private binary artwork channel is unchanged.
+```powershell
+dotnet run --project product/native/tests/Flamoris2D.Native.Client.Tests -c Release --no-build -- product/native/tests
+```
 
-## Native command migration (#127)
+The Windows workflow generates synthetic source/render fixtures, runs the
+packaged WPF Source→Export→Save/reopen smoke with developer runtimes absent from
+PATH, and checks real H.264 output. These checks do not replace human artwork,
+DPI, pointer, GPU/playback and manual external MCP acceptance.
 
-The [current handler/query inventory](../../docs/native-command-migration.md)
-tracks the remaining migration. The native session now supports scene lock,
-group creation/removal and reparenting, plus clipping create/source/enabled/removal
-and index-preserving history restoration. Commands report all affected IDs in
-first-seen order. Public transactions reject history-only types and preflight the
-whole batch before applying a domain handler. The JS-derived session fixture
-compares full Project, history, revision/dirty state and error after every operation,
-including cycles, invalid payloads, internal-command rejection, Undo/Redo and
-stale prepared hierarchy edits. WPF/MCP and portable packaging are unchanged.
+## Native boundary
 
-The next #127 checkpoint adds rigid bindings, rotation/IK constraints, Skin
-bindings and sparse form/deformation offsets. Compiled command schemas are
-checked against current JS as part of the existing session conformance gate;
-no runtime JS or test files are loaded by native execution. The payload validator
-is shared across native domains and public/history command classification follows
-Product schemas, including its existing public mesh-target restore contract.
-Skin normalization, sparse zero-offset removal, duplicate handling and sorting
-preserve JS behavior. Stable-ID sorting uses UTF-16 code units in both commands
-and Project validation, including astral-plane/private-use characters.
-`rig-conformance.json` protects full Project/history/error/state parity for
-bindings, constraints, weight authoring and mesh samples through ordinary
-native transactions, Undo/Redo, save points and replacement.
+C ABI 1.5 is declared in `core/include/flamoris2d_core.h`. Opaque sessions and
+prepared edits have explicit ownership; managed adapters use SafeHandle.
+Caller-owned UTF-8 buffers carry immutable projections. Prepared candidates can
+be queried for gesture previews and disposed without changing live history.
+All mutations enter native Commands/Transactions and the same revision guards.
 
-Bone creation/rest/pose/reparent/removal and Warp grid/keyform/control-point/
-hierarchy commands now use the same native session. `hierarchy-conformance.json`
-compares full Project/history/error/revision state for typed edits and Undo/Redo,
-including hierarchy cycles, dependency locks, topology compatibility, ordered
-child lifting/restoration, grid presets and atomic candidate rejection.
+`.fl2d` format-v1 and schema 15 retain current compatibility. Native parsing
+migrates schemas 1–14 and retains embedded PNG records/identity metadata. Save
+acknowledges a captured revision only after successful atomic filesystem write;
+copy/recovery never marks the document clean. PSD/PSB and `.flimg` v1/v2 decode
+into immutable candidates; C++ converts/reconciles them before guarded replacement.
 
-Temporal programs/tracks/keyframes/events/regions, AnimationClip ownership and
-Sequence/ViewLane/ClipInstance edits now use native typed commands. Prepared
-transactions, Undo and Redo validate before/after Clip/Sequence ownership: owner
-creation/removal must include its program, and a surviving stable owner cannot
-reassign programs. `temporal-session-conformance.json` compares complete snapshots and
-history across successful atomic owner edits, lifecycle failures, time/channel
-checks, typed item edits, canonical ordering and schema preflight.
+ICU 78.3 supplies locale queries. Windows CMake fetches the pinned official
+Win64 MSVC2022 archive and copies its DLLs/license. Other platforms require that
+exact version (`-DICU_ROOT=/path/to/icu`). The C++ D3D11 compositor owns devices,
+textures/masks and readback; WPF only maps viewport/DPI/output resolution.
+Third-party provenance is in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
 
-KeyArt, SemanticSlot mapping, Topology/Keyform lifecycle and Transition part/
-diagnostic authoring now run through native commands. Product normalizers,
-stable identity/mapping exclusivity, topology dependency locks and indexed
-inverses are preserved. `transition-session-conformance.json` compares full
-Project/history/error/revision state, including atomic failures and Undo/Redo.
+## Compatibility oracle
 
-Typed Layout vertex/label/triangle/edge and generated-mesh commands update all
-associated Keyforms atomically. Snapshot inverses, issued vertex IDs, optional
-metadata, Skin/form locks, geometric checks and replacement consent retain
-Product behavior. `mesh-session-conformance.json` compares complete state and
-history across two KeyArts, shared-edge subdivision, Undo/Redo and rejection
-cases, including a malformed intermediate Keyform within a transaction.
+Node 24.21.0 is a development-only fixture oracle. `npm ci --prefix product
+--workspaces=false --ignore-scripts` installs its locked test dependencies.
+`npm test` and `tests/check-*-conformance.mjs` compare old behavior with native
+fixtures. Nothing under legacy JS/Host/Electron, tests, staging or history is a
+native runtime input. Keep the old source until physical acceptance permits
+its deletion; see [`../LEGACY.md`](../LEGACY.md).
 
-All 155 current Product command handlers now have native implementations. PSD
-re-import uses the ordinary Project snapshot inverse, logical identity check,
-affected-ID enumeration and before/after owner validation.
-`source-session-conformance.json` protects state/history parity and observable
-property order across typed node creation, source replacement, Undo/Redo and
-serialization. ABI 1.4 now adds all 72 readonly Product queries on this
-same session; see [the Query boundary](../../docs/native-query-migration.md).
-`query-conformance.json` protects values, Product exception messages, canonical
-lists, ancestor/pivot matrices, nullable selectors and complete session immutability,
-including outstanding prepared edits. Project validation reuses admission and
-retains the three existing warning messages/details. Native temporal sampling, rational Clip tick inspection and export frame planning
-now share deterministic math, including exact 128-bit intermediate tick products.
-Admission uses the same exact Clip arithmetic. Export planning bounds sub-tick
-frames directly instead of iterating potentially billions of trailing candidates.
-Pinned ICU preserves locale-sensitive lists/search. The shared native rig evaluator
-adds Bone FK, projected IK inspection/solve, Skin and Form correction, including
-parent-first nested Warp evaluation. All frame reads now share those same stages: Transition modes, resolved
-instance clipping, weighted composite groups, Sequence Clip mixing, camera/events
-and rational export frames. Diagnostic fingerprints and acknowledgements retain
-Product identity. Runtime authority cutover remains pending.
+## Live MCP
+
+Core/Wpf 1.2.0 supplies the stdio/named-pipe bridge, same-user security, grants,
+guards and connection UI. The bridge has no Project or session. WPF and MCP use
+the exact same workspace/native history. Connection is manual by default; copied
+credentials are transient and never stored in project/settings/logs.
+See [MCP design](../../docs/mcp-design.md) and [connection guide](../../docs/shared-mcp-connection.md).

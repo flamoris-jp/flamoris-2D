@@ -1,5 +1,9 @@
 # ADR 0007: Native Recovery lineage and revision-qualified save acknowledgement
 
+> The save/recovery contract is retained. ADR 0012 replaces the Host named below
+> with NativeWorkspace/C++ persistence; the managed atomic writer and revision-
+> qualified acknowledgement remain. Original Host evidence follows.
+
 Status: accepted for implementation by the 2026-09-15 production-migration instruction;
 implementation and Windows acceptance remain subject to PR review.
 

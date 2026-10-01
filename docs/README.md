@@ -5,6 +5,9 @@ Start with the [product overview](../README.md) or the detailed
 
 ## Current design set
 
+- [`repository-renovation.md`](repository-renovation.md) — #142 inventory and native/legacy responsibility boundaries
+- [`decisions/0012-native-session-cutover.md`](decisions/0012-native-session-cutover.md) — one C++ NativeSession, persistence/source ingest and WPF/MCP cutover
+
 - [`basic-design.md`](basic-design.md) — foundational domain/product design. Its browser/WebGL shell notes are historical where they conflict with the accepted native migration; current shell/rendering authority is the WPF migration design plus ADRs 0006–0009.
 - [`feature-matrix.md`](feature-matrix.md) — early prioritized feature inventory and backlog reference, not current implementation status. Use the native capability ledger and roadmap for shipped/migrated/deferred disposition.
 - [`roadmap.md`](roadmap.md) — current dependency-driven implementation phases, native migration checkpoint, and acceptance criteria
@@ -19,8 +22,8 @@ Start with the [product overview](../README.md) or the detailed
 - [`key-art-transition.md`](key-art-transition.md) — multi-Key-Art A→B→C transition model
 - [`mcp-design.md`](mcp-design.md) — MCP-ready command/transaction architecture
 - [`repository-boundaries.md`](repository-boundaries.md) — Product / Staging / Test / History separation, testing and CI boundary
-- [`csharp-wpf-ui-migration.md`](csharp-wpf-ui-migration.md) — accepted WPF shell / JavaScript Product Host migration design; Phase 1 foundation is complete and Issue #96 / PR #101 carries the Source-through-Export production candidate
-- [`native-capability-map.md`](native-capability-map.md) — Issue #96 migration completion ledger and remaining release acceptance; this is the current capability-status authority for native migration
+- [`csharp-wpf-ui-migration.md`](csharp-wpf-ui-migration.md) — historical WPF/JavaScript Host migration design, superseded for runtime by ADR 0012
+- [`native-capability-map.md`](native-capability-map.md) — current C++ production capability map, implementation owners, evidence and remaining Windows acceptance
 - [`native-command-migration.md`](native-command-migration.md) — C++ typed Command coverage and migration scope
 - [`native-query-migration.md`](native-query-migration.md) — NativeSession readonly Query boundary and conformance
 - [`native-production-workflow.md`](native-production-workflow.md) — Nativeの素材読込から書き出し・保存再開までの制作手順と最終Windows確認
@@ -51,11 +54,11 @@ For questions such as “is this feature implemented now?”, prefer documents i
 
 1. [`native-capability-map.md`](native-capability-map.md) for native migration capability disposition and evidence;
 2. [`roadmap.md`](roadmap.md) for current phase/gate status;
-3. accepted ADRs 0006–0009 for current native architectural decisions;
+3. ADR 0012 for current native authority, with retained domain/recovery/rendering decisions;
 4. phase-specific normative design documents for domain semantics;
 5. older reviews/drafts only as historical context.
 
-PR #101 is merged; final real-art Windows acceptance of the native production candidate remains open. Electron remains the default installed/released shell until the explicit retirement/cutover criteria pass.
+The #118/#142 unified native candidate keeps final real-art Windows acceptance open. JS/Electron/Host are compatibility reference outside production. Installer/default association is a separate release decision.
 
 ## Earlier draft
 

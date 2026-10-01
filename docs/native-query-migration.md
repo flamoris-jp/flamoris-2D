@@ -1,9 +1,8 @@
 # NativeSession Query migration
 
-Issue #127 follows the command milestone with the same readonly Product Query
-surface as `product/src/queries/project.js`. NativeSession remains experimental;
-the Product Host is the production authority until queries, evaluation, source
-ingest, persistence and the physical Windows acceptance are complete.
+All 72 Product queries and additional native authoring/render-plan queries run
+on the same C++ NativeSession used by WPF/MCP in #118/#142 (ADR 0012).
+`product/src/queries/project.js` is the compatibility oracle, outside runtime.
 
 ## Boundary
 
@@ -172,10 +171,9 @@ projections, Project/history/revision/error and prepared-edit state remain exact
 The current corpus contains 190 admitted Projects and 70,381 reads. It
 exercises every mode and all supported Clip track families with current JS, rather than making the native implementation its oracle.
 
-This completes the command/query parity scope of #127. Production editing still
-uses the JS Product Host until #118's native renderer, persistence/source ingest
-and one-session WPF/MCP authority cutover is reviewed. Real-art Windows acceptance
-still precedes deletion of the old authority and bundled Node runtime.
+This completes the command/query parity scope of #127. The #118/#142 candidate
+now uses these queries through the shared native WPF/MCP workspace. Real-art
+Windows acceptance still precedes deletion of the old reference authority.
 
 Self-review adds large finite diagnostic area ratios at decimal/exponent boundaries.
 Evidence uses shortest significant decimal formatting before ECMAScript fixed/exponent

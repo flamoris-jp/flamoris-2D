@@ -1,6 +1,6 @@
 # Native command/query migration (#127)
 
-This checkpoint follows reviewed main `bb361ec` (#133). Production remains the JS Product Host until the explicit #118 cutover. WPF/MCP never dual-write. Native commands run in the same session, candidate validator, prepared commit and history path introduced by #123.
+The #118/#142 production candidate routes WPF/MCP through one NativeWorkspace and C++ NativeSession (ADR 0012). JS Product Host is now compatibility reference only. WPF/MCP never dual-write. Native commands run in the same session, candidate validator, prepared commit and history path introduced by #123.
 
 ## Command contract
 

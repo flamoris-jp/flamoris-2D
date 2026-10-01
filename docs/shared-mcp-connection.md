@@ -35,7 +35,7 @@ reconnect until a new explicit connection; auto-connect runs when a document is 
   configured WSS endpoint. No desktop LAN listener is created.
 - Only connection and successful edits show centered Chipsy; verify actual scale
   and timing by eye. Queries, errors and cancellation must not show it.
-- Verify the bottom-right indicator is the only MCP connection indicator, while the separate upper Product Host status remains; the mouse cursor is unchanged.
+- Verify the bottom-right indicator is the only MCP connection indicator, while the separate upper native authority status remains; the mouse cursor is unchanged.
 - Stop, document replacement and exit revoke the previous client. Hub loss leaves
   manual editing and history intact and never replays a mutation.
 

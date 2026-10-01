@@ -10,7 +10,12 @@ for phase dependencies and release gates, use the [roadmap](roadmap.md).
 
 The production core is implemented through Phase 8, except the deferred Phase 5 input-simplification track described below.
 
-The native WPF production candidate introduced by merged [PR #101](https://github.com/flamoris-jp/flamoris-2D/pull/101) now supports Source through Export, Recovery, PSD/Cutwork import, textured Mesh authoring, Rig/Deform, Sequence animation, Preview, PNG/MP4 export, and save/reopen/resume. See the [Japanese native workflow](native-production-workflow.md) and [completion ledger](native-capability-map.md). Electron remains the default installed/released shell until final Windows acceptance and a reviewed release cutover.
+The native WPF candidate now uses one C++ NativeSession shared with MCP under
+#118/#142. Source through Export, Recovery, PSD/Cutwork ingest and save/reopen
+remain the production workflow. JS/Electron/Product Host are retained only as
+compatibility references, outside native build/publish inputs. Windows CI and
+human artwork/interaction acceptance remain gates; installer/signing/default
+association are a separate release decision.
 
 Current checkpoint:
 
@@ -22,9 +27,11 @@ Current checkpoint:
 - Phase 7 Bones / FK / rigid and weighted skinning / form correction / constraints / IK — complete
 - Phase 8 Multi-Key-Art Sequence / AnimationClip / deterministic mixer / timeline authoring — complete
 - Phase 9 Production Robustness / Internal Beta — active hardening stage
-- Native WPF migration (#96 / PR #101) — Source-through-Export implementation candidate complete; final real-art Windows acceptance and release cutover remain
+- Native renovation (#118/#142) — one C++ authority and native-only package candidate; final Windows verification and release acceptance remain
 
-The immediate gate is the final Windows hands-on pass for the native production candidate under Issue #96 / PR #101 using real FLAMORIS artwork and projects. Issue #78 remains the broader post-Phase-8 packaged-Windows QA checklist, and Issue #79 remains the Phase 9 hardening umbrella. Issues #97/#98 have implementation in PR #101 but stay open for final Windows acceptance.
+The immediate gate is the unified native candidate's full regression/packaged
+Windows verification, followed by real-art Windows hands-on. Track discovered
+defects as focused fixes. Code conformance does not certify perceptual acceptance.
 
 Phase 5 flat-image part decomposition remains an experimental/deferred input-simplification track and does not block the current PSD/Cutwork production workflow.
 
@@ -39,8 +46,8 @@ Phase 5 flat-image part decomposition remains an experimental/deferred input-sim
 - Save / Save As / Incremental Save / Save Copy
 - dirty/save-point tracking, lineage-scoped native Recovery, Recent Files, and native Windows dialogs
 - PSD import/re-import and Cutwork `.flimg` v1/v2 source-art import with document-coordinate placement
-- native WPF production candidate plus the currently released Electron Windows shell
-- installed `.fl2d` file association remains owned by the Electron release until cutover; the portable native candidate does not change system association
+- native WPF production candidate; previous shells retained as compatibility references
+- portable native candidate does not change an existing installed `.fl2d` association
 - typed MCP-ready command/query boundaries with one shared EditorSession authority
 
 ### Mesh and Key Art authoring
@@ -98,15 +105,12 @@ The remaining real-device validation work is perceptual/operational acceptance: 
 
 ## Current follow-up work
 
-- #96 / PR #101 — final native Source-to-Export real Windows acceptance; release cutover remains open
-- #97 — native Recovery acceptance; implementation is in PR #101
-- #98 — native bulk artwork/renderer proof; implementation and measured renderer decision are in PR #101
-- #78 — broader packaged Windows end-to-end Production QA checklist
-- #79 — Phase 9 Production Robustness / Internal Beta umbrella
-- #58 — production UX cleanup and Japanese-first labels
-- #43 — post-public dependency, package, and history audit
+- #118/#142 — native cutover review, Windows packaged verification and physical acceptance.
+- Real production QA — artwork/DPI/interaction/playback and output inspection.
+- Release policy — installer/signing/update/file association, separately reviewed.
+- Existing roadmap hardening and deferred features continue after the native path is dependable.
 
-The remaining release audit in #43 is separate from product hardening. See the [audit evidence and remaining release gates](reviews/issue-43-release-hygiene.md). The software license does not grant rights to FLAMORIS creative assets.
+The software license does not grant rights to FLAMORIS creative assets.
 
 ## README visual example — remaining acceptance for #108
 

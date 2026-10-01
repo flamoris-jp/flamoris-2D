@@ -1,5 +1,9 @@
 # C# / WPF editor shell migration design
 
+> Historical Host-backed shell design, superseded for runtime authority and
+> packaging by [ADR 0012](decisions/0012-native-session-cutover.md) and #142. The original design below
+> remains reference; it does not authorize a JS/Node production fallback.
+
 Status: accepted by PR #93; Phase 1 implementation tracked by Issue #94  
 Baseline audited: `main` at `2d9dd7cc5ec2fd67f845a34a1a692ce07387346d`  
 Decision record: [`decisions/0006-csharp-wpf-shell-product-host.md`](decisions/0006-csharp-wpf-shell-product-host.md)

@@ -24,7 +24,7 @@ MCP/AI readiness remains an architectural constraint from the beginning, not a l
 
 ## Current checkpoint
 
-The Phase 1-8 production core is implemented. The native WPF migration has advanced beyond shell proof: Issue #96 / PR #101 is now a Source-through-Export production candidate built on the existing JavaScript Product/Core authority.
+The Phase 1-8 production core is implemented. The native WPF migration has advanced beyond shell proof: The #118/#142 Source-through-Export candidate now uses one C++ NativeSession shared by WPF and MCP; the earlier Host architecture is compatibility reference.
 
 Implemented production architecture includes:
 
@@ -36,7 +36,7 @@ Implemented production architecture includes:
 - Phase 6 clipping + Warp/Lattice Deformer
 - Phase 7 Bones, FK, rigid/weighted skinning, form correction, constraints, IK, and mirror helpers
 - Phase 8 Multi-Key-Art Sequence / Clip animation architecture, deterministic mixer, timeline authoring, and automated production proof
-- Native WPF Product Host integration from Source through Export, including Recovery, PSD/`.flimg` import, textured mesh editing, Rig/Deform, Animation, Preview, Export, Save/Open, and a self-contained Windows candidate
+- Native WPF/NativeSession integration from Source through Export, including Recovery, PSD/`.flimg` import, textured mesh editing, Rig/Deform, Animation, Preview, Export, Save/Open, and a self-contained Windows candidate
 
 Phase 5 input-simplification work remains experimental/deferred and does not block the current PSD/Cutwork production pipeline.
 
@@ -108,7 +108,7 @@ Delivered includes:
 - typed MCP-ready command/query schemas
 - Windows desktop adapters
 
-Native WPF does not replace this authority. It routes edits through the same Product Host / EditorSession.
+Native WPF and MCP now route edits through the same NativeWorkspace/C++ NativeSession, retaining the existing Project/Command semantics.
 
 ---
 
@@ -264,28 +264,29 @@ Deferred beyond Phase 8 remain existing roadmap items such as a full graph edito
 
 Design authority:
 
-- [`csharp-wpf-ui-migration.md`](csharp-wpf-ui-migration.md)
-- ADR 0006 Product Host boundary
+- [ADR 0012 native session cutover](decisions/0012-native-session-cutover.md)
+- [Repository renovation](repository-renovation.md)
+- ADR 0006 is historical Host architecture
 - ADR 0007 native Recovery lifecycle
 - ADR 0008 measured D3D11 renderer selection
 - ADR 0009 mesh-animation identity bridge
 - [`native-capability-map.md`](native-capability-map.md)
 - [`native-production-workflow.md`](native-production-workflow.md)
 
-Current PR #101 implements:
+The current native candidate preserves these capabilities:
 
 - native New/Open/Save/Save As/Incremental/Copy and scoped Recovery
 - full `.fl2d` envelope/artwork retention
 - PSD and Cutwork `.flimg` import plus reviewed PSD update
-- authenticated bounded document/raster bulk transfer
+- bounded immutable document/raster candidates on the shared native session lane
 - D3D11 hardware renderer with WARP fallback consuming canonical Product render plans
 - textured Mesh Layout, topology, Grid/Contour, correspondence, UV and Key State authoring
 - Bone / Warp / Weight / Skin / clipping / IK / mirror / form correction
 - Sequence / clips / typed tracks / keys / scrub / playback / camera
 - Preview / PNG / H.264 MP4 export through the same evaluated semantics
-- self-contained Windows x64 candidate with pinned Node and LGPL FFmpeg
+- self-contained Windows x64 candidate with C++ core/compositor, ICU and pinned LGPL FFmpeg
 
-The migration is **not yet a release cutover**. Electron remains the default installed/released shell until the final Windows acceptance and retirement stop conditions pass.
+The unified native path is a production candidate pending final Windows verification/acceptance. Legacy source remains reference only. Installer/default association requires a separate reviewed release decision.
 
 ---
 
@@ -384,13 +385,13 @@ Audio analysis/lip-sync may later integrate with FLAMORIS production workflows, 
 
 ## Near-term execution order
 
-1. Keep PR #101 reviewable and green; fix documentation/implementation review findings as focused commits.
-2. Run the final native Windows hands-on with real PSD/`.flimg`/`.fl2d` material and an approximately 8-second shot.
-3. Turn any real defect found by hands-on into a focused Issue/fix rather than extending the migration umbrella blindly.
-4. When acceptance evidence is complete, decide merge/cutover status for #96 and whether #97/#98 can close.
-5. Continue Phase 9 profiling, recovery/export stress and UX hardening under #79.
-6. Retire or replace the Electron default only after every stop condition in the migration design passes, including installer/association/release policy.
-7. Revisit input simplification and AI assistance only after the main production loop is dependable.
+1. Complete #118/#142 candidate review and focused regression fixes.
+2. Verify the unified native path, package and absence of Node/Host runtime inputs.
+3. Run final Windows hands-on with real PSD/`.flimg`/`.fl2d` and an approximately eight-second shot.
+4. Turn observed defects into focused fixes; retain compatibility source until parity/physical evidence permits deletion.
+5. Review installer/signing/association/default release policy separately.
+6. Continue robustness/profiling/UX work once real MV production is dependable.
+7. Revisit deferred input simplification/AI assistance after the main production loop.
 
 This order deliberately favors producing real MV shots and hardening the current production candidate over adding broad new feature families.
 
