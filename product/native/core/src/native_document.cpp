@@ -680,7 +680,14 @@ static fl2d_status document_json(const uint8_t *bytes, uint32_t length,
   }
   std::string text(reinterpret_cast<const char *>(bytes), length), error;
   auto end = picojson::parse(v, text.begin(), text.end(), &error);
-  return error.empty() && end == text.end() ? FL2D_OK : FL2D_MALFORMED_JSON;
+  if (!error.empty())
+    return FL2D_MALFORMED_JSON;
+  // picojson stops at the root value. Accept exactly JSON whitespace after it,
+  // not another value, locale-dependent whitespace or trailing garbage.
+  while (end != text.end() &&
+         (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r'))
+    ++end;
+  return end == text.end() ? FL2D_OK : FL2D_MALFORMED_JSON;
 }
 extern "C" FL2D_API fl2d_status FL2D_CALL
 fl2d_document_parse_json(const uint8_t *bytes, uint32_t length, char *buffer,

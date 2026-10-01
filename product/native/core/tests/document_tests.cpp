@@ -63,6 +63,17 @@ int main() {
     uint32_t size=123;const uint8_t invalid[]={0xc0,0xaf};
     assert(fl2d_document_parse_json(invalid,2,nullptr,0,&size)==FL2D_INVALID_UTF8 && size==0);
     assert(fl2d_document_parse_json(invalid,FL2D_DOCUMENT_MAX_BYTES+1,nullptr,0,&size)==FL2D_INPUT_TOO_LARGE);
-    const std::string trailing="{}{}";assert(fl2d_document_parse_json(reinterpret_cast<const uint8_t*>(trailing.data()),4,nullptr,0,&size)==FL2D_MALFORMED_JSON);
+    // JSON permits only SP, TAB, LF and CR around its single root value.
+    const auto document=fixtures.get<Object>().at("serialize").get<picojson::array>().front().get<Object>().at("expected").serialize();
+    const auto parsed=read([&](char* b,uint32_t c,uint32_t* n){return fl2d_document_parse_json(reinterpret_cast<const uint8_t*>(document.data()),static_cast<uint32_t>(document.size()),b,c,n);});
+    for(const std::string whitespace:{" ","\t","\n","\r","\r\n"," \t\r\n"}) {
+        const auto padded=whitespace+document+whitespace;
+        const auto actual=read([&](char* b,uint32_t c,uint32_t* n){return fl2d_document_parse_json(reinterpret_cast<const uint8_t*>(padded.data()),static_cast<uint32_t>(padded.size()),b,c,n);});
+        assert(actual==parsed);
+    }
+    for(const std::string suffix:{"{}"," true","\nnull"," x","\v","\f","\xC2\xA0"}) {
+        const auto trailing=document+suffix;size=123;
+        assert(fl2d_document_parse_json(reinterpret_cast<const uint8_t*>(trailing.data()),static_cast<uint32_t>(trailing.size()),nullptr,0,&size)==FL2D_MALFORMED_JSON && size==0);
+    }
     puts("Native document conformance passed.");
 }
