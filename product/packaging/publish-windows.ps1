@@ -25,9 +25,9 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $package 'mcp') -Force | Out-Null
     Push-Location $repo
     try {
-        & dotnet publish product/native/src/Flamoris2D.Bridge -c Release -r win-x64 --self-contained true -o (Join-Path $package 'mcp')
+        & dotnet publish product/native/src/Flamoris2D.Bridge/Flamoris2D.Bridge.csproj -c Release -r win-x64 --self-contained true -o (Join-Path $package 'mcp')
         if ($LASTEXITCODE -ne 0) { throw 'Bridge publish failed' }
-        & dotnet publish product/native/src/Flamoris2D.App -c Release -r win-x64 --self-contained true -o $package
+        & dotnet publish product/native/src/Flamoris2D.App/Flamoris2D.App.csproj -c Release -r win-x64 --self-contained true -o $package
         if ($LASTEXITCODE -ne 0) { throw 'App publish failed' }
     } finally { Pop-Location }
 
