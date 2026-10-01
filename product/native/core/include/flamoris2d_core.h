@@ -126,6 +126,12 @@ FL2D_API fl2d_status FL2D_CALL fl2d_document_parse_json(const uint8_t* bytes, ui
 FL2D_API fl2d_status FL2D_CALL fl2d_session_document_json(const fl2d_session* session,
     const uint8_t* options, uint32_t length, char* buffer, uint32_t capacity, uint32_t* required);
 
+/* Immutable source-to-Project conversion. Decoder candidates are
+ * {kind:"psd"|"flimg",source:object,options:{fileName,projectName,importedAt}}.
+ * This does not attach or edit a session. Raster decoding/validation precedes it. */
+FL2D_API fl2d_status FL2D_CALL fl2d_source_project_json(const uint8_t* bytes, uint32_t length,
+    char* buffer, uint32_t capacity, uint32_t* required);
+
 typedef struct fl2d_frame_rate {
     int64_t numerator;
     int64_t denominator;

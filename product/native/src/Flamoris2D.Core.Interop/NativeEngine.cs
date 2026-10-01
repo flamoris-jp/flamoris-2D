@@ -47,6 +47,10 @@ internal static class NativeMethods
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_abi_version")]
     internal static extern NativeStatus AbiVersion(out int major, out int minor);
 
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_source_project_json")]
+    internal static extern NativeStatus SourceProject(byte[] input, uint length,
+        byte[]? buffer, uint capacity, out uint required);
+
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl, EntryPoint = "fl2d_document_parse_json")]
     internal static extern NativeStatus DocumentParse(byte[] input, uint length,
         byte[]? buffer, uint capacity, out uint required);

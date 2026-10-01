@@ -35,6 +35,11 @@ public static class NativeDocument
         ArgumentNullException.ThrowIfNull(input);
         return Read((byte[]? b, uint c, out uint r) => NativeMethods.DocumentParse(input, checked((uint)input.Length), b, c, out r));
     }
+    public static JsonElement SourceProject(JsonElement request)
+    {
+        var input = JsonSerializer.SerializeToUtf8Bytes(request);
+        return Read((byte[]? b, uint c, out uint r) => NativeMethods.SourceProject(input, checked((uint)input.Length), b, c, out r));
+    }
     public static JsonElement Serialize(NativeSession session, JsonElement options)
     {
         ArgumentNullException.ThrowIfNull(session);
