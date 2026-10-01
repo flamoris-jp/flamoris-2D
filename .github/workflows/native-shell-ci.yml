@@ -34,6 +34,17 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Stage production test fixtures
+        shell: pwsh
+        run: |
+          $source = Join-Path $env:GITHUB_WORKSPACE 'product/native/tests/fixtures/production'
+          New-Item -ItemType Directory -Force -Path $env:FLAMORIS_RENDER_FIXTURE_DIR | Out-Null
+          foreach ($name in @('production-render-projections.json', 'production-render-textures.json', 'native-production-source.psd', 'native-production-source.flimg')) {
+            $fixture = Join-Path $source $name
+            if (!(Test-Path -LiteralPath $fixture -PathType Leaf)) { throw "Required production test fixture missing: $fixture" }
+            Copy-Item -LiteralPath $fixture -Destination $env:FLAMORIS_RENDER_FIXTURE_DIR
+          }
+
       - name: Build native solution
         run: dotnet build product/native/Flamoris2D.Native.sln -c Release
 
