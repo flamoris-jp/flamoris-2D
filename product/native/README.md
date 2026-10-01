@@ -14,7 +14,7 @@ core/compositor, ICU libraries, self-contained .NET runtime, `mcp/` and `ffmpeg/
 directories together. Node, Electron and Product Host are absent. The portable
 candidate does not install itself or change `.fl2d` associations.
 
-The [Native Shell Boundary workflow](https://github.com/flamoris-jp/flamoris-2D/actions/workflows/native-shell-ci.yml)
+The [Windows Portable Package workflow](https://github.com/flamoris-jp/flamoris-2D/actions/workflows/windows-package.yml)
 uploads the accepted ZIP and inventory as `FLAMORIS-2D-win-x64` after successful
 PR/manual runs, with three-day retention.
 Use the [Japanese production guide](../../docs/native-production-workflow.md).
