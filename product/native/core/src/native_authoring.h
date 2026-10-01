@@ -58,6 +58,11 @@ struct Ids {
     return Value(s.str());
   }
 };
+Value timeline_state(const Value &project, const Value &context);
+Value transition_diagnostics(const Value &id, const Value &validation,
+                             const Value &evaluation, const Value &failure);
+Value timeline_tool(const Value &project, const Value &input);
+Value playback_tick(const Value &project, const Value &input);
 Value rig_state(const Value &project, const Value &context);
 Value rig_tool(const Value &project, const Value &input);
 Value mesh_state(const Value &project, const Value &input, bool strict = false);

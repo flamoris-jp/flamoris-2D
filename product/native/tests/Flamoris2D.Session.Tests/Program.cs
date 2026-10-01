@@ -77,6 +77,21 @@ using(var fixtures=JsonDocument.Parse(File.ReadAllBytes(args[1])))
     var stale=await workspace.AnalyzeSourceAsync(bytes,"stale.psd");await workspace.InvokeAsync(w=>w.Execute(Rename("edit"),"edit"));
     try {await workspace.InvokeAsync(w=>w.ApplySourceReview(stale.GetProperty("id").GetString()!));throw new Exception("Stale reimport review applied.");}catch(WorkspaceException e) when(e.Code=="source.review_stale") {}
 }
+// Timeline intents compile in C++ and enter the same native undo history.
+await workspace.InvokeAsync(w=>
+{
+    var art=w.Query("keyart.list",Json(new {}))[0].GetProperty("id").GetString()!;
+    var result=w.ExecutePlan(w.CompileTimeline(Json(new {}),"sequence.create",Json(new {displayName="native sequence",keyArtId=art,durationSeconds=2})));
+    var sequenceId=result.GetProperty("sequenceId").GetString()!;
+    var context=Json(new {sequenceId});
+    var track=w.ExecutePlan(w.CompileTimeline(context,"track.add",Json(new {kind="CameraTrack",target=new {cameraId="main"}}))).GetProperty("trackId").GetString()!;
+    w.ExecutePlan(w.CompileTimeline(context,"key.add",Json(new {trackId=track,channel="positionX",timeTicks=0,value=5})));
+    if(w.Timeline(context).GetProperty("tracks").GetArrayLength()!=1)throw new Exception("Native timeline projection lost track.");
+    var before=w.Project.GetRawText();w.Undo();w.Redo();if(w.Project.GetRawText()!=before)throw new Exception("Timeline Undo/Redo differs.");
+    var sample=w.Playback(Json(new {sequenceId,playback=new {startTicks=0,elapsedMilliseconds=2500,mode="loop"}}));
+    if(sample.GetProperty("timeTicks").GetInt64()!=60000||!sample.GetProperty("playing").GetBoolean())throw new Exception("Native playback differs.");
+    return true;
+});
 // Exercise the shared Core boundary, not a mock Product dispatcher.
 using(var host=new NativeMcpHost(workspace))
 using(var boundary=new McpBoundary(host,host.Tools(),new McpOptions(),new McpDiagnostics(Flamoris.Logging.FlamorisLogger.Create(new Flamoris.Logging.LoggingOptions {Level="error"}))))
