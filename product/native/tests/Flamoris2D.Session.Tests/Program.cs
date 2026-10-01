@@ -5,6 +5,47 @@ using Flamoris.Mcp.Core;
 static JsonElement Json(object v)=>JsonSerializer.SerializeToElement(v);
 await using var workspace=new NativeWorkspace();int events=0;workspace.Changed+=_=>events++;
 var initial=await workspace.NewAsync("Native",1920,1080);string root=await workspace.InvokeAsync(w=>w.Project.GetProperty("scene").GetProperty("rootId").GetString()!);
+// An idle lane must still run native work off a WPF-like caller/context.
+var uiSnapshot=await FromUiThread(caller=>workspace.InvokeAsync(w=>
+{
+    if(Environment.CurrentManagedThreadId==caller || SynchronizationContext.Current is not null)throw new Exception("Native work ran on the UI caller/context.");
+    _=w.Project;return w.Snapshot;
+}));
+if(uiSnapshot.DocumentToken!=initial.DocumentToken)throw new Exception("Worker lost workspace authority.");
+// Callbacks release the lane and revoke native access even when they throw.
+Task<JsonElement>? escaped=null;
+using(var resume=new ManualResetEventSlim())
+{
+    try
+    {
+        await FromUiThread(caller=>workspace.InvokeAsync<int>(w=>
+        {
+            if(Environment.CurrentManagedThreadId==caller)throw new Exception("Throwing callback ran on UI.");
+            escaped=Task.Run(()=>{resume.Wait();return w.Project;});
+            throw new WorkspaceException("test.callback_failure");
+        }));
+        throw new Exception("Callback exception was swallowed.");
+    }
+    catch(WorkspaceException e)when(e.Code=="test.callback_failure"){}
+    finally{resume.Set();}
+    try{await escaped!;throw new Exception("Failed callback leaked native access.");}catch(InvalidOperationException){}
+}
+if((await workspace.InvokeAsync(w=>w.Snapshot)).DocumentToken!=initial.DocumentToken)throw new Exception("Failed callback did not release lane.");
+// Cancellation while another callback owns the lane never invokes the waiter.
+using(var entered=new ManualResetEventSlim())
+using(var release=new ManualResetEventSlim())
+using(var cancelledWaiter=new CancellationTokenSource())
+{
+    var holding=workspace.InvokeAsync(w=>{entered.Set();if(!release.Wait(TimeSpan.FromSeconds(10)))throw new Exception("Lane test timed out.");return w.Snapshot;});
+    try
+    {
+        if(!entered.Wait(TimeSpan.FromSeconds(10)))throw new Exception("Worker did not enter lane.");
+        var waiting=workspace.InvokeAsync<int>(_=>throw new Exception("Cancelled waiter ran."),cancelledWaiter.Token);
+        cancelledWaiter.Cancel();
+        try{await waiting;throw new Exception("Cancelled lane wait succeeded.");}catch(OperationCanceledException){}
+    }
+    finally{release.Set();await holding;}
+}
 JsonElement Rename(string name)=>Json(new[]{new {type="scene.rename_node",payload=new {nodeId=root,displayName=name}}});
 await workspace.InvokeAsync(w=>w.Execute(Rename("first"),"first"));
 var save=await workspace.InvokeAsync(w=>w.PrepareSave("save"));
@@ -139,3 +180,15 @@ using(var boundary=new McpBoundary(host,host.Tools(),new McpOptions(),new McpDia
     await workspace.NewAsync("replacement",64,64);if(readOnly.IsActive)throw new Exception("Replaced document retained MCP grant.");
 }
 Console.WriteLine($"Native workspace: shared lane, cancellation, revision guards, save acknowledgement, Undo/Redo and source reopen passed ({events} changes).");
+
+static Task<T> FromUiThread<T>(Func<int,Task<T>> action)
+{
+    var completion=new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+    var thread=new Thread(()=>
+    {
+        SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
+        try{completion.SetResult(action(Environment.CurrentManagedThreadId).GetAwaiter().GetResult());}
+        catch(Exception e){completion.SetException(e);}
+    }){IsBackground=true};
+    thread.Start();return completion.Task.WaitAsync(TimeSpan.FromSeconds(10));
+}

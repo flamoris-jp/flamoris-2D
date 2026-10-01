@@ -41,8 +41,24 @@ public sealed partial class NativeWorkspace : IAsyncDisposable
     public async Task<T> InvokeAsync<T>(Func<NativeWorkspace, T> action, CancellationToken token = default)
     {
         await lane.WaitAsync(token).ConfigureAwait(false);
-        try { ObjectDisposedException.ThrowIf(disposed, this); token.ThrowIfCancellationRequested(); invocation.Value = ++invocationEpoch; return action(this); }
-        finally { invocation.Value = null; ++invocationEpoch; lane.Release(); }
+        try
+        {
+            // WaitAsync can complete synchronously on WPF's dispatcher.
+            // Explicitly move the entire atomic callback to a worker while
+            // keeping the shared UI/MCP lane held until that work completes.
+            return await Task.Run(() =>
+            {
+                try
+                {
+                    ObjectDisposedException.ThrowIf(disposed, this);
+                    token.ThrowIfCancellationRequested();
+                    invocation.Value = ++invocationEpoch;
+                    return action(this);
+                }
+                finally { invocation.Value = null; ++invocationEpoch; }
+            }).ConfigureAwait(false);
+        }
+        finally { lane.Release(); }
     }
     public WorkspaceSnapshot Snapshot => new(RuntimeId, documentToken, revision, Session.State());
     private void AssertLane() { if (invocation.Value != invocationEpoch) throw new InvalidOperationException("Native session access requires the shared workspace lane."); }
