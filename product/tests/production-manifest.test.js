@@ -45,8 +45,8 @@ test('native production uses one workspace and has no JS/Node/Host build inputs'
   const publish = await readFile(new URL('../packaging/publish-windows.ps1', import.meta.url), 'utf8');
   assert.match(app, /Flamoris2D.Native.Client/);
   assert.match(client, /ProjectReference Include="..\/Flamoris2D.Session\/Flamoris2D.Session.csproj"/);
-  assert.match(authority, /NativeWorkspace _workspace=new\(\)/);
-  assert.match(mcp, /new NativeMcpHost\(_workspace,expectedToken,/);
+  assert.match(authority, /NativeWorkspace\s+_workspace\s*=\s*new\(\)/);
+  assert.match(mcp, /new NativeMcpHost\(_workspace,\s*expectedToken,/);
   for (const source of [app, client, startup, authority, mcp])
     assert.doesNotMatch(source, /ProductHost|main\.mjs|node\.exe|FLAMORIS_NODE_PATH|ProcessStartInfo|HttpClient/);
   assert.doesNotMatch(publish, /npm ci|Get-Command node|Copy-Item \$node/);
