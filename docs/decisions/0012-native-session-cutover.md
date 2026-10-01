@@ -1,0 +1,31 @@
+# ADR 0012: Native document and session cutover
+
+Status: implementation in progress for #118; supersedes ADR 0006's runtime
+authority after the native cutover is verified.
+
+The C++ session owns Project validation, commands, queries, history, revision,
+schema migration and `.fl2d` serialization. WPF owns dialogs, same-directory atomic
+writes and immutable decoded artwork. A document is parsed and validated as a
+candidate before replacing the live session. A failed open leaves the live
+Project, history and artwork unchanged.
+
+The existing format version 1 and Project schema 15 remain unchanged. Native
+persistence ports schemas 1–14, including rejection of incompatible schema 14
+reserved tracks. The document envelope retains embedded PNG assets and identity
+metadata. Save serializes the authoritative revision; successful filesystem
+completion acknowledges that revision. Copy and recovery do not mark clean.
+
+WPF and MCP must share one serialized native session lane. MCP Core continues to
+own its transport, capabilities and permission checks. Preparation is separate
+from commit so cancellation and revision guards are rechecked before mutation.
+No mutable C# Project/history implementation or second MCP session is introduced.
+
+Source decoders produce immutable candidates; source conversion/reconciliation
+and typed commits belong to C++. Retained artwork follows native source history.
+Production packaging will remove Product Host and Node only when its replacement
+passes the full packaged workflow. The old JS oracle may be retained outside
+production pending physical Windows acceptance; it cannot remain a production
+fallback or editing authority after cutover.
+
+Windows visual/DPI/input/artwork acceptance remains human work. Code completion
+must not claim that those checks were performed.
