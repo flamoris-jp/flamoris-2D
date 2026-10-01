@@ -42,7 +42,7 @@ Phase 5 input-simplification work remains experimental/deferred and does not blo
 
 ### Current production gate
 
-The immediate gate is **final real-art Windows acceptance of PR #101 / Issue #96**, not another architecture phase.
+The immediate gate is the **unified native #118/#142 candidate review/Windows verification, then real-art acceptance**.
 
 Automated Windows evidence now goes beyond the older Phase 8 proof. The packaged native candidate has exercised a synthetic but real-format workflow through:
 
@@ -64,7 +64,7 @@ PSD import
 -> Cutwork .flimg import
 ```
 
-At the current PR #101 candidate, Product CI, Native Shell Boundary, and Windows Desktop Package are green. The remaining acceptance is deliberately human/physical where automation is weak:
+The current Product CI and Native Shell Boundary protect the unified runtime. Automated evidence does not replace human/physical acceptance:
 
 - use real FLAMORIS artwork/project data rather than synthetic fixtures
 - inspect actual deformation/compositing and exported motion
@@ -72,9 +72,9 @@ At the current PR #101 candidate, Product CI, Native Shell Boundary, and Windows
 - verify 100/125/150/200% DPI behavior on the real Windows machine
 - inspect light/dark artwork overlay contrast and dense timeline navigation
 - Save, close, reopen and continue editing in normal use
-- review release cutover / installer / association / Electron-retirement conditions
+- review release cutover / installer / association and legacy-source deletion conditions
 
-Issue #78 remains the broader post-Phase-8 packaged-Windows QA checklist. Issue #79 remains the Production Robustness / Internal Beta umbrella. Issues #97 and #98 have implementation and accepted decision records in PR #101, but stay open until review/final acceptance is complete.
+Issue #78 remains the broader post-Phase-8 packaged-Windows QA checklist. Issue #79 remains the Production Robustness / Internal Beta umbrella. Recovery/artwork evidence from #97/#98 is preserved; physical acceptance is still required.
 
 ---
 

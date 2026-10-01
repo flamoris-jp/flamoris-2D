@@ -19,7 +19,7 @@ public partial class MainWindow
     }
     private async Task<McpDesktopAttachment> AttachMcp(CorePermission permission)
     {
-        var client = _client ?? throw new InvalidOperationException("Product Host unavailable.");
+        var client = _client ?? throw new InvalidOperationException("Native editing authority unavailable.");
         _mcpConnection = await client.EnableMcpAsync(permission == CorePermission.Edit ? McpPermission.Edit : McpPermission.ReadOnly,
             startLocalEndpoint: false);
         return new(client.LiveMcpBoundary!, client.LiveMcpGrant!, async () => { await client.DisableMcpAsync(); });

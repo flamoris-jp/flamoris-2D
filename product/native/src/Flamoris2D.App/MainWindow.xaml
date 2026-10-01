@@ -122,7 +122,7 @@
                                 Content="やり直し" Click="Redo_Click" IsEnabled="False" />
                         <Separator />
                         <TextBlock VerticalAlignment="Center" Margin="7,0,3,0"
-                                   Foreground="#555" Text="編集エンジン" ToolTip="Product Host" />
+                                   Foreground="#555" Text="編集エンジン" ToolTip="編集エンジンの状態" />
                         <Ellipse x:Name="HostStatusIndicator" Width="9" Height="9"
                                  Fill="#9A9A9A" Margin="4,0" />
                         <TextBlock x:Name="HostStatusText" VerticalAlignment="Center"

@@ -1,6 +1,6 @@
 namespace Flamoris.Flamoris2D.Native.Client;
 
-// OS storage adapter only. The bytes are produced/validated by Product Host.
+// OS storage adapter only. The bytes are produced/validated by native persistence.
 public static class AtomicDocumentFile
 {
     public static async Task WriteAsync(string path, Func<Stream, CancellationToken, Task> write,

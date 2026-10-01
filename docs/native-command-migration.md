@@ -24,7 +24,7 @@ PSD re-import keeps its current typed Project replacement contract: preserve log
 
 ## Current handler inventory
 
-155 JS handlers: 155 native, 0 pending. Status means native coverage; JS remains production authority for every handler. Internal/public classification comes from current commandSchemas/internalCommandSchemas.
+155 JS handlers: 155 native, 0 pending. Status means native coverage; C++ is the production authority and JS is compatibility reference only. Internal/public classification comes from current commandSchemas/internalCommandSchemas.
 
 | Command | Access | Native | JS source |
 | --- | --- | --- | --- |

@@ -8,7 +8,7 @@ Start with the [product overview](../README.md) or the detailed
 - [`repository-renovation.md`](repository-renovation.md) — #142 inventory and native/legacy responsibility boundaries
 - [`decisions/0012-native-session-cutover.md`](decisions/0012-native-session-cutover.md) — one C++ NativeSession, persistence/source ingest and WPF/MCP cutover
 
-- [`basic-design.md`](basic-design.md) — foundational domain/product design. Its browser/WebGL shell notes are historical where they conflict with the accepted native migration; current shell/rendering authority is the WPF migration design plus ADRs 0006–0009.
+- [`basic-design.md`](basic-design.md) — foundational domain/product design. Its browser/WebGL shell notes are historical; current shell/authority is WPF plus ADR 0012 and the native capability map.
 - [`feature-matrix.md`](feature-matrix.md) — early prioritized feature inventory and backlog reference, not current implementation status. Use the native capability ledger and roadmap for shipped/migrated/deferred disposition.
 - [`roadmap.md`](roadmap.md) — current dependency-driven implementation phases, native migration checkpoint, and acceptance criteria
 - [`phase6-clipping-group-deformer.md`](phase6-clipping-group-deformer.md) — Phase 6 clipping, Warp/Lattice Deformer, evaluation order, and authoring contract
@@ -31,7 +31,7 @@ Start with the [product overview](../README.md) or the detailed
 - [`research/rigging-tools.md`](research/rigging-tools.md) — reference research from Inochi2D/Inochi Creator, Live2D Cubism, Stretchy Studio, Iki, Godot, and Synfig
 - [`research/key-art-transition-research.md`](research/key-art-transition-research.md) — correspondence/morphing research notes
 - [`reviews/phase1c-implementation-20260831.md`](reviews/phase1c-implementation-20260831.md) — historical Phase 1C implementation coverage and manual acceptance record
-- [`reviews/issue-94-native-foundation.md`](reviews/issue-94-native-foundation.md) — Phase 1 Product Host/WPF foundation review; later production migration state is tracked by #96 / PR #101
+- [`reviews/issue-94-native-foundation.md`](reviews/issue-94-native-foundation.md) — Phase 1 Product Host/WPF foundation review; current native state is tracked by #118/#142 and the capability map
 
 Repository-wide AI/automation rules live at [`../AGENTS.md`](../AGENTS.md).
 
@@ -42,7 +42,7 @@ Repository-wide AI/automation rules live at [`../AGENTS.md`](../AGENTS.md).
 - [`decisions/0003-mesh-layout-vs-deform-mode.md`](decisions/0003-mesh-layout-vs-deform-mode.md) — separate Mesh Layout (位置決め) from Deform (変形), including topology/Key-Art/MCP implications
 - [`decisions/0004-project-files-recovery-and-psd-reimport.md`](decisions/0004-project-files-recovery-and-psd-reimport.md) — `.fl2d`, save points, Preferences/Recovery, reviewed PSD re-import, and the minimal headless boundary
 - [`decisions/0005-windows-desktop-shell.md`](decisions/0005-windows-desktop-shell.md) — Electron Windows shell, native file semantics, Recovery storage, Recent Files, and security boundary; remains release history until native cutover
-- [`decisions/0006-csharp-wpf-shell-product-host.md`](decisions/0006-csharp-wpf-shell-product-host.md) — accepted WPF shell with a versioned out-of-process JavaScript Product Host
+- [`decisions/0006-csharp-wpf-shell-product-host.md`](decisions/0006-csharp-wpf-shell-product-host.md) — historical WPF/JS Host design, superseded for runtime by ADR 0012
 - [`decisions/0007-native-recovery-lifecycle.md`](decisions/0007-native-recovery-lifecycle.md) — accepted native Recovery lineage/save acknowledgement implementation contract; final PR/Windows acceptance remains open
 - [`decisions/0008-native-renderer-selection.md`](decisions/0008-native-renderer-selection.md) — measured D3D11 hardware/WARP native renderer choice and bounded artifact policy
 - [`decisions/0009-native-mesh-animation-identity.md`](decisions/0009-native-mesh-animation-identity.md) — expose the existing mesh animation identity through ordinary Commands

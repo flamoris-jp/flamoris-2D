@@ -98,8 +98,8 @@ The original v0.3 prototype snapshot remains preserved on `prototype/psd-import-
 ## Native live MCP
 
 Native live MCP uses Core/Wpf 1.2.0 and a packaged stdio bridge over an authenticated same-user named pipe, attached to the running Native
-editor's **same NativeSession and Undo/Redo history**. `MCP / AI` offers Read only /
-Edit, connection copy, activity and revocation. Current protocol 2026-07-28 uses
+editor's **same NativeSession and Undo/Redo history**. `MCP / AI` offers Connect / Stop / Settings, with Read only /
+Edit permissions and manual connection by default. Current protocol 2026-07-28 uses
 official SDK 2.2.0; file/import/save capabilities stay Native-only.
 See [connection and hands-on guide](docs/native-production-workflow.md),
 [MCP design](docs/mcp-design.md), and [ADR 0011](docs/decisions/0011-mcp-core-migration.md).
