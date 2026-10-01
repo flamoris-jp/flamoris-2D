@@ -19,7 +19,7 @@ FLAMORIS 2D focuses on short animated shots, rather than the full scope of a DAW
 
 ## Run the native Windows candidate
 
-The [Native Shell Boundary workflow](https://github.com/flamoris-jp/flamoris-2D/actions/workflows/native-shell-ci.yml) uploads `FLAMORIS-2D-win-x64` after successful PR/manual package checks, with three-day artifact retention. Download the portable ZIP, extract it completely and run `Flamoris2D.exe` on Windows x64.
+The [Windows Portable Package workflow](https://github.com/flamoris-jp/flamoris-2D/actions/workflows/windows-package.yml) uploads `FLAMORIS-2D-win-x64` after successful PR/manual package checks, with three-day artifact retention. Download the portable ZIP, extract it completely and run `Flamoris2D.exe` on Windows x64.
 
 Build the same portable candidate from the repository root on Windows x64 with PowerShell 7, the .NET 10 SDK, Git, CMake and Visual Studio C++ Build Tools:
 
