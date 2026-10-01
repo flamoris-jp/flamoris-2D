@@ -57,7 +57,7 @@ requests, and do not alter history or revision; one semantic command commits on 
 
 Left tools, top contextual controls, right targets/properties and the Animation-only bottom
 Timeline remain distinct. Empty placeholder tools were removed; Warp creation/deletion is
-explicit in Properties. The [Japanese production guide](native-production-workflow.md)
+explicit in Properties. The [Japanese production guide](../../docs/native-production-workflow.md)
 provides the complete import-to-reopen path and final Windows checklist.
 
 ## Feature ledger
@@ -166,7 +166,7 @@ commit `0c7824c8959d168cb5d682f2f6f939a70337c412`: 1920×1080, 720 evaluated tri
 hardware-device median 27.08 ms (five warm frames each, CPU readback included). Mean channel
 error against software: 0.0006/255, isolated edge max 255 on less than 0.00005% of channels.
 Those are runner measurements, not a guarantee for a user's GPU or a full interop frame.
-See [ADR 0008](decisions/0008-native-renderer-selection.md) for exact methodology/limits.
+See [ADR 0008](../../docs/decisions/0008-native-renderer-selection.md) for exact methodology/limits.
 
 Preview presentation is at most 2048 pixels on the long edge while retaining document
 coordinates. Native export is at most 4096 pixels per edge and 8294400 pixels; MP4 requires
@@ -380,4 +380,4 @@ Command/Query/import from current schemas/implementations. Safe commands have
 individual typed tools; queries without a public MCP schema are explicitly excluded,
 not silently dropped. Native reviewed reimport and internal restore commands are
 excluded even in Edit mode. Native file/binary capabilities remain Native-only.
-See [MCP design](mcp-design.md) for paging, revisions, limits and compatibility.
+See [MCP design](../../docs/mcp-design.md) for paging, revisions, limits and compatibility.
