@@ -149,8 +149,8 @@ Source replacement remains native-only, excluded from live MCP.
 | Command | `mesh_topology.update` | `src/commands/transition-command-handlers.js` | `core/src/transition_commands.cpp` | Mesh > Structure/generation commands replace raw topology replacement | superseded |
 | Command | `mesh_topology.remove` | `src/commands/transition-command-handlers.js` | `core/src/transition_commands.cpp` | Mesh > 画像の割当・メッシュの削除; references reject unsafe deletion | migrated |
 | Command | `mesh_topology.add_vertex` | `src/commands/mesh-topology-command-handlers.js` | `core/src/mesh_commands.cpp` | Mesh > Structure | migrated |
-| Command | `mesh_topology.remove_vertex` | `src/commands/mesh-topology-command-handlers.js` | `core/src/transition_commands.cpp` | Mesh > Structure | migrated |
-| Command | `mesh_topology.create_triangle` | `src/commands/mesh-topology-command-handlers.js` | `core/src/transition_commands.cpp` | Mesh > Structure | migrated |
+| Command | `mesh_topology.remove_vertex` | `src/commands/mesh-topology-command-handlers.js` | `core/src/mesh_commands.cpp` | Mesh > Structure | migrated |
+| Command | `mesh_topology.create_triangle` | `src/commands/mesh-topology-command-handlers.js` | `core/src/mesh_commands.cpp` | Mesh > Structure | migrated |
 | Command | `mesh_topology.subdivide_edge` | `src/commands/mesh-topology-command-handlers.js` | `core/src/mesh_commands.cpp` | Mesh > Structure | migrated |
 | Command | `mesh_topology.set_vertex_label` | `src/commands/mesh-topology-command-handlers.js` | `core/src/mesh_commands.cpp` | Mesh > Structure | migrated |
 | Command | `mesh_topology.clear_vertex_label` | `src/commands/mesh-topology-command-handlers.js` | `core/src/mesh_commands.cpp` | Mesh > Structure | migrated |
@@ -158,7 +158,7 @@ Source replacement remains native-only, excluded from live MCP.
 | Command | `mesh_keyform.create` | `src/commands/transition-command-handlers.js` | `core/src/transition_commands.cpp` | Mesh > Layout | migrated |
 | Command | `mesh_keyform.update` | `src/commands/transition-command-handlers.js` | `core/src/transition_commands.cpp` | Mesh > 画像の割当・メッシュの削除; references reject unsafe deletion | migrated |
 | Command | `mesh_keyform.remove` | `src/commands/transition-command-handlers.js` | `core/src/transition_commands.cpp` | Mesh > 画像の割当・メッシュの削除; references reject unsafe deletion | migrated |
-| Command | `mesh_keyform.move_vertices` | `src/commands/mesh-topology-command-handlers.js` | `core/src/transition_commands.cpp` | Mesh > Layout | migrated |
+| Command | `mesh_keyform.move_vertices` | `src/commands/mesh-topology-command-handlers.js` | `core/src/mesh_commands.cpp` | Mesh > Layout | migrated |
 | Command | `transition.create` | `src/commands/transition-command-handlers.js` | `core/src/transition_commands.cpp` | Deform > Key State / Transition | migrated |
 | Command | `transition.update` | `src/commands/transition-command-handlers.js` | `core/src/transition_commands.cpp` | Deform > Key State / Transition | migrated |
 | Command | `transition.remove` | `src/commands/transition-command-handlers.js` | `core/src/transition_commands.cpp` | Deform > Key State / Transition | migrated |
