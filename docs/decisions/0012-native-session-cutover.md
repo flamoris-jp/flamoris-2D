@@ -1,7 +1,7 @@
 # ADR 0012: Native document and session cutover
 
-Status: unified production candidate for #118/#142; subject to PR review and
-Windows acceptance. Supersedes ADR 0006's runtime authority for this candidate.
+Status: implemented and merged for #118/#142. Real-art Windows acceptance
+remains separate. Supersedes ADR 0006's runtime authority.
 
 The C++ session owns Project validation, commands, queries, history, revision,
 schema migration and `.fl2d` serialization. WPF owns dialogs, same-directory atomic
@@ -29,9 +29,9 @@ commit the live Project while a pointer is moving.
 Source decoders produce immutable candidates; source conversion/reconciliation
 and typed commits belong to C++. Retained artwork follows native source history.
 Production packaging excludes Product Host and Node. The full Windows packaged
-workflow remains its acceptance gate. The old JS oracle may be retained outside
-production pending physical Windows acceptance; it cannot remain a production
-fallback or editing authority after cutover.
+workflow remains its automated acceptance gate. The old JS oracle, Electron
+shell and Product Host source were removed in #146 after physical Windows launch.
+They are not production fallbacks or editing authorities.
 
 Windows visual/DPI/input/artwork acceptance remains human work. Code completion
 must not claim that those checks were performed.
