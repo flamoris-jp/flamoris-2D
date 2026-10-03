@@ -8,7 +8,7 @@ or PSD import.
 
 ```text
 .flimg archive bytes
-  -> CutworkFlimgReader (ZIP / strict JSON / checksum / PNG validation)
+  -> FlimgCodec (ZIP / strict JSON / checksum / PNG validation)
   -> normalized Cutwork import model
   -> deterministic Part / Base / Patch / Repair raster materialization
   -> ordinary Project / Scene / KeyArt + transient render assets
@@ -55,10 +55,50 @@ manifest structure and duplicate properties, version/format, UUIDs, layer
 bands, bounds/transforms, expected assets only, SHA-256, and canonical PNG
 dimensions/formats.
 
-UI and the headless `import.cutwork_flimg` operation call the same domain
-importer. They construct and validate the complete candidate plus render assets
+The desktop import adapter and native workspace call the same source codec and
+C++ source conversion. They construct and validate the complete candidate plus render assets
 before session replacement, so a failed import leaves the current Project and
 history unchanged.
 
 Full re-import/reconciliation, Cutwork editing tools, `.flimg` export, and
 future schema migration remain out of scope.
+
+
+## Continuous compatibility boundary (#150)
+
+| Producer format | 2D consumer | Regression boundary |
+| --- | --- | --- |
+| Cutwork v1 (frozen legacy contract) | Supported | Existing v1 codec and native-workspace archives in `source-codec-conformance.json` |
+| Cutwork current writer, v2 | Supported | `fixtures/cutwork/cutwork-current-v2.flimg` through native import and `.fl2d` save/reopen |
+| Unknown newer version | Rejected before replacement | An actionable `flimg.schema_unsupported` diagnostic; live Project, history and artwork remain unchanged |
+
+The compact current-writer fixture includes Base, multiple Parts with semantic
+order different from compositor order, transformed Patch, owned and global
+Repairs, hidden layers, graded masks and transparent pixels. The native session
+regression compares source provenance, semantic mappings, stack/visibility,
+placement and decoded RGBA bytes, then reopens `.fl2d` in a fresh workspace after
+the source file is removed. Test fixtures and regeneration code are outside the
+Product runtime dependency graph and portable package.
+
+The existing **Windows Portable Package** PR check runs this regression as part
+of `Flamoris2D.Session.Tests`; no additional workflow or duplicate renderer gate
+is needed. To run it locally with a built native library:
+
+```sh
+dotnet run --project product/native/tests/Flamoris2D.Session.Tests -c Release -- product/native/tests/source-codec-conformance.json product/native/tests/psd-codec-conformance.json
+```
+
+### Writer maintenance rule
+
+Any Cutwork change to `.flimg` schema or writer serialization must regenerate
+the current fixture, update its recorded producer SHA/schema/encoder provenance,
+and run the 2D compatibility regression before declaring the handoff supported.
+Keep the frozen v1 corpus. A new schema stays rejected until 2D explicitly
+implements it and adds a matching producer fixture and matrix row. Updating a
+fixture is not permission to relax existing preservation assertions.
+
+See [fixture provenance and regeneration](../product/native/tests/fixtures/cutwork/README.md)
+for the pinned source and regeneration commands. The recorded fixture protects
+that reviewed producer output; it does not silently claim every later Cutwork
+commit is compatible. Normal 2D builds and tests neither fetch Cutwork nor require
+an installed Cutwork app.
