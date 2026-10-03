@@ -6,12 +6,15 @@ FLAMORIS invokes `ffmpeg.exe` as a separate process and does not link its own
 executable to the FFmpeg libraries. Export settings can select another compatible
 executable. No restriction on modifying or reverse engineering FFmpeg is added.
 
-The exact build selects **LGPL version 3**, with `--enable-version3`. The original
+The FFmpeg configuration selects **LGPL version 3**, with `--enable-version3`. The original
 `LICENSE.txt` is LGPLv3; `COPYING.GPLv3.txt` supplies the GPLv3 terms it incorporates.
 `FFMPEG-LICENSE.md` is FFmpeg's unmodified license explanation at the exact revision.
 `BUILD-CONFIG.txt` records the configuration embedded in the pinned binary.
 This software is based in part on the work of the Independent JPEG Group.
 FLAMORIS has not modified FFmpeg's IJG-derived files or the distributed binaries.
+However, transitive FFTW implementation evidence in the pinned DLL prevents this
+audit from certifying the whole archive as LGPL-only. `FFTW-NOTICE.md` records
+that GPLv2-or-later component, its source revision and the unresolved conclusion.
 
 ## Exact upstream references
 
@@ -37,7 +40,8 @@ be accounted for. Keeping the DLLs replaceable alone does not resolve that work.
 
 Before promoting this candidate to a supported public release, FLAMORIS must
 publish and retain a verified corresponding-source bundle alongside the binaries,
-with a complete dependency notice inventory and build/relink instructions, or adopt
+with a complete dependency notice inventory and build/relink instructions, resolve
+the transitive GPL component evidence, or adopt
 a separately reviewed external-FFmpeg distribution. No durable FLAMORIS source
 download URL or written offer is asserted by this file. The current audit and
 recovery references are at:

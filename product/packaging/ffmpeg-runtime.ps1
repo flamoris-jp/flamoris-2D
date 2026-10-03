@@ -17,7 +17,8 @@ function Copy-FfmpegRuntime {
     }
     $upstreamLicense = Join-Path $ArchiveRoot 'LICENSE.txt'
     if (-not (Test-Path -LiteralPath $upstreamLicense -PathType Leaf)) { throw 'Missing upstream FFmpeg license' }
-    $notices = @('COPYING.GPLv3.txt', 'FFMPEG-LICENSE.md', 'SOURCE-ACCESS.md', 'BUILD-CONFIG.txt')
+    $notices = @('COPYING.GPLv3.txt', 'COPYING.GPLv2.txt', 'FFMPEG-LICENSE.md',
+        'FFTW-NOTICE.md', 'SOURCE-ACCESS.md', 'BUILD-CONFIG.txt')
     foreach ($name in $notices) {
         if (-not (Test-Path -LiteralPath (Join-Path $NoticeDirectory $name) -PathType Leaf)) {
             throw "Missing FFmpeg notice: $name"

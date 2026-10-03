@@ -26,7 +26,8 @@ try {
     }
     if ((Get-FileHash (Join-Path $archive 'LICENSE.txt')).Hash -ne
         (Get-FileHash (Join-Path $package 'ffmpeg/LICENSE.txt')).Hash) { throw 'Upstream license changed' }
-    foreach ($name in @('COPYING.GPLv3.txt', 'FFMPEG-LICENSE.md', 'SOURCE-ACCESS.md', 'BUILD-CONFIG.txt')) {
+    foreach ($name in @('COPYING.GPLv3.txt', 'COPYING.GPLv2.txt', 'FFMPEG-LICENSE.md',
+        'FFTW-NOTICE.md', 'SOURCE-ACCESS.md', 'BUILD-CONFIG.txt')) {
         if (-not (Test-Path -LiteralPath (Join-Path $package "ffmpeg/$name"))) { throw "Missing notice: $name" }
     }
     foreach ($excluded in @('ffplay.exe', 'doc', 'include', 'lib', 'presets')) {
