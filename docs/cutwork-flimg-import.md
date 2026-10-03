@@ -87,7 +87,10 @@ actual Windows/WPF PNG writer, and runs the focused compatibility regression.
 The offline corpus protects reviewed historical bytes; the producer step
 protects drift in the current writer, including its PNG encoding. A future
 incompatible Cutwork `main` makes this check fail until explicitly supported.
-No additional workflow or duplicate renderer gate is needed. To run it locally with a built native library:
+No additional workflow or duplicate renderer gate is needed. This check runs on
+relevant 2D PRs and manual dispatch. A Cutwork-only commit does not trigger 2D CI;
+writer changes must dispatch this workflow before the updated handoff is declared
+supported. To run it locally with a built native library:
 
 ```sh
 dotnet run --project product/native/tests/Flamoris2D.Session.Tests -c Release -- product/native/tests/source-codec-conformance.json product/native/tests/psd-codec-conformance.json
