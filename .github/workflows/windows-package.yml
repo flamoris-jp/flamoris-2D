@@ -8,6 +8,8 @@ on:
       - "product/native/**"
       - "product/packaging/**"
       - "test/packaging/**"
+      - "test/compatibility/flimg/**"
+      - "docs/cutwork-flimg-import.md"
       - "docs/windows-packaging.md"
       - "docs/native-production-workflow.md"
       - "LICENSE"
@@ -57,6 +59,28 @@ jobs:
         run: |
           dotnet run --project product/native/tests/Flamoris2D.Source.Codecs.Tests -c Release --no-build -- product/native/tests/source-codec-conformance.json product/native/tests/psd-codec-conformance.json
           dotnet run --project product/native/tests/Flamoris2D.Session.Tests -c Release --no-build -- product/native/tests/source-codec-conformance.json product/native/tests/psd-codec-conformance.json
+
+      # Offline corpus above protects recorded archives; this protects drift in
+      # the real current producer, including Cutwork's Windows PNG encoder.
+      - name: Checkout current Cutwork producer
+        uses: actions/checkout@v4
+        with:
+          repository: flamoris-jp/flamoris-cutwork
+          ref: main
+          path: out/cutwork-producer
+          persist-credentials: false
+
+      - name: Verify current Cutwork WPF writer handoff
+        shell: pwsh
+        run: |
+          $producer = Join-Path $env:GITHUB_WORKSPACE 'out/cutwork-producer'
+          $fixtures = Join-Path $env:GITHUB_WORKSPACE 'out/cutwork-current-fixtures'
+          git -C $producer rev-parse HEAD
+          dotnet run --project test/compatibility/flimg/CutworkFixtureGenerator.csproj -c Release "-p:CutworkRoot=$producer" -- $fixtures
+          if ($LASTEXITCODE -ne 0) { throw "Current Cutwork writer fixture generation failed." }
+          Get-Content (Join-Path $fixtures 'cutwork-current-v2.provenance.json')
+          dotnet run --project product/native/tests/Flamoris2D.Session.Tests -c Release --no-build -- --cutwork-only $fixtures
+          if ($LASTEXITCODE -ne 0) { throw "Current Cutwork writer handoff is incompatible with FLAMORIS 2D." }
 
       - name: Portable archive integrity contracts
         shell: pwsh

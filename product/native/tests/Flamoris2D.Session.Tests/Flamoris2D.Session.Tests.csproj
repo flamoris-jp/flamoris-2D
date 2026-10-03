@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
   <ItemGroup><ProjectReference Include="../../src/Flamoris2D.Session/Flamoris2D.Session.csproj" /></ItemGroup>
+  <ItemGroup>
+    <Content Include="../fixtures/cutwork/*.flimg;../fixtures/cutwork/*.json" Link="fixtures/cutwork/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

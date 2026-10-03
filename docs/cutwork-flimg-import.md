@@ -81,8 +81,13 @@ the source file is removed. Test fixtures and regeneration code are outside the
 Product runtime dependency graph and portable package.
 
 The existing **Windows Portable Package** PR check runs this regression as part
-of `Flamoris2D.Session.Tests`; no additional workflow or duplicate renderer gate
-is needed. To run it locally with a built native library:
+of `Flamoris2D.Session.Tests`. It also checks out public Cutwork `main` under
+`out/`, records the exact producer SHA, regenerates the archive through the
+actual Windows/WPF PNG writer, and runs the focused compatibility regression.
+The offline corpus protects reviewed historical bytes; the producer step
+protects drift in the current writer, including its PNG encoding. A future
+incompatible Cutwork `main` makes this check fail until explicitly supported.
+No additional workflow or duplicate renderer gate is needed. To run it locally with a built native library:
 
 ```sh
 dotnet run --project product/native/tests/Flamoris2D.Session.Tests -c Release -- product/native/tests/source-codec-conformance.json product/native/tests/psd-codec-conformance.json
@@ -99,6 +104,7 @@ fixture is not permission to relax existing preservation assertions.
 
 See [fixture provenance and regeneration](../product/native/tests/fixtures/cutwork/README.md)
 for the pinned source and regeneration commands. The recorded fixture protects
-that reviewed producer output; it does not silently claim every later Cutwork
+that reviewed producer output; current-producer CI establishes compatibility
+only with its logged Cutwork SHA. It does not silently claim every later Cutwork
 commit is compatible. Normal 2D builds and tests neither fetch Cutwork nor require
 an installed Cutwork app.
