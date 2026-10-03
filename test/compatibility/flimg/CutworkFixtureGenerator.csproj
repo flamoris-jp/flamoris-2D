@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework Condition="$([MSBuild]::IsOSPlatform('Windows'))">net10.0-windows</TargetFramework>
+    <UseWPF Condition="$([MSBuild]::IsOSPlatform('Windows'))">true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <CutworkRoot Condition="'$(CutworkRoot)' != ''">$([System.IO.Path]::GetFullPath('$(CutworkRoot)'))</CutworkRoot>
+    <DefineConstants Condition="$([MSBuild]::IsOSPlatform('Windows'))">$(DefineConstants);CUTWORK_WPF_PNG</DefineConstants>
+  </PropertyGroup>
+  <Target Name="RequireCutworkSource" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(CutworkRoot)' == ''" Text="Set -p:CutworkRoot to an external checkout of flamoris-jp/flamoris-cutwork." />
+    <Error Condition="!Exists('$(CutworkRoot)/src/Cutwork.Imaging/Persistence/FlimgArchiveCodec.cs')" Text="CutworkRoot must contain the current Cutwork source checkout." />
+  </Target>
+  <ItemGroup>
+    <ProjectReference Include="$(CutworkRoot)/src/Cutwork.Core/Cutwork.Core.csproj" />
+    <Compile Include="$(CutworkRoot)/src/Cutwork.Imaging/Persistence/FlimgArchiveCodec.cs" Link="CurrentCutwork/FlimgArchiveCodec.cs" />
+    <Compile Include="$(CutworkRoot)/src/Cutwork.Imaging/Persistence/FlimgModels.cs" Link="CurrentCutwork/FlimgModels.cs" />
+    <AssemblyMetadata Include="CutworkRoot" Value="$(CutworkRoot)" />
+  </ItemGroup>
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <Compile Remove="PortablePngAssetCodec.cs" />
+    <Compile Include="$(CutworkRoot)/src/Cutwork.Imaging/Persistence/PngAssetCodec.cs" Link="CurrentCutwork/PngAssetCodec.cs" />
+  </ItemGroup>
+</Project>

@@ -83,7 +83,10 @@ public static class FlimgCodec
         var entries=ReadZip(bytes,token); if(!entries.TryGetValue("manifest.json",out var manifest)) throw Error("manifest_missing");
         using var doc=JsonDocument.Parse(Utf8.GetString(manifest)); var m=doc.RootElement; UniqueProperties(m);
         if(m.ValueKind!=JsonValueKind.Object || Text(m,"format")!="flamoris-cutwork") throw Error("format_invalid");
-        int schema=Integer(m,"schemaVersion"); if(schema!=1 && schema!=2) throw Error("schema_unsupported"); Keys(m,"format","schemaVersion","documentId","canvas","original","layers");
+        int schema=Integer(m,"schemaVersion");
+        if(schema!=1 && schema!=2) throw new SourceDecodeException("flimg.schema_unsupported",
+            $"Cutwork .flimg schema version {schema} is unsupported. This FLAMORIS 2D supports versions 1 and 2. Update FLAMORIS 2D or export using a supported Cutwork version.");
+        Keys(m,"format","schemaVersion","documentId","canvas","original","layers");
         string documentId=Id(m,"documentId"); var canvas=m.GetProperty("canvas"); Keys(canvas,"width","height","colorSpace","pixelFormat"); int width=Integer(canvas,"width"), height=Integer(canvas,"height");
         try {RasterCodec.Dimensions(width,height);} catch(SourceDecodeException) {throw Error("canvas_invalid");}
         if(Text(canvas,"colorSpace")!="srgb8" || Text(canvas,"pixelFormat")!="straight-bgra32") throw Error("canvas_invalid");

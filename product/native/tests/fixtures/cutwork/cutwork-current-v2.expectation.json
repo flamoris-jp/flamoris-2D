@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 2,
+  "canvas": {
+    "width": 8,
+    "height": 6
+  },
+  "documentId": "15000000-0000-0000-0000-000000000001",
+  "sourceName": "synthetic-cutwork-compatibility.png",
+  "originalRgbaHex": "111f2fff282a3c803f354940564056006d4b63ff845670809b617d40b26c8a00183c34402f47410046524eff5d5d5b80746868408b737500a27e82ffb9898f801f5939ff366446804d6f5340647a60007b856dff92907a80a99b8740c0a6940026763e403d814b00548c58ff6b97658082a2724099ad7f00b0b88cffc7c399802d9343ff449e50805ba95d4072b46a0089bf77ffa0ca8480b7d59140cee09e0034b048404bbb550062c662ff79d16f8090dc7c40a7e78900bef296ffd5fda380",
+  "layers": [
+    {
+      "id": "15000000-0000-0000-0000-000000000003",
+      "kind": "part",
+      "name": "Front cut",
+      "semanticName": "face.front",
+      "visible": true,
+      "bounds": {
+        "x": 1,
+        "y": 1,
+        "width": 4,
+        "height": 3
+      },
+      "imageWidth": 4,
+      "imageHeight": 3,
+      "rgbaHex": "2f47410046524e805d5d5b0074686810366446104d6f5332647a60007b856d603d814b00548c58406b97654082a27240",
+      "partOrder": 9
+    },
+    {
+      "id": "15000000-0000-0000-0000-000000000004",
+      "kind": "part",
+      "name": "Back cut",
+      "semanticName": "hair.back",
+      "visible": true,
+      "bounds": {
+        "x": 3,
+        "y": 2,
+        "width": 3,
+        "height": 3
+      },
+      "imageWidth": 3,
+      "imageHeight": 3,
+      "rgbaHex": "647a60007b856dff92907a106b97650082a2722099ad7f0072b46a0089bf7740a0ca8400",
+      "partOrder": 2
+    },
+    {
+      "id": "15000000-0000-0000-0000-000000000005",
+      "kind": "part",
+      "name": "Hidden cut",
+      "semanticName": "eye.closed",
+      "visible": false,
+      "bounds": {
+        "x": 0,
+        "y": 4,
+        "width": 2,
+        "height": 2
+      },
+      "imageWidth": 2,
+      "imageHeight": 2,
+      "rgbaHex": "2d9343ff449e500034b048204bbb5500",
+      "partOrder": 5
+    },
+    {
+      "id": "15000000-0000-0000-0000-000000000002",
+      "kind": "base",
+      "name": "Base",
+      "semanticName": "body.base",
+      "visible": true,
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 8,
+        "height": 6
+      },
+      "imageWidth": 8,
+      "imageHeight": 6,
+      "rgbaHex": "111f2fff282a3c803f354940564056006d4b63ff845670809b617d40b26c8a00183c34402f47410046524e7f5d5d5b80746868308b737500a27e82ffb9898f801f5939ff366446704d6f530e647a60007b856d0092907a70a99b8740c0a6940026763e403d814b00548c58bf6b97654082a2720099ad7f00b0b88cffc7c399802d934300449e50805ba95d4072b46a0089bf77bfa0ca8480b7d59140cee09e0034b048204bbb550062c662ff79d16f8090dc7c40a7e78900bef296ffd5fda380"
+    },
+    {
+      "id": "15000000-0000-0000-0000-000000000006",
+      "kind": "patch",
+      "name": "Transformed patch",
+      "semanticName": "patch.edge",
+      "visible": true,
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 2,
+        "height": 2
+      },
+      "imageWidth": 2,
+      "imageHeight": 2,
+      "rgbaHex": "dc3c14ff0ac846801e5af0009650d260",
+      "transform": {
+        "centerX": 6,
+        "centerY": 2,
+        "scale": 1.25,
+        "rotationDegrees": 30
+      },
+      "sourcePolygon": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 2,
+          "y": 0
+        },
+        {
+          "x": 2,
+          "y": 2
+        },
+        {
+          "x": 0,
+          "y": 2
+        }
+      ]
+    },
+    {
+      "id": "15000000-0000-0000-0000-000000000007",
+      "kind": "repair",
+      "name": "Owned repair",
+      "semanticName": "repair.face",
+      "visible": true,
+      "bounds": {
+        "x": 1,
+        "y": 1,
+        "width": 2,
+        "height": 2
+      },
+      "imageWidth": 2,
+      "imageHeight": 2,
+      "rgbaHex": "28d246ff28d246400f1e3200d2468c80",
+      "ownerPartId": "15000000-0000-0000-0000-000000000003"
+    },
+    {
+      "id": "15000000-0000-0000-0000-000000000008",
+      "kind": "repair",
+      "name": "Global repair",
+      "semanticName": "repair.global",
+      "visible": true,
+      "bounds": {
+        "x": 5,
+        "y": 3,
+        "width": 2,
+        "height": 2
+      },
+      "imageWidth": 2,
+      "imageHeight": 2,
+      "rgbaHex": "6414e6c046505aff14dc3c00f0285020"
+    },
+    {
+      "id": "15000000-0000-0000-0000-000000000009",
+      "kind": "repair",
+      "name": "Hidden owned repair",
+      "semanticName": "repair.hidden",
+      "visible": false,
+      "bounds": {
+        "x": 3,
+        "y": 2,
+        "width": 2,
+        "height": 2
+      },
+      "imageWidth": 2,
+      "imageHeight": 2,
+      "rgbaHex": "ff0a28ff055a78605a28d2803cfa0a00",
+      "ownerPartId": "15000000-0000-0000-0000-000000000004"
+    }
+  ]
+}

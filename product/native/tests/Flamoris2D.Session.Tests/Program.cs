@@ -3,6 +3,12 @@ using Flamoris.Flamoris2D.Session;
 using Flamoris.Mcp.Core;
 
 static JsonElement Json(object v)=>JsonSerializer.SerializeToElement(v);
+if(args is ["--cutwork-only", var fixtureDirectory])
+{
+    await CutworkCompatibilityTests.RunAsync(fixtureDirectory);
+    return;
+}
+await CutworkCompatibilityTests.RunAsync();
 await using var workspace=new NativeWorkspace();int events=0;workspace.Changed+=_=>events++;
 var initial=await workspace.NewAsync("Native",1920,1080);string root=await workspace.InvokeAsync(w=>w.Project.GetProperty("scene").GetProperty("rootId").GetString()!);
 // An idle lane must still run native work off a WPF-like caller/context.
