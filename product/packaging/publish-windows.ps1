@@ -6,6 +6,7 @@ $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'portable-package.ps1')
+. (Join-Path $PSScriptRoot 'ffmpeg-runtime.ps1')
 $destination = if ([IO.Path]::IsPathRooted($OutputDirectory)) {
     [IO.Path]::GetFullPath($OutputDirectory)
 } else { [IO.Path]::GetFullPath((Join-Path $repo $OutputDirectory)) }
@@ -38,12 +39,11 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'App publish failed' }
     } finally { Pop-Location }
 
-    # Retain runtime binaries, shared libraries, docs and notices. Headers and
-    # import libraries belong to the FFmpeg development SDK, not this executable.
+    # Retain the encoder, smoke probe, all shared libraries and notices. ffplay,
+    # HTML manuals, SDK files and unrelated presets are not export dependencies.
     $ffmpegDestination = Join-Path $package 'ffmpeg'
-    New-Item -ItemType Directory $ffmpegDestination -Force | Out-Null
-    Get-ChildItem -LiteralPath $ffmpegRoot | Where-Object { $_.Name -notin @('include', 'lib') } |
-        ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $ffmpegDestination -Recurse }
+    Copy-FfmpegRuntime -ArchiveRoot $ffmpegRoot -Destination $ffmpegDestination `
+        -NoticeDirectory (Join-Path $PSScriptRoot 'ffmpeg-notices')
     Get-ChildItem -LiteralPath $package -Filter '*.pdb' -File -Recurse |
         ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
     foreach ($required in @('Flamoris2D.exe', 'Flamoris2D.Renderer.Native.dll', 'LICENSE-picojson.txt', 'Flamoris2D.Core.Native.dll', 'icuuc78.dll', 'icuin78.dll', 'icudt78.dll', 'ICU-LICENSE.txt', 'ffmpeg/bin/ffmpeg.exe', 'mcp/Flamoris.Mcp.Bridge.exe', 'mcp/Flamoris.Mcp.Core.dll', 'mcp/coreclr.dll', 'mcp/hostfxr.dll', 'Flamoris.Mcp.Core.dll', 'Flamoris.Mcp.Wpf.dll', 'coreclr.dll', 'hostfxr.dll', 'hostpolicy.dll', 'PresentationFramework.dll')) {

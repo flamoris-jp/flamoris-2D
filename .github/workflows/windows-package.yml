@@ -84,7 +84,9 @@ jobs:
 
       - name: Portable archive integrity contracts
         shell: pwsh
-        run: ./test/packaging/portable-package.Tests.ps1
+        run: |
+          ./test/packaging/portable-package.Tests.ps1
+          ./test/packaging/ffmpeg-runtime.Tests.ps1
 
       - name: Build portable Windows candidate
         shell: pwsh

@@ -28,7 +28,7 @@ git pull --ff-only
 ./product/packaging/publish-windows.ps1
 ```
 
-Outputs are `artifacts/windows/FLAMORIS-2D-win-x64/`, its `.zip` and `.inventory.json`. The candidate bundles the self-contained .NET 10 runtime, C++ core/compositor, ICU, native source codecs and pinned LGPL shared FFmpeg. Keep the directory intact. It does not install itself or change `.fl2d` file association. See [the shared Windows packaging contract](docs/windows-packaging.md).
+Outputs are `artifacts/windows/FLAMORIS-2D-win-x64/`, its `.zip` and `.inventory.json`. The candidate bundles the self-contained .NET 10 runtime, C++ core/compositor, ICU, native source codecs and pinned shared FFmpeg. Keep the directory intact. It does not install itself or change `.fl2d` file association. See [the shared Windows packaging contract](docs/windows-packaging.md). [The FFmpeg audit](docs/reviews/issue-149-ffmpeg-redistribution.md) identifies unresolved source-delivery and transitive GPL dependency requirements; redistribution is not certified and Issue #149 remains open.
 
 For development builds and the full native workflow, see [`product/native/README.md`](product/native/README.md) and [`docs/native-production-workflow.md`](docs/native-production-workflow.md).
 
