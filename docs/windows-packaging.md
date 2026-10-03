@@ -37,9 +37,17 @@ Checksums establish file consistency, not publisher identity or code signing.
 Self-contained publish inputs remain product-specific. Source, tests, intermediate
 build directories, PDBs, repository metadata and retired Node/Electron/Product Host
 content are rejected. Kachinco permits exactly the root `recipe-worker.py` runtime
-file. 2D retains FFmpeg binaries, shared libraries and distribution notices/docs,
-while excluding development headers/import libraries. No new shared runtime is
+file. 2D retains FFmpeg/ffprobe, every upstream DLL, the original LGPLv3 license,
+incorporated GPLv3 license, FFTW's GPLv2 license/notice and build/source-access notices. It omits ffplay, HTML
+manuals, unrelated presets and development headers/import libraries. No new shared runtime is
 introduced; `portable-package.ps1` is repository-local build tooling only.
+
+See [the exact FFmpeg redistribution and size audit](reviews/issue-149-ffmpeg-redistribution.md).
+Issue #149 remains open for transitive GPL component evidence, durable
+corresponding-source delivery and complete dependency notices. The upstream
+LGPL-labelled archive is not certified as LGPL-only; the smaller candidate is not
+an attestation that this public
+release requirement has been satisfied.
 
 The final output is validated before CI executes the packaged editor/bridge and
 uploads the ZIP plus inventory. All three workflows retain candidates for 3 days;
@@ -55,7 +63,7 @@ All bridges live at `mcp/Flamoris.Mcp.Bridge.exe`.
 |---|---|---|---|
 | Name | FLAMORIS-Cutwork-win-x64 | FLAMORIS-2D-win-x64 | FLAMORIS-Kachinco-win-x64 |
 | Main executable | Cutwork.exe | Flamoris2D.exe | Kachinco.App.exe |
-| Bundled runtime | Self-contained .NET/WPF, app resources, MCP | Self-contained .NET/WPF, C++ core/renderer/source codecs, ICU, pinned LGPL shared FFmpeg, MCP | Self-contained .NET/WPF, C++ runtime, restricted Recipe worker, MCP |
+| Bundled runtime | Self-contained .NET/WPF, app resources, MCP | Self-contained .NET/WPF, C++ core/renderer/source codecs, ICU, pinned shared FFmpeg (redistribution audit open), MCP | Self-contained .NET/WPF, C++ runtime, restricted Recipe worker, MCP |
 | Build prerequisites | PowerShell 7, .NET 10 SDK, Git | PowerShell 7, .NET 10 SDK, Git, CMake, Visual Studio C++ Build Tools, network for pinned ICU/FFmpeg | PowerShell 7, .NET 10 SDK, Git, CMake, Visual Studio C++ Build Tools |
 | User prerequisites | Windows x64 | Windows x64 | Windows x64; FFmpeg/ffprobe on PATH for media, Python 3 for Recipes |
 | Integrity/provenance | SHA256SUMS.txt, inventory, BUILD-INFO.txt | SHA256SUMS.txt, inventory, BUILD-INFO.txt | SHA256SUMS.txt, inventory, BUILD-INFO.txt with native ABI/capabilities/timebase |
@@ -68,9 +76,14 @@ All bridges live at `mcp/Flamoris.Mcp.Bridge.exe`.
 
 ```powershell
 ./test/packaging/portable-package.Tests.ps1
+./test/packaging/ffmpeg-runtime.Tests.ps1
 ```
 
 This small synthetic test runs without WPF or downloads. It checks Unicode file
 paths, complete inventory/checksum coverage, repeat assembly, allowed runtime source,
 forbidden content, and corrupt/missing/extra ZIP entries. It does not claim Windows
 UI, DPI, rendering or physical playback acceptance.
+
+The FFmpeg selection test preserves every DLL and the required encoder/probe and
+notices, excludes unused content, and rejects missing dependencies. The existing
+Windows package smoke remains the real H.264/240-frame export acceptance check.

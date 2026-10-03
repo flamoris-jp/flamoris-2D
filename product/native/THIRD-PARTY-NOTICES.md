@@ -5,13 +5,27 @@ the C++ editing/evaluation core and Direct3D11 compositor. JavaScript, Electron,
 Node, Product Host and npm decoder dependencies are not part of the current product
 or repository runtime/tooling graph.
 
-- FFmpeg N-126947-g45f3fecca9, Windows x64 LGPL shared distribution:
+- FFmpeg N-126947-g45f3fecca9, Windows x64 upstream-labelled LGPL shared archive
+  (FFmpeg configured for **LGPLv3; whole-archive redistribution not certified**):
   https://github.com/BtbN/FFmpeg-Builds/releases/tag/autobuild-2026-09-28-13-06 .
   Archive: `ffmpeg-N-126947-g45f3fecca9-win64-lgpl-shared.zip`.
   SHA256: `7f82d0e4ed9c20e9ca96573f5ab82b85f1b44a5d62f195e5cf09ffc28da70a4e`.
-  The distribution, documentation, notices and replaceable shared libraries are
-  retained together in `ffmpeg/`. Its build/source information is supplied by
-  https://github.com/BtbN/FFmpeg-Builds and https://github.com/FFmpeg/FFmpeg/tree/45f3fecca9 .
+  `ffmpeg/` retains the encoder, ffprobe, all seven replaceable shared libraries,
+  original LGPLv3 license, incorporated GPLv3 license, FFTW's GPLv2 license/notice, exact upstream license
+  explanation and recorded build configuration. `ffplay`, HTML manuals, SDK files
+  and unrelated encoder presets are omitted; no DLL or codec is removed.
+  Read `ffmpeg/SOURCE-ACCESS.md` for exact source/build references and the
+  **unresolved transitive GPL component, corresponding-source and dependency-notice
+  requirements in Issue #149**. The exact DLL contains FFTW implementation strings;
+  pinned upstream recipes statically link it through Chromaprint. Thus the archive
+  label and configure flags do not suffice to establish LGPL-only redistribution.
+  Upstream source links alone are not a complete source offer or redistribution
+  attestation. This candidate must not be promoted to a supported public release
+  before that requirement is resolved. This software is based in part on the
+  work of the Independent JPEG Group; FLAMORIS does not modify FFmpeg or its
+  IJG-derived files. The source/build revisions are:
+  https://github.com/BtbN/FFmpeg-Builds/tree/16523e260106182950d7072b6ea1401808f68a50 and
+  https://github.com/FFmpeg/FFmpeg/tree/45f3fecca9f800a4432a6e3cfb3a76ef47f9d07a .
   The application invokes a separate process with an argument list; it does not
   link FFmpeg into the application. Export accepts the existing Product LGPL-only
   `h264_mf` encoder contract. The executable can be selected in Export settings.
