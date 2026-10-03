@@ -286,7 +286,7 @@ The current native candidate preserves these capabilities:
 - Preview / PNG / H.264 MP4 export through the same evaluated semantics
 - self-contained Windows x64 candidate with C++ core/compositor, ICU and pinned LGPL FFmpeg
 
-The unified native path is a production candidate pending final Windows verification/acceptance. Legacy source remains reference only. Installer/default association requires a separate reviewed release decision.
+The unified native path is implemented. Legacy JS/Electron/Product Host source was removed in #146 after a Windows launch; automated package checks and remaining real-art acceptance protect the current candidate. Installer/default association requires a separate reviewed release decision.
 
 ---
 
@@ -296,16 +296,16 @@ Goal: turn the feature-complete core and native production candidate into a depe
 
 Primary work now:
 
-- final PR #101 review and real-art Windows acceptance
+- real-art Windows acceptance of the current C++ NativeSession candidate
 - focused bug fixes found by that hands-on pass
 - production-scale PSD / multi-Key-Art profiling
 - missing-source/decode diagnostics and recovery stress
 - export stress/cancellation/partial-output checks
 - performance profiling before optimization
-- dependency lockfile/provenance work (#6)
-- focused production UX cleanup (#58)
-- release/installer/association/cutover policy before Electron retirement
-- public repository readiness only when desired (#43)
+- native dependency and pinned-runtime provenance maintenance
+- focused production UX fixes from observed defects
+- release/installer/signing/update/file-association policy
+- public repository hygiene and third-party redistribution maintenance
 
 Acceptance criteria:
 
@@ -385,10 +385,10 @@ Audio analysis/lip-sync may later integrate with FLAMORIS production workflows, 
 
 ## Near-term execution order
 
-1. Complete #118/#142 candidate review and focused regression fixes.
+1. Maintain the completed #118/#142 C++ migration with focused regression fixes.
 2. Verify the unified native path, package and absence of Node/Host runtime inputs.
 3. Run final Windows hands-on with real PSD/`.flimg`/`.fl2d` and an approximately eight-second shot.
-4. Turn observed defects into focused fixes; retain compatibility source until parity/physical evidence permits deletion.
+4. Turn observed defects into focused fixes; legacy source was removed in #146.
 5. Review installer/signing/association/default release policy separately.
 6. Continue robustness/profiling/UX work once real MV production is dependable.
 7. Revisit deferred input simplification/AI assistance after the main production loop.
@@ -424,11 +424,17 @@ For each capability:
 
 Large implementation work should be committed in resumable logical slices such as foundation / domain / evaluator / command / UI / tests / fixes. Phase numbers should describe actual architectural checkpoints rather than preserve an obsolete implementation order for appearance alone.
 
-## Issue #102 — Native live MCP transport
+## Native live MCP transport
 
-Implemented for PR review: current SDK/protocol Streamable HTTP, explicit local
-capabilities, read/edit permissions, same Host mutation queue and source-art history,
-revision conflicts, request cancellation/revocation and Native management UI.
-Protocol/security/shared-session tests and packaged external WPF edit proof protect
-this milestone. Final physical Windows acceptance remains the documented hands-on
-check; remote transport, providers, stdio bridge and semantic AI authoring are deferred.
+The current implementation uses Core/Wpf 1.2.0, the packaged stdio bridge and an
+authenticated same-user named pipe. WPF and MCP share the NativeWorkspace lane
+and the same C++ NativeSession authority, source-art history and revision guards.
+Connect / Stop / Settings is manual by default; Settings stores Read only / Edit
+permission and optional automatic connection. The transient capability is exported
+only through explicit connection copy. The earlier HTTP/Product Host transport
+is historical; see [the current MCP contract](mcp-design.md).
+
+Protocol/shared-session tests and packaged external WPF editing proof protect
+this boundary. Physical Windows acceptance still covers real artwork, keyboard
+Undo/Redo, input/DPI and the intended client configuration. Remote transport and
+semantic AI authoring remain separate work.

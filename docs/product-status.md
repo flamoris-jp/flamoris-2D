@@ -12,8 +12,8 @@ The production core is implemented through Phase 8, except the deferred Phase 5 
 
 The native WPF candidate now uses one C++ NativeSession shared with MCP under
 #118/#142. Source through Export, Recovery, PSD/Cutwork ingest and save/reopen
-remain the production workflow. JS/Electron/Product Host are retained only as
-compatibility references, outside native build/publish inputs. Windows CI and
+remain the production workflow. Legacy JS/Electron/Product Host source and its
+validation tooling were removed in #146; current build/publish inputs are native. Windows CI and
 human artwork/interaction acceptance remain gates; installer/signing/default
 association are a separate release decision.
 
@@ -46,7 +46,7 @@ Phase 5 flat-image part decomposition remains an experimental/deferred input-sim
 - Save / Save As / Incremental Save / Save Copy
 - dirty/save-point tracking, lineage-scoped native Recovery, Recent Files, and native Windows dialogs
 - PSD import/re-import and Cutwork `.flimg` v1/v2 source-art import with document-coordinate placement
-- native WPF production candidate; previous shells retained as compatibility references
+- native WPF production candidate; legacy shell source removed in #146
 - portable native candidate does not change an existing installed `.fl2d` association
 - typed MCP-ready command/query boundaries with one shared C++ NativeSession authority
 
@@ -105,14 +105,15 @@ The remaining real-device validation work is perceptual/operational acceptance: 
 
 ## Current follow-up work
 
-- #118/#142 — native cutover review, Windows packaged verification and physical acceptance.
+- #118/#142 — C++ migration completed; keep native regression/package coverage and
+  track remaining physical acceptance through the production QA gates.
 - Real production QA — artwork/DPI/interaction/playback and output inspection.
 - Release policy — installer/signing/update/file association, separately reviewed.
 - Existing roadmap hardening and deferred features continue after the native path is dependable.
 
 The software license does not grant rights to FLAMORIS creative assets.
 
-## README visual example — remaining acceptance for #108
+## README visual example
 
 No tracked editor screenshot, GIF, video, or explicitly cleared artwork suitable
 for a product demonstration was found in the repository at the post-#112 baseline
@@ -120,9 +121,10 @@ for a product demonstration was found in the repository at the post-#112 baselin
 technical proof, not a representative product demo. No private production artwork
 or unrelated placeholder has been added to the README.
 
-Issue [#108](https://github.com/flamoris-jp/flamoris-2D/issues/108) stays open until
-an owner-approved screenshot, GIF, or short demo is supplied and added near the
-README opening. It should show the current native editor with an actual artwork
+Issue [#108](https://github.com/flamoris-jp/flamoris-2D/issues/108) is closed.
+The current README has a capability summary and links to detailed status, but
+still has no maintained visual example. An owner-approved screenshot, GIF, or
+short demo can be added near the README opening. It should show the current native editor with an actual artwork
 and mesh or timeline, identify the demonstrated build, and have a caption/alt text.
 Confirm publication and redistribution permission for the visible artwork and
 record its separate rights statement beside the example. Check that the capture
