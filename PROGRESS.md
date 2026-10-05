@@ -4,7 +4,7 @@ Updated: 2026-10-06 (JST).
 
 ## Current checkpoint
 
-Baseline: `e556d7b` on `main`. Source → Mesh → Rig → Deform → Animation →
+Starting baseline: `e556d7b` on `main`. Source → Mesh → Rig → Deform → Animation →
 Preview → Export is implemented in the native candidate. WPF and MCP share
 one C++ NativeSession. The old JavaScript/Electron/Product Host source has
 already been removed. Open #96/#97/#98 are acceptance gates, not a request
@@ -23,12 +23,23 @@ Accepted production choices:
 | Work | State |
 | --- | --- |
 | Current main, Issue comments and native capability audit | Complete |
-| Save / Recovery contract review | Found #154: save capture expires after one minute instead of ten; retained captures lack the accepted admission cap |
-| Fix #154 and focused regression tests | In progress |
-| Artwork preservation / source ownership review | In progress |
-| Native C++ and portable managed regressions | In progress |
-| Independent review and Windows package CI | Pending |
-| Reconcile historical Issue bodies with the current native candidate | In progress |
+| Save / Recovery contract review | Found and corrected #154: ten-minute expiry, two captures / 256 MiB reservation, active transfer retention and disposal-safe cleanup |
+| Fix #154 and focused regression tests | Implemented; fake-clock expiry, receipt/lineage/revision, release and active-transfer tests pass |
+| Artwork preservation / source ownership review | Complete; no separate correctness defect found |
+| Native C++ and portable managed regressions | CTest 9/9; source codec fixtures; full Session tests; actual DocumentTests portable harness pass |
+| Independent review | Complete after transfer/disposal fixes; no unresolved findings in the changed scope |
+| Windows package CI | Required merge gate: see Windows Portable Package checks on the #154 fix PR for the exact head/result |
+| Reconcile historical Issue bodies with the current native candidate | #96/#97/#98/#78/#79 updated; acceptance still open |
+
+The focused correction retains active transfer reservations even after release,
+expiry or document replacement. Completion/failure/cancellation releases them;
+disposal cleanup preserves the original cancellation/error. It does not change
+Project schema, saved data, history authority, renderer or evaluation order.
+
+Local managed builds completed with zero warnings/errors. The Client document
+tests were run from their actual source in a temporary portable harness; full
+WPF/bridge/package/encoder checks run in the Windows PR workflow. These checks
+are different from the physical acceptance below.
 
 ## Remaining physical acceptance
 

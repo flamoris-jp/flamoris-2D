@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Flamoris.Flamoris2D.Native.Client;
+using Flamoris.Flamoris2D.Session;
 
 internal static class DocumentTests
 {
@@ -13,8 +14,166 @@ internal static class DocumentTests
             Started.TrySetResult();await Task.Delay(Timeout.Infinite,token);return 0;
         }
     }
+    private sealed class PendingOutput : MemoryStream
+    {
+        internal readonly TaskCompletionSource Started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource proceed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal void Complete() => proceed.TrySetResult();
+        public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken token = default)
+        {
+            Started.TrySetResult();
+            await proceed.Task.WaitAsync(token);
+            await base.WriteAsync(buffer, token);
+        }
+    }
+    private sealed class DeferredCancellationOutput : MemoryStream
+    {
+        internal readonly TaskCompletionSource Started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal readonly TaskCompletionSource Cancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource unwind = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal void AllowUnwind() => unwind.TrySetResult();
+        public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken token = default)
+        {
+            Started.TrySetResult();
+            try { await Task.Delay(Timeout.Infinite, token); }
+            catch (OperationCanceledException)
+            {
+                Cancelled.TrySetResult();
+                await unwind.Task;
+                throw;
+            }
+        }
+    }
+    private static async Task RejectTransferBudgetAsync(NativeSessionClient client)
+    {
+        try { await client.PrepareDocumentAsync("recovery"); }
+        catch (WorkspaceException error) when (error.Code == "document.budget") { return; }
+        throw new InvalidOperationException("Active document transfer released its handle budget early.");
+    }
+    private static Task ReleaseAsync(NativeSessionClient client, PreparedDocument document) =>
+        client.ReleaseDocumentAsync(document.Id, document.Identity.DocumentToken, document.Identity.Revision);
+
+    private static async Task TransfersBoundedAsync()
+    {
+        await using var client = new NativeSessionClient();
+        await client.StartAsync();
+        await client.CreateSessionAsync("transfer admission", 64, 64);
+        // Releasing a prepared handle revokes future reads, but a blocked writer
+        // still owns its bytes and must count against admission until completion.
+        var released = await client.PrepareDocumentAsync("copy");
+        using (var output = new PendingOutput())
+        {
+            var download = client.DownloadDocumentAsync(released, output);
+            try
+            {
+                await output.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                await ReleaseAsync(client, released);
+                var other = await client.PrepareDocumentAsync("copy");
+                await RejectTransferBudgetAsync(client);
+                output.Complete();
+                await download.WaitAsync(TimeSpan.FromSeconds(5));
+                Check(output.Length == released.ByteLength, "Released transfer lost its prepared bytes.");
+                var afterCompletion = await client.PrepareDocumentAsync("recovery");
+                await ReleaseAsync(client, other);
+                await ReleaseAsync(client, afterCompletion);
+            }
+            finally { output.Complete(); await download.WaitAsync(TimeSpan.FromSeconds(5)); }
+        }
+
+        // Replacement clears the old document's receipts without reclaiming the
+        // memory that an in-flight old-document writer still holds.
+        var replaced = await client.PrepareDocumentAsync("copy");
+        using (var output = new PendingOutput())
+        {
+            var download = client.DownloadDocumentAsync(replaced, output);
+            try
+            {
+                await output.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                await client.CreateSessionAsync("replacement", 64, 64);
+                var other = await client.PrepareDocumentAsync("copy");
+                await RejectTransferBudgetAsync(client);
+                output.Complete();
+                try
+                {
+                    await download.WaitAsync(TimeSpan.FromSeconds(5));
+                    throw new InvalidOperationException("Old document transfer passed the replacement guard.");
+                }
+                catch (WorkspaceException error) when (error.Code == "document.conflict") { }
+                var afterConflict = await client.PrepareDocumentAsync("recovery");
+                await ReleaseAsync(client, other);
+                await ReleaseAsync(client, afterConflict);
+            }
+            finally
+            {
+                output.Complete();
+                try { await download.WaitAsync(TimeSpan.FromSeconds(5)); }
+                catch (WorkspaceException error) when (error.Code == "document.conflict") { }
+            }
+        }
+
+        // The transfer's finally must release its reservation even when the
+        // destination is cancelled while waiting for an asynchronous write.
+        var cancelled = await client.PrepareDocumentAsync("copy");
+        using (var output = new PendingOutput())
+        using (var cancellation = new CancellationTokenSource())
+        {
+            var download = client.DownloadDocumentAsync(cancelled, output, cancellation.Token);
+            try
+            {
+                await output.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                await ReleaseAsync(client, cancelled);
+                var other = await client.PrepareDocumentAsync("copy");
+                await RejectTransferBudgetAsync(client);
+                cancellation.Cancel();
+                try
+                {
+                    await download.WaitAsync(TimeSpan.FromSeconds(5));
+                    throw new InvalidOperationException("Blocked transfer ignored cancellation.");
+                }
+                catch (OperationCanceledException) { }
+                var afterCancellation = await client.PrepareDocumentAsync("recovery");
+                await ReleaseAsync(client, other);
+                await ReleaseAsync(client, afterCancellation);
+            }
+            finally
+            {
+                cancellation.Cancel();
+                try { await download.WaitAsync(TimeSpan.FromSeconds(5)); }
+                catch (OperationCanceledException) { }
+            }
+        }
+        // Dispose clears the workspace after cancelling downloads. If a stream
+        // observes cancellation later, lease cleanup must preserve that result.
+        var disposing = await client.PrepareDocumentAsync("copy");
+        using (var output = new DeferredCancellationOutput())
+        {
+            var download = client.DownloadDocumentAsync(disposing, output);
+            try
+            {
+                await output.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                var disposal = client.DisposeAsync().AsTask();
+                await output.Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                await disposal.WaitAsync(TimeSpan.FromSeconds(5));
+                output.AllowUnwind();
+                try
+                {
+                    await download.WaitAsync(TimeSpan.FromSeconds(5));
+                    throw new InvalidOperationException("Dispose left a document transfer running.");
+                }
+                catch (OperationCanceledException) { }
+            }
+            finally
+            {
+                output.AllowUnwind();
+                try { await download.WaitAsync(TimeSpan.FromSeconds(5)); }
+                catch (OperationCanceledException) { }
+            }
+        }
+        Console.WriteLine("Document transfers: release/replacement retain admission; completion/cancellation release it; disposal preserves cancellation.");
+    }
     public static async Task RunAsync(string hostPath)
     {
+        await TransfersBoundedAsync();
         var directory = Path.Combine(Path.GetTempPath(), "flamoris-document-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try
