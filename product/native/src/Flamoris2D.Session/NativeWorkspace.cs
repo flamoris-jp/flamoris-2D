@@ -20,6 +20,10 @@ public sealed record WorkspaceArtwork(string Id, string NodeId, string Name, int
 // it never modifies a Project. Every edit/Undo/Redo commits in C++.
 public sealed partial class NativeWorkspace : IAsyncDisposable
 {
+    private const int MaximumSaveCandidates = 2;
+    private const long MaximumPreparedSaveBytes = 256L * 1024 * 1024;
+    private static readonly TimeSpan SaveLifetime = TimeSpan.FromMinutes(10);
+    private readonly TimeProvider saveClock;
     private readonly SemaphoreSlim lane = new(1, 1);
     private readonly AsyncLocal<long?> invocation = new();
     private long invocationEpoch;
@@ -33,7 +37,10 @@ public sealed partial class NativeWorkspace : IAsyncDisposable
     private JsonElement[] orphanRecords = [];
     private readonly Dictionary<long, IReadOnlyDictionary<string, WorkspaceArtwork>> artworkHistory = [];
     private readonly Dictionary<string, (SaveCandidate Candidate, object ModifiedAt, DateTimeOffset Expires)> saves = [];
+    private readonly Dictionary<string, (SaveCandidate Candidate, int Count)> saveTransfers = [];
     private static readonly UTF8Encoding Utf8 = new(false, true);
+    public NativeWorkspace() : this(TimeProvider.System) { }
+    public NativeWorkspace(TimeProvider saveTimeProvider) => saveClock = saveTimeProvider ?? throw new ArgumentNullException(nameof(saveTimeProvider));
     public string RuntimeId { get; } = Guid.NewGuid().ToString();
     public event Action<WorkspaceChanged>? Changed;
     // Atomic callbacks are synchronous: no await, reentrant lane acquisition or
@@ -171,23 +178,44 @@ public sealed partial class NativeWorkspace : IAsyncDisposable
     {
         AssertLane(); if (proofOnly) throw new WorkspaceException("document.proof_only");
         if (operation is not ("save" or "saveAs" or "incremental" or "copy" or "recovery")) throw new WorkspaceException("document.receipt_invalid");
-        foreach (var id in saves.Where(s => s.Value.Expires <= DateTimeOffset.UtcNow).Select(s => s.Key).ToArray()) saves.Remove(id);
+        var now = saveClock.GetUtcNow();
+        foreach (var id in saves.Where(s => s.Value.Expires <= now).Select(s => s.Key).ToArray()) saves.Remove(id);
         bool intentional = operation is not ("copy" or "recovery"); if (intentional && saves.Values.Any(s => s.Candidate.ReceiptId is not null)) throw new WorkspaceException("document.save_busy");
+        // Copy and Recovery also retain complete document bytes. Apply the same
+        // two-handle admission policy before materializing another envelope.
+        // Revoked/expired candidates keep their reservation until active writers
+        // release the bytes, including across document replacement.
+        var transferring = saveTransfers.Values.Where(t => !saves.ContainsKey(t.Candidate.Id)).Select(t => t.Candidate).ToArray();
+        if (saves.Count + transferring.Length >= MaximumSaveCandidates) throw new WorkspaceException("document.budget");
         string timestamp = Now(); object modified = operation == "recovery" ? modifiedAt : timestamp;
         var envelope = NativeDocument.Serialize(Session, JsonSerializer.SerializeToElement(new { now = timestamp, createdAt, modifiedAt = modified, renderAssets = artwork.Values.Select(a => a.Record).Concat(orphanRecords) }));
         var bytes = JsonSerializer.SerializeToUtf8Bytes(envelope); if (bytes.LongLength > NativeDocument.MaximumBytes) throw new WorkspaceException("document.budget");
+        if (saves.Values.Sum(s => (long)s.Candidate.Bytes.Length) + transferring.Sum(s => (long)s.Bytes.Length) + bytes.LongLength > MaximumPreparedSaveBytes) throw new WorkspaceException("document.budget");
         var identity = new SaveIdentity(lineageId, documentToken, revision, Session.State().CurrentRevision, Guid.NewGuid().ToString(), timestamp, Project.GetProperty("displayName").GetString()!);
-        var candidate = new SaveCandidate(Guid.NewGuid().ToString(), intentional ? Guid.NewGuid().ToString() : null, operation, identity, bytes); saves[candidate.Id] = (candidate, modified, DateTimeOffset.UtcNow.AddMinutes(1)); return candidate;
+        var candidate = new SaveCandidate(Guid.NewGuid().ToString(), intentional ? Guid.NewGuid().ToString() : null, operation, identity, bytes); saves[candidate.Id] = (candidate, modified, saveClock.GetUtcNow() + SaveLifetime); return candidate;
     }
     public SaveCleanup AcknowledgeSave(string receiptId)
     {
         AssertLane();
         var receipt = saves.Values.FirstOrDefault(s => s.Candidate.ReceiptId == receiptId);
-        if (receipt.Candidate is null || receipt.Expires <= DateTimeOffset.UtcNow || receipt.Candidate.Identity.DocumentToken != documentToken) throw new WorkspaceException("document.receipt_invalid");
+        if (receipt.Candidate is null || receipt.Expires <= saveClock.GetUtcNow() || receipt.Candidate.Identity.DocumentToken != documentToken) throw new WorkspaceException("document.receipt_invalid");
         Check(Session.MarkSaved(receipt.Candidate.Identity.EditorRevision)); modifiedAt = receipt.ModifiedAt; saves.Remove(receipt.Candidate.Id);
         var cleanup = new SaveCleanup(lineageId, documentToken, receipt.Candidate.Identity.Revision, restoredSnapshotId); restoredSnapshotId = null; return cleanup;
     }
-    public SaveCandidate GetSave(string id, string token) { AssertLane(); if (token != documentToken || !saves.TryGetValue(id, out var entry) || entry.Expires <= DateTimeOffset.UtcNow) throw new WorkspaceException("document.receipt_invalid"); return entry.Candidate; }
+    public SaveCandidate GetSave(string id, string token) { AssertLane(); if (token != documentToken || !saves.TryGetValue(id, out var entry) || entry.Expires <= saveClock.GetUtcNow()) throw new WorkspaceException("document.receipt_invalid"); return entry.Candidate; }
+    public SaveCandidate BeginSaveTransfer(string id, string token)
+    {
+        var candidate = GetSave(id, token);
+        saveTransfers[id] = (candidate, saveTransfers.TryGetValue(id, out var transfer) ? checked(transfer.Count + 1) : 1);
+        return candidate;
+    }
+    public void EndSaveTransfer(string id)
+    {
+        AssertLane();
+        if (!saveTransfers.TryGetValue(id, out var transfer)) throw new WorkspaceException("document.receipt_invalid");
+        if (transfer.Count == 1) saveTransfers.Remove(id);
+        else saveTransfers[id] = (transfer.Candidate, transfer.Count - 1);
+    }
     public void ReleaseSave(string id) { AssertLane(); saves.Remove(id); }
     private static string Now() => DateTimeOffset.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'");
     private static object? Metadata(JsonElement? value, string key) => value is { } m && m.ValueKind == JsonValueKind.Object && m.TryGetProperty(key, out var p) && p.ValueKind is JsonValueKind.String or JsonValueKind.Number ? p.Clone() : null;
@@ -243,6 +271,6 @@ public sealed partial class NativeWorkspace : IAsyncDisposable
     }
     public async ValueTask DisposeAsync()
     {
-        await lane.WaitAsync().ConfigureAwait(false); try { if (disposed) return; disposed = true; session?.Dispose(); session = null; artwork = EmptyArtwork(); artworkHistory.Clear(); saves.Clear(); } finally { lane.Release(); }
+        await lane.WaitAsync().ConfigureAwait(false); try { if (disposed) return; disposed = true; session?.Dispose(); session = null; artwork = EmptyArtwork(); artworkHistory.Clear(); saves.Clear(); saveTransfers.Clear(); } finally { lane.Release(); }
     }
 }

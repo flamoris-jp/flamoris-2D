@@ -25,8 +25,21 @@ public sealed partial class NativeSessionClient
     public async Task DownloadDocumentAsync(PreparedDocument document, Stream destination, CancellationToken cancellationToken = default)
     {
         EnsureReady(); using var bounded = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token); cancellationToken = bounded.Token; if (document.ByteLength <= 0 || document.ByteLength > MaximumDocumentBytes) throw new InvalidDataException("Document limit exceeded.");
-        var bytes = await _workspace.InvokeAsync(w => { var c = w.GetSave(document.Id, document.Identity.DocumentToken); if (c.Bytes.Length != document.ByteLength || c.Identity.Revision != document.Identity.Revision || c.ReceiptId != document.ReceiptId) throw new WorkspaceException("document.receipt_invalid"); return c.Bytes; }, cancellationToken);
-        await destination.WriteAsync(bytes, cancellationToken); await _workspace.InvokeAsync(w => { if (w.Snapshot.DocumentToken != document.Identity.DocumentToken) throw new WorkspaceException("document.conflict"); return true; }, cancellationToken);
+        var transferring = false;
+        try
+        {
+            var bytes = await _workspace.InvokeAsync(w => { var c = w.GetSave(document.Id, document.Identity.DocumentToken); if (c.Bytes.Length != document.ByteLength || c.Identity.Revision != document.Identity.Revision || c.ReceiptId != document.ReceiptId) throw new WorkspaceException("document.receipt_invalid"); return w.BeginSaveTransfer(document.Id, document.Identity.DocumentToken).Bytes; }, cancellationToken);
+            transferring = true;
+            await destination.WriteAsync(bytes, cancellationToken); await _workspace.InvokeAsync(w => { if (w.Snapshot.DocumentToken != document.Identity.DocumentToken) throw new WorkspaceException("document.conflict"); return true; }, cancellationToken);
+        }
+        finally
+        {
+            if (transferring)
+            {
+                try { await _workspace.InvokeAsync(w => { w.EndSaveTransfer(document.Id); return true; }); }
+                catch (ObjectDisposedException) { /* Disposed workspace already released every transfer reservation. */ }
+            }
+        }
     }
     public Task<NativeSessionResponse> OpenDocumentAsync(Stream source, long byteLength, RecoveryOrigin? recovery = null, CancellationToken cancellationToken = default) => ReplaceFromStreamAsync(source, byteLength, recovery, null, null, cancellationToken);
     public Task<NativeSessionResponse> ImportSourceAsync(Stream source, long byteLength, NativeSourceKind kind, string fileName, CancellationToken cancellationToken = default) => ReplaceFromStreamAsync(source, byteLength, null, kind == NativeSourceKind.Psd ? "psd" : "flimg", fileName, cancellationToken);
