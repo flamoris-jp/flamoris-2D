@@ -26,6 +26,33 @@ A repeat run replaces only this product's directory, ZIP and inventory. Package
 names have no version suffix across the three products; `BUILD-INFO.txt` records
 source commit and platform, and the executable carries its product version.
 
+## Pinned FFmpeg input and offline rebuilds
+
+The publisher uses the September 30, 2026 month-end BtbN shared archive, pinned by
+SHA256. Month-end builds have two-year upstream retention; ordinary daily builds
+are unsuitable long-lived inputs. Downloads are verified and kept in
+`artifacts/downloads/ffmpeg/<sha256>.zip`, separately from the portable output.
+Every use rechecks the hash. Cache hits do not need the FFmpeg download server.
+
+To retain the cache on another disk:
+
+```powershell
+./product/packaging/publish-windows.ps1 -FfmpegCacheDirectory 'D:\FLAMORIS-BuildCache\ffmpeg'
+```
+
+To use a backed-up copy without downloading FFmpeg:
+
+```powershell
+./product/packaging/publish-windows.ps1 -FfmpegArchivePath 'D:\BuildInputs\ffmpeg-N-127021-ge0c94b2d1c-win64-lgpl-shared.zip'
+```
+
+The explicit archive must match the same pinned hash; it is never an unchecked
+version override. Other build prerequisites may still need the network. Keep a
+backup of the verified ZIP for rebuilds beyond upstream's retention window;
+review this pin before September 2028. Downloads and failed hash checks happen
+before an existing portable output is removed. A corrupt cache is refused with a
+repair instruction. See [the pin, source identity and validation record](reviews/issue-157-ffmpeg-build-input.md).
+
 ## Integrity and package boundary
 
 `SHA256SUMS.txt` contains lowercase SHA-256, two spaces, and a package-relative
@@ -77,6 +104,7 @@ All bridges live at `mcp/Flamoris.Mcp.Bridge.exe`.
 ```powershell
 ./test/packaging/portable-package.Tests.ps1
 ./test/packaging/ffmpeg-runtime.Tests.ps1
+./test/packaging/ffmpeg-download.Tests.ps1
 ```
 
 This small synthetic test runs without WPF or downloads. It checks Unicode file

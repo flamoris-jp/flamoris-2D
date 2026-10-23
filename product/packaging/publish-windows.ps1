@@ -1,12 +1,27 @@
 # Run from any directory on Windows x64 with PowerShell, .NET 10 SDK and CMake.
 [CmdletBinding()]
-param([string]$OutputDirectory = "artifacts/windows")
+param(
+    [string]$OutputDirectory = "artifacts/windows",
+    [string]$FfmpegArchivePath = '',
+    [string]$FfmpegCacheDirectory = 'artifacts/downloads/ffmpeg'
+)
 
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'portable-package.ps1')
 . (Join-Path $PSScriptRoot 'ffmpeg-runtime.ps1')
+# Month-end builds have a two-year upstream retention window. Keep a verified
+# local copy as well; neither a floating latest URL nor network access is required
+# once this input has been cached (or supplied explicitly for an offline build).
+$ffmpegUrl = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-N-127021-ge0c94b2d1c-win64-lgpl-shared.zip'
+$ffmpegHash = '2CC3DD0BAF74EBD68A3FCEAF771DF8351A7A6D69694D05F43B16BB0C966EC909'
+$cache = if ([IO.Path]::IsPathRooted($FfmpegCacheDirectory)) { $FfmpegCacheDirectory }
+    else { Join-Path $repo $FfmpegCacheDirectory }
+$providedArchive = $FfmpegArchivePath
+if ($providedArchive -and -not [IO.Path]::IsPathRooted($providedArchive)) { $providedArchive = Join-Path $repo $providedArchive }
+$archive = Get-VerifiedFfmpegArchive -Uri $ffmpegUrl -ExpectedSha256 $ffmpegHash `
+    -CacheDirectory $cache -ArchivePath $providedArchive
 $destination = if ([IO.Path]::IsPathRooted($OutputDirectory)) {
     [IO.Path]::GetFullPath($OutputDirectory)
 } else { [IO.Path]::GetFullPath((Join-Path $repo $OutputDirectory)) }
@@ -20,14 +35,9 @@ $null = Get-Command dotnet -ErrorAction Stop
 & git -C $repo submodule update --init --recursive -- dependencies/flamoris-capture
 if ($LASTEXITCODE -ne 0) { throw 'Capture submodule initialization failed.' }
 
-$ffmpegUrl = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-28-13-06/ffmpeg-N-126947-g45f3fecca9-win64-lgpl-shared.zip'
-$ffmpegHash = '7F82D0E4ED9C20E9CA96573F5AB82B85F1B44A5D62F195E5CF09FFC28DA70A4E'
 $temp = Join-Path ([IO.Path]::GetTempPath()) ([IO.Path]::GetRandomFileName())
 New-Item -ItemType Directory -Path $temp | Out-Null
 try {
-    $archive = Join-Path $temp 'ffmpeg.zip'
-    Invoke-WebRequest $ffmpegUrl -OutFile $archive
-    if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne $ffmpegHash) { throw 'Encoder archive checksum mismatch' }
     $extracted = Join-Path $temp 'extracted'
     Expand-Archive $archive $extracted
     $encoder = Get-ChildItem $extracted -Filter ffmpeg.exe -Recurse | Select-Object -First 1

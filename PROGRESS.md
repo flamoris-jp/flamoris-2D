@@ -80,3 +80,13 @@ remain separate release work.
 - MCP connection includes editor-window observation; no separate sharing checkbox
   or confirmation dialog. Disconnect/failure releases the capture lease.
 - The bottom bar reports MCP sharing status.
+
+## 2026-10-24 — Issue #157 FFmpeg build input candidate
+
+- Replaced the expired September 28 daily URL with the hash-pinned September 30
+  month-end build, whose upstream retention is two years.
+- Keep verified archives separately from package outputs; allow a hash-verified
+  offline ZIP and reject corrupt/partial inputs. No floating latest fallback.
+- Updated current binary/source/configuration references. Issue #149 remains open.
+- Added download/cache regression tests to the existing Windows packaging workflow.
+- Full Windows package/export result is recorded in the PR.

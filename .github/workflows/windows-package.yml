@@ -42,6 +42,12 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Cache verified FFmpeg build input
+        uses: actions/cache@v4
+        with:
+          path: artifacts/downloads/ffmpeg
+          key: windows-ffmpeg-2cc3dd0baf74ebd68a3fceaf771df8351a7a6d69694d05f43b16bb0c966ec909
+
       - name: Stage production test fixtures
         shell: pwsh
         run: |
@@ -91,6 +97,7 @@ jobs:
         run: |
           ./test/packaging/portable-package.Tests.ps1
           ./test/packaging/ffmpeg-runtime.Tests.ps1
+          ./test/packaging/ffmpeg-download.Tests.ps1
 
       - name: Build portable Windows candidate
         shell: pwsh

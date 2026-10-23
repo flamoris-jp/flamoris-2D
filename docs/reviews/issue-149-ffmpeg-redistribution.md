@@ -1,5 +1,9 @@
 # Issue #149 — pinned FFmpeg redistribution and runtime-size audit
 
+**Historical September 28 pin:** current build input was advanced to the retained
+September 30 month-end archive under [Issue #157](issue-157-ffmpeg-build-input.md).
+The measurements/recovery references below describe the old archive.
+
 Audit date: 2026-10-03. **Issue #149 remains open.** This change safely removes
 unused files and corrects known notices; it does not certify the archive as
 LGPL-only or supply a complete corresponding-source distribution. Transitive GPL
