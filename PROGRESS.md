@@ -74,3 +74,9 @@ remain separate release work.
 - Reuses pinned Capture Wpf/Core/Windows/Mcp; MCP Core/Wpf/bridge aligned to 1.3.1.
 - No input recording or second editing state.
 - Real Windows/GPU/DPI acceptance pending; see `docs/embedded-capture.md`.
+
+### Embedded connection policy update (2026-10-24)
+
+- MCP connection includes editor-window observation; no separate sharing checkbox
+  or confirmation dialog. Disconnect/failure releases the capture lease.
+- The bottom bar reports MCP sharing status.

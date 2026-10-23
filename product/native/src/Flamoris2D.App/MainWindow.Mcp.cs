@@ -18,17 +18,24 @@ public partial class MainWindow
             "FLAMORIS.2D", Path.Combine(AppContext.BaseDirectory, "mcp", "Flamoris.Mcp.Bridge.exe"),
             AttachMcp, () => _client?.HasAuthoritativeProjection == true && !_documentBusy && !_disposed);
         McpStatusPanel.Content = _mcpUi.StatusIndicator;
-        _capture = new EmbeddedWindowCapture(this,
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FLAMORIS", "2D", "capture-preferences.json"),
-            () => _mcpUi?.Invalidate());
+        _capture = new EmbeddedWindowCapture(this, () => _mcpUi?.Invalidate());
         CaptureStatusPanel.Content = _capture.Control;
     }
     private async Task<McpDesktopAttachment> AttachMcp(CorePermission permission)
     {
         var client = _client ?? throw new InvalidOperationException("Native editing authority unavailable.");
-        _mcpConnection = await client.EnableMcpAsync(permission == CorePermission.Edit ? McpPermission.Edit : McpPermission.ReadOnly,
-            startLocalEndpoint: false, additionalTools: _capture!.Tools());
-        return new(client.LiveMcpBoundary!, client.LiveMcpGrant!, async () => { await client.DisableMcpAsync(); });
+        var captureLease = _capture!.BeginConnection();
+        try
+        {
+            _mcpConnection = await client.EnableMcpAsync(permission == CorePermission.Edit ? McpPermission.Edit : McpPermission.ReadOnly,
+                startLocalEndpoint: false, additionalTools: _capture.Tools());
+            return new(client.LiveMcpBoundary!, client.LiveMcpGrant!, async () =>
+            {
+                captureLease.Dispose();
+                await client.DisableMcpAsync();
+            });
+        }
+        catch { captureLease.Dispose(); throw; }
     }
     private void Client_McpStatusChanged() => Dispatcher.BeginInvoke(new Action(() =>
     {
