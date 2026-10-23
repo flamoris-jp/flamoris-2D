@@ -566,6 +566,8 @@ public partial class MainWindow : Window, IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         if (_disposed) return;
+        _capture?.Dispose();
+        _mcpUi?.Shutdown();
         _recoveryTimer.Stop();
         StopPlayback();
         _exportWork?.Cancel();

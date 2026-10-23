@@ -16,6 +16,10 @@ foreach ($path in @($package, "$package.zip", "$package.inventory.json")) {
 }
 $null = Get-Command dotnet -ErrorAction Stop
 
+# Restore the reviewed Capture source dependency before evaluating project references.
+& git -C $repo submodule update --init --recursive -- dependencies/flamoris-capture
+if ($LASTEXITCODE -ne 0) { throw 'Capture submodule initialization failed.' }
+
 $ffmpegUrl = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-28-13-06/ffmpeg-N-126947-g45f3fecca9-win64-lgpl-shared.zip'
 $ffmpegHash = '7F82D0E4ED9C20E9CA96573F5AB82B85F1B44A5D62F195E5CF09FFC28DA70A4E'
 $temp = Join-Path ([IO.Path]::GetTempPath()) ([IO.Path]::GetRandomFileName())
@@ -46,7 +50,7 @@ try {
         -NoticeDirectory (Join-Path $PSScriptRoot 'ffmpeg-notices')
     Get-ChildItem -LiteralPath $package -Filter '*.pdb' -File -Recurse |
         ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
-    foreach ($required in @('Flamoris2D.exe', 'Flamoris2D.Renderer.Native.dll', 'LICENSE-picojson.txt', 'Flamoris2D.Core.Native.dll', 'icuuc78.dll', 'icuin78.dll', 'icudt78.dll', 'ICU-LICENSE.txt', 'ffmpeg/bin/ffmpeg.exe', 'mcp/Flamoris.Mcp.Bridge.exe', 'mcp/Flamoris.Mcp.Core.dll', 'mcp/coreclr.dll', 'mcp/hostfxr.dll', 'Flamoris.Mcp.Core.dll', 'Flamoris.Mcp.Wpf.dll', 'coreclr.dll', 'hostfxr.dll', 'hostpolicy.dll', 'PresentationFramework.dll')) {
+    foreach ($required in @('Flamoris2D.exe', 'Flamoris2D.Renderer.Native.dll', 'LICENSE-picojson.txt', 'Flamoris2D.Core.Native.dll', 'icuuc78.dll', 'icuin78.dll', 'icudt78.dll', 'ICU-LICENSE.txt', 'ffmpeg/bin/ffmpeg.exe', 'mcp/Flamoris.Mcp.Bridge.exe', 'mcp/Flamoris.Mcp.Core.dll', 'mcp/coreclr.dll', 'mcp/hostfxr.dll', 'Flamoris.Mcp.Core.dll', 'Flamoris.Mcp.Wpf.dll', 'Flamoris.Capture.Wpf.dll', 'Flamoris.Capture.Core.dll', 'Flamoris.Capture.Windows.dll', 'Flamoris.Capture.Mcp.dll', 'coreclr.dll', 'hostfxr.dll', 'hostpolicy.dll', 'PresentationFramework.dll')) {
         if (-not (Test-Path (Join-Path $package $required))) { throw "Missing runtime: $required" }
     }
     # MSBuild project inputs are explicit; audit the final artifact as well.

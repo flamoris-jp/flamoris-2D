@@ -50,7 +50,7 @@ public sealed partial class NativeSessionClient
         _mcpBoundary?.Disable();
         PublishMcpStatus();
     }
-    public async Task<McpConnection> EnableMcpAsync(McpPermission permission, CancellationToken cancellationToken = default, bool startLocalEndpoint = true)
+    public async Task<McpConnection> EnableMcpAsync(McpPermission permission, CancellationToken cancellationToken = default, bool startLocalEndpoint = true, IEnumerable<HostTool>? additionalTools = null)
     {
         var epoch = Interlocked.Increment(ref _mcpEpoch);
         await _mcpLifecycle.WaitAsync(cancellationToken);
@@ -65,7 +65,7 @@ public sealed partial class NativeSessionClient
             var host = new NativeMcpHost(_workspace,expectedToken,permission==McpPermission.Edit?CorePermission.Edit:CorePermission.ReadOnly);
             _mcpHost = host;
             var options = new McpOptions { MaxRequestBytes = 4 * 1024 * 1024, MaxConcurrentRequests = 4 };
-            var boundary = new McpBoundary(host, host.Tools(), options, new McpDiagnostics(_logger ?? Flamoris.Logging.FlamorisLogger.Create(new Flamoris.Logging.LoggingOptions { Level = "error" })));
+            var boundary = new McpBoundary(host, host.Tools().Concat(additionalTools ?? []), options, new McpDiagnostics(_logger ?? Flamoris.Logging.FlamorisLogger.Create(new Flamoris.Logging.LoggingOptions { Level = "error" })));
             _mcpBoundary = boundary;
             boundary.Status.Changed += PublishMcpStatus;
             var grant = await boundary.EnableAsync(permission == McpPermission.Edit ? CorePermission.Edit : CorePermission.ReadOnly);

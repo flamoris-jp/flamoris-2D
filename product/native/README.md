@@ -26,6 +26,7 @@ Tools with Desktop development with C++ and a Windows SDK. Public nuget.org
 provides shared FLAMORIS packages; no GitHub credentials or Node install is needed.
 
 ```powershell
+git submodule update --init --recursive
 dotnet build product/native/Flamoris2D.Native.sln -c Release
 ctest --test-dir product/native/src/Flamoris2D.Core.Interop/obj/native-x64 -C Release --output-on-failure
 dotnet run --project product/native/tests/Flamoris2D.Source.Codecs.Tests -c Release --no-build -- product/native/tests/source-codec-conformance.json product/native/tests/psd-codec-conformance.json
@@ -79,7 +80,7 @@ Native C++/managed tests and packaged Windows smoke are the authoritative regres
 
 ## Live MCP
 
-Core/Wpf 1.2.0 supplies the stdio/named-pipe bridge, same-user security, grants,
+Core/Wpf 1.3.1 supplies the stdio/named-pipe bridge, same-user security, grants,
 guards and connection UI. The bridge has no Project or session. WPF and MCP use
 the exact same workspace/native history. Connection is manual by default; copied
 credentials are transient and never stored in project/settings/logs.
