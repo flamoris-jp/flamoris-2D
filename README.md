@@ -137,3 +137,10 @@ FLAMORISのキャラクター、キャラクターデザイン、イラスト、
 ## Shared desktop MCP connection
 
 The shared MCP UI migration and package release order are documented in [shared MCP connection](docs/shared-mcp-connection.md).
+
+## AI screen observation / AIの画面確認
+
+The embedded Capture candidate adds opt-in **画面共有** to the bottom bar.
+Enable it locally, then reconnect the existing MCP connection to use
+`capture.screenshot.get` (`{"input":{}}`). No separate Capture EXE is needed.
+See [usage, build dependency and Windows acceptance](docs/embedded-capture.md).

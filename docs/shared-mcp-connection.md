@@ -1,6 +1,6 @@
 # Shared desktop MCP connection
 
-This app consumes `Flamoris.Mcp.Core` and `Flamoris.Mcp.Wpf` 1.2.0.
+This app consumes `Flamoris.Mcp.Core` and `Flamoris.Mcp.Wpf` 1.3.1.
 The common implementation lives in flamoris-jp/flamoris-mcp-core#13; the server
 counterpart is flamoris-jp/flamoris-mcp-hub#16. The production solution consumes the released NuGet packages; no Core source
 checkout or `FlamorisMcpSourceRoot` is required.

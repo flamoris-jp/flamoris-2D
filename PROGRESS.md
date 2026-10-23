@@ -66,3 +66,11 @@ and package smoke do not claim human artwork/DPI/GPU acceptance.
 
 FFmpeg redistribution #149 and installer/signing/update/file association
 remain separate release work.
+
+
+## 2026-10-24 Embedded Capture candidate
+
+- Added opt-in owner-window screenshots through the existing editor MCP connection.
+- Reuses pinned Capture Wpf/Core/Windows/Mcp; MCP Core/Wpf/bridge aligned to 1.3.1.
+- No input recording or second editing state.
+- Real Windows/GPU/DPI acceptance pending; see `docs/embedded-capture.md`.

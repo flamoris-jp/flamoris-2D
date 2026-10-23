@@ -278,6 +278,7 @@
 
         <Border DockPanel.Dock="Bottom" Background="#292B2F" Padding="10,5">
             <DockPanel>
+                <ContentControl x:Name="CaptureStatusPanel" DockPanel.Dock="Right" Margin="14,0,0,0" />
                 <ContentControl x:Name="McpStatusPanel" DockPanel.Dock="Right" Margin="14,0,0,0" />
                 <TextBlock x:Name="RevisionText" DockPanel.Dock="Right"
                            Foreground="#C7C9CD" Text="revision —" />
