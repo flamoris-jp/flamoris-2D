@@ -1,6 +1,6 @@
 # FFmpeg source access and redistribution status
 
-This package uses unmodified FFmpeg N-126947-g45f3fecca9 from the BtbN Windows
+This package uses unmodified FFmpeg N-127021-ge0c94b2d1c from the BtbN Windows
 x64 LGPL shared archive. FFmpeg and its DLLs are separate, replaceable files.
 FLAMORIS invokes `ffmpeg.exe` as a separate process and does not link its own
 executable to the FFmpeg libraries. Export settings can select another compatible
@@ -18,13 +18,13 @@ that GPLv2-or-later component, its source revision and the unresolved conclusion
 
 ## Exact upstream references
 
-- Binary release: https://github.com/BtbN/FFmpeg-Builds/releases/tag/autobuild-2026-09-28-13-06
-- Archive: `ffmpeg-N-126947-g45f3fecca9-win64-lgpl-shared.zip`
-- SHA256: `7f82d0e4ed9c20e9ca96573f5ab82b85f1b44a5d62f195e5cf09ffc28da70a4e`
-- FFmpeg source: https://github.com/FFmpeg/FFmpeg/tree/45f3fecca9f800a4432a6e3cfb3a76ef47f9d07a
-- FFmpeg source archive: https://github.com/FFmpeg/FFmpeg/archive/45f3fecca9f800a4432a6e3cfb3a76ef47f9d07a.tar.gz
+- Binary release: https://github.com/BtbN/FFmpeg-Builds/releases/tag/autobuild-2026-09-30-13-08
+- Archive: `ffmpeg-N-127021-ge0c94b2d1c-win64-lgpl-shared.zip`
+- SHA256: `2cc3dd0baf74ebd68a3fceaf771df8351a7a6d69694d05f43b16bb0c966ec909`
+- FFmpeg source: https://github.com/FFmpeg/FFmpeg/tree/e0c94b2d1c96c2548645d00690f26dc5178d4855
+- FFmpeg source archive: https://github.com/FFmpeg/FFmpeg/archive/e0c94b2d1c96c2548645d00690f26dc5178d4855.tar.gz
 - Build scripts, pinned dependency revisions and patches:
-  https://github.com/BtbN/FFmpeg-Builds/tree/16523e260106182950d7072b6ea1401808f68a50
+  https://github.com/BtbN/FFmpeg-Builds/tree/6c9aec5fc9a72ec3abedd1fa84db141fa18cf52b
 - LGPLv3: https://www.gnu.org/licenses/lgpl-3.0.html
 - GPLv3: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -49,3 +49,6 @@ https://github.com/flamoris-jp/flamoris-2D/blob/main/docs/reviews/issue-149-ffmp
 
 Copyright-license compliance does not settle H.264 or other codec patent rights.
 The current export contract remains Windows Media Foundation `h264_mf`.
+
+Current archive availability, exact pin and refreshed binary/recipe observations:
+https://github.com/flamoris-jp/flamoris-2D/blob/main/docs/reviews/issue-157-ffmpeg-build-input.md
