@@ -37,11 +37,17 @@ try {
         Assert-Throws { Get-VerifiedFfmpegArchive -Uri $uri -ExpectedSha256 $hash -CacheDirectory $isolated -Download $bad } 'checksum mismatch|Pinned FFmpeg download failed'
         if (@(Get-ChildItem -LiteralPath $isolated -Force -File).Count -ne 0) { throw 'Failed download left cached/partial bytes' }
     }
-    # The download function must remain before package cleanup so a missing input
-    # cannot remove a previously usable portable package.
-    $publisher = Get-Content -LiteralPath (Join-Path $repo 'product/packaging/publish-windows.ps1') -Raw
-    if ($publisher.IndexOf('$archive = Get-VerifiedFfmpegArchive') -ge $publisher.IndexOf('foreach ($path in @($package')) {
-        throw 'Package cleanup happens before input verification'
+    # Exercise the publisher itself with a bad offline input. It must fail before
+    # invoking build tools and must preserve a previously usable package.
+    $output = Join-Path $temp 'existing-output'
+    $existing = Join-Path $output 'FLAMORIS-2D-win-x64'
+    New-Item -ItemType Directory -Path $existing | Out-Null
+    $sentinel = Join-Path $existing 'keep.txt'
+    Set-Content -LiteralPath $sentinel -Value 'previous usable package'
+    $publisher = Join-Path $repo 'product/packaging/publish-windows.ps1'
+    Assert-Throws { & $publisher -OutputDirectory $output -FfmpegArchivePath $first } 'Provided FFmpeg archive checksum mismatch'
+    if (-not (Test-Path -LiteralPath $sentinel) -or (Get-Content $sentinel -Raw).Trim() -cne 'previous usable package') {
+        throw 'A missing/invalid FFmpeg input removed the existing package'
     }
-    Write-Host 'PASS: verified cold download, warm/offline cache, explicit offline ZIP, corrupt input rejection and partial cleanup'
+    Write-Host 'PASS: verified cold download, warm/offline cache, explicit offline ZIP, corrupt input rejection, partial cleanup and existing package preservation'
 } finally { Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue }
