@@ -8,10 +8,15 @@
 #include <regex>
 namespace fl2d_authoring {
 namespace {
-Value profile() {
+constexpr double default_video_bit_rate = 20000000;
+constexpr double min_video_bit_rate = 1000000;
+constexpr double max_video_bit_rate = 200000000;
+Value profile(double bit_rate = default_video_bit_rate) {
   return Value(Object{{"container", Value("mp4")},
                       {"videoCodec", Value("h264_mf")},
                       {"pixelFormat", Value("nv12")},
+                      {"rateControl", Value("cbr")},
+                      {"videoBitRate", Value(bit_rate)},
                       {"alphaComposite", Value("black")},
                       {"audio", Value("disabled")},
                       {"overwrite", Value("reject-existing-output")}});
@@ -25,6 +30,17 @@ bool safe_positive(const Value &v) {
   return v.is<double>() && std::isfinite(v.get<double>()) &&
          v.get<double>() > 0 && v.get<double>() <= 9007199254740991.0 &&
          std::trunc(v.get<double>()) == v.get<double>();
+}
+double video_bit_rate(const Value &input) {
+  if (!input.get<Object>().count("videoBitRate"))
+    return default_video_bit_rate;
+  const auto value = field(input, "videoBitRate");
+  if (!safe_positive(value) || value.get<double>() < min_video_bit_rate ||
+      value.get<double>() > max_video_bit_rate)
+    throw fl2d_queries::Error{
+        "RangeError",
+        "Video bitrate must be an integer from 1000000 to 200000000 bits/sec."};
+  return value.get<double>();
 }
 Value normalized_rate(const Value &rate) {
   const auto n = field(rate, "numerator"), d = field(rate, "denominator");
@@ -115,6 +131,14 @@ Value export_settings(const Value &p) {
                       {"renderSettings", render},
                       {"canvas", canvas},
                       {"videoProfile", profile()},
+                      {"videoBitRatePresets",
+                       Value(Array{Value(Object{{"id", Value("standard")},
+                                                {"videoBitRate", Value(10000000.0)}}),
+                                   Value(Object{{"id", Value("high")},
+                                                {"videoBitRate", Value(default_video_bit_rate)}})})},
+                      {"videoBitRateRange",
+                       Value(Object{{"min", Value(min_video_bit_rate)},
+                                    {"max", Value(max_video_bit_rate)}})},
                       {"partialOutputPolicy", partial_policy()}});
 }
 Value export_plan(const Value &p, const Value &input) {
@@ -144,8 +168,11 @@ Value export_plan(const Value &p, const Value &input) {
   if (w > 4096 || h > 4096 || w * h > 8294400)
     error("Native export supports up to 8,294,400 pixels, maximum dimension "
           "4096.");
-  if (truthy(field(input, "video")) && (w % 2 || h % 2))
-    error("H.264 output dimensions must be even.");
+  if (truthy(field(input, "video"))) {
+    if (w % 2 || h % 2)
+      error("H.264 output dimensions must be even.");
+    video_bit_rate(input);
+  }
   plan.get<Object>()["target"] = Value(
       Object{{"width", field(input, "width")},
              {"height", field(input, "height")},
@@ -224,6 +251,7 @@ Value encoder_contract(const Value &input) {
     throw fl2d_queries::Error{
         "RangeError", "Video frame count must be a positive safe integer."};
   auto rate = normalized_rate(field(input, "frameRate"));
+  const auto bit_rate = video_bit_rate(input);
   auto directory = text(field(input, "frameDirectory"));
   if (!directory.empty() &&
       (directory.back() == '/' || directory.back() == '\\'))
@@ -247,6 +275,10 @@ Value encoder_contract(const Value &input) {
            "format=gbrap,premultiply=inplace=1,format=nv12",
            "-c:v",
            "h264_mf",
+           "-rate_control",
+           "cbr",
+           "-b:v",
+           numeric(Value(bit_rate)),
            "-pix_fmt",
            "nv12",
            "-movflags",
@@ -254,6 +286,6 @@ Value encoder_contract(const Value &input) {
            "-n",
            text(field(input, "outputPath"))})
     arguments.emplace_back(v);
-  return Value(Object{{"args", Value(arguments)}, {"profile", profile()}});
+  return Value(Object{{"args", Value(arguments)}, {"profile", profile(bit_rate)}});
 }
 } // namespace fl2d_authoring
