@@ -1,8 +1,8 @@
-# Cutwork `.flimg` v1/v2 import
+# Cutwork `.flimg` v1/v2/v3 import
 
 Status: implemented for Issue #86
 
-FLAMORIS 2D consumes the documented Cutwork `.flimg` v1 and v2 contracts as external
+FLAMORIS 2D consumes the documented Cutwork `.flimg` v1, v2 and v3 contracts as external
 source art. `.flimg` is not a native Project format and does not replace `.fl2d`
 or PSD import.
 
@@ -17,8 +17,9 @@ or PSD import.
 
 The importer is independent of the Cutwork runtime. The cross-repository
 authority is `flamoris-cutwork/docs/flimg-schema-v1.md` and
-`flamoris-cutwork/docs/flimg-schema-v2.md`. Cutwork currently writes v2; old
-v1 archives remain readable. Unknown versions fail explicitly.
+`flamoris-cutwork/docs/flimg-schema-v2.md` and
+`flamoris-cutwork/docs/flimg-schema-v3.md`. Cutwork writes v2 without an artwork
+work log and v3 when that log is nonempty; old v1 archives remain readable. Unknown versions fail explicitly.
 
 ## Conversion contract
 
@@ -46,6 +47,28 @@ Imported RGBA render assets use the existing render-asset adapter and are
 embedded in the next native `.fl2d` save. The original `.flimg` does not need to
 remain available after import.
 
+## v3 artwork work log
+
+Acceptance criteria: import genuine Cutwork v3 output with unchanged v2 raster,
+mask, ownership and stack semantics; retain the log through a source-independent
+`.fl2d` save/reopen; reject malformed logs before replacing any live state.
+
+The source codec validates `workLog` metadata and exact `work-log.jsonl` bytes:
+canonical asset path, SHA-256, strict UTF-8 JSON Lines with a final newline,
+nonempty contiguous records, unique nonempty UUIDs, UTC timestamps, document
+tokens, nonnegative Int64 revisions, strict fields and producer quotas (4096
+records, 32 KiB per line including newline, 4 MiB total). v1/v2 still forbid
+work-log metadata/assets. Unknown future versions stay rejected.
+
+The normalized source description adds `workLogJsonl` only after validation.
+The C++ converter stores the manifest `workLog` descriptor and exact UTF-8 text
+as `sourceAsset.metadata.workLog` and `sourceAsset.metadata.workLogJsonl`.
+Keeping the JSONL as text preserves its byte checksum and Int64 revisions across
+the C++ JSON model. These are editorial source records, never executable commands,
+2D Undo/Redo entries or 2D document revision authority. No new Project schema,
+MCP command, or Cutwork runtime dependency is needed. The original Cutwork file
+is left untouched; 2D does not append to or export its log.
+
 ## Safety and replacement boundary
 
 The archive is never extracted. Before a candidate Project can replace a live
@@ -70,6 +93,7 @@ future schema migration remain out of scope.
 | --- | --- | --- |
 | Cutwork v1 (frozen legacy contract) | Supported | Existing v1 codec and native-workspace archives in `source-codec-conformance.json` |
 | Cutwork current writer, v2 | Supported | `fixtures/cutwork/cutwork-current-v2.flimg` through native import and `.fl2d` save/reopen |
+| Cutwork writer with nonempty log, v3 | Supported | `cutwork-current-v3.flimg`, strict log rejection and exact log preservation through `.fl2d` save/reopen |
 | Unknown newer version | Rejected before replacement | An actionable `flimg.schema_unsupported` diagnostic; live Project, history and artwork remain unchanged |
 
 The compact current-writer fixture includes Base, multiple Parts with semantic

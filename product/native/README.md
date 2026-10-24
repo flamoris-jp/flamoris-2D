@@ -65,7 +65,7 @@ All mutations enter native Commands/Transactions and the same revision guards.
 `.fl2d` format-v1 and schema 15 retain current compatibility. Native parsing
 migrates schemas 1–14 and retains embedded PNG records/identity metadata. Save
 acknowledges a captured revision only after successful atomic filesystem write;
-copy/recovery never marks the document clean. PSD/PSB and `.flimg` v1/v2 decode
+copy/recovery never marks the document clean. PSD/PSB and `.flimg` v1/v2/v3 decode
 into immutable candidates; C++ converts/reconciles them before guarded replacement.
 
 ICU 78.3 supplies locale queries. Windows CMake fetches the pinned official

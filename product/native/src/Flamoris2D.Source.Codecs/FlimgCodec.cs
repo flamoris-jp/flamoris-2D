@@ -33,7 +33,7 @@ public static class FlimgCodec
             if((flags&~0x0808)!=0 || (method!=0 && method!=8)) throw Error("archive_malformed");
             if(length>512*1024*1024 || (total+=length)>1024L*1024*1024) throw Error("size_limit_exceeded");
             string name; try {name=Utf8.GetString(Slice(bytes,cursor+46,nameLength));} catch(DecoderFallbackException) {throw Error("archive_path_invalid");}
-            ValidatePath(name); if(!names.Add(name)) throw Error("archive_entry_duplicate"); if(name=="manifest.json" && length>4*1024*1024) throw Error("size_limit_exceeded");
+            ValidatePath(name); if(!names.Add(name)) throw Error("archive_entry_duplicate"); if((name=="manifest.json" || name=="work-log.jsonl") && length>4*1024*1024) throw Error("size_limit_exceeded");
             descriptors.Add(new(name,flags,method,U32(bytes,cursor+16),compressed,length,checked((int)U32(bytes,cursor+42)))); cursor+=recordLength;
         }
         if(cursor!=end) throw Error("archive_malformed");
@@ -84,9 +84,11 @@ public static class FlimgCodec
         using var doc=JsonDocument.Parse(Utf8.GetString(manifest)); var m=doc.RootElement; UniqueProperties(m);
         if(m.ValueKind!=JsonValueKind.Object || Text(m,"format")!="flamoris-cutwork") throw Error("format_invalid");
         int schema=Integer(m,"schemaVersion");
-        if(schema!=1 && schema!=2) throw new SourceDecodeException("flimg.schema_unsupported",
-            $"Cutwork .flimg schema version {schema} is unsupported. This FLAMORIS 2D supports versions 1 and 2. Update FLAMORIS 2D or export using a supported Cutwork version.");
-        Keys(m,"format","schemaVersion","documentId","canvas","original","layers");
+        if(schema!=1 && schema!=2 && schema!=3) throw new SourceDecodeException("flimg.schema_unsupported",
+            $"Cutwork .flimg schema version {schema} is unsupported. This FLAMORIS 2D supports versions 1, 2 and 3. Update FLAMORIS 2D or export using a supported Cutwork version.");
+        if(schema==3) Keys(m,"format","schemaVersion","documentId","canvas","original","layers","workLog");
+        else Keys(m,"format","schemaVersion","documentId","canvas","original","layers");
+        string? workLogJsonl=schema==3?ReadWorkLog(m.GetProperty("workLog"),entries,token):null;
         string documentId=Id(m,"documentId"); var canvas=m.GetProperty("canvas"); Keys(canvas,"width","height","colorSpace","pixelFormat"); int width=Integer(canvas,"width"), height=Integer(canvas,"height");
         try {RasterCodec.Dimensions(width,height);} catch(SourceDecodeException) {throw Error("canvas_invalid");}
         if(Text(canvas,"colorSpace")!="srgb8" || Text(canvas,"pixelFormat")!="straight-bgra32") throw Error("canvas_invalid");
@@ -96,7 +98,7 @@ public static class FlimgCodec
         foreach(var layer in layers.EnumerateArray())
         {
             token.ThrowIfCancellationRequested(); string kind=Text(layer,"kind"); var keys=new List<string>{"id","kind","name","semanticName","visible","bounds"};
-            if(kind!="base") keys.AddRange(["asset","sha256"]); if(kind=="patch") keys.AddRange(["transform","sourcePolygon"]); if(kind=="part" && schema==2) keys.Add("partOrder"); if(kind=="repair" && schema==2 && layer.TryGetProperty("ownerPartId",out _)) keys.Add("ownerPartId"); Keys(layer,keys.ToArray());
+            if(kind!="base") keys.AddRange(["asset","sha256"]); if(kind=="patch") keys.AddRange(["transform","sourcePolygon"]); if(kind=="part" && schema>=2) keys.Add("partOrder"); if(kind=="repair" && schema>=2 && layer.TryGetProperty("ownerPartId",out _)) keys.Add("ownerPartId"); Keys(layer,keys.ToArray());
             string id=Id(layer,"id"); if(!identities.Add(id)) throw Error("identity_duplicate");
             _=Text(layer,"name"); var semantic=layer.GetProperty("semanticName"); if(semantic.ValueKind!=JsonValueKind.Null && (semantic.ValueKind!=JsonValueKind.String || string.IsNullOrWhiteSpace(semantic.GetString()))) throw Error("layer_invalid");
             if(layer.GetProperty("visible").ValueKind!=JsonValueKind.True && layer.GetProperty("visible").ValueKind!=JsonValueKind.False) throw Error("layer_invalid");
@@ -106,13 +108,14 @@ public static class FlimgCodec
             {
                 if(kind!="part" && kind!="patch" && kind!="repair") throw Error("layer_invalid"); string asset=$"layers/{id.Replace("-", "")}/{(kind=="part"?"mask.png":"pixels.png")}"; if(Text(layer,"asset")!=asset) throw Error("layer_invalid"); referenced.Add(asset);
                 working+=(long)w*h*(kind=="part"?5:8);
-                if(kind=="part") {partIds.Add(id); if(schema==2) {int order=Integer(layer,"partOrder"); if(order<0 || order==int.MaxValue || !orders.Add(order)) throw Error("layer_invalid");}}
+                if(kind=="part") {partIds.Add(id); if(schema>=2) {int order=Integer(layer,"partOrder"); if(order<0 || order==int.MaxValue || !orders.Add(order)) throw Error("layer_invalid");}}
                 if(kind=="patch") ValidatePatch(layer,w,h,width,height);
             }
             index++;
         }
         if(baseIndex<0) throw Error("layer_order_invalid"); index=0;
         foreach(var layer in layers.EnumerateArray()) {string kind=Text(layer,"kind"); if((index<baseIndex && kind!="part") || (index>baseIndex && kind!="patch" && kind!="repair")) throw Error("layer_order_invalid"); if(layer.TryGetProperty("ownerPartId",out _) && !partIds.Contains(Id(layer,"ownerPartId"))) throw Error("layer_invalid"); index++;}
+        if(schema==3) referenced.Add("work-log.jsonl");
         if(entries.Keys.Any(p=>!referenced.Contains(p))) throw Error("asset_unexpected");
         // Include live ZIP payloads and PNG decode scratch in the candidate budget.
         if(working+bytes.Length+entries.Values.Sum(v=>(long)v.Length)>RasterCodec.MaximumWorkingBytes) throw Error("size_limit_exceeded");
@@ -130,7 +133,52 @@ public static class FlimgCodec
         }
         var basePixels=rgba.ToArray(); for(int i=0;i<union.Length;i++) basePixels[i*4+3]=(byte)((rgba[i*4+3]*(255-union[i])+127)/255);
         foreach(var layer in layers.EnumerateArray()) {string kind=Text(layer,"kind"); if(kind=="part") continue; var b=layer.GetProperty("bounds"); int w=Integer(b,"width"),h=Integer(b,"height"); images.Add(Text(layer,"id"),new(w,h,kind=="base"?basePixels:Asset(layer,w,h,6)));}
-        return new(m.Clone(),images);
+        if(workLogJsonl is null) return new(m.Clone(),images);
+        var description=m.EnumerateObject().ToDictionary(p=>p.Name,p=>(object)p.Value.Clone());
+        description.Add("workLogJsonl",workLogJsonl);
+        return new(JsonSerializer.SerializeToElement(description),images);
+    }
+    private static string ReadWorkLog(JsonElement metadata,Dictionary<string,byte[]> entries,CancellationToken token)
+    {
+        Keys(metadata,"asset","sha256","count");
+        if(Text(metadata,"asset")!="work-log.jsonl") throw Error("work_log_invalid");
+        int count=Integer(metadata,"count");
+        if(count<1 || count>4096) throw Error("work_log_invalid");
+        if(!entries.TryGetValue("work-log.jsonl",out var bytes)) throw Error("asset_missing");
+        if(bytes.Length>4*1024*1024) throw Error("size_limit_exceeded");
+        string hash=Text(metadata,"sha256");
+        if(!Regex.IsMatch(hash,"^[0-9a-f]{64}$")) throw Error("checksum_invalid");
+        if(Convert.ToHexStringLower(SHA256.HashData(bytes))!=hash) throw Error("checksum_mismatch");
+        string text;
+        try {text=Utf8.GetString(bytes);} catch(DecoderFallbackException) {throw Error("work_log_invalid");}
+        if(!text.EndsWith('\n')) throw Error("work_log_invalid");
+        var lines=text[..^1].Split('\n');
+        if(lines.Length!=count) throw Error("work_log_invalid");
+        var ids=new HashSet<Guid>(); var requests=new HashSet<Guid>();
+        for(int index=0;index<lines.Length;index++)
+        {
+            token.ThrowIfCancellationRequested();
+            string line=lines[index];
+            if(Utf8.GetByteCount(line)+1>32*1024) throw Error("size_limit_exceeded");
+            try
+            {
+                using var record=JsonDocument.Parse(line); var e=record.RootElement;
+                Keys(e,"sequence","id","requestId","recordedUtc","documentToken","documentRevision","decision","observation");
+                if(Integer(e,"sequence")!=index+1 ||
+                    !Guid.TryParse(Text(e,"id"),out var id) || id==Guid.Empty || !ids.Add(id) ||
+                    !Guid.TryParse(Text(e,"requestId"),out var request) || request==Guid.Empty || !requests.Add(request))
+                    throw Error("work_log_invalid");
+                string documentToken=Text(e,"documentToken");
+                if(documentToken.Length!=32 || !Guid.TryParseExact(documentToken,"N",out var document) || document==Guid.Empty ||
+                    !e.GetProperty("documentRevision").TryGetInt64(out long revision) || revision<0 ||
+                    !e.GetProperty("recordedUtc").TryGetDateTimeOffset(out var recorded) || recorded.Offset!=TimeSpan.Zero || recorded==default ||
+                    string.IsNullOrWhiteSpace(Text(e,"decision")+Text(e,"observation"))) throw Error("work_log_invalid");
+            }
+            catch(SourceDecodeException) {throw;}
+            catch(Exception error) when(error is JsonException or InvalidOperationException or KeyNotFoundException)
+            {throw Error("work_log_invalid");}
+        }
+        return text;
     }
     private static void ValidatePatch(JsonElement layer,int w,int h,int width,int height)
     {

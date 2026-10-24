@@ -6,7 +6,7 @@ PSD・Cutworkの素材から、メッシュとリグで動きを付けてMVの�
 
 ## What you can do today
 
-- **Bring in your artwork:** import layered PSDs or Cutwork `.flimg` v1/v2 projects, then select and arrange parts.
+- **Bring in your artwork:** import layered PSDs or Cutwork `.flimg` v1/v2/v3 projects, then select and arrange parts.
 - **Build poses and transitions:** generate/edit meshes, add bones and warp deformers, and connect artwork states (Key Arts).
 - **Animate a shot:** author reusable clips for motions such as blinking, breathing, or hair sway; place them on a sequence timeline and preview playback.
 - **Export and keep editing:** write PNG frame sequences or Windows MP4/H.264, save a `.fl2d` project, and reopen it with artwork and authored motion. Edits support Undo/Redo.

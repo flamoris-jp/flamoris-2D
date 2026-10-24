@@ -120,9 +120,14 @@ Value cutwork(const Value& request) {
     const auto source_id=ids.next("source"),art_id=ids.next("keyart"),root=text(field(field(p,"scene"),"rootId"));
     const auto document_id=field(source,"documentId"),schema=field(source,"schemaVersion");
     auto original=field(source,"original");original.get<Object>().erase("pixels");original.get<Object>()["colorSpace"]=field(canvas,"colorSpace");original.get<Object>()["pixelFormat"]=field(canvas,"pixelFormat");
+    Object source_metadata{{"format",field(source,"format")},{"schemaVersion",schema},{"documentId",document_id},{"original",original}};
+    if(field(source,"workLog").is<Object>()) {
+        source_metadata["workLog"]=field(source,"workLog");
+        source_metadata["workLogJsonl"]=field(source,"workLogJsonl");
+    }
     p.get<Object>()["sourceAssets"]=Value(Array{Value(Object{{"id",Value(source_id)},{"kind",Value("cutwork-flimg")},
         {"fileName",Value(file)},{"displayLabel",Value(file)},{"importedAt",field(options,"importedAt")},
-        {"metadata",Value(Object{{"format",field(source,"format")},{"schemaVersion",schema},{"documentId",document_id},{"original",original}})}})});
+        {"metadata",Value(source_metadata)}})});
     const Value metadata(Object{{"importedFrom",Value("cutwork-flimg")},{"cutworkDocumentId",document_id},{"cutworkSchemaVersion",schema}});
     Array members,bindings,node_ids,slots;auto& nodes=p.get<Object>().at("scene").get<Object>().at("nodes").get<Object>();
     const auto& layers=field(source,"layers").get<Array>();

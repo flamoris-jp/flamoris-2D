@@ -17,9 +17,15 @@ internal static class CutworkCompatibilityTests
     public static async Task RunAsync(string? fixtureDirectory = null)
     {
         fixtureDirectory ??= Path.Combine(AppContext.BaseDirectory, "fixtures", "cutwork");
-        var archive = File.ReadAllBytes(Path.Combine(fixtureDirectory, "cutwork-current-v2.flimg"));
-        using var oracle = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(fixtureDirectory, "cutwork-current-v2.expectation.json")));
-        using var provenance = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(fixtureDirectory, "cutwork-current-v2.provenance.json")));
+        foreach(string name in new[]{"cutwork-current-v2","cutwork-current-v3"})
+            await RunFixtureAsync(fixtureDirectory,name);
+    }
+
+    private static async Task RunFixtureAsync(string fixtureDirectory,string fixtureName)
+    {
+        var archive = File.ReadAllBytes(Path.Combine(fixtureDirectory, fixtureName+".flimg"));
+        using var oracle = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(fixtureDirectory, fixtureName+".expectation.json")));
+        using var provenance = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(fixtureDirectory, fixtureName+".provenance.json")));
         Check(Convert.ToHexStringLower(SHA256.HashData(archive)) == provenance.RootElement.GetProperty("archiveSha256").GetString(),
             "archive differs from its recorded producer output.");
         var expected = oracle.RootElement;
@@ -66,12 +72,22 @@ internal static class CutworkCompatibilityTests
                 await RejectWithoutReplacement(workspace, Rewrite(archive, entries =>
                 {
                     var manifest = JsonNode.Parse(entries["manifest.json"])!.AsObject();
-                    manifest["schemaVersion"] = 3;
+                    manifest["schemaVersion"] = 4;
                     entries["manifest.json"] = JsonSerializer.SerializeToUtf8Bytes(manifest);
                 }), "flimg.schema_unsupported", diagnostic =>
-                    diagnostic.Contains("version 3", StringComparison.Ordinal) &&
-                    diagnostic.Contains("1 and 2", StringComparison.Ordinal) &&
+                    diagnostic.Contains("version 4", StringComparison.Ordinal) &&
+                    diagnostic.Contains("1, 2 and 3", StringComparison.Ordinal) &&
                     diagnostic.Contains("Update FLAMORIS 2D", StringComparison.Ordinal));
+                if(expected.GetProperty("schemaVersion").GetInt32()==3)
+                {
+                    await RejectWithoutReplacement(workspace, Rewrite(archive, entries=>entries["work-log.jsonl"][0]^=1),"flimg.checksum_mismatch");
+                    await RejectWithoutReplacement(workspace, Rewrite(archive, entries=>entries.Remove("work-log.jsonl")),"flimg.asset_missing");
+                    await RejectWithoutReplacement(workspace, Rewrite(archive, entries=>
+                    {
+                        var m=JsonNode.Parse(entries["manifest.json"])!.AsObject();m["workLog"]!["count"]=0;
+                        entries["manifest.json"]=JsonSerializer.SerializeToUtf8Bytes(m);
+                    }),"flimg.work_log_invalid");
+                }
                 await RejectWithoutReplacement(workspace, Rewrite(archive, entries => entries["assets/original.png"][^1] ^= 1),
                     "flimg.checksum_mismatch");
                 await workspace.InvokeAsync(w =>
@@ -119,6 +135,16 @@ internal static class CutworkCompatibilityTests
         Check(metadata.GetProperty("documentId").GetString() == expected.GetProperty("documentId").GetString(), "document UUID changed.");
         Check(metadata.GetProperty("schemaVersion").GetInt32() == expected.GetProperty("schemaVersion").GetInt32(), "source schema provenance changed.");
         Check(metadata.GetProperty("original").GetProperty("sourceName").GetString() == expected.GetProperty("sourceName").GetString(), "original source name changed.");
+        if(expected.TryGetProperty("workLogJsonl",out var expectedLog))
+        {
+            string actual=metadata.GetProperty("workLogJsonl").GetString()!;
+            Check(actual==expectedLog.GetString(),"work log text or Int64 revision changed.");
+            var descriptor=metadata.GetProperty("workLog");
+            Check(descriptor.GetProperty("count").GetInt32()==2 && descriptor.GetProperty("asset").GetString()=="work-log.jsonl" &&
+                descriptor.GetProperty("sha256").GetString()==Convert.ToHexStringLower(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(actual))),
+                "work log provenance changed.");
+        }
+        else Check(!metadata.TryGetProperty("workLog",out _) && !metadata.TryGetProperty("workLogJsonl",out _),"invented legacy work log.");
         var nodes = project.GetProperty("scene").GetProperty("nodes");
         var children = nodes.GetProperty(project.GetProperty("scene").GetProperty("rootId").GetString()!).GetProperty("children");
         var art = project.GetProperty("keyArts").EnumerateArray().Single();

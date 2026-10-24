@@ -43,3 +43,13 @@ Patch/Repair RGBA arrays are explicit constants in the generator. Their expected
 images use source raster dimensions; Patch placement belongs to its transform.
 The fixture includes partial and fully transparent pixels to protect straight
 alpha handling, and semantic creation order differs from compositor stack order.
+
+## v3 work-log fixture
+
+`cutwork-current-v3.flimg` uses the same artwork with two synthetic editorial
+records, emitted by the pinned Cutwork writer in its accompanying provenance JSON.
+The committed fixture uses the portable test PNG encoder; Windows CI regenerates
+both v2 and v3 using the genuine WPF PNG encoder. Its expectation also includes
+exact `workLogJsonl` text. The second record's revision is 9007199254740993;
+source metadata must preserve that text and its SHA-256 through native save/reopen.
+No private artwork or personal work history is included.

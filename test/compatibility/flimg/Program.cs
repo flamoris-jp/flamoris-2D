@@ -11,7 +11,6 @@ internal static class Program
 {
     private const int Width = 8;
     private const int Height = 6;
-    private const string FixtureName = "cutwork-current-v2";
     private const string SourceName = "synthetic-cutwork-compatibility.png";
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -75,55 +74,66 @@ internal static class Program
         AddRepair(9, "Hidden owned repair", "repair.hidden", false, new(3, 2, 2, 2),
             [255, 10, 40, 255, 5, 90, 120, 96, 90, 40, 210, 128, 60, 250, 10, 0], Id(4));
 
-        var document = CutworkDocument.Restore(Id(1),
-            new OriginalAsset(SourceName, new(Width, Height), Width * 4, Bgra(originalRgba)), states);
-        var writer = new FlimgArchiveCodec();
-        var archivePath = Path.Combine(destination, FixtureName + ".flimg");
-        using (var output = File.Create(archivePath)) writer.Write(output, document);
+        foreach (int schema in new[] { 2, 3 })
+        {
+            string fixtureName = $"cutwork-current-v{schema}";
+            ArtworkWorkLogEntry[] workLog=schema==3?
+            [new(1,Id(20),Id(21),new DateTimeOffset(2026,10,24,6,0,0,TimeSpan.Zero),Id(22).ToString("N"),3,
+                "目頭の上までマスクを広げる。", "取り残しを確認。髪の境目は調整中。"),
+             new(2,Id(23),Id(24),new DateTimeOffset(2026,10,24,6,1,0,TimeSpan.Zero),Id(22).ToString("N"),9007199254740993L,
+                "全パーツを表示して保存。", "2Dへ渡す比較用の記録。")]:[];
+            var document = CutworkDocument.Restore(Id(1),
+                new OriginalAsset(SourceName, new(Width, Height), Width * 4, Bgra(originalRgba)), states,workLog);
+            var writer = new FlimgArchiveCodec();
+            var archivePath = Path.Combine(destination, fixtureName + ".flimg");
+            using (var output = File.Create(archivePath)) writer.Write(output, document);
 
-        // Windows also exercises the genuine PNG reader. Linux deliberately only
-        // generates archives; FLAMORIS 2D then independently decodes their pixels.
+            // Windows also exercises the genuine PNG reader. Linux deliberately only
+            // generates archives; FLAMORIS 2D then independently decodes their pixels.
 #if CUTWORK_WPF_PNG
-        using (var input = File.OpenRead(archivePath))
-        {
-            var restored = writer.Read(input);
-            if (restored.Id != document.Id || restored.Layers.Count != states.Count)
-                throw new InvalidDataException("Current Cutwork writer/reader did not preserve the synthetic document.");
-        }
-        const string encoderMode = "cutwork-wpf";
+            using (var input = File.OpenRead(archivePath))
+            {
+                var restored = writer.Read(input);
+                if (restored.Id != document.Id || restored.Layers.Count != states.Count)
+                    throw new InvalidDataException("Current Cutwork writer/reader did not preserve the synthetic document.");
+                if(!restored.WorkLog.SequenceEqual(workLog)) throw new InvalidDataException("Cutwork work log changed.");
+            }
+            const string encoderMode = "cutwork-wpf";
 #else
-        const string encoderMode = "portable-test-png-rgba8-gray8";
+            const string encoderMode = "portable-test-png-rgba8-gray8";
 #endif
-        WriteJson(destination, FixtureName + ".expectation.json", new
-        {
-            schemaVersion = FlimgArchiveCodec.SchemaVersion,
-            canvas = new { width = Width, height = Height },
-            documentId = document.Id.ToString("D"),
-            sourceName = SourceName,
-            originalRgbaHex = Hex(originalRgba),
-            layers = expectedLayers,
-        });
-        string[] writerPaths = [
-            "src/Cutwork.Imaging/Persistence/FlimgArchiveCodec.cs",
-            "src/Cutwork.Imaging/Persistence/FlimgModels.cs",
-            "src/Cutwork.Imaging/Persistence/PngAssetCodec.cs",
-        ];
-        var paths = writerPaths.Concat(Directory.EnumerateFiles(Path.Combine(cutworkRoot, "src/Cutwork.Core"), "*.cs")
-                .Select(path => Path.GetRelativePath(cutworkRoot, path).Replace('\\', '/')))
-            .Order(StringComparer.Ordinal).ToArray();
-        var sourceHashes = paths.ToDictionary(path => path,
-            path => Hash(File.ReadAllBytes(Path.Combine(cutworkRoot, path))), StringComparer.Ordinal);
-        WriteJson(destination, FixtureName + ".provenance.json", new
-        {
-            cutworkRepository = "flamoris-jp/flamoris-cutwork",
-            cutworkCommit = Git(cutworkRoot, "rev-parse", "HEAD"),
-            sourceWorktreeDirty = Git(cutworkRoot, ["status", "--porcelain", "--", ..paths]).Length != 0,
-            schemaVersion = FlimgArchiveCodec.SchemaVersion,
-            pngEncoderMode = encoderMode,
-            archiveSha256 = Hash(File.ReadAllBytes(archivePath)),
-            sourceSha256 = sourceHashes,
-        });
-        Console.WriteLine($"Generated {Path.GetFileName(archivePath)} ({encoderMode}, schema {FlimgArchiveCodec.SchemaVersion}).");
+            WriteJson(destination, fixtureName + ".expectation.json", new
+            {
+                schemaVersion = schema,
+                canvas = new { width = Width, height = Height },
+                documentId = document.Id.ToString("D"),
+                sourceName = SourceName,
+                originalRgbaHex = Hex(originalRgba),
+                workLogJsonl = schema==3?string.Concat(workLog.Select(e=>System.Text.Encoding.UTF8.GetString(ArtworkWorkLog.Encode(e))+"\n")):null,
+                layers = expectedLayers,
+            });
+            string[] writerPaths = [
+                "src/Cutwork.Imaging/Persistence/FlimgArchiveCodec.cs",
+                "src/Cutwork.Imaging/Persistence/FlimgModels.cs",
+                "src/Cutwork.Imaging/Persistence/PngAssetCodec.cs",
+            ];
+            var paths = writerPaths.Concat(Directory.EnumerateFiles(Path.Combine(cutworkRoot, "src/Cutwork.Core"), "*.cs")
+                    .Select(path => Path.GetRelativePath(cutworkRoot, path).Replace('\\', '/')))
+                .Order(StringComparer.Ordinal).ToArray();
+            var sourceHashes = paths.ToDictionary(path => path,
+                path => Hash(File.ReadAllBytes(Path.Combine(cutworkRoot, path))), StringComparer.Ordinal);
+            WriteJson(destination, fixtureName + ".provenance.json", new
+            {
+                cutworkRepository = "flamoris-jp/flamoris-cutwork",
+                cutworkCommit = Git(cutworkRoot, "rev-parse", "HEAD"),
+                sourceWorktreeDirty = Git(cutworkRoot, ["status", "--porcelain", "--", ..paths]).Length != 0,
+                schemaVersion = schema,
+                pngEncoderMode = encoderMode,
+                archiveSha256 = Hash(File.ReadAllBytes(archivePath)),
+                sourceSha256 = sourceHashes,
+            });
+            Console.WriteLine($"Generated {Path.GetFileName(archivePath)} ({encoderMode}, schema {schema}).");
+        }
         return 0;
 
         void AddRepair(int number, string name, string semanticName, bool visible,

@@ -89,6 +89,7 @@ jobs:
           dotnet run --project test/compatibility/flimg/CutworkFixtureGenerator.csproj -c Release "-p:CutworkRoot=$producer" -- $fixtures
           if ($LASTEXITCODE -ne 0) { throw "Current Cutwork writer fixture generation failed." }
           Get-Content (Join-Path $fixtures 'cutwork-current-v2.provenance.json')
+          Get-Content (Join-Path $fixtures 'cutwork-current-v3.provenance.json')
           dotnet run --project product/native/tests/Flamoris2D.Session.Tests -c Release --no-build -- --cutwork-only $fixtures
           if ($LASTEXITCODE -ne 0) { throw "Current Cutwork writer handoff is incompatible with FLAMORIS 2D." }
 
