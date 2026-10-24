@@ -50,6 +50,9 @@ The Phase 4-4 dialog exposes:
 - Format:
   - PNG sequence;
   - MP4 / H.264.
+- MP4 quality (independent of FPS): Standard (10 Mbps), High (20 Mbps,
+  default), or Custom (whole Mbps, 1–200). These are bitrate presets, not
+  encoder-specific quality/CRF values.
 - Native Desktop destination selection.
 - Export / Cancel.
 - Frame progress, encoding status, and reason-specific diagnostics.
@@ -73,6 +76,9 @@ The initial Windows video profile is:
 - container: MP4;
 - encoder: FFmpeg `h264_mf` using Windows Media Foundation;
 - encoder input pixel format: NV12;
+- rate control: explicit `-rate_control cbr`;
+- target video bitrate: explicit `-b:v <videoBitRate>` in bits/sec, default
+  20,000,000 (High); Standard is 10,000,000;
 - audio: disabled;
 - overwrite: rejected;
 - alpha policy: deterministic composite over opaque black before alpha is discarded.
@@ -86,6 +92,29 @@ format=gbrap,premultiply=inplace=1,format=nv12
 The FFmpeg capability probe requires `h264_mf` and `premultiply` and rejects builds configured with `--enable-gpl`, `--enable-nonfree`, or `--enable-libx264` for the official distribution path.
 
 The first production implementation does not claim that H.264 bytes are bit-for-bit identical across different Media Foundation implementations or hardware. The deterministic contract covers evaluated frames, frame order, rational FPS, encoder arguments, and output policy.
+
+### Bitrate settings and validation
+
+`native.export_settings` exposes `videoBitRatePresets` and `videoBitRateRange`
+(1,000,000–200,000,000 bits/sec), with the default bitrate and rate control in
+`videoProfile`. `native.export_plan` and `native.encoder` accept optional
+`videoBitRate`; omission uses High for compatibility with existing callers.
+Explicit null, strings, fractional bits/sec and out-of-range values are rejected.
+Video planning validates this before rendering any PNG frames. PNG-only planning
+ignores video bitrate. The managed export settings and encoder adapter pass the
+same value through to Product; the shell does not assemble encoder arguments.
+
+Quality settings are transient export choices: they do not change Project,
+`.fl2d`, revision or Undo/Redo. FPS still determines frame timing and is not a
+compression-quality control. No MCP tool/schema is added or changed.
+
+The target bitrate is an encoder request, not a promised measured bitrate or
+file size. In Windows artwork QA on 2026-10-24, 720 PNGs at 1122×1402 / 60 FPS
+produced severe blocking with the previous implicit bitrate (about 0.23 Mbps).
+Explicit `h264_mf -rate_control cbr -b:v 20M` preserved hair and clothing detail;
+that output measured about 4.96 Mbps / 7.44 MB / 12 seconds. This confirms one
+machine/artwork result, not cross-device encoder equivalence. Private artwork is
+not a repository test dependency.
 
 ## One-step MP4 temporary-frame boundary
 
@@ -144,8 +173,12 @@ Automated tests cover the Phase 4 contracts including:
 - Desktop-owned temporary MP4 frames and exact write order;
 - ExportJobController validation/progress/cancel/reuse;
 - resolution/FPS presets and missing-render-asset preflight.
+- explicit bitrate defaults/presets/custom bounds, managed/native argument
+  propagation, preflight rejection, PNG isolation and unchanged document history.
 
-`npm test`, Product CI, and Windows Desktop Package must all be green at the PR head before merge.
+Native C++/managed regression tests and the Windows Portable Package workflow
+must be green at the PR head before merge. The retired JavaScript test runner
+is not current validation authority.
 
 ## Manual Windows QA
 
@@ -166,5 +199,11 @@ Before declaring the first production export path validated on a Windows release
 13. Cancel during MP4 frame production and during FFmpeg encoding; confirm no incomplete MP4 is reported as success and temporary files are cleaned.
 14. Attempt export to an existing destination and confirm it is not silently overwritten.
 15. Confirm editor selection, viewport, Undo/Redo history, dirty state, and authoring remain usable after success, failure, and cancellation.
+16. Select Standard, High and Custom; confirm the bitrate field follows the
+    preset, is editable only for Custom, and is disabled for PNG-only export.
+    Reject custom zero, non-integer and >200 Mbps before any frames are rendered.
+17. With detailed artwork, compare High MP4 against PNG at the same frame/time
+    and inspect hair lines, dark fabric and moving areas. Record actual bitrate;
+    do not require it to equal the requested bitrate.
 
 Record any machine-specific Media Foundation or FFmpeg behavior in the Phase 4 PR/Issue before final release validation.

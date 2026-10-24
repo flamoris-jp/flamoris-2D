@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Windows;
@@ -31,6 +32,33 @@ public partial class MainWindow
         var width=Field(panel,"幅",Number(canvas,"width"));var height=Field(panel,"高さ",Number(canvas,"height"));
         var numerator=Field(panel,"FPS 分子",Number(rate,"numerator",30));var denominator=Field(panel,"FPS 分母",Number(rate,"denominator",1));
         var video=Check(panel,"MP4 / H.264も作成（PNG連番も保持）",false);
+        var videoProfile=Property(settings,"videoProfile");
+        var defaultBitRate=videoProfile.GetProperty("videoBitRate").GetInt64();
+        var presets=ArrayOf(settings,"videoBitRatePresets");
+        var qualityPanel=new StackPanel();panel.Children.Add(qualityPanel);
+        var quality=Choices(qualityPanel,"MP4の画質",presets.Select(p=>new EntityChoice(String(p,"id")!,
+            String(p,"id")=="high"?"高画質（20 Mbps）":"標準（10 Mbps）"))
+            .Append(new EntityChoice("custom","カスタム")),
+            presets.First(p=>p.GetProperty("videoBitRate").GetInt64()==defaultBitRate).GetProperty("id").GetString());
+        var bitRate=Field(qualityPanel,"ビットレート（Mbps）",defaultBitRate/1_000_000);
+        var bitRateRange=Property(settings,"videoBitRateRange");
+        var minMbps=bitRateRange.GetProperty("min").GetInt64()/1_000_000;
+        var maxMbps=bitRateRange.GetProperty("max").GetInt64()/1_000_000;
+        Note(qualityPanel,$"カスタムは{minMbps}〜{maxMbps}の整数。指定は目標値で、実際の容量・ビットレートは映像とエンコーダーによって変わります。");
+        void UpdateQuality()
+        {
+            qualityPanel.IsEnabled=video.IsChecked==true;
+            var selected=Chosen(quality);bitRate.IsEnabled=selected=="custom";
+            if(selected!="custom")bitRate.Text=(presets.First(p=>String(p,"id")==selected).GetProperty("videoBitRate").GetInt64()/1_000_000).ToString(CultureInfo.InvariantCulture);
+        }
+        long SelectedBitRate()
+        {
+            if(!long.TryParse(bitRate.Text,NumberStyles.Integer,CultureInfo.InvariantCulture,out var mbps)||mbps<minMbps||mbps>maxMbps)
+                throw new ArgumentException($"ビットレートは{minMbps}〜{maxMbps} Mbpsの整数で入力してください。");
+            return checked(mbps*1_000_000);
+        }
+        quality.SelectionChanged+=(_,_)=>UpdateQuality();
+        video.Checked+=(_,_)=>UpdateQuality();video.Unchecked+=(_,_)=>UpdateQuality();UpdateQuality();
         Note(panel,"解像度は原画と同じ縦横比。PNGは透明、MP4は黒背景に合成します。");
         var destination=Field(panel,"書き出し先フォルダー",_exportDirectory??"");
         ActionButton(panel,"書き出し先を選ぶ",()=>
@@ -58,7 +86,8 @@ public partial class MainWindow
             {
                 if(_renderChoice?.Kind is not ("sequence" or "transition"))throw new ArgumentException("書き出すシーケンスか遷移を選んでください。");
                 var spec=new ExportSettings(_renderChoice.Kind=="sequence"?_renderChoice.Id:null,_renderChoice.Kind=="transition"?_renderChoice.Id:null,
-                    checked((int)ReadTicks(width)),checked((int)ReadTicks(height)),checked((int)ReadTicks(numerator)),checked((int)ReadTicks(denominator)),video.IsChecked==true);
+                    checked((int)ReadTicks(width)),checked((int)ReadTicks(height)),checked((int)ReadTicks(numerator)),checked((int)ReadTicks(denominator)),video.IsChecked==true,
+                    video.IsChecked==true?SelectedBitRate():defaultBitRate);
                 await ExportAsync(spec,destination.Text,encoder.Text);
             }
             catch(Exception error){StatusText.Text=$"書き出しできませんでした: {error.Message}";}
@@ -118,7 +147,7 @@ public partial class MainWindow
                 cancellation.Token.ThrowIfCancellationRequested();client.AssertCurrent(token,revision);
                 _exportProgressText!.Text="PNGをH.264へ変換中…";_exportProgressBar!.IsIndeterminate=true;
                 var output=Path.Combine(directory,"shot.mp4");videoTemporary=Path.Combine(directory,$".video-{Guid.NewGuid():N}.mp4");
-                var arguments=await client.GetEncoderArgumentsAsync(directory,videoTemporary,count,settings.FpsNumerator,settings.FpsDenominator,cancellation.Token);
+                var arguments=await client.GetEncoderArgumentsAsync(directory,videoTemporary,count,settings.FpsNumerator,settings.FpsDenominator,cancellation.Token,videoBitRate:settings.VideoBitRate);
                 var result=await NativeVideoEncoder.RunAsync(encoder,arguments.Payload.GetProperty("args").EnumerateArray().Select(a=>a.GetString()!),cancellation.Token);
                 if(result.ExitCode!=0)throw new InvalidOperationException(result.StandardError);
                 if(!File.Exists(videoTemporary)||new FileInfo(videoTemporary).Length==0)throw new InvalidDataException("エンコーダーが動画を作成しませんでした。");
