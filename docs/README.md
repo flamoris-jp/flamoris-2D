@@ -3,6 +3,10 @@
 Start with the [product overview](../README.md) or the detailed
 [capabilities and status](product-status.md).
 
+## AI制作メモ
+
+- [AI guide](ai-guide/README.md) — 実作品で観測した判断・操作・失敗と、人間による再生評価。
+
 ## Current design set
 
 - [`repository-renovation.md`](repository-renovation.md) — #142 native convergence record and cleanup boundary
