@@ -24,7 +24,9 @@ encoder mode, schema version, and archive SHA-256. It contains no local paths or
 timestamps. Identical producer source, generator, runtime, and PNG encoder produce
 identical output; cross-platform PNG encoders may produce different archive bytes.
 
-The current scenario deliberately uses schema v2. If Cutwork changes its writer
+The generator emits both a log-free v2 document and the same artwork with a
+nonempty v3 log. The v3 log includes Japanese text and an Int64 revision above
+2^53 to detect lossy JSON conversion. The frozen v2 seed remains unchanged. If Cutwork changes its writer
 schema, the consumer's compatibility test must fail until that version is reviewed
 and supported. Regeneration alone must never make an unsupported schema pass.
 

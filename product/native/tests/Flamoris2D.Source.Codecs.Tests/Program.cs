@@ -43,5 +43,6 @@ static void CompareTree(JsonElement expected,JsonElement actual,DecodedSource so
         if(e.TryGetProperty("rgba",out var rgba)) {var image=source.Images[a.GetProperty("image").GetProperty("id").GetString()!];if(image.Width!=e.GetProperty("width").GetInt32() || image.Height!=e.GetProperty("height").GetInt32() || !image.Rgba.Span.SequenceEqual(rgba.EnumerateArray().Select(v=>v.GetByte()).ToArray())) throw new Exception("PSD pixel mismatch.");}
     }
 }
+FlimgV3Tests.Run();
 Console.WriteLine($"Source codecs: {count} oracle archives, PNG round trips, CRC/truncation/cancellation passed.");
 static void ExpectInvalid(Action action) {try {action();} catch(Exception e) when(e is IOException or InvalidDataException) {return;} throw new Exception("Invalid input accepted.");}

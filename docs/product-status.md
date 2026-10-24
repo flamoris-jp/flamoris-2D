@@ -45,7 +45,7 @@ Phase 5 flat-image part decomposition remains an experimental/deferred input-sim
 - Undo / Redo and grouped history
 - Save / Save As / Incremental Save / Save Copy
 - dirty/save-point tracking, lineage-scoped native Recovery, Recent Files, and native Windows dialogs
-- PSD import/re-import and Cutwork `.flimg` v1/v2 source-art import with document-coordinate placement
+- PSD import/re-import and Cutwork `.flimg` v1/v2/v3 source-art import with document-coordinate placement
 - native WPF production candidate; legacy shell source removed in #146
 - portable native candidate does not change an existing installed `.fl2d` association
 - typed MCP-ready command/query boundaries with one shared C++ NativeSession authority

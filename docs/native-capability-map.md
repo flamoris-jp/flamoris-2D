@@ -27,7 +27,7 @@ Paths below are relative to `product/native/`. Native C++/managed tests and reta
 | Readonly queries, exact ticks and locale lists | `core/src/native_queries.cpp`, native evaluators, pinned ICU | Query conformance in `core_tests` |
 | `.fl2d` format-v1, schemas 1–14 → 15, asset envelopes | `core/src/native_document.cpp`, `Core.Interop/NativeDocument.cs` | `document_tests`; managed document round-trip/failure tests |
 | Atomic save/receipts, dirty state, Recovery and Preferences | `Session/NativeWorkspace.cs`, `Native.Client/DocumentClient.cs`, `AtomicDocumentFile.cs`, recovery/preferences adapters | `Session.Tests`; `Native.Client.Tests/DocumentTests.cs` |
-| PSD/PSB, `.flimg` v1/v2, PNG raster decode | `Source.Codecs/`; immutable decoded candidates | `Source.Codecs.Tests`; PSD and source-codec fixtures |
+| PSD/PSB, `.flimg` v1/v2/v3, PNG raster decode | `Source.Codecs/`; immutable decoded candidates | `Source.Codecs.Tests`; PSD and source-codec fixtures |
 | Source conversion, reviewed reimport and source-art history | `core/src/native_source.cpp`, `native_source_review.cpp`; `Session/NativeWorkspace.SourceReview.cs` | `source_tests`; `Session.Tests` reimport/Undo/Redo/save/reopen |
 | Mesh Layout/Structure, Grid/Contour, correspondence | `core/src/native_mesh_authoring.cpp`, `native_mesh_generation.cpp`, `native_key_state_authoring.cpp` | Mesh/Key State authoring conformance/tests; managed workflow |
 | Bone/FK/IK, rigid/Skin, Warp, weights and form correction | `core/src/native_rig_authoring.cpp`, `native_rig_evaluation.cpp`; domain commands | Rig conformance/authoring tests; managed preview and shared history |
