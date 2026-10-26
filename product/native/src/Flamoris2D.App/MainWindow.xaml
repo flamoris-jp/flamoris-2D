@@ -5,7 +5,7 @@
         Title="{DynamicResource App.Title}"
         Width="1440" Height="900" MinWidth="1060" MinHeight="680"
         Background="{StaticResource CanvasBrush}"
-        Closing="MainWindow_Closing">
+        Closing="MainWindow_Closing" Icon="Assets/FLAMORIS-2D.ico">
     <Window.Resources>
         <Style x:Key="CommandButton" TargetType="Button">
             <Setter Property="MinWidth" Value="70" />
