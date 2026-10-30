@@ -22,7 +22,7 @@ public partial class MainWindow
     {
         var client = _client!;
         await _mcpUi!.ConnectAsync(new Flamoris.Mcp.Core.DesktopConnectionSettings { Permission = Flamoris.Mcp.Core.McpPermission.Edit });
-        var connection = _mcpConnection;
+        var connection = _mcpConnection ?? throw new InvalidOperationException("MCP attachment missing.");
         await RefreshMcpStatusAsync(client);
         await using var probe = await McpClient.CreateAsync(new StdioClientTransport(new()
         {
