@@ -31,6 +31,19 @@ internal static class McpTests
     {
         await using var host = new NativeSessionClient();
         await host.StartAsync();
+        var startup = await host.EnableMcpAsync(McpPermission.ReadOnly, applicationLifetime: true);
+        await using (var probe = await ConnectAsync(startup))
+        {
+            Check(!(await Context(probe)).GetProperty("hasDocument").GetBoolean(), "Startup invented a document.");
+            Check((await probe.CallToolAsync("live.context", new Dictionary<string, object?> { ["input"] = new { } })).IsError == true, "Empty document query succeeded.");
+            await host.CreateSessionAsync("First document");
+            var before = await Context(probe);
+            await host.CreateSessionAsync("Replaced document");
+            var after = await Context(probe);
+            Check(before.GetProperty("documentToken").GetString() != after.GetProperty("documentToken").GetString(), "Replacement reused identity.");
+            Check(host.LiveMcpGrant?.IsActive == true, "Application connection was revoked by document replacement.");
+        }
+        await host.DisableMcpAsync();
         await host.CreateSessionAsync("Core integration");
         var root = (await host.GetSceneTreeAsync()).Payload.GetProperty("id").GetString()!;
         var connection = await host.EnableMcpAsync(McpPermission.Edit);

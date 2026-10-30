@@ -21,7 +21,7 @@ public partial class MainWindow
     private async Task RunLiveMcpSmokeAsync(string nodeId, string keyArtId)
     {
         var client = _client!;
-        _mcpConnection = await client.EnableMcpAsync(McpPermission.Edit);
+        await _mcpUi!.ConnectAsync(new Flamoris.Mcp.Core.DesktopConnectionSettings { Permission = Flamoris.Mcp.Core.McpPermission.Edit });
         var connection = _mcpConnection;
         await RefreshMcpStatusAsync(client);
         await using var probe = await McpClient.CreateAsync(new StdioClientTransport(new()

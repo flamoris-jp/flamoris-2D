@@ -67,6 +67,7 @@ public sealed partial class NativeWorkspace : IAsyncDisposable
         }
         finally { lane.Release(); }
     }
+    public bool HasDocument { get { AssertLane(); return session is not null; } }
     public WorkspaceSnapshot Snapshot => new(RuntimeId, documentToken, revision, Session.State());
     private void AssertLane() { if (invocation.Value != invocationEpoch) throw new InvalidOperationException("Native session access requires the shared workspace lane."); }
     private NativeSession Session { get { AssertLane(); return session ?? throw new WorkspaceException("document.required"); } }
