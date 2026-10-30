@@ -97,7 +97,7 @@ The original v0.3 prototype snapshot remains preserved on `prototype/psd-import-
 
 ## Native live MCP
 
-Native live MCP uses Core/Wpf 1.2.0 and a packaged stdio bridge over an authenticated same-user named pipe, attached to the running Native
+Native live MCP uses Core/Wpf 1.4.0 and a packaged stdio bridge over an authenticated same-user named pipe, attached to the running Native
 editor's **same NativeSession and Undo/Redo history**. `MCP / AI` offers Connect / Stop / Settings, with Read only /
 Edit permissions and manual connection by default. Current protocol 2026-07-28 uses
 official SDK 2.2.0; file/import/save capabilities stay Native-only.
@@ -140,11 +140,13 @@ The shared MCP UI migration and package release order are documented in [shared 
 
 ## AI screen observation / AIの画面確認
 
-The embedded Capture candidate includes screen observation whenever the editor's
-MCP connection is enabled. Connect normally (read-only or edit), then request
-`capture.screenshot.get` (`{"input":{}}`). The bottom bar provides an independent **画面共有 ON/OFF** checkbox. Enable it explicitly after connecting; connection alone does not share pixels.
-No separate sharing checkbox or Capture EXE is needed; disconnecting MCP stops
-sharing. See [usage, build dependency and Windows acceptance](docs/embedded-capture.md).
+The editor reuses its normal MCP connection (read-only or edit) for the embedded
+Capture tools. In the bottom bar, explicitly enable **画面共有 ON/OFF** and confirm
+the notice before requesting `capture.screenshot.get` (`{"input":{}}`). Connecting
+alone never shares pixels. Turning sharing OFF cancels pending image disclosure
+while keeping MCP connected. Disconnect, document replacement, target loss, lock
+and suspend stop sharing; it never resumes automatically. No separate Capture EXE
+is needed. See [usage, build dependency and Windows acceptance](docs/embedded-capture.md).
 
 
 ## MCP startup and sharing

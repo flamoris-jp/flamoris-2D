@@ -36,7 +36,7 @@ Paths below are relative to `product/native/`. Native C++/managed tests and reta
 | Preview, masks, clipping and compositing | `core/src/native_render_plan.cpp`, `renderer/src/d3d11_renderer.cpp` | Render-plan conformance; Windows hardware/WARP smoke |
 | PNG/MP4 export planning and frame semantics | `core/src/native_export_authoring.cpp`; `Native.Client` PNG/FFmpeg adapters | Export-authoring fixtures; managed tests; Windows 240-frame/H.264 smoke |
 | Existing WPF tools/panels/gestures | `src/Flamoris2D.App/`; typed `Native.Client` adapters | Native desktop authority tests; packaged WPF workflow |
-| Live MCP, permissions, guards, cancellation/revocation | `Session/NativeMcpHost.cs`; `Native.Client/McpClient.cs`; MCP Core/Wpf 1.2.0 | Session and desktop authority tests; Windows bridge transport tests |
+| Live MCP, permissions, guards, cancellation/revocation | `Session/NativeMcpHost.cs`; `Native.Client/McpClient.cs`; MCP Core/Wpf 1.4.0 | Session and desktop authority tests; Windows bridge transport tests |
 | Native-only portable package | explicit App/Bridge project graph; `../packaging/publish-windows.ps1` | Package boundary test plus published launch without developer runtimes |
 
 ## Limits and remaining acceptance

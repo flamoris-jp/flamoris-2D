@@ -39,7 +39,8 @@ redo independently of C++ history.
 The workspace revision is a monotonic attachment/guard revision; native
 `currentRevision` identifies the selected history/save state. Neither is a
 second editable Project. MCP Core owns capabilities, permissions and revocation;
-document replacement revokes attachment to the old document.
+document replacement invalidates old target guards while retaining the application
+connection. See [the current startup contract](mcp-startup.md).
 
 ## Remaining work and verification
 
