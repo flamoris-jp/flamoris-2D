@@ -9,10 +9,11 @@ Current contract: [ADR 0012](decisions/0012-native-session-cutover.md) for nativ
 historical HTTP transport in [ADR 0010](decisions/0010-native-live-mcp.md).
 
 External MCP client → packaged `mcp/Flamoris.Mcp.Bridge.exe` → authenticated,
-same-user local named pipe → `Flamoris.Mcp.Core 1.2.0` → `NativeMcpHost`
+same-user local named pipe → `Flamoris.Mcp.Core 1.4.0` → `NativeMcpHost`
 → the same `NativeWorkspace` / C++ NativeSession and source-artwork history.
 
-Manual connection is disabled by default. `MCP / AI` offers Connect / Stop /
+New preferences auto-connect locally in read-only Manual mode at runtime startup,
+before document creation/open. Saved auto-connect OFF remains OFF. `MCP / AI` offers Connect / Stop /
 Settings; settings retain Read only / Edit permission. Connection copy explicitly
 exports a transient capability. The copied entry starts
 the bridge with `--pipe <name>` and passes the transient capability only through
@@ -63,21 +64,23 @@ Synchronous native preparation is not preempted mid-instruction; its commit is
 still subject to the cancellation/lease check. No Host reservation or IPC
 acknowledgement exists in this runtime.
 
-Document replacement invalidates the document lease and Core grant in the same
-workspace lane. Disable revokes before endpoint cleanup; shutdown cancels the
+Document replacement invalidates the old target lease and guards in the same
+workspace lane while preserving the application-lifetime Core grant. `mcp.context`
+and discovery work without a document; document tools return `no_document`.
+See [startup and consent](mcp-startup.md). Disable revokes before endpoint cleanup; shutdown cancels the
 client lifetime and disposes the workspace. Every enable rotates the capability.
 Prepared candidates and immutable JSON/raster projections are not editable
 Project mirrors. Artwork restoration follows native Undo/Redo revision identity.
 
 ### Protocol, status and package
 
-Core/Wpf 1.2.0 owns stdio/named-pipe transport and shared connection UI. The official
+Core/Wpf 1.4.0 owns stdio/named-pipe transport and shared connection UI. The official
 C# SDK owns protocol negotiation. `Flamoris.Mcp.Bridge.exe` has no session or
 filesystem editing capability. Node/JS/Product Host are excluded from runtime.
 
 The status is green for an authenticated connected bridge and red otherwise,
 with text distinguishing disabled, waiting and connected. Foreground activity
-uses Core's projection, Chipsy and temporary wait cursor. Shared UI offers
+uses Core's projection and centered Chipsy acknowledgement without a cursor override. Shared UI offers
 Connect/Stop/Settings, manual by default; credentials remain transient.
 
 Native session/desktop tests cover shared revision/history, stale guards,

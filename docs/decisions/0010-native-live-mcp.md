@@ -1,5 +1,7 @@
 # ADR 0010: Live Native MCP attachment and local capability boundary
 
+> The document-replacement grant/connection lifecycle below describes the original implementation. Current Core/Wpf 1.4.0 uses [application-lifetime startup](../mcp-startup.md): document changes preserve MCP, rotate target guards and cancel old document-scoped results/resources. Explicit Stop, permission changes and runtime loss/shutdown still revoke. Original test evidence remains historical.
+
 Status: historical Issue #102 decision; MCP transport superseded by [ADR 0011](0011-mcp-core-migration.md).
 The original decision below is preserved as historical context.
 Baseline: main f717f282 (merged #101). No Project/schema/timebase change.

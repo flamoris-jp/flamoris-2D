@@ -1,5 +1,7 @@
 # FLAMORIS 2D — Production acceptance progress
 
+> Current MCP policy (2026-10-30): [startup lifetime](docs/mcp-startup.md) supersedes the dated connection/share coupling below. Core/Wpf/bridge 1.4.0 is published; #165 is merged with accepted Capture submodule #12. The user reports rebuilding and launching all updated desktop apps. Document changes keep MCP, refresh target guards and stop sharing; sharing needs its own checkbox/notice. Physical content/platform cases remain separate.
+
 Updated: 2026-10-06 (JST).
 
 ## Current checkpoint
