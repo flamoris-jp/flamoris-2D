@@ -16,9 +16,9 @@ public partial class MainWindow
         _mcpUi = new(this, McpMenu, "flamoris-2d",
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FLAMORIS", "2D", "mcp-connection.json"),
             "FLAMORIS.2D", Path.Combine(AppContext.BaseDirectory, "mcp", "Flamoris.Mcp.Bridge.exe"),
-            AttachMcp, () => _client?.HasAuthoritativeProjection == true && !_documentBusy && !_disposed);
+            AttachMcp, () => _client?.IsRunning == true && !_disposed);
         McpStatusPanel.Content = _mcpUi.StatusIndicator;
-        _capture = new EmbeddedWindowCapture(this, () => _mcpUi?.Invalidate());
+        _capture = new EmbeddedWindowCapture(this);
         CaptureStatusPanel.Content = _capture.Control;
     }
     private async Task<McpDesktopAttachment> AttachMcp(CorePermission permission)
@@ -28,7 +28,7 @@ public partial class MainWindow
         try
         {
             _mcpConnection = await client.EnableMcpAsync(permission == CorePermission.Edit ? McpPermission.Edit : McpPermission.ReadOnly,
-                startLocalEndpoint: false, additionalTools: _capture.Tools());
+                startLocalEndpoint: false, additionalTools: _capture.Tools(), applicationLifetime: true);
             return new(client.LiveMcpBoundary!, client.LiveMcpGrant!, async () =>
             {
                 captureLease.Dispose();
@@ -46,8 +46,11 @@ public partial class MainWindow
     private void ClearMcpStatus()
     {
         _capture?.Stop();
-        _mcpConnection = null;
-        _mcpUi?.Invalidate();
+        if (_disposed || _client?.IsRunning != true)
+        {
+            _mcpConnection = null;
+            _mcpUi?.Invalidate();
+        }
         _mcpUi?.Refresh();
     }
     private Task RefreshMcpStatusAsync(NativeSessionClient client)

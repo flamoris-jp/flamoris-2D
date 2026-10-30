@@ -50,7 +50,7 @@ public sealed partial class NativeSessionClient
         _mcpBoundary?.Disable();
         PublishMcpStatus();
     }
-    public async Task<McpConnection> EnableMcpAsync(McpPermission permission, CancellationToken cancellationToken = default, bool startLocalEndpoint = true, IEnumerable<HostTool>? additionalTools = null)
+    public async Task<McpConnection> EnableMcpAsync(McpPermission permission, CancellationToken cancellationToken = default, bool startLocalEndpoint = true, IEnumerable<HostTool>? additionalTools = null, bool applicationLifetime = false)
     {
         var epoch = Interlocked.Increment(ref _mcpEpoch);
         await _mcpLifecycle.WaitAsync(cancellationToken);
@@ -58,13 +58,12 @@ public sealed partial class NativeSessionClient
         {
             await DisableMcpCoreAsync();
             cancellationToken.ThrowIfCancellationRequested();
-            EnsureReady();var expectedToken=DocumentToken!;
-            await _workspace.InvokeAsync(w=>{if(w.Snapshot.DocumentToken!=expectedToken)throw new McpFault(McpErrors.HostUnavailable);return true;},cancellationToken);
+            EnsureReady(document: !applicationLifetime); var expectedToken = applicationLifetime ? null : DocumentToken;
             if (epoch != Interlocked.Read(ref _mcpEpoch)) throw new McpFault(McpErrors.Cancelled);
             _mcpPermission = permission;
-            var host = new NativeMcpHost(_workspace,expectedToken,permission==McpPermission.Edit?CorePermission.Edit:CorePermission.ReadOnly);
+            var host = new NativeMcpHost(_workspace,expectedToken,permission==McpPermission.Edit?CorePermission.Edit:CorePermission.ReadOnly, applicationLifetime);
             _mcpHost = host;
-            var options = new McpOptions { MaxRequestBytes = 4 * 1024 * 1024, MaxConcurrentRequests = 4 };
+            var options = new McpOptions { ApplicationLifetime = applicationLifetime, MaxRequestBytes = 4 * 1024 * 1024, MaxConcurrentRequests = 4 };
             var boundary = new McpBoundary(host, host.Tools().Concat(additionalTools ?? []), options, new McpDiagnostics(_logger ?? Flamoris.Logging.FlamorisLogger.Create(new Flamoris.Logging.LoggingOptions { Level = "error" })));
             _mcpBoundary = boundary;
             boundary.Status.Changed += PublishMcpStatus;

@@ -72,6 +72,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         try
         {
             var handshake = await _client.StartAsync();
+            await RefreshMcpStatusAsync(_client);
             HostStatusIndicator.Fill = Brushes.SeaGreen;
             HostStatusText.Text = "接続済み";
             HostStatusText.ToolTip = $"NativeSession · ABI {handshake.ProtocolVersion} · schema {handshake.ProductSchemaVersion}";

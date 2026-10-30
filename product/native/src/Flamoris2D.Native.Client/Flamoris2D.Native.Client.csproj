@@ -9,6 +9,6 @@
   <ItemGroup>
     <ProjectReference Include="../Flamoris2D.Session/Flamoris2D.Session.csproj" />
     <PackageReference Include="Flamoris.Logging" Version="1.0.0" />
-    <PackageReference Include="Flamoris.Mcp.Core" Version="1.3.1" />
+    <PackageReference Include="Flamoris.Mcp.Core" Version="1.4.0" />
   </ItemGroup>
 </Project>

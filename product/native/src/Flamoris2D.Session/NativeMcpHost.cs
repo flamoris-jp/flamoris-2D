@@ -11,19 +11,20 @@ public sealed class NativeMcpHost : IMcpHost, IDisposable
     private readonly NativeWorkspace workspace;
     private readonly string? expectedDocumentToken;
     private readonly McpPermission permission;
+    private readonly bool applicationLifetime;
     private readonly CancellationTokenSource lease = new();
     private readonly JsonElement catalog;
     private volatile bool invalidated;
     public HostSnapshot Snapshot { get; private set; } = new("flamoris.2d", "0.4.0", "", "", 0, false);
     public event Action? Invalidating;
-    public NativeMcpHost(NativeWorkspace workspace, string? expectedDocumentToken = null, McpPermission permission = McpPermission.Edit)
+    public NativeMcpHost(NativeWorkspace workspace, string? expectedDocumentToken = null, McpPermission permission = McpPermission.Edit, bool applicationLifetime = false)
     {
-        this.workspace = workspace; this.expectedDocumentToken = expectedDocumentToken; this.permission = permission;
+        this.workspace = workspace; this.expectedDocumentToken = expectedDocumentToken; this.permission = permission; this.applicationLifetime = applicationLifetime;
         using var stream = typeof(NativeMcpHost).Assembly.GetManifestResourceStream("Flamoris2D.LiveCatalog")!;
         using var json = JsonDocument.Parse(stream); catalog = json.RootElement.Clone();
         workspace.Changed += WorkspaceChanged;
     }
-    private void WorkspaceChanged(WorkspaceChanged change) { if (change.Operation == "replace") Invalidate(); else { var s = change.Snapshot; Snapshot = new("flamoris.2d", "0.4.0", s.RuntimeId, s.DocumentToken, s.Revision); } }
+    private void WorkspaceChanged(WorkspaceChanged change) { if (change.Operation == "replace" && !applicationLifetime) Invalidate(); else { var s = change.Snapshot; Snapshot = new("flamoris.2d", "0.4.0", s.RuntimeId, s.DocumentToken, s.Revision); } }
     public void Invalidate()
     {
         if (invalidated) return; invalidated = true; lease.Cancel(); Invalidating?.Invoke();
@@ -31,7 +32,17 @@ public sealed class NativeMcpHost : IMcpHost, IDisposable
     public Task<T> InvokeAsync<T>(Func<T> action, CancellationToken token) => workspace.InvokeAsync(w =>
     {
         if (invalidated) throw new McpFault(McpErrors.HostUnavailable);
-        var s = w.Snapshot; if (expectedDocumentToken is not null && s.DocumentToken != expectedDocumentToken) throw new McpFault(McpErrors.HostUnavailable); Snapshot = new("flamoris.2d", "0.4.0", s.RuntimeId, s.DocumentToken, s.Revision);
+        if (!w.HasDocument)
+        {
+            if (!applicationLifetime) throw new McpFault(McpErrors.NoDocument);
+            Snapshot = new("flamoris.2d", "0.4.0", w.RuntimeId, "", 0) { HasDocument = false };
+        }
+        else
+        {
+            var s = w.Snapshot;
+            if (expectedDocumentToken is not null && s.DocumentToken != expectedDocumentToken) throw new McpFault(McpErrors.StaleDocument);
+            Snapshot = new("flamoris.2d", "0.4.0", s.RuntimeId, s.DocumentToken, s.Revision);
+        }
         token.ThrowIfCancellationRequested(); return action();
     }, token);
     public IEnumerable<HostTool> Tools()
