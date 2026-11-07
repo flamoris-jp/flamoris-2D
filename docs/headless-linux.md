@@ -5,7 +5,9 @@ Cutwork `.flimg` v1/v2/v3、PSD/PSB、既存 `.fl2d`を読み込み、MCPで編�
 透過PNGを確認・書き出せます。初期版は明示的なCPUオフライン描画です。
 Windows版のDirect3D描画、デスクトップ画面共有、MP4エンコーダーは使いません。
 
-設計・受け入れ条件は[ADR 0013](decisions/0013-headless-linux-host.md)。
+編集コアの設計は[ADR 0013](decisions/0013-headless-linux-host.md)、現行の常駐方式は
+[ADR 0014](decisions/0014-updater-resident-linux.md)。
+[2026-11-07の実機接続・移行完了記録](reviews/lime-resident-acceptance-20261107.md)も参照してください。
 自動テストの合格と、実作品の見た目・LIME実機の性能・Hub本番接続は別々に確認します。
 
 ## ビルドと配布候補
@@ -47,6 +49,7 @@ dotnet product/native/tests/Flamoris2D.Cli.Tests/bin/Release/net10.0/Flamoris2D.
 以下の`flamoris2d`は配布候補の実行ファイルです。
 
 ```bash
+flamoris2d new --output blank.fl2d
 flamoris2d import character.flimg --output character.fl2d
 flamoris2d inspect character.fl2d
 flamoris2d preview character.fl2d --output preview.png --width 640
@@ -54,6 +57,7 @@ flamoris2d preview character.fl2d --sequence SEQUENCE_ID --time-ticks 120000 --o
 flamoris2d render character.fl2d --sequence SEQUENCE_ID --width 1920 --height 1080 --fps 30 --output-dir frames
 ```
 
+- `new`は通常のNativeWorkspaceで空のプロジェクトを作ります。既存出力は上書きしません。
 - `import`は新しい`.fl2d`を作ります。入力と既存出力は上書きしません。
 - `inspect`はScene、Key Art、Sequence等をJSONで返します。
 - `preview`はKey Art、Sequence、Transitionを一つ指定します。省略時は最初のKey Artです。
@@ -115,30 +119,69 @@ MCP Coreの通常の`input`ラッパーを使います。変更操作には最�
 `interrupted`として扱います。自動再開や成功扱いにはしません。
 プレビューも描画後に版を再確認してから画像を返します。
 
-## HubとLIMEの常駐サービス
+## HubとLinuxの常駐サービス
 
-`flamoris2d mcp-catalog`は、別ID`flamoris2d-lime`の登録用JSONを出します。
-JSONはYAMLとしても読めるので、Hubのruntime catalogに`.yaml`名で配置できます。
-既存Windows版の接続・カタログは置き換えません。
+現行の配布は、Kachinco CLIと同じ**Docker・Updater管理**です。
+公開済みCLI 0.1.1のカタログは[こちら](https://github.com/flamoris-jp/flamoris-2D/releases/download/cli-v0.1.1/catalog.json)。
+アプリケーションID・コンテナ名は `flamoris-2d-cli`、対応platformは `linux/amd64` です。
+配布imageをUpdaterが配置し、UID/GID 10001で実行します。実行先でソースをビルドする必要はありません。
 
-Hub側は生成した定義の`FLAMORIS2D_LIME_CONNECTOR_TOKEN`、LIME側は
-`FLAMORIS_HUB_CREDENTIAL`へ、同じ専用接続キーを設定します。接続キーはコマンド引数、
-リポジトリ、プロジェクトへ入れません。実行時に環境から取り込み、環境変数を消します。
+| 境界 | 動作 |
+| --- | --- |
+| 永続state | 管理rootの `state/` をコンテナの `/data/state` へbind mount |
+| 起動元 | `state/initial.fl2d`。初回のみ、作業コピーがない場合に通常の `new` で作成 |
+| 編集用checkpoint | `state/workspace/project.fl2d`。既存なら再起動時に再読込 |
+| PNG JOB | `state/workspace/renders/`。受領記録と完成済みPNGを保持 |
+| HTTP health | loopbackの `/healthz`、既定port 8774。`status: ready` は子プロセス生存 |
+| 接続確認 | healthの `hubConnected: true` とHub経由の `mcp.context` を別途確認 |
 
-```bash
-flamoris2d mcp character.flimg --workspace /path/to/shot --permission edit \
-  --hub wss://YOUR-HUB/desktop/flamoris2d-lime
-```
+Updater設定の `PORT`、`HUB_ENDPOINT`、`HUB_TOKEN` は、コンテナ内では
+`FLAMORIS2D_PORT`、`FLAMORIS2D_HUB_ENDPOINT`、`FLAMORIS2D_HUB_TOKEN` になります。
+移行済みstateのprivateな `connection.json` に `endpoint` と `credential` を保持する場合、
+HUB_ENDPOINT/HUB_TOKENは空にしてその値を使えます。ファイルは権限600、実行UIDが読める所有者にします。
+接続キーの値をGit・チャット・ログへ出さないでください。
 
-systemdの例は[`flamoris2d-lime.service.example`](../product/packaging/flamoris2d-lime.service.example)。
-配置先と実行ユーザーを実環境に合わせ、権限600の`hub.env`に以下を設定します。
+`flamoris2d mcp-catalog` は、別ID `flamoris2d-lime`、namespace `flamoris2d_lime` の
+184ツールを出します。Windows版 `flamoris2d` の登録とは別です。
+Hub側の `FLAMORIS2D_LIME_CONNECTOR_TOKEN` と、CLIへ渡す
+`FLAMORIS_HUB_CREDENTIAL` には同じ専用キーを使います。
+entrypointがprivate設定を読み、CLIは実行時にキーを取り込んで環境変数を消します。
 
-```text
-FLAMORIS2D_INPUT=/path/to/character.flimg
-FLAMORIS2D_HUB_ENDPOINT=wss://YOUR-HUB/desktop/flamoris2d-lime
-FLAMORIS_HUB_CREDENTIAL=YOUR_DEDICATED_CONNECTOR_CREDENTIAL
-```
+### 接続に必要な三つの配置
 
-Hubカタログ・専用キー・サービスの設定はデプロイ時の作業です。ソースのビルドやPRだけで
-本番接続が切り替わることはありません。接続が失敗した場合は終了コードを返し、
-systemdの再起動方針へ戻します。SIGTERM/stdio EOFで終了処理し、実行中JOBを止めます。
+1. Updater管理のCLIと永続stateを配置する。
+2. Hubへ専用descriptorと専用connectorキーを登録する。
+3. 公開WSSの `/desktop/flamoris2d-lime` をHubへ転送する。
+
+Kachincoの別URLが接続できても、2D用のexact locationがある証明にはなりません。
+[セットアップ](../deploy/linux/README.md)のhub phaseは既存Kachinco proxyを検証し、
+2D用経路を追加、バックアップ、`nginx -t`、reloadを行ってから接続を検証します。
+JSONをそのままYAMLとして保存すると `5e-324` 等が文字列になる場合があります。
+セットアップはinstalled HubのYAML round tripとschema検証を通します。
+
+### 障害時の動作と確認順
+
+Hub接続が失敗しても常駐プロセスとNativeWorkspaceは保持します。
+共通providerのretry後、エラーが残る場合は60秒ごとにrefreshします。
+編集要求を再送することはありません。
+保存済みcheckpointは再起動後に戻りますが、未保存編集はプロセス内なので、
+停止・再配置の前に `cli.project_save` を実行します。
+
+`hub_unavailable` は共通providerが通信・認証・登録時の失敗をまとめたコードです。
+これだけで障害箇所を断定せず、プロセスhealth、外部proxy経路、Hub認証、
+schemaの順に観測を分けます。
+Hubのツール一覧と実際の `mcp.context` のproductId・permission・hasDocumentを確認し、
+接続が成立してから旧配置を片付けます。
+
+### native/systemd版からの移行
+
+旧 `flamoris2d-lime.service` の例は手動運用・移行履歴の参照です。
+現行のUpdater管理コンテナと同じworkspaceを同時に開かないでください。
+Updaterの初回導入は既存配置を上書きしません。`prepare` は引き継ぎ準備であり、
+直後に `cleanup` を行う手順ではありません。
+
+既存配置による `install/not_empty` の復旧は[移行手順](../deploy/linux/README.md)へ。
+配置前の失敗と確認できる場合だけ、旧rootを丸ごと退避し、
+公式Installerで作った空のstateへコピーして全ファイルのSHA-256を照合します。
+旧unit・検証済みrelease/archiveと停止中Hub swapコンテナの除去は接続確認後です。
+現在のstate、退避したstate、秘密設定、private rollback backupは保持します。

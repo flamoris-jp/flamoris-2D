@@ -2,7 +2,17 @@
 
 > Current MCP policy (2026-10-30): [startup lifetime](docs/mcp-startup.md) supersedes the dated connection/share coupling below. Core/Wpf/bridge 1.4.0 is published; #165 is merged with accepted Capture submodule #12. The user reports rebuilding and launching all updated desktop apps. Document changes keep MCP, refresh target guards and stop sharing; sharing needs its own checkbox/notice. Physical content/platform cases remain separate.
 
-Updated: 2026-10-06 (JST).
+Updated: 2026-11-07 (JST).
+
+## 2026-11-07 — LIME resident CLI / Hub acceptance
+
+- CLI 0.1.1 deployed with Kachinco-compatible Docker/Updater ownership and retained NativeWorkspace.
+- Hub attachment accepted: 184 tools, edit permission, hasDocument=true; Windows connector remains a separate identity.
+- Corrected the missing dedicated external WSS proxy route, verified with actual Nginx 404-to-101 regression and live context response.
+- Old native binaries and stopped 2D Hub swap containers cleaned after connection acceptance; state, credentials and rollback backups retained.
+- See [evidence, source PRs and remaining production checks](docs/reviews/lime-resident-acceptance-20261107.md).
+
+The Windows checkpoint below was recorded on 2026-10-06 (JST); its physical acceptance remains separate.
 
 ## Current checkpoint
 
