@@ -117,13 +117,20 @@ def main():
     if active: raise ValueError('Native service must be stopped')
     source = migration['source']
     if source != native.SOURCE: raise ValueError('Unexpected legacy release; no deletion')
-    binary = ROOT / 'bin'
+    legacy = pathlib.Path(migration.get('legacyRoot', str(ROOT)))
+    if legacy != ROOT:
+        if legacy.parent != ROOT.parent or not legacy.name.startswith(ROOT.name + '-native-retired-'):
+            raise ValueError('Unexpected retired installation path')
+        native.no_links(legacy)
+    binary = legacy / 'bin'
     unit = UNIT_PATH
-    release = ROOT / 'releases' / source
-    archive = ROOT / 'packages' / (source + '.tar.gz')
+    release = legacy / 'releases' / source
+    archive = legacy / 'packages' / (source + '.tar.gz')
     for path in (unit, release, archive): native.no_links(path)
     if binary.is_symlink():
-        if binary.resolve() != release: raise ValueError('Unexpected legacy binary path')
+        expected = ROOT / 'releases' / source
+        if pathlib.Path(os.readlink(binary)) not in (release, expected):
+            raise ValueError('Unexpected legacy binary path')
     elif binary.exists(): raise ValueError('Unexpected legacy binary path')
     if unit.exists() and unit.read_text() != native.UNIT_TEXT: raise ValueError('Service unit differs; no deletion')
     if release.exists(): native.verify_release(release)

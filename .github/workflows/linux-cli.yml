@@ -7,7 +7,6 @@ on:
       - 'product/packaging/**'
       - 'release/**'
       - 'test/cli/**'
-      - 'deploy/linux/migrate-resident.py'
       - 'product/packaging/flamoris2d-lime.service.example'
       - 'docs/headless-linux.md'
       - '.github/workflows/linux-cli.yml'

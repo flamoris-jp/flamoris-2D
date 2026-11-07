@@ -24,6 +24,33 @@ NATIVE = module('native', 'deploy/linux/setup-2d-lime.py')
 
 
 class ResidentTests(unittest.TestCase):
+    def test_cleanup_uses_retired_root_and_retains_both_state_copies(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory) / 'app'; root.mkdir()
+            (root/'config').mkdir(); (root/'state').mkdir(); (root/'state/project').write_bytes(b'current')
+            legacy = root.with_name(root.name+'-native-retired-fixture'); legacy.mkdir()
+            backup = legacy/'native-backup-fixture'; backup.mkdir()
+            (legacy/'state').mkdir(); (legacy/'state/project').write_bytes(b'retired')
+            (backup/'checkpoint').write_bytes(b'backup')
+            release = legacy/'releases'/NATIVE.SOURCE; release.mkdir(parents=True)
+            (release/'SHA256SUMS.txt').write_text('')
+            (legacy/'bin').symlink_to(root/'releases'/NATIVE.SOURCE)
+            unit = legacy/'unit'; unit.write_text(NATIVE.UNIT_TEXT)
+            (root/'config/native-migration.json').write_text(json.dumps({'source':NATIVE.SOURCE,'backup':str(backup),'legacyRoot':str(legacy)}))
+            observed = {'State':{'Running':True},'Mounts':[{'Source':str(root/'state'),'Destination':'/data/state'}]}
+            with patch.object(MIGRATE,'ROOT',root), patch.object(MIGRATE,'UNIT_PATH',unit), \
+                 patch.object(MIGRATE.os,'geteuid',return_value=0), \
+                 patch.object(MIGRATE.socket,'gethostname',return_value='lime'), \
+                 patch.object(MIGRATE,'run',return_value=types.SimpleNamespace(stdout=json.dumps([observed]).encode())), \
+                 patch.object(MIGRATE.subprocess,'run',return_value=types.SimpleNamespace(returncode=1)), \
+                 patch.object(MIGRATE.urllib.request,'urlopen',return_value=io.BytesIO(b'{"hubConnected":true}')), \
+                 patch.object(sys,'argv',['migration','cleanup','--apply']), contextlib.redirect_stdout(io.StringIO()):
+                MIGRATE.main()
+            self.assertFalse((legacy/'bin').is_symlink()); self.assertFalse(unit.exists()); self.assertFalse(release.exists())
+            self.assertEqual((root/'state/project').read_bytes(),b'current')
+            self.assertEqual((legacy/'state/project').read_bytes(),b'retired')
+            self.assertEqual((backup/'checkpoint').read_bytes(),b'backup')
+
     def test_retained_credential_stays_private_and_unsafe_inputs_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory); retained = root / 'connection.json'

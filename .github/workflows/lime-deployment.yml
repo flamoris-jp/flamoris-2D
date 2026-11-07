@@ -5,6 +5,7 @@ on:
     paths:
       - 'deploy/linux/**'
       - 'tests/deployment/**'
+      - 'test/cli/verify-resident-recovery.py'
       - '.github/workflows/lime-deployment.yml'
   workflow_dispatch:
 permissions:
@@ -29,3 +30,22 @@ jobs:
           FLAMORIS2D_TEST_DOCKER: ${{ matrix.mcp == '2.2.0' && '1' || '' }}
         run: python -m unittest discover -s tests/deployment -v
 
+
+  existing-native-recovery:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install the deployed Updater 1.0.15 implementation
+        run: python -m pip install 'https://github.com/flamoris-jp/flamoris-updater/archive/d3390f5dfbd1b1fe453df714d8219a12cec2706e.zip' python-dotenv pyyaml jsonschema
+      - name: Obtain the immutable accepted CLI 0.1.1 package
+        run: |
+          mkdir -p "$RUNNER_TEMP/accepted"
+          for asset in catalog.json linux-amd64--image.tar; do
+            curl -fL --retry 2 "https://github.com/flamoris-jp/flamoris-2D/releases/download/cli-v0.1.1/$asset" -o "$RUNNER_TEMP/accepted/$asset"
+          done
+      - name: Recover a real preflight rejection and retain native state
+        run: sudo env GITHUB_ACTIONS=true "$(command -v python)" test/cli/verify-resident-recovery.py "$RUNNER_TEMP/accepted/catalog.json"
