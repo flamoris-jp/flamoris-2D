@@ -101,6 +101,7 @@ try
         var listed = await client.ListToolsAsync();
         Check(listed.Any(t => t.Name == "cli.preview_frame") && !listed.Any(t => t.Name == "cli.project_save" || t.Name.StartsWith("command.") || t.Name.StartsWith("cli.source_upload_")), "Read-only discovery exposes edits");
         Check((await client.CallToolAsync("cli.project_save", Input(new { }, await Context(client)))).IsError == true, "Read-only checkpoint accepted");
+        Check((await client.CallToolAsync("cli.source_upload_begin", Input(new { uploadId = Guid.NewGuid().ToString(), fileName = "read-only.flimg", sizeBytes = "1", sha256 = new string('0', 64) }, await Context(client)))).IsError == true, "Read-only source upload accepted");
         Image(await client.CallToolAsync("cli.preview_frame", Input(new { width = 64 })));
     }
     Check(!File.Exists(Path.Combine(state, "project.fl2d")), "Read-only service initialized a project");
@@ -225,6 +226,15 @@ try
         Result(await client.CallToolAsync("cli.project_save", Input(new { }, await Context(client))));
         var valid = await Upload(client, sourceBytes);
         await Reject(client, "cli.source_upload_finish", new { uploadId = valid, replaceCurrent = false }, "source.replacement_required");
+        var render = Result(await client.CallToolAsync("cli.render_start", Input(new { sequenceId = sequence, width = 1200, height = 900, fpsNumerator = 30 }, await Context(client)))).GetProperty("jobId").GetString()!;
+        await Reject(client, "cli.source_upload_finish", new { uploadId = valid, replaceCurrent = true }, "render.busy");
+        Result(await client.CallToolAsync("cli.render_cancel", Input(new { jobId = render }, await Context(client))));
+        var renderWait = Stopwatch.StartNew();
+        while (Result(await client.CallToolAsync("cli.render_status", Input(new { jobId = render }))).GetProperty("state").GetString() is "queued" or "running")
+        {
+            Check(renderWait.Elapsed < TimeSpan.FromSeconds(20), "Import render cancellation timed out");
+            await Task.Delay(20);
+        }
         var checkpoint = Path.Combine(state, "project.fl2d");
         previousCheckpoint = File.ReadAllBytes(checkpoint);
         File.AppendAllText(checkpoint, " ");
@@ -256,8 +266,7 @@ try
     Check((await Run("preview", source, "--output", preview, "--width", "64")).Exit == 0, "One-shot preview failed");
     Check((await Run("preview", source, "--output", preview)).Exit != 0, "Preview overwrote output");
     Check(SHA256.HashData(File.ReadAllBytes(fixture)).SequenceEqual(sourceHash), "Original Cutwork source changed");
-    Console.WriteLine("PASS: Linux CLI import/reopen, animated RGBA PNG, official-client MCP, permissions, guards, Undo/Redo, checkpoint/restart/conflict, bounded render JOB/cancel/receipts source preservation and resident source upload/replacement/backup/restart.");
+    Console.WriteLine("PASS: Linux CLI import/reopen, animated RGBA PNG, official-client MCP, permissions, guards, Undo/Redo, checkpoint/restart/conflict, bounded render JOB/cancel/receipts, source preservation and resident source upload/replacement/backup/restart.");
 }
 finally { Directory.Delete(folder, true); }
-
 

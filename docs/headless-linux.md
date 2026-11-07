@@ -220,4 +220,3 @@ Updaterの初回導入は既存配置を上書きしません。`prepare` は引
 公式Installerで作った空のstateへコピーして全ファイルのSHA-256を照合します。
 旧unit・検証済みrelease/archiveと停止中Hub swapコンテナの除去は接続確認後です。
 現在のstate、退避したstate、秘密設定、private rollback backupは保持します。
-

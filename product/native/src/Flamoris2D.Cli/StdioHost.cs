@@ -139,4 +139,3 @@ internal static class StdioHost
         protected override void Dispose(bool disposing) { if (disposing) source.Dispose(); base.Dispose(disposing); }
     }
 }
-

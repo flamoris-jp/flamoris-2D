@@ -141,4 +141,3 @@ internal sealed class RenderJobs(NativeWorkspace workspace, string? root) : IAsy
         currentCancellation?.Dispose(); lifetime.Dispose();
     }
 }
-

@@ -174,4 +174,3 @@ internal static class HeadlessMcp
     }
 }
 
-

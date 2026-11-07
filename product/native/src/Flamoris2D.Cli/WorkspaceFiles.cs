@@ -141,4 +141,3 @@ internal sealed class WorkspaceFiles : IDisposable
 }
 
 internal sealed class McpSaveException(string code) : Exception(code);
-
