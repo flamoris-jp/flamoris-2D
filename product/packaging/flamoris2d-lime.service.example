@@ -1,0 +1,21 @@
+[Unit]
+Description=FLAMORIS 2D headless MCP host
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=akino
+Group=akino
+WorkingDirectory=/srv/flamoris/apps/flamoris-2d-cli
+EnvironmentFile=/srv/flamoris/apps/flamoris-2d-cli/hub.env
+ExecStart=/srv/flamoris/apps/flamoris-2d-cli/current/flamoris2d mcp ${FLAMORIS2D_INPUT} --workspace /srv/flamoris/apps/flamoris-2d-cli/state --permission edit --hub ${FLAMORIS2D_HUB_ENDPOINT}
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

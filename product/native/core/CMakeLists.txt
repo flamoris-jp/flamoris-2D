@@ -33,6 +33,12 @@ target_compile_definitions(Flamoris2D.Core.Native PRIVATE FL2D_CORE_BUILD)
 target_include_directories(Flamoris2D.Core.Native PUBLIC include)
 target_include_directories(Flamoris2D.Core.Native PRIVATE third_party/picojson)
 target_link_libraries(Flamoris2D.Core.Native PRIVATE ${fl2d_icu_libraries})
+if(UNIX AND NOT APPLE)
+  # ICU's official Linux binaries have no relative RUNPATH. RPATH also resolves
+  # their transitive data library beside our core in the portable package.
+  set_target_properties(Flamoris2D.Core.Native PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE INSTALL_RPATH "$ORIGIN")
+  target_link_options(Flamoris2D.Core.Native PRIVATE "-Wl,--disable-new-dtags")
+endif()
 if(WIN32)
   add_custom_command(TARGET Flamoris2D.Core.Native POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different

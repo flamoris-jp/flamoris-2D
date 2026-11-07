@@ -1,0 +1,50 @@
+name: Linux headless CLI
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'product/native/**'
+      - 'product/packaging/*linux*'
+      - 'product/packaging/flamoris2d-lime.service.example'
+      - 'docs/headless-linux.md'
+      - '.github/workflows/linux-cli.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux-headless:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/cache@v4
+        with:
+          path: artifacts/downloads/icu4c-78.3-Ubuntu22.04-x64.tgz
+          key: icu-linux-9c8abe58a20cf82ea22341d8125272094f7fca2414173cbc2d8742feb84566a2
+      - name: Prepare checksum-pinned ICU 78.3
+        run: echo "FLAMORIS2D_ICU_ROOT=$(bash product/packaging/prepare-linux-icu.sh)" >> "$GITHUB_ENV"
+      - name: Build Linux product and acceptance client
+        run: dotnet build product/native/tests/Flamoris2D.Cli.Tests -c Release -m:1 -p:UseSharedCompilation=false -p:NativeIcuRoot="$FLAMORIS2D_ICU_ROOT" -p:NativeCoreBuildDir="$GITHUB_WORKSPACE/out/linux-core"
+      - name: Official-process MCP and offline rendering acceptance
+        run: dotnet product/native/tests/Flamoris2D.Cli.Tests/bin/Release/net10.0/Flamoris2D.Cli.Tests.dll product/native/src/Flamoris2D.Cli/bin/Release/net10.0/flamoris2d.dll product/native/tests/fixtures/cutwork/cutwork-current-v3.flimg
+      - name: Existing native source and save lifecycle regressions on Linux
+        run: |
+          dotnet build product/native/tests/Flamoris2D.Session.Tests -c Release -m:1 -p:UseSharedCompilation=false -p:NativeIcuRoot="$FLAMORIS2D_ICU_ROOT" -p:NativeCoreBuildDir="$GITHUB_WORKSPACE/out/linux-core"
+          dotnet product/native/tests/Flamoris2D.Session.Tests/bin/Release/net10.0/Flamoris2D.Session.Tests.dll product/native/tests/source-codec-conformance.json product/native/tests/psd-codec-conformance.json
+      - name: Publish standalone Linux runtime
+        run: bash product/packaging/publish-linux.sh
+      - name: Standalone package import and transparent preview
+        run: |
+          package="$GITHUB_WORKSPACE/artifacts/linux/FLAMORIS-2D-linux-x64"
+          "$package/flamoris2d" import product/native/tests/fixtures/cutwork/cutwork-current-v3.flimg --output "$RUNNER_TEMP/cli-package.fl2d"
+          "$package/flamoris2d" preview "$RUNNER_TEMP/cli-package.fl2d" --output "$RUNNER_TEMP/cli-package.png" --width 64
+          cd "$package"
+          sha256sum --check SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FLAMORIS-2D-linux-x64
+          path: artifacts/linux/FLAMORIS-2D-linux-x64.tar.gz
+          retention-days: 3

@@ -4,6 +4,10 @@ Turn layered artwork into short animated shots for music videos. FLAMORIS 2D is 
 
 PSD・Cutworkの素材から、メッシュとリグで動きを付けてMVの短いカットを作る2Dアニメーションエディターです。
 
+Linux/LIME向けの**画面なしCLI＋MCPホスト**も用意しています。既存の編集コアで素材を読み込み、
+動きを編集し、CPU描画で透過PNGのプレビュー・連番を書き出します。
+Windowsエディターとは別の起動口です。[Linuxのビルド・制作・常駐設定](docs/headless-linux.md)を参照してください。
+
 ## What you can do today
 
 - **Bring in your artwork:** import layered PSDs or Cutwork `.flimg` v1/v2/v3 projects, then select and arrange parts.

@@ -1104,7 +1104,8 @@ std::vector<ClippingInstance> transition_clipping_instances(const Value& project
                 }
                 weights = Value(defaults);
             }
-            for (const auto& endpoint : {std::make_pair(&from, "from"), std::make_pair(&to, "to")}) {
+            const std::pair<const Value*, const char*> endpoints[] = {{&from, "from"}, {&to, "to"}};
+            for (const auto& endpoint : endpoints) {
                 const Value& state = *endpoint.first;
                 const Value& weight = field(weights, str(field(state, "appearanceId")));
                 if (str(field(state, "presence")) == "present" && finite(weight) && weight.get<double>() > 0)
