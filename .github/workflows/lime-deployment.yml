@@ -12,13 +12,20 @@ permissions:
 jobs:
   deployment-contracts:
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        mcp: ['1.29.0', '2.2.0', '2.3.0']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install mcp==1.29.0 httpx==0.28.1 python-dotenv==1.2.2 PyYAML==6.0.2
+      - run: python -m pip install 'mcp==${{ matrix.mcp }}' httpx==0.28.1 python-dotenv==1.2.2 PyYAML==6.0.2
+      - if: matrix.mcp != '1.29.0'
+        run: python -m pip install httpx2==2.16.0
       - name: Bootstrap boundaries and actual read-only Docker replacement
         env:
-          FLAMORIS2D_TEST_DOCKER: '1'
+          FLAMORIS2D_TEST_DOCKER: ${{ matrix.mcp == '2.2.0' && '1' || '' }}
         run: python -m unittest discover -s tests/deployment -v
+

@@ -450,6 +450,7 @@ except ImportError:
 from dotenv import load_dotenv
 from flamoris_mcp_hub.config import env_file
 from mcp import ClientSession
+from mcp.types import PaginatedRequestParams
 from mcp.client.streamable_http import streamable_http_client
 load_dotenv(env_file(),override=False)
 expected=json.load(sys.stdin)
@@ -464,7 +465,8 @@ async def main():
     await session.initialize()
     actual={};cursor=None;seen=set()
     while True:
-     page=(await session.list_tools(cursor=cursor)).model_dump(by_alias=True)
+     pagination={'cursor':cursor} if 'cursor' in inspect.signature(session.list_tools).parameters else {'params':PaginatedRequestParams(cursor=cursor)}
+     page=(await session.list_tools(**pagination)).model_dump(by_alias=True)
      for t in page['tools']:
       if t['name'] in actual:raise RuntimeError('Duplicate tool')
       actual[t['name']]=t
@@ -483,6 +485,13 @@ async def main():
                      'hasDocument':value['hasDocument'],'runtimeId':value['runtimeId']}))
 asyncio.run(main())
 '''
+
+
+def redact_diagnostic(data, credentials):
+    text = data.decode(errors="replace") if isinstance(data, bytes) else str(data)
+    for value in sorted({str(v) for v in credentials if v and len(str(v)) >= 8}, key=len, reverse=True):
+        text = text.replace(value, "[REDACTED]")
+    return text[-8000:]
 
 
 def hub(args, user):
@@ -521,6 +530,7 @@ def hub(args, user):
     candidate_name = container + "-2d-candidate-" + secrets.token_hex(6)
     old_name = container + "-before-2d-" + secrets.token_hex(6)
     stage = "retain configuration"
+    verified = None
     # The inspect snapshot includes credentials: keep it root-only, never print it.
     atomic(backups / "container.json", json.dumps(observed).encode())
     try:
@@ -567,6 +577,17 @@ def hub(args, user):
         raise RuntimeError("Hub or LIME connector did not pass verification within four minutes")
 
     except Exception:
+        # Retain the original failure before removing a failed replacement.
+        try:
+            diagnostic = getattr(verified, "stderr", b"") or b""
+            if candidate or not needs_replacement:
+                logs = run(["docker", "logs", "--tail", "60", candidate or container], check=False, timeout=10)
+                diagnostic += (getattr(logs, "stdout", b"") or b"") + (getattr(logs, "stderr", b"") or b"")
+            hidden = [token, *values(old_env).values(), *current_env.values()]
+            atomic(backups / "verification.log", redact_diagnostic(diagnostic, hidden).encode())
+            print("Diagnostic log: " + str(backups / "verification.log"), flush=True)
+        except Exception:
+            pass  # Diagnostics must never prevent restoration.
         atomic(runtime, old_env.encode())
         if previous_target is not None:
             atomic(target, previous_target, mode=0o644)
@@ -609,3 +630,4 @@ if __name__ == "__main__":
         detail = str(error) if type(error) in (RuntimeError, ValueError) else type(error).__name__
         print("Setup stopped: " + detail)
         raise SystemExit(1)
+
