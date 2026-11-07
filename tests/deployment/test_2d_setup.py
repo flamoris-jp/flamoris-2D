@@ -11,6 +11,8 @@ import tarfile
 import tempfile
 import types
 import unittest
+import yaml
+from jsonschema import Draft202012Validator
 from unittest.mock import patch
 
 SOURCE = pathlib.Path(__file__).resolve().parents[2] / "deploy/linux/setup-2d-lime.py"
@@ -110,6 +112,38 @@ class SetupTests(unittest.TestCase):
             self.assertEqual(destination.stat().st_mode & 0o777, 0o755)
             self.assertTrue((destination / SETUP.TOP / "flamoris2d").stat().st_mode & 0o111)
 
+    def test_hub_yaml_preserves_tiny_numbers_and_validates_the_serialized_catalog(self):
+        registration = catalog()
+        # Reproduce JSON's valid exponent spelling becoming a YAML 1.1 string.
+        registration["tools"][0]["input_schema"] = {
+            "type":"object", "properties": {
+                "weight": {"type":"number", "minimum":5e-324},
+                "exponentText": {"type":"string", "const":"5e-324"}}}
+        self.assertIsInstance(yaml.safe_load(json.dumps(registration))["tools"][0]["input_schema"]
+                              ["properties"]["weight"]["minimum"], str)
+        class Model:
+            @staticmethod
+            def model_validate(raw):
+                for tool in raw["tools"]:
+                    Draft202012Validator.check_schema(tool["input_schema"])
+                return types.SimpleNamespace(id=raw["id"], namespace=raw["namespace"], tools=raw["tools"])
+        configuration = types.ModuleType("flamoris_mcp_hub.config")
+        configuration.UpstreamConfig = Model
+        configuration.load_upstreams = lambda directory: []
+        configuration.config_dir = lambda: pathlib.Path("/unused")
+        with patch.dict(sys.modules, {"flamoris_mcp_hub":types.ModuleType("flamoris_mcp_hub"),
+                                      "flamoris_mcp_hub.config":configuration}), \
+             patch.object(sys, "stdin", io.StringIO(json.dumps(registration))):
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                exec(compile(SETUP.VALIDATE, "installed-hub-yaml-validation", "exec"), {})
+        serialized = json.loads(output.getvalue())["yaml"]
+        loaded = yaml.safe_load(serialized)
+        self.assertEqual(loaded, registration)
+        self.assertIsInstance(loaded["tools"][0]["input_schema"]["properties"]["weight"]["minimum"], float)
+        for tool in loaded["tools"]:
+            Draft202012Validator.check_schema(tool["input_schema"])
+
     def test_replacement_preserves_image_mounts_security_and_existing_credentials(self):
         observed = self.container()
         before = json.dumps(observed, sort_keys=True)
@@ -160,7 +194,7 @@ class SetupTests(unittest.TestCase):
         self.assertNotIn(TOKEN, output.getvalue())
 
     def test_failed_replacement_restores_original_container_descriptor_and_runtime(self):
-        for fail_stage in ("create", "start"):
+        for fail_stage in ("create", "start", "crash", "timeout"):
             with self.subTest(fail_stage=fail_stage), tempfile.TemporaryDirectory() as directory:
                 root = pathlib.Path(directory)
                 (root / "config").mkdir(); (root / "mcps").mkdir()
@@ -177,21 +211,33 @@ class SetupTests(unittest.TestCase):
                 connection.chmod(0o600)
                 original = self.container()
                 calls = []
+                swapped = False
                 def command(arguments, **kwargs):
+                    nonlocal swapped
                     calls.append(arguments)
                     if arguments[:2] == ["docker", "inspect"]:
                         if "--format" in arguments:
                             return types.SimpleNamespace(stdout=b"original-id\n", returncode=0)
-                        return types.SimpleNamespace(stdout=json.dumps([original]).encode(), returncode=0)
+                        state = self.container()
+                        if swapped and fail_stage == "crash":
+                            state["State"] = {"Running": False, "Restarting": True}
+                        return types.SimpleNamespace(stdout=json.dumps([state]).encode(), returncode=0)
+                    if arguments[-1] == SETUP.VALIDATE:
+                        return types.SimpleNamespace(stdout=json.dumps({"yaml":yaml.safe_dump(registration)}).encode(),returncode=0)
+                    if arguments[-1] == SETUP.VERIFY:
+                        return types.SimpleNamespace(stdout=b"",returncode=1)
                     if arguments == ["docker", "start", "candidate-id"]:
-                        raise RuntimeError("simulated candidate startup failure")
+                        if fail_stage == "start": raise RuntimeError("simulated candidate startup failure")
+                        swapped = True
                     return types.SimpleNamespace(stdout=b"{}", returncode=0)
                 def create(name, config):
                     if fail_stage == "create": raise RuntimeError("simulated create failure")
                     return "candidate-id"
                 with patch.object(SETUP, "HUB_ROOT", root), patch.object(SETUP, "run", command), \
                      patch.object(SETUP, "create_replacement", create), \
-                     patch.object(SETUP.socket, "gethostname", return_value="decopon"), self.assertRaises(RuntimeError):
+                     patch.object(SETUP.socket, "gethostname", return_value="decopon"), \
+                     patch.object(SETUP.time, "monotonic", side_effect=([0, 241] if fail_stage == "timeout" else [0, 1])), \
+                     self.assertRaises(RuntimeError):
                     SETUP.hub(types.SimpleNamespace(connection=str(connection)), types.SimpleNamespace(pw_dir=str(root)))
                 self.assertEqual(runtime.read_text(), original_env)
                 self.assertEqual(target.read_bytes(), original_catalog)

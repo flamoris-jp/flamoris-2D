@@ -17,7 +17,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install mcp==1.29.0 httpx==0.28.1 python-dotenv==1.2.2
+      - run: python -m pip install mcp==1.29.0 httpx==0.28.1 python-dotenv==1.2.2 PyYAML==6.0.2
       - name: Bootstrap boundaries and actual read-only Docker replacement
         env:
           FLAMORIS2D_TEST_DOCKER: '1'
