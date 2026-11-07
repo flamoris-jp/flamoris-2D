@@ -23,3 +23,7 @@ coverage/
 product/native/**/bin/
 product/native/**/obj/
 product/native/**/*_wpftmp.csproj
+
+# Deployment helper bytecode
+__pycache__/
+*.py[cod]
