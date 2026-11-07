@@ -427,13 +427,18 @@ def restore_container(observed, candidate):
 
 
 VALIDATE = r'''
-import json,sys
+import json,sys,yaml
 from flamoris_mcp_hub.config import UpstreamConfig,load_upstreams,config_dir
-d=UpstreamConfig.model_validate(json.load(sys.stdin))
+raw=json.load(sys.stdin)
+serialized=yaml.safe_dump(raw,sort_keys=False,allow_unicode=True)
+decoded=yaml.safe_load(serialized)
+if json.dumps(raw,sort_keys=True)!=json.dumps(decoded,sort_keys=True):
+ raise SystemExit('Catalog YAML round trip changed the schema')
+d=UpstreamConfig.model_validate(decoded)
 for old in load_upstreams(config_dir()):
  if (old.id==d.id or old.namespace==d.namespace) and old.model_dump()!=d.model_dump():
   raise SystemExit('Existing upstream conflicts; no overwrite')
-print(json.dumps({'validated':True,'tools':len(d.tools)}))
+print(json.dumps({'validated':True,'tools':len(d.tools),'yaml':serialized}))
 '''
 
 VERIFY = r'''
@@ -503,11 +508,10 @@ def hub(args, user):
     updated = append_credential(old_env, token)
     target = HUB_ROOT / "mcps/flamoris2d-lime.yaml"
     no_links(target)
-    registration_bytes = (json.dumps(registration, indent=2) + "\n").encode()
-    if target.exists() and json.loads(target.read_text()) != registration:
-        raise ValueError("Existing 2D descriptor differs; no automatic overwrite")
     previous_target = target.read_bytes() if target.exists() else None
-    run(["docker", "exec", "-i", container, "python", "-c", VALIDATE], data=json.dumps(registration).encode())
+    validated = run(["docker", "exec", "-i", container, "python", "-c", VALIDATE],
+                    data=json.dumps(registration).encode())
+    registration_bytes = json.loads(validated.stdout)["yaml"].encode()
     needs_replacement = KEY not in current_env
     replacement = replacement_config(observed, token) if needs_replacement else None
     backups = HUB_ROOT / "config" / ("2d-setup-backup-" + time.strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(3))
@@ -543,6 +547,25 @@ def hub(args, user):
         else:
             stage = "restart Hub"
             run(["docker", "restart", "--time", "30", container], timeout=60)
+        deadline = time.monotonic() + 240
+        stage = "verify Hub startup and LIME connection"
+        while time.monotonic() < deadline:
+            state = json.loads(run(["docker", "inspect", container]).stdout)[0]["State"]
+            if state.get("Restarting") or not state.get("Running"):
+                raise RuntimeError("Hub exited during verification")
+            verified = run(["docker", "exec", "-i", container, "python", "-c", VERIFY],
+                           data=json.dumps(registration).encode(), check=False, timeout=25)
+            if verified.returncode == 0:
+                print(verified.stdout.decode().strip())
+                path.unlink()
+                if needs_replacement:
+                    # Keep the stopped original for operator rollback; do not delete it.
+                    print("Previous stopped Hub retained as " + old_name)
+                return
+            print("Waiting for the LIME connector; no editing request is being sent.", flush=True)
+            time.sleep(10)
+        raise RuntimeError("Hub or LIME connector did not pass verification within four minutes")
+
     except Exception:
         atomic(runtime, old_env.encode())
         if previous_target is not None:
@@ -557,20 +580,6 @@ def hub(args, user):
         except Exception:
             raise RuntimeError("Hub setup failed at " + stage + "; container restoration needs inspection") from None
         raise RuntimeError("Hub setup failed at " + stage + "; previous container/settings restored") from None
-    deadline = time.monotonic() + 240
-    while time.monotonic() < deadline:
-        verified = run(["docker", "exec", "-i", container, "python", "-c", VERIFY],
-                       data=json.dumps(registration).encode(), check=False, timeout=25)
-        if verified.returncode == 0:
-            print(verified.stdout.decode().strip())
-            path.unlink()
-            if needs_replacement:
-                # Keep the stopped original for operator rollback; do not delete it.
-                print("Previous stopped Hub retained as " + old_name)
-            return
-        print("Waiting for the LIME connector; no editing request is being sent.", flush=True)
-        time.sleep(10)
-    raise RuntimeError("Hub route installed; LIME connection still pending. Keep the private connection file and rerun hub.")
 
 
 def main():
