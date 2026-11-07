@@ -1,0 +1,9 @@
+**
+!product/
+!product/packaging/
+!product/packaging/Dockerfile.linux
+!product/packaging/updater-entrypoint.py
+!artifacts/
+!artifacts/linux/
+!artifacts/linux/FLAMORIS-2D-linux-x64/
+!artifacts/linux/FLAMORIS-2D-linux-x64/**

@@ -1,0 +1,9 @@
+FROM ubuntu:24.04
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libstdc++6 libssl3t64 zlib1g python3 && rm -rf /var/lib/apt/lists/* && useradd --uid 10001 --create-home --home-dir /home/flamoris2d flamoris2d
+LABEL org.opencontainers.image.title="flamoris-2d-cli" org.opencontainers.image.version="0.1.1"
+WORKDIR /app
+COPY artifacts/linux/FLAMORIS-2D-linux-x64/ /app/
+COPY product/packaging/updater-entrypoint.py /app/updater-entrypoint.py
+USER 10001:10001
+ENV DOTNET_EnableDiagnostics=0
+ENTRYPOINT ["python3", "/app/updater-entrypoint.py"]

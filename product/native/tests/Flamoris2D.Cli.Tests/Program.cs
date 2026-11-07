@@ -81,6 +81,10 @@ try
             return id;
         });
     }
+    var blank = Path.Combine(folder, "blank.fl2d");
+    Check((await Run("new", "--output", blank)).Exit == 0, "Native blank creation failed");
+    Check((await Run("inspect", blank)).Exit == 0, "Native blank reopen failed");
+    Check((await Run("new", "--output", blank)).Exit != 0, "Native blank creation overwrote a file");
     var import = await Run("import", fixture, "--output", Path.Combine(folder, "imported.fl2d"));
     Check(import.Exit == 0, "Headless .flimg import failed: " + import.Error);
     Check((await Run("import", fixture, "--output", Path.Combine(folder, "imported.fl2d"))).Exit != 0, "Import overwrote an existing project");
@@ -166,3 +170,4 @@ try
     Console.WriteLine("PASS: Linux CLI import/reopen, animated RGBA PNG, official-client MCP, permissions, guards, Undo/Redo, checkpoint/restart/conflict, bounded render JOB/cancel/receipts and source preservation.");
 }
 finally { Directory.Delete(folder, true); }
+

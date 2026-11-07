@@ -41,7 +41,8 @@ internal static class Program
         if (args.Length == 0 || args[0] is "--help" or "help")
         {
             Console.WriteLine("""
-                FLAMORIS 2D headless CLI 0.1.0 (.NET 10 / CPU offline)
+                FLAMORIS 2D headless CLI 0.1.1 (.NET 10 / CPU offline)
+                new --output NEW.fl2d
                 import INPUT --output NEW.fl2d
                 inspect INPUT
                 preview INPUT --output NEW.png [--key-art ID | --sequence ID | --transition ID] [--time-ticks 0] [--width 640]
@@ -57,7 +58,7 @@ internal static class Program
         var command = args[0];
         var accepted = command switch
         {
-            "import" => new[] { "output" }, "inspect" or "mcp-catalog" => [],
+            "import" or "new" => new[] { "output" }, "inspect" or "mcp-catalog" => [],
             "preview" => ["output", "key-art", "sequence", "transition", "time-ticks", "width"],
             "render" => ["output-dir", "sequence", "transition", "width", "height", "fps", "fps-denominator"],
             "mcp" => ["workspace", "permission", "hub"], _ => throw new CliException("cli.unknown_command")
@@ -69,7 +70,7 @@ internal static class Program
             var arg = args[i];
             if (!arg.StartsWith("--", StringComparison.Ordinal))
             {
-                if (input is not null || command == "mcp-catalog") throw new CliException("cli.invalid_arguments");
+                if (input is not null || command is "mcp-catalog" or "new") throw new CliException("cli.invalid_arguments");
                 input = arg; continue;
             }
             var name = arg[2..];
@@ -81,7 +82,7 @@ internal static class Program
         string? Optional(string name) => values.GetValueOrDefault(name);
         int Number(string name, int fallback) => !values.ContainsKey(name) ? fallback :
             int.TryParse(values[name], NumberStyles.None, CultureInfo.InvariantCulture, out var value) ? value : throw new CliException("cli.invalid_" + name);
-        if (command != "mcp-catalog" && input is null) throw new CliException("cli.input_required");
+        if (command is not ("mcp-catalog" or "new") && input is null) throw new CliException("cli.input_required");
         var permission = (Optional("permission") ?? "read-only") switch
         {
             "read-only" => McpPermission.ReadOnly, "edit" => McpPermission.Edit, _ => throw new CliException("cli.invalid_permission")
@@ -109,6 +110,12 @@ internal static class Program
         }
         var version = NativeEngine.Version();
         if (version.Major != 1 || version.Minor < 5) throw new CliException("native.abi_mismatch");
+        if (command == "new")
+        {
+            await workspace.NewAsync("LIME 2D", 1920, 1080, token);
+            await WorkspaceFiles.SaveNewAsync(workspace, Required("output"), token);
+            Print(new { saved = true, file = Path.GetFullPath(Required("output")) }); return 0;
+        }
         await files.LoadAsync(workspace, input!, command == "mcp" && permission == McpPermission.Edit, token);
         switch (command)
         {
@@ -147,3 +154,4 @@ internal static class Program
         throw new CliException("cli.unknown_command");
     }
 }
+

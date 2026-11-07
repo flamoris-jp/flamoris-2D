@@ -5,10 +5,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>flamoris2d</AssemblyName>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Flamoris2D.Native.Client/Flamoris2D.Native.Client.csproj" />
     <ProjectReference Include="../Flamoris2D.Rendering/Flamoris2D.Rendering.csproj" />
   </ItemGroup>
 </Project>
+

@@ -120,10 +120,25 @@ internal static class HeadlessMcp
                 try
                 {
                     await provider.StartAsync(lifetime.Token);
+                    Console.WriteLine(JsonSerializer.Serialize(new { status = "started", hubConnected = false }));
+                    // Match Kachinco's resident host: preserve the workspace/grant
+                    // and refresh the shared provider after its bounded retry budget.
+                    int elapsed = 0;
+                    bool? connected = null;
                     while (true)
                     {
                         await Task.Delay(1000, lifetime.Token);
-                        if (boundary.Status.Current.LastError == "hub_unavailable") throw new CliException("hub.unavailable");
+                        var status = boundary.Status.Current;
+                        if (connected != status.IsGreen)
+                        {
+                            connected = status.IsGreen;
+                            Console.WriteLine(JsonSerializer.Serialize(new { status = "connection", hubConnected = status.IsGreen, error = status.LastError }));
+                        }
+                        if (++elapsed >= 60)
+                        {
+                            elapsed = 0;
+                            if (status.LastError is not null) await provider.RefreshAsync(lifetime.Token);
+                        }
                     }
                 }
                 finally { await provider.StopAsync(CancellationToken.None); }
@@ -136,3 +151,4 @@ internal static class HeadlessMcp
         finally { boundary.Disable(); }
     }
 }
+
