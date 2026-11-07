@@ -9,6 +9,8 @@ Start with the [product overview](../README.md) or the detailed
 
 ## Current design set
 
+- [`headless-linux.md`](headless-linux.md) — Linux/LIME CLI, MCP, transparent PNG preview/export and service setup
+- [`decisions/0013-headless-linux-host.md`](decisions/0013-headless-linux-host.md) — headless authority, fixed workspace and offline CPU boundary
 - [`repository-renovation.md`](repository-renovation.md) — #142 native convergence record and cleanup boundary
 - [`decisions/0012-native-session-cutover.md`](decisions/0012-native-session-cutover.md) — one C++ NativeSession, persistence/source ingest and WPF/MCP cutover
 

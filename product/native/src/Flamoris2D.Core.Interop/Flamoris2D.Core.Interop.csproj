@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <NativeCoreBuildDir>$(MSBuildProjectDirectory)/obj/native-x64</NativeCoreBuildDir>
     <NativeCoreDll>$(NativeCoreBuildDir)/$(Configuration)/Flamoris2D.Core.Native.dll</NativeCoreDll>
+    <NativeCoreBuildDir Condition="$([MSBuild]::IsOSPlatform('Linux'))">$(MSBuildProjectDirectory)/obj/native-linux</NativeCoreBuildDir>
   </PropertyGroup>
   <ItemGroup Condition="'$(OS)' == 'Windows_NT'">
     <Content Include="$(NativeCoreDll)" Link="Flamoris2D.Core.Native.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
@@ -13,8 +14,17 @@
     <Content Include="$(NativeCoreBuildDir)/$(Configuration)/icudt78.dll" Link="icudt78.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="$(NativeCoreBuildDir)/$(Configuration)/ICU-LICENSE.txt" Link="ICU-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+    <Content Include="$(NativeCoreBuildDir)/libFlamoris2D.Core.Native.so" Link="libFlamoris2D.Core.Native.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Condition="'$(NativeIcuRoot)' != ''" Include="$(NativeIcuRoot)/lib/libicuuc.so.78;$(NativeIcuRoot)/lib/libicui18n.so.78;$(NativeIcuRoot)/lib/libicudata.so.78" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
   <Target Name="BuildNativeCore" BeforeTargets="CoreCompile;GetCopyToOutputDirectoryItems" Condition="'$(OS)' == 'Windows_NT'">
     <Exec Command='cmake -S &quot;$(MSBuildProjectDirectory)/../../core&quot; -B &quot;$(NativeCoreBuildDir)&quot; -A x64 -DBUILD_TESTING=ON' />
     <Exec Command='cmake --build &quot;$(NativeCoreBuildDir)&quot; --config $(Configuration) --parallel' />
+  </Target>
+  <Target Name="BuildLinuxNativeCore" BeforeTargets="CoreCompile;GetCopyToOutputDirectoryItems" Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+    <PropertyGroup><IcuRootOption Condition="'$(NativeIcuRoot)' != ''">-DICU_ROOT=&quot;$(NativeIcuRoot)&quot;</IcuRootOption></PropertyGroup>
+    <Exec Command='cmake -S &quot;$(MSBuildProjectDirectory)/../../core&quot; -B &quot;$(NativeCoreBuildDir)&quot; -DCMAKE_BUILD_TYPE=$(Configuration) -DBUILD_TESTING=OFF $(IcuRootOption)' />
+    <Exec Command='cmake --build &quot;$(NativeCoreBuildDir)&quot; --parallel 2' />
   </Target>
 </Project>

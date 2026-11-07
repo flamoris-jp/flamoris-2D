@@ -69,3 +69,15 @@ Its `icuuc78.dll`, `icuin78.dll`, `icudt78.dll` and original `LICENSE` (copied a
 exact-version installation; source archive `icu4c-78.3-sources.tgz` SHA256 is
 `3a2e7a47604ba702f345878308e6fefeca612ee895cf4a5f222e7955fabfe0c0`.
 The App references Core.Interop through its single NativeWorkspace authority.
+
+## Linux headless package
+
+The Linux CLI uses the same ICU 78.3 C API with the official
+`icu4c-78.3-Ubuntu22.04-x64.tgz` archive, SHA256
+`9c8abe58a20cf82ea22341d8125272094f7fca2414173cbc2d8742feb84566a2`.
+It packages `libicuuc.so.78`, `libicui18n.so.78`, `libicudata.so.78` and the original
+`share/icu/78.3/LICENSE` as `ICU-LICENSE.txt`. The native core is built from this
+repository; its picojson license is included. The self-contained .NET 10 runtime
+retains `DOTNET-LICENSE.txt` and `DOTNET-ThirdPartyNotices.txt`.
+MCP Core 1.4.0, Logging 1.0.0 and official MCP SDK 2.2.0 versions remain recorded
+in `.deps.json`. This package contains no WPF, Capture, D3D11 or FFmpeg runtime.
