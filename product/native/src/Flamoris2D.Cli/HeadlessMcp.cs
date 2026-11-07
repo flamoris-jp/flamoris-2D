@@ -50,6 +50,20 @@ internal static class HeadlessMcp
         """, "[\"width\",\"height\"]");
     private static readonly JsonElement JobSchema = Schema("{\"jobId\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]{32}$\"}}", "[\"jobId\"]");
 
+    private const string UploadIdProperty = "\"uploadId\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$\"}";
+    private const string HashProperty = "{\"type\":\"string\",\"pattern\":\"^[0-9a-f]{64}$\"}";
+    private static readonly JsonElement UploadBeginSchema = Schema("{" + UploadIdProperty + "," +
+        "\"fileName\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":260}," +
+        "\"sizeBytes\":{\"type\":\"string\",\"pattern\":\"^[1-9][0-9]{0,7}$\"},\"sha256\":" + HashProperty + "}",
+        "[\"uploadId\",\"fileName\",\"sizeBytes\",\"sha256\"]");
+    private static readonly JsonElement UploadWriteSchema = Schema("{" + UploadIdProperty + "," +
+        "\"offset\":{\"type\":\"string\",\"pattern\":\"^(0|[1-9][0-9]{0,7})$\"}," +
+        "\"dataBase64\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":174764},\"chunkSha256\":" + HashProperty + "}",
+        "[\"uploadId\",\"offset\",\"dataBase64\",\"chunkSha256\"]");
+    private static readonly JsonElement UploadIdSchema = Schema("{" + UploadIdProperty + "}", "[\"uploadId\"]");
+    private static readonly JsonElement UploadFinishSchema = Schema("{" + UploadIdProperty + ",\"replaceCurrent\":{\"type\":\"boolean\",\"const\":true}}",
+        "[\"uploadId\",\"replaceCurrent\"]");
+
     private static JsonElement Translate(Func<JsonElement> action)
     {
         try { return action(); }
@@ -60,7 +74,7 @@ internal static class HeadlessMcp
         catch (IOException) { throw new McpFault("workspace.io_error"); }
     }
 
-    public static IEnumerable<HostTool> ExtraTools(NativeWorkspace workspace, WorkspaceFiles files, RenderJobs jobs)
+    public static IEnumerable<HostTool> ExtraTools(NativeWorkspace workspace, WorkspaceFiles files, RenderJobs jobs, SourceUploads uploads)
     {
         yield return new HostImageTool<FrameSelection>("cli.preview_frame", "Render a bounded transparent PNG through the offline CPU backend. Default target is the first Key Art; 120000 ticks/second.",
             PreviewSchema, Decode<FrameSelection>, async (context, input, token) =>
@@ -84,6 +98,14 @@ internal static class HeadlessMcp
                     revision = frame.Revision.ToString(), timeTicks = input.TimeTicks
                 })) { Image = new McpImage("image/png", png) };
             });
+        yield return new HostTool<SourceUploadBegin>("cli.source_upload_begin", "Begin one bounded source upload (.flimg/PSD/PSB, max 64 MiB). Binds the current document/revision. No paths or URLs.",
+            UploadBeginSchema, OperationKind.Mutation, Decode<SourceUploadBegin>, (context, input, _) => context.CommitAsync(() => Translate(() => uploads.Begin(input, workspace, files))));
+        yield return new HostTool<SourceUploadWrite>("cli.source_upload_write", "Append a checked source chunk, max 128 KiB decoded. Retry the identical last chunk safely; offsets are decimal strings.",
+            UploadWriteSchema, OperationKind.Mutation, Decode<SourceUploadWrite>, (context, input, _) => context.CommitAsync(() => Translate(() => uploads.Write(input, workspace))));
+        yield return new HostTool<SourceUploadId>("cli.source_upload_cancel", "Discard the unfinished source upload. Does not edit the document or delete import backups.",
+            UploadIdSchema, OperationKind.Mutation, Decode<SourceUploadId>, (context, input, _) => context.CommitAsync(() => Translate(() => uploads.Cancel(input.UploadId))));
+        yield return new HostTool<SourceUploadFinish>("cli.source_upload_finish", "Validate uploaded artwork and replace the current document. Requires replaceCurrent=true, a clean checkpoint and no render JOB. Preserves the previous checkpoint in import-backups. Save explicitly after import; fetch mcp.context for the new guard.",
+            UploadFinishSchema, OperationKind.Mutation, Decode<SourceUploadFinish>, (context, input, token) => uploads.FinishAsync(input, context, workspace, files, jobs, token));
         yield return new HostTool<JsonElement>("cli.project_save", "Atomically checkpoint this service's fixed working project, preserving the startup source. Edit permission and current guard required.",
             Empty, OperationKind.Mutation, DecodeEmpty, (context, _, token) => context.CommitAsync(() => Translate(() => files.Save(workspace, token))));
         yield return new HostTool<ExportRequest>("cli.render_start", "Start one revision-bound offline PNG export JOB into the configured workspace. Maximum 1800 frames and 512 MiB. Returns immediately.",
@@ -101,7 +123,7 @@ internal static class HeadlessMcp
     }
 
     public static McpBoundary Boundary(NativeMcpHost host, IEnumerable<HostTool> additional) => new(host,
-        host.Tools().Concat(additional), new McpOptions { RequestTimeoutMs = 30000 },
+        host.Tools().Concat(additional), new McpOptions { RequestTimeoutMs = 30000, ApplicationLifetime = true },
         new McpDiagnostics(FlamorisLogger.Create(new LoggingOptions { Level = "error" })));
 
     public static async Task ServeAsync(NativeMcpHost host, McpBoundary boundary, McpPermission permission, string? endpoint, CancellationToken token)
@@ -151,4 +173,5 @@ internal static class HeadlessMcp
         finally { boundary.Disable(); }
     }
 }
+
 

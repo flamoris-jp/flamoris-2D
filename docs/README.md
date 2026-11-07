@@ -9,6 +9,8 @@ Start with the [product overview](../README.md) or the detailed
 
 ## Current design set
 
+- [`decisions/0015-resident-source-import.md`](decisions/0015-resident-source-import.md) — resident source upload/replacement candidate; LIME deployment deferred
+
 - [`headless-linux.md`](headless-linux.md) — Linux/LIME CLI, MCP, transparent PNG preview/export and service setup
 - [`decisions/0014-updater-resident-linux.md`](decisions/0014-updater-resident-linux.md) — current Docker/Updater residency, reconnect and migration boundary
 - [`reviews/lime-resident-acceptance-20261107.md`](reviews/lime-resident-acceptance-20261107.md) — real Hub attachment, proxy-route correction and cleanup acceptance
@@ -81,3 +83,4 @@ Design decisions should be recorded in GitHub before or together with implementa
 Current proposals remain draft until reviewed/merged. Prototype branches are runnable snapshots and do not automatically override current design authority.
 
 - [ADR 0010 — Native live MCP transport/security](decisions/0010-native-live-mcp.md): current external attachment contract under Issue #102.
+

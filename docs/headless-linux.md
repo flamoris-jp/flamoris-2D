@@ -87,6 +87,7 @@ stdio設定の例:
 権限の省略時は`read-only`です。`edit`では既存のtyped編集ツール、Transaction、
 Undo/Redoに加え、固定された作業フォルダーへの保存・書き出しが使えます。
 任意ファイルをリモート指定して開く・保存するツールはありません。
+常駐中の素材取り込みには、後述のバイト転送用ツールを使います。
 
 作業フォルダーに`project.fl2d`があれば、次の起動ではそのファイルを開きます。
 初回の`edit`起動では入力から作業コピーを作ります。元の入力は変更しません。
@@ -118,6 +119,40 @@ MCP Coreの通常の`input`ラッパーを使います。変更操作には最�
 中止・失敗時は完成済みPNGと受領記録を残します。プロセス再起動後、以前の未完了JOBは
 `interrupted`として扱います。自動再開や成功扱いにはしません。
 プレビューも描画後に版を再確認してから画像を返します。
+
+## 常駐中の素材取り込み（追加候補・LIME未適用）
+
+Cutworkで保存した`.flimg`、PSD/PSBを、接続を切らずに新しい編集対象として
+取り込めます。これは現在のプロジェクトの**置き換え**です。既存のリグへ追加・再照合
+する機能ではありません。設計と受入れ条件は[ADR 0015](decisions/0015-resident-source-import.md)。
+
+1. 現在の編集を`cli.project_save`で保存し、描画JOBの終了を確認する。
+2. `mcp.context`で最新guardを取得する。
+3. `cli.source_upload_begin`へ`uploadId`（小文字・ハイフン付きUUID）、`fileName`、
+   `sizeBytes`（10進文字列）、`sha256`（小文字16進64桁）を送る。最大64 MiB。
+4. `cli.source_upload_write`へ`uploadId`、`offset`（10進文字列）、`dataBase64`、
+   `chunkSha256`を送る。1チャンクの復号後上限は128 KiB。返された`receivedBytes`を
+   次のoffsetに使う。同じ直前チャンクの再送は重複追加されない。
+5. `cli.source_upload_finish`へ`uploadId`と`replaceCurrent: true`を送る。
+   完全なファイルと素材を検証し、保存済みcheckpointを
+   `workspace/import-backups/<uploadId>.fl2d`へ退避してから置き換える。
+6. `mcp.context`を取り直し、新しいdocumentTokenのguardで編集・プレビューする。
+   取り込み後に`cli.project_save`を行うと、再起動後も新しい素材から再開できる。
+
+4ツールすべてedit権限と最新guardが必要です。転送中に編集するとfinishは競合になるため、
+`cli.source_upload_cancel`でそのuploadIdを破棄し、新しく転送を始めます。
+未完転送はプロセス内だけに保持し、再起動後の転送再開は行いません。
+ファイル名にパスは指定できず、URLやサーバー上の任意ファイルは読みません。
+
+`source.unsaved_changes`は現在の編集の保存が必要、`source.incomplete_upload`は転送不足、
+`source.checksum_mismatch`は全体のハッシュ不一致、`save.external_conflict`はcheckpointの
+外部変更です。失敗時は現在のプロジェクトを維持します。取り込み前のプロジェクトは
+退避ファイルから戻せますが、ファイルをまたぐUndoはありません。
+
+この追加候補のLinuxカタログは188ツールです。現在適用済みのCLI 0.1.1／184ツールと
+区別してください。LIMEへの適用時は、保存・退避のうえで新CLIの`mcp-catalog`から
+Hub descriptorを更新し、実際の素材取り込み・保存・再接続を別途確認します。
+このPRの作成やCI実行だけでは本番への配置は行いません。
 
 ## HubとLinuxの常駐サービス
 
@@ -185,3 +220,4 @@ Updaterの初回導入は既存配置を上書きしません。`prepare` は引
 公式Installerで作った空のstateへコピーして全ファイルのSHA-256を照合します。
 旧unit・検証済みrelease/archiveと停止中Hub swapコンテナの除去は接続確認後です。
 現在のstate、退避したstate、秘密設定、private rollback backupは保持します。
+

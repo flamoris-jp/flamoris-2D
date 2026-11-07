@@ -15,6 +15,7 @@ internal sealed class WorkspaceFiles : IDisposable
     private byte[]? savedHash;
     public string? ProjectPath { get; }
     public string? RenderRoot { get; }
+    public string? ImportBackupRoot { get; }
 
     public WorkspaceFiles(string? directory)
     {
@@ -28,6 +29,7 @@ internal sealed class WorkspaceFiles : IDisposable
         catch (IOException) { throw new CliException("workspace.in_use"); }
         ProjectPath = Path.Combine(directory, "project.fl2d");
         RenderRoot = Path.Combine(directory, "renders");
+        ImportBackupRoot = Path.Combine(directory, "import-backups");
         RejectLink(ProjectPath); RejectLink(RenderRoot);
     }
 
@@ -98,6 +100,27 @@ internal sealed class WorkspaceFiles : IDisposable
         finally { workspace.ReleaseSave(candidate.Id); }
     }
 
+    // Preserve the exact clean checkpoint before a source replaces the document.
+    // Keep savedHash: the next explicit save still checks the original checkpoint.
+    public string BackupForImport(NativeWorkspace workspace, string uploadId, CancellationToken token)
+    {
+        if (ProjectPath is null || ImportBackupRoot is null) throw new CliException("workspace.required");
+        if (workspace.Snapshot.State.Dirty != 0) throw new CliException("source.unsaved_changes");
+        RejectLink(ProjectPath);
+        if (savedHash is null || !File.Exists(ProjectPath)) throw new McpSaveException("save.external_conflict");
+        var bytes = ReadBounded(ProjectPath);
+        if (!SHA256.HashData(bytes).SequenceEqual(savedHash)) throw new McpSaveException("save.external_conflict");
+        RejectLink(ImportBackupRoot); Directory.CreateDirectory(ImportBackupRoot);
+        var backup = Path.Combine(ImportBackupRoot, uploadId + ".fl2d");
+        RejectLink(backup);
+        if (File.Exists(backup))
+        {
+            if (!SHA256.HashData(ReadBounded(backup)).SequenceEqual(savedHash)) throw new CliException("source.backup_conflict");
+        }
+        else AtomicDocumentFile.WriteAsync(backup, (s, ct) => s.WriteAsync(bytes, ct).AsTask(), false, token).GetAwaiter().GetResult();
+        return backup;
+    }
+
     public static async Task SaveNewAsync(NativeWorkspace workspace, string output, CancellationToken token)
     {
         RejectLink(output);
@@ -118,3 +141,4 @@ internal sealed class WorkspaceFiles : IDisposable
 }
 
 internal sealed class McpSaveException(string code) : Exception(code);
+

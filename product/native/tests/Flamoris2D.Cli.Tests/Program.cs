@@ -99,7 +99,7 @@ try
     await using (var client = await Connect("read-only"))
     {
         var listed = await client.ListToolsAsync();
-        Check(listed.Any(t => t.Name == "cli.preview_frame") && !listed.Any(t => t.Name == "cli.project_save" || t.Name.StartsWith("command.")), "Read-only discovery exposes edits");
+        Check(listed.Any(t => t.Name == "cli.preview_frame") && !listed.Any(t => t.Name == "cli.project_save" || t.Name.StartsWith("command.") || t.Name.StartsWith("cli.source_upload_")), "Read-only discovery exposes edits");
         Check((await client.CallToolAsync("cli.project_save", Input(new { }, await Context(client)))).IsError == true, "Read-only checkpoint accepted");
         Image(await client.CallToolAsync("cli.preview_frame", Input(new { width = 64 })));
     }
@@ -163,11 +163,101 @@ try
         Check(Result(await client.CallToolAsync("cli.render_status", Input(new { jobId }))).GetProperty("state").GetString() == "succeeded", "Completed JOB receipt lost on restart");
         Check(Result(await client.CallToolAsync("cli.render_status", Input(new { jobId = interruptedId }))).GetProperty("state").GetString() == "interrupted", "Abandoned JOB reported as running or successful");
     }
+    // Resident source handoff: the same official-client connection survives
+    // document replacement; old document guards cannot edit the imported source.
+    static string Digest(byte[] value) => Convert.ToHexStringLower(SHA256.HashData(value));
+    var sourceBytes = File.ReadAllBytes(fixture);
+    async Task<string> Upload(McpClient client, byte[] content, string? digest = null)
+    {
+        var uploadId = Guid.NewGuid().ToString();
+        var header = new { uploadId, fileName = "resident.flimg", sizeBytes = content.Length.ToString(), sha256 = digest ?? Digest(content) };
+        var guard = await Context(client);
+        Result(await client.CallToolAsync("cli.source_upload_begin", Input(header, guard)));
+        Result(await client.CallToolAsync("cli.source_upload_begin", Input(header, guard)));
+        for (int offset = 0; offset < content.Length; offset += 97)
+        {
+            var chunk = content.Skip(offset).Take(97).ToArray();
+            var request = new { uploadId, offset = offset.ToString(), dataBase64 = Convert.ToBase64String(chunk), chunkSha256 = Digest(chunk) };
+            var first = Result(await client.CallToolAsync("cli.source_upload_write", Input(request, guard)));
+            var retried = Result(await client.CallToolAsync("cli.source_upload_write", Input(request, guard)));
+            Check(first.GetProperty("receivedBytes").GetString() == retried.GetProperty("receivedBytes").GetString(), "Chunk retry appended duplicate bytes");
+        }
+        return uploadId;
+    }
+    static async Task Reject(McpClient client, string tool, object value, string? code = null)
+    {
+        var failed = await client.CallToolAsync(tool, Input(value, await Context(client)));
+        Check(failed.IsError == true, tool + " unexpectedly succeeded");
+        if (code is not null) Check(failed.StructuredContent!.Value.GetProperty("error").GetProperty("code").GetString() == code, failed.StructuredContent.Value.GetRawText());
+    }
+    byte[] importedPreview;
+    string backupPath;
+    byte[] previousCheckpoint;
+    await using (var client = await Connect())
+    {
+        var originalContext = await Context(client);
+        var originalPixels = Pixels(Image(await client.CallToolAsync("cli.preview_frame", Input(new { width = 64 }))));
+        var root = Result(await client.CallToolAsync("query.scene.get_tree", Input(new { input = new { includeHidden = true } }))).GetProperty("result").GetProperty("id").GetString()!;
+        await Reject(client, "cli.source_upload_begin", new { uploadId = Guid.NewGuid().ToString(), fileName = "../bad.flimg", sizeBytes = "1", sha256 = Digest([0]) });
+        await Reject(client, "cli.source_upload_begin", new { uploadId = Guid.NewGuid().ToString(), fileName = "bad.flimg", sizeBytes = "67108865", sha256 = Digest([0]) });
+        var partial = Guid.NewGuid().ToString();
+        Result(await client.CallToolAsync("cli.source_upload_begin", Input(new { uploadId = partial, fileName = "test.flimg", sizeBytes = "10", sha256 = Digest([0]) }, originalContext)));
+        await Reject(client, "cli.source_upload_finish", new { uploadId = partial, replaceCurrent = true }, "source.incomplete_upload");
+        await Reject(client, "cli.source_upload_write", new { uploadId = partial, offset = "0", dataBase64 = "AA==", chunkSha256 = Digest([1]) }, "source.chunk_checksum_mismatch");
+        await Reject(client, "cli.source_upload_write", new { uploadId = partial, offset = "1", dataBase64 = "AA==", chunkSha256 = Digest([0]) }, "source.offset_mismatch");
+        Result(await client.CallToolAsync("cli.source_upload_cancel", Input(new { uploadId = partial }, await Context(client))));
+        var invalid = await Upload(client, [1, 2, 3]);
+        await Reject(client, "cli.source_upload_finish", new { uploadId = invalid, replaceCurrent = true }, "flimg.archive_malformed");
+        Result(await client.CallToolAsync("cli.source_upload_cancel", Input(new { uploadId = invalid }, await Context(client))));
+        var corrupt = await Upload(client, sourceBytes, Digest([0]));
+        await Reject(client, "cli.source_upload_finish", new { uploadId = corrupt, replaceCurrent = true }, "source.checksum_mismatch");
+        Result(await client.CallToolAsync("cli.source_upload_cancel", Input(new { uploadId = corrupt }, await Context(client))));
+        Check((await Context(client)).GetRawText() == originalContext.GetRawText(), "Rejected imports changed the document/revision");
+        Check(Pixels(Image(await client.CallToolAsync("cli.preview_frame", Input(new { width = 64 })))).SequenceEqual(originalPixels), "Rejected imports changed artwork");
+
+        Result(await client.CallToolAsync("command.scene.rename_node", Input(new { payload = new { nodeId = root, displayName = "Unsaved edit" } }, await Context(client))));
+        var dirtyUpload = await Upload(client, sourceBytes);
+        await Reject(client, "cli.source_upload_finish", new { uploadId = dirtyUpload, replaceCurrent = true }, "source.unsaved_changes");
+        Result(await client.CallToolAsync("cli.project_save", Input(new { }, await Context(client))));
+        Result(await client.CallToolAsync("command.scene.rename_node", Input(new { payload = new { nodeId = root, displayName = "Concurrent edit" } }, await Context(client))));
+        await Reject(client, "cli.source_upload_finish", new { uploadId = dirtyUpload, replaceCurrent = true }, "revision.conflict");
+        Result(await client.CallToolAsync("cli.source_upload_cancel", Input(new { uploadId = dirtyUpload }, await Context(client))));
+        Result(await client.CallToolAsync("cli.project_save", Input(new { }, await Context(client))));
+        var valid = await Upload(client, sourceBytes);
+        await Reject(client, "cli.source_upload_finish", new { uploadId = valid, replaceCurrent = false }, "source.replacement_required");
+        var checkpoint = Path.Combine(state, "project.fl2d");
+        previousCheckpoint = File.ReadAllBytes(checkpoint);
+        File.AppendAllText(checkpoint, " ");
+        await Reject(client, "cli.source_upload_finish", new { uploadId = valid, replaceCurrent = true }, "save.external_conflict");
+        File.WriteAllBytes(checkpoint, previousCheckpoint);
+        var oldGuard = await Context(client);
+        var finished = Result(await client.CallToolAsync("cli.source_upload_finish", Input(new { uploadId = valid, replaceCurrent = true }, oldGuard)));
+        backupPath = finished.GetProperty("backupFile").GetString()!;
+        Check(File.ReadAllBytes(backupPath).SequenceEqual(previousCheckpoint), "Import did not preserve the previous checkpoint");
+        Check(File.ReadAllBytes(checkpoint).SequenceEqual(previousCheckpoint), "Import implicitly overwrote the checkpoint");
+        var current = await Context(client);
+        Check(current.GetProperty("runtimeId").GetString() == oldGuard.GetProperty("runtimeId").GetString() && current.GetProperty("documentToken").GetString() != oldGuard.GetProperty("documentToken").GetString(), "Import lost connection or kept the old document token");
+        Check((await client.CallToolAsync("cli.project_save", Input(new { }, oldGuard))).IsError == true, "Pre-import guard was accepted");
+        var newRoot = Result(await client.CallToolAsync("query.scene.get_tree", Input(new { input = new { includeHidden = true } }))).GetProperty("result").GetProperty("id").GetString()!;
+        Result(await client.CallToolAsync("command.scene.rename_node", Input(new { payload = new { nodeId = newRoot, displayName = "Imported through resident MCP" } }, current)));
+        Result(await client.CallToolAsync("live.undo", Input(new { }, await Context(client))));
+        Result(await client.CallToolAsync("live.redo", Input(new { }, await Context(client))));
+        importedPreview = Pixels(Image(await client.CallToolAsync("cli.preview_frame", Input(new { width = 64 }))));
+        Result(await client.CallToolAsync("cli.project_save", Input(new { }, await Context(client))));
+    }
+    await using (var client = await Connect())
+    {
+        var tree = Result(await client.CallToolAsync("query.scene.get_tree", Input(new { input = new { includeHidden = true } }))).GetProperty("result");
+        Check(tree.GetProperty("displayName").GetString() == "Imported through resident MCP", "Imported checkpoint was not resumed");
+        Check(Pixels(Image(await client.CallToolAsync("cli.preview_frame", Input(new { width = 64 })))).SequenceEqual(importedPreview), "Imported checkpoint lost artwork on restart");
+        Check(File.ReadAllBytes(backupPath).SequenceEqual(previousCheckpoint), "Explicit save replaced the import backup");
+    }
     var preview = Path.Combine(folder, "one.png");
     Check((await Run("preview", source, "--output", preview, "--width", "64")).Exit == 0, "One-shot preview failed");
     Check((await Run("preview", source, "--output", preview)).Exit != 0, "Preview overwrote output");
     Check(SHA256.HashData(File.ReadAllBytes(fixture)).SequenceEqual(sourceHash), "Original Cutwork source changed");
-    Console.WriteLine("PASS: Linux CLI import/reopen, animated RGBA PNG, official-client MCP, permissions, guards, Undo/Redo, checkpoint/restart/conflict, bounded render JOB/cancel/receipts and source preservation.");
+    Console.WriteLine("PASS: Linux CLI import/reopen, animated RGBA PNG, official-client MCP, permissions, guards, Undo/Redo, checkpoint/restart/conflict, bounded render JOB/cancel/receipts source preservation and resident source upload/replacement/backup/restart.");
 }
 finally { Directory.Delete(folder, true); }
+
 
