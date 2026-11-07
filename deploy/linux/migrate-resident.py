@@ -103,7 +103,7 @@ def main():
             for path in [state, *state.rglob('*')]: os.chown(path, account.pw_uid, account.pw_gid)
             run('systemctl', 'start', UNIT)
             raise
-        print(json.dumps({'prepared': True, 'backup': str(backup), 'updaterApplication': 'flamoris-2d-cli'}))
+        print(json.dumps({'prepared': True, 'endpoint': endpoint, 'backup': str(backup), 'updaterApplication': 'flamoris-2d-cli'}))
         return
     if not record.exists(): raise ValueError('Migration record is required')
     migration = json.loads(record.read_text())

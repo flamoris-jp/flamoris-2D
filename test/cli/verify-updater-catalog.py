@@ -59,12 +59,15 @@ def verify(catalog_path, install=False):
                 manager.run_job(job['job_id'])
                 recorded = manager.journal.get('managed_job', job['job_id'])
                 assert recorded['phase'] == 'awaiting_setup', recorded
+                retained = root / 'apps' / recipe.application_id / 'state' / 'retained-marker'
+                retained.write_bytes(b'prior native state')
                 manager.start_setup(recipe.application_id)
                 completed = manager.complete(recipe.application_id)
                 assert completed['phase'] == 'succeeded', completed
                 container = recipe.application['container_name']
                 state = root / 'apps' / recipe.application_id / 'state'
                 project = state / 'initial.fl2d'
+                assert retained.read_bytes() == b'prior native state'
                 assert project.is_file()
                 before = project.read_bytes()
                 # The bad Hub remains unavailable: native process must stay resident.
@@ -84,6 +87,7 @@ def verify(catalog_path, install=False):
                 assert project.read_bytes() == before
         finally:
             if install:
+                subprocess.run(['docker','logs','--tail','80',recipe.application['container_name']],check=False,timeout=15)
                 subprocess.run(['docker', 'rm', '--force', recipe.application['container_name']], check=False,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
     print(json.dumps(dict(catalog_validated=True, installation_performed=install, hub_connection_verified=False)))
