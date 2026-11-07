@@ -66,3 +66,6 @@ alpha and source preservation. Exercise EOF/shutdown. Run existing source/sessio
 regressions where relevant. Add one path-scoped Linux workflow at this milestone;
 retain the existing Windows checks. Real-art visual quality, LIME performance and
 live Hub deployment must be reported separately from automated Linux acceptance.
+
+
+Deployment/lifetime follow-up: ADR 0014 uses Docker/Updater and resident reconnect.

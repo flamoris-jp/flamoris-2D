@@ -4,7 +4,10 @@ on:
     branches: [main]
     paths:
       - 'product/native/**'
-      - 'product/packaging/*linux*'
+      - 'product/packaging/**'
+      - 'release/**'
+      - 'test/cli/**'
+      - 'deploy/linux/migrate-resident.py'
       - 'product/packaging/flamoris2d-lime.service.example'
       - 'docs/headless-linux.md'
       - '.github/workflows/linux-cli.yml'
@@ -43,8 +46,30 @@ jobs:
           "$package/flamoris2d" preview "$RUNNER_TEMP/cli-package.fl2d" --output "$RUNNER_TEMP/cli-package.png" --width 64
           cd "$package"
           sha256sum --check SHA256SUMS.txt
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Package the same accepted runtime for Updater
+        run: |
+          docker build -f product/packaging/Dockerfile.linux -t flamoris2d-cli-candidate .
+          mkdir -p dist
+          docker image save --output dist/image.tar flamoris2d-cli-candidate
+          image_id=$(docker image inspect --format '{{.Id}}' flamoris2d-cli-candidate)
+          python product/packaging/package-updater.py --image dist/image.tar --image-id "$image_id" --revision "$GITHUB_SHA" --output dist/release
+      - name: Actual Updater install, offline residency and retained project restart
+        run: |
+          python -m pip install 'https://github.com/flamoris-jp/flamoris-updater/archive/93561720aed68e34ee3d4ffb9ccd81a9f035ab79.zip' python-dotenv pyyaml jsonschema
+          sudo env GITHUB_ACTIONS=true "$(command -v python)" test/cli/verify-updater-catalog.py dist/release/catalog.json --install
+          cp deploy/linux/setup-2d-lime.py deploy/linux/migrate-resident.py dist/release/
+          (cd dist/release && sha256sum catalog.json candidate.json linux-amd64--image.tar setup-2d-lime.py migrate-resident.py > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flamoris2d-updater-candidate
+          path: dist/release/
+          retention-days: 3
       - uses: actions/upload-artifact@v4
         with:
           name: FLAMORIS-2D-linux-x64
           path: artifacts/linux/FLAMORIS-2D-linux-x64.tar.gz
           retention-days: 3
+
