@@ -417,6 +417,11 @@ def restore_container(observed, candidate):
     name = observed["Name"].lstrip("/")
     if current["Name"] != observed["Name"]:
         run(["docker", "rename", original, name])
+    policy = observed["HostConfig"].get("RestartPolicy") or {"Name": "no"}
+    restart = policy.get("Name") or "no"
+    if restart == "on-failure" and policy.get("MaximumRetryCount"):
+        restart += ":" + str(policy["MaximumRetryCount"])
+    run(["docker", "update", "--restart=" + restart, original])
     if observed["State"]["Running"] and not current["State"]["Running"]:
         run(["docker", "start", original])
 
@@ -525,6 +530,8 @@ def hub(args, user):
             current = run(["docker", "inspect", "--format", "{{.Id}}", container]).stdout.decode().strip()
             if current != observed["Id"]:
                 raise RuntimeError("Hub changed during setup")
+            stage = "retain original restart policy"
+            run(["docker", "update", "--restart=no", observed["Id"]])
             stage = "stop installed Hub"
             run(["docker", "stop", "--time", "30", observed["Id"]], timeout=60)
             stage = "retain original container"

@@ -212,6 +212,7 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(calls, [["docker", "rm", "--force", "candidate-id"],
                                ["docker", "inspect", "original-id"],
                                ["docker", "rename", "original-id", "flamoris-mcp-hub"],
+                               ["docker", "update", "--restart=unless-stopped", "original-id"],
                                ["docker", "start", "original-id"]])
 
     @unittest.skipUnless(os.environ.get("FLAMORIS2D_TEST_DOCKER"), "Explicit Docker boundary acceptance")
@@ -220,10 +221,11 @@ class SetupTests(unittest.TestCase):
         prefix = "fl2d-env-test-" + os.urandom(6).hex()
         original = replacement = None
         with tempfile.TemporaryDirectory() as directory:
+            pathlib.Path(directory).chmod(0o755)
             pathlib.Path(directory, "retained").write_text("mount retained")
             try:
                 original = subprocess.check_output(["docker", "run", "-d", "--name", prefix,
-                    "--read-only", "--network", "host", "--cap-drop", "ALL",
+                    "--read-only", "--network", "host", "--cap-drop", "ALL", "--user", "10001:10001",
                     "--security-opt", "no-new-privileges", "--restart", "unless-stopped",
                     "--label", "fl2d.acceptance=retained", "--env", "EXISTING_TOKEN=retained",
                     "--mount", "type=bind,src=" + directory + ",dst=/acceptance,readonly",
@@ -240,6 +242,7 @@ class SetupTests(unittest.TestCase):
                 for key in ("ReadonlyRootfs", "RestartPolicy", "CapDrop", "SecurityOpt", "NetworkMode"):
                     self.assertEqual(actual["HostConfig"][key], observed["HostConfig"][key])
                 self.assertEqual(actual["Config"]["Labels"], observed["Config"]["Labels"])
+                self.assertEqual(actual["Config"]["User"], observed["Config"]["User"])
             finally:
                 for identifier in (replacement, original):
                     if identifier: subprocess.run(["docker", "rm", "-f", identifier], capture_output=True)
