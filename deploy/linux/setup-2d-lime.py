@@ -29,6 +29,8 @@ SOURCE = "d14d450dec2498603aa85db9f65864236bd4cba2"
 ARCHIVE_SHA256 = "e72b07e8095f5f711dea170ae0a3a22bea0889a4db4cb834777915a69b6a369d"
 ROOT = pathlib.Path("/srv/flamoris/apps/flamoris-2d-cli")
 HUB_ROOT = pathlib.Path("/srv/flamoris/apps/flamoris-mcp-hub")
+NGINX_2D = pathlib.Path('/etc/nginx/snippets/flamoris-flamoris2d-hub.conf')
+NGINX_REFERENCE = pathlib.Path('/etc/nginx/snippets/flamoris-kachinco-lime-hub.conf')
 KEY = "FLAMORIS2D_LIME_CONNECTOR_TOKEN"
 UNIT = "flamoris2d-lime.service"
 SETTING = pathlib.Path("/etc/flamoris/flamoris2d-lime.env")
@@ -494,6 +496,54 @@ def redact_diagnostic(data, credentials):
     return text[-8000:]
 
 
+def ensure_nginx_route(backups):
+    """Extend the already-included 2D snippet using the live Kachinco route."""
+    for path in (NGINX_2D, NGINX_REFERENCE):
+        no_links(path)
+        info = path.stat()
+        if not path.is_file() or info.st_uid != os.geteuid() or info.st_mode & 0o022:
+            raise ValueError('Nginx snippets must be protected regular files')
+    configured = run(['nginx', '-T']).stdout.decode()
+    for path in (NGINX_2D, NGINX_REFERENCE):
+        if '# configuration file ' + str(path) + ':' not in configured:
+            raise ValueError('Expected Nginx snippet is not included; no changes')
+    reference = NGINX_REFERENCE.read_text()
+    blocks = re.findall(r'(?ms)^location = /desktop/kachinco-lime \{\n.*?^\}', reference)
+    if len(blocks) != 1 or blocks[0] not in configured:
+        raise ValueError('Expected active Kachinco WebSocket route')
+    block = blocks[0]
+    required = ('proxy_pass http://127.0.0.1:8769;', 'proxy_http_version 1.1;',
+                'proxy_set_header Host $host;', 'proxy_set_header Authorization $http_authorization;',
+                'proxy_set_header Upgrade $http_upgrade;', 'proxy_set_header Connection "upgrade";')
+    if not all(value in block for value in required):
+        raise ValueError('Kachinco proxy settings differ; inspect before changing Nginx')
+    candidate = block.replace('/desktop/kachinco-lime', '/desktop/flamoris2d-lime', 1)
+    previous = NGINX_2D.read_bytes()
+    matches = re.findall(r'location\s*=\s*/desktop/flamoris2d-lime\s*\{', configured)
+    if matches:
+        if len(matches) == 1 and candidate in previous.decode() and candidate in configured:
+            return  # Idempotent: preserve an already-installed matching route.
+        raise ValueError('An existing 2D LIME proxy route differs; no overwrite')
+    if b'/desktop/flamoris2d-lime' in previous:
+        raise ValueError('Unrecognized 2D LIME proxy configuration; no changes')
+    info = NGINX_2D.stat()
+    atomic(backups / 'nginx-2d.conf', previous)
+    reload_attempted = False
+    try:
+        atomic(NGINX_2D, previous.rstrip() + b'\n\n' + candidate.encode() + b'\n',
+               mode=info.st_mode & 0o777, uid=info.st_uid, gid=info.st_gid)
+        run(['nginx', '-t'])
+        reload_attempted = True
+        run(['systemctl', 'reload', 'nginx'])
+    except Exception:
+        atomic(NGINX_2D, previous, mode=info.st_mode & 0o777, uid=info.st_uid, gid=info.st_gid)
+        if reload_attempted:
+            run(['nginx', '-t'], check=False)
+            run(['systemctl', 'reload', 'nginx'], check=False)
+        raise RuntimeError('Nginx route setup failed; previous snippet restored') from None
+    print('Nginx route installed: /desktop/flamoris2d-lime', flush=True)
+
+
 def hub(args, user):
     if socket.gethostname().split(".")[0].lower() != "decopon":
         raise ValueError("The hub phase must run on DECO PON")
@@ -533,6 +583,9 @@ def hub(args, user):
     verified = None
     # The inspect snapshot includes credentials: keep it root-only, never print it.
     atomic(backups / "container.json", json.dumps(observed).encode())
+    # Hub's local MCP verifier alone cannot detect a missing public WSS proxy.
+    # Keep this valid route installed if the later Hub/connector verification fails.
+    ensure_nginx_route(backups)
     try:
         atomic(runtime, updated.encode(), mode=runtime.stat().st_mode & 0o777,
                uid=runtime.stat().st_uid, gid=runtime.stat().st_gid)

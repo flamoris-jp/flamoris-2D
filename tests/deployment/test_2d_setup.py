@@ -242,6 +242,7 @@ class SetupTests(unittest.TestCase):
                     if fail_stage == "create": raise RuntimeError("simulated create failure")
                     return "candidate-id"
                 with patch.object(SETUP, "HUB_ROOT", root), patch.object(SETUP, "run", command), \
+                     patch.object(SETUP, "ensure_nginx_route", lambda backups: None), \
                      patch.object(SETUP, "create_replacement", create), \
                      patch.object(SETUP.socket, "gethostname", return_value="decopon"), \
                      patch.object(SETUP.time, "monotonic", side_effect=([0, 241] if fail_stage == "timeout" else [0, 1])), \
