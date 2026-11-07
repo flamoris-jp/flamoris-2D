@@ -7,7 +7,9 @@ PSD・Cutworkの素材から、メッシュとリグで動きを付けてMVの�
 Linux/LIME向けの**画面なしCLI＋MCPホスト**も用意しています。既存の編集コアで素材を読み込み、
 動きを編集し、CPU描画で透過PNGのプレビュー・連番を書き出します。
 Windowsエディターとは別の起動口です。[Linuxのビルド・制作・常駐設定](docs/headless-linux.md)を参照してください。
-初回のLIME配置と専用Hub登録は[2台用セットアップ手順](deploy/linux/README.md)でまとめて行えます。
+現行の常駐方式はDocker・Updater管理です。[2台用セットアップ手順](deploy/linux/README.md)は
+専用Hub登録と外部WSSの転送設定も扱います。
+[2026-11-07の実機接続・移行完了記録](docs/reviews/lime-resident-acceptance-20261107.md)では184ツールの接続を確認しています。
 
 ## What you can do today
 
