@@ -35,6 +35,14 @@ def catalog():
 
 
 class SetupTests(unittest.TestCase):
+    def test_failure_diagnostics_redact_current_and_retained_credentials(self):
+        retained = "retained-secret-" + "y" * 32
+        raw = ("TypeError: unexpected cursor\n" + TOKEN + "\n" + retained).encode()
+        output = SETUP.redact_diagnostic(raw, [TOKEN, retained])
+        self.assertIn("unexpected cursor", output)
+        self.assertNotIn(TOKEN, output)
+        self.assertNotIn(retained, output)
+
     def test_endpoint_derives_only_dedicated_route_and_preserves_front_door(self):
         self.assertEqual(SETUP.endpoint_from_existing("wss://hub.example:443/prefix/desktop/kachinco-lime"),
                          "wss://hub.example:443/prefix/desktop/flamoris2d-lime")
@@ -318,8 +326,13 @@ class SetupTests(unittest.TestCase):
                 value = {"protocolVersion": message["params"]["protocolVersion"], "capabilities": {"tools": {}},
                          "serverInfo": {"name": "test-hub", "version": "1"}}
             elif method == "tools/list":
+                cursor = message.get("params", {}).get("cursor")
+                self.assertIn(cursor, (None, "second-page"))
+                page = registration["tools"][:92] if cursor is None else registration["tools"][92:]
                 value = {"tools": [{"name": "flamoris2d_lime." + item["name"], "inputSchema": item["input_schema"]}
-                                   for item in registration["tools"]]}
+                                   for item in page]}
+                if cursor is None:
+                    value["nextCursor"] = "second-page"
             elif method == "tools/call":
                 self.assertEqual(message["params"]["name"], "flamoris2d_lime.mcp.context")
                 value = {"content": [{"type": "text", "text": json.dumps({"productId": "flamoris.2d",
@@ -342,7 +355,7 @@ class SetupTests(unittest.TestCase):
                 exec(compile(SETUP.VERIFY, "hub-readonly-verifier", "exec"), {})
         self.assertNotIn(TOKEN, output.getvalue())
         self.assertTrue(json.loads(output.getvalue())["connected"])
-        self.assertEqual(calls, ["initialize", "notifications/initialized", "tools/list", "tools/call"])
+        self.assertEqual(calls, ["initialize", "notifications/initialized", "tools/list", "tools/list", "tools/call"])
 
     def test_effects_cannot_relabel_a_checkpoint_as_read_only(self):
         raw = catalog()
@@ -426,3 +439,4 @@ class SetupTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
