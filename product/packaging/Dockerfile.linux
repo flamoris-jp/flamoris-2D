@@ -1,5 +1,5 @@
 FROM ubuntu:24.04
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libstdc++6 libssl3t64 zlib1g python3 && rm -rf /var/lib/apt/lists/* && useradd --uid 10001 --create-home --home-dir /home/flamoris2d flamoris2d
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libicu74 libstdc++6 libssl3t64 zlib1g python3 && rm -rf /var/lib/apt/lists/* && useradd --uid 10001 --create-home --home-dir /home/flamoris2d flamoris2d
 LABEL org.opencontainers.image.title="flamoris-2d-cli" org.opencontainers.image.version="0.1.1"
 WORKDIR /app
 COPY artifacts/linux/FLAMORIS-2D-linux-x64/ /app/
