@@ -14,6 +14,7 @@ import urllib.request
 
 ROOT = pathlib.Path('/srv/flamoris/apps/flamoris-2d-cli')
 UNIT = 'flamoris2d-lime.service'
+UNIT_PATH = pathlib.Path('/etc/systemd/system') / UNIT
 
 
 def run(*args):
@@ -56,6 +57,7 @@ def main():
     if not args.apply and not args.hub:
         print(json.dumps({'changes': False, 'action': args.action, 'retained': str(ROOT / 'state')})); return
     if args.hub:
+        if args.action != 'cleanup': raise ValueError('--hub is only for cleanup')
         cleanup_hub(args.apply)
         return
     if os.geteuid() != 0 or socket.gethostname().split('.')[0] != 'lime':
@@ -68,6 +70,9 @@ def main():
     native.no_links(state); native.no_links(record)
     if args.action == 'prepare':
         if record.exists():
+            if not (state / 'connection.json').is_file() or state.stat().st_uid != 10001:
+                raise ValueError('Prepared migration state changed; inspect the retained backup')
+            run('systemctl', 'stop', UNIT); run('systemctl', 'disable', UNIT)
             print(json.dumps({'prepared': True, 'retained': True})); return
         setting = pathlib.Path('/etc/flamoris/flamoris2d-lime.env')
         native.no_links(setting)
@@ -81,7 +86,8 @@ def main():
         run('systemctl', 'stop', UNIT)
         try:
             for path in state.rglob('*'):
-                if path.is_symlink(): raise ValueError('Linked workspace requires manual migration')
+                if path.is_symlink() or path.is_mount() or not (path.is_file() or path.is_dir()):
+                    raise ValueError('Linked, mounted or special workspace files require manual migration')
             shutil.copytree(state, backup / 'state')
             shutil.copy2(setting, backup / 'native.env')
             native.atomic(state / 'connection.json', json.dumps({'endpoint': endpoint, 'credential': credential}).encode(), uid=10001, gid=10001)
@@ -112,7 +118,7 @@ def main():
     source = migration['source']
     if source != native.SOURCE: raise ValueError('Unexpected legacy release; no deletion')
     binary = ROOT / 'bin'
-    unit = pathlib.Path('/etc/systemd/system') / UNIT
+    unit = UNIT_PATH
     release = ROOT / 'releases' / source
     archive = ROOT / 'packages' / (source + '.tar.gz')
     for path in (unit, release, archive): native.no_links(path)

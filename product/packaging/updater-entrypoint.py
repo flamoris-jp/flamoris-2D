@@ -13,6 +13,8 @@ import time
 
 def settings(environment, state):
     retained = state / 'connection.json'
+    if retained.is_symlink() or (retained.exists() and retained.stat().st_mode & 0o077):
+        raise ValueError('Retained connection must be a private regular file')
     old = json.loads(retained.read_text()) if retained.exists() else {}
     endpoint = environment.get('FLAMORIS2D_HUB_ENDPOINT') or old.get('endpoint', '')
     credential = environment.get('FLAMORIS2D_HUB_TOKEN') or old.get('credential', '')
@@ -74,7 +76,13 @@ def main():
         stopping.set()
         if child.poll() is None: child.terminate()
 
-    server = http.server.ThreadingHTTPServer(('127.0.0.1', port), Health)
+    try:
+        server = http.server.ThreadingHTTPServer(('127.0.0.1', port), Health)
+    except Exception:
+        child.terminate()
+        try: child.wait(timeout=25)
+        except subprocess.TimeoutExpired: child.kill(); child.wait()
+        raise
     server.daemon_threads = True
     signal.signal(signal.SIGTERM, stop); signal.signal(signal.SIGINT, stop)
     threading.Thread(target=output, daemon=True).start()
