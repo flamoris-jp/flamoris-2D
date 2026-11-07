@@ -110,56 +110,142 @@ class SetupTests(unittest.TestCase):
             self.assertEqual(destination.stat().st_mode & 0o777, 0o755)
             self.assertTrue((destination / SETUP.TOP / "flamoris2d").stat().st_mode & 0o111)
 
-    def test_container_dotenv_uses_real_newlines_and_never_prints_credential(self):
+    def test_replacement_preserves_image_mounts_security_and_existing_credentials(self):
+        observed = self.container()
+        before = json.dumps(observed, sort_keys=True)
+        result = SETUP.replacement_config(observed, TOKEN)
+        self.assertEqual(result["Image"], observed["Image"])
+        self.assertEqual(result["HostConfig"], observed["HostConfig"])
+        self.assertEqual(result["Env"], ["EXISTING_TOKEN=retained", SETUP.KEY + "=" + TOKEN])
+        self.assertEqual(result["Cmd"], observed["Config"]["Cmd"])
+        self.assertNotIn("Hostname", result)
+        self.assertEqual(json.dumps(observed, sort_keys=True), before)
+        for update in [{"AutoRemove": True}, {"NetworkMode": "bridge"}, {"PidMode": "container:other"}]:
+            altered = self.container()
+            altered["HostConfig"].update(update)
+            with self.assertRaises(ValueError):
+                SETUP.replacement_config(altered, TOKEN)
+
+    @staticmethod
+    def container():
+        return {"Id": "original-id", "Name": "/flamoris-mcp-hub", "Image": "sha256:installed",
+                "State": {"Running": True},
+                "Config": {"Env": ["EXISTING_TOKEN=retained"], "Image": "mutable-tag",
+                           "Hostname": "decopon", "Cmd": ["python", "-m", "hub"],
+                           "Labels": {"updater": "retained"}},
+                "HostConfig": {"NetworkMode": "host", "ReadonlyRootfs": True,
+                               "RestartPolicy": {"Name": "unless-stopped"},
+                               "CapDrop": ["ALL"], "SecurityOpt": ["no-new-privileges"],
+                               "Binds": ["/host/mcps:/app/config/mcps:ro"]},
+                "Mounts": [{"Type": "bind", "Source": "/host/mcps", "Destination": "/app/config/mcps", "RW": False}]}
+
+    def test_engine_create_sends_credential_only_in_private_http_body(self):
+        captured = {}
+        class Response:
+            status = 201
+            def read(self, limit): return b'{"Id":"candidate-id"}'
+        def request(client, method, path, body, headers):
+            captured.update(method=method, path=path, payload=json.loads(body), headers=headers)
+        with patch.object(SETUP, "run", return_value=types.SimpleNamespace(stdout=b"unix:///var/run/docker.sock\n")), \
+             patch.dict(os.environ, {"DOCKER_HOST": "", "DOCKER_CONTEXT": ""}), \
+             patch.object(SETUP.http.client.HTTPConnection, "request", request), \
+             patch.object(SETUP.http.client.HTTPConnection, "getresponse", return_value=Response()):
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                identifier = SETUP.create_replacement("candidate", SETUP.replacement_config(self.container(), TOKEN))
+        self.assertEqual(identifier, "candidate-id")
+        self.assertEqual(captured["method"], "POST")
+        self.assertEqual(captured["path"], "/containers/create?name=candidate")
+        self.assertEqual(captured["payload"]["Env"][-1], SETUP.KEY + "=" + TOKEN)
+        self.assertNotIn(TOKEN, output.getvalue())
+
+    def test_failed_replacement_restores_original_container_descriptor_and_runtime(self):
+        for fail_stage in ("create", "start"):
+            with self.subTest(fail_stage=fail_stage), tempfile.TemporaryDirectory() as directory:
+                root = pathlib.Path(directory)
+                (root / "config").mkdir(); (root / "mcps").mkdir()
+                runtime = root / "config/runtime.env"
+                original_env = "PORT=8769\nEXISTING_TOKEN=untouched\n"
+                runtime.write_text(original_env)
+                registration = SETUP.descriptor(catalog())
+                target = root / "mcps/flamoris2d-lime.yaml"
+                original_catalog = json.dumps(registration, separators=(",", ":")).encode()
+                target.write_bytes(original_catalog)
+                connection = root / "connection.json"
+                connection.write_text(json.dumps({"source": SETUP.SOURCE, "archiveSha256": SETUP.ARCHIVE_SHA256,
+                                                 "credential": TOKEN, "descriptor": registration}))
+                connection.chmod(0o600)
+                original = self.container()
+                calls = []
+                def command(arguments, **kwargs):
+                    calls.append(arguments)
+                    if arguments[:2] == ["docker", "inspect"]:
+                        if "--format" in arguments:
+                            return types.SimpleNamespace(stdout=b"original-id\n", returncode=0)
+                        return types.SimpleNamespace(stdout=json.dumps([original]).encode(), returncode=0)
+                    if arguments == ["docker", "start", "candidate-id"]:
+                        raise RuntimeError("simulated candidate startup failure")
+                    return types.SimpleNamespace(stdout=b"{}", returncode=0)
+                def create(name, config):
+                    if fail_stage == "create": raise RuntimeError("simulated create failure")
+                    return "candidate-id"
+                with patch.object(SETUP, "HUB_ROOT", root), patch.object(SETUP, "run", command), \
+                     patch.object(SETUP, "create_replacement", create), \
+                     patch.object(SETUP.socket, "gethostname", return_value="decopon"), self.assertRaises(RuntimeError):
+                    SETUP.hub(types.SimpleNamespace(connection=str(connection)), types.SimpleNamespace(pw_dir=str(root)))
+                self.assertEqual(runtime.read_text(), original_env)
+                self.assertEqual(target.read_bytes(), original_catalog)
+                self.assertTrue(connection.exists())
+                self.assertTrue(any(c[:3] == ["docker", "rm", "--force"] for c in calls))
+                self.assertFalse(any("/app/.env" in str(c) for c in calls))
+
+    def test_restore_renames_and_starts_retained_original_by_id(self):
+        original = self.container()
+        stopped = self.container()
+        stopped["Name"] = "/retained-original"; stopped["State"]["Running"] = False
+        calls = []
+        def command(arguments, **kwargs):
+            calls.append(arguments)
+            return types.SimpleNamespace(stdout=json.dumps([stopped]).encode(), returncode=0)
+        with patch.object(SETUP, "run", command):
+            SETUP.restore_container(original, "candidate-id")
+        self.assertEqual(calls, [["docker", "rm", "--force", "candidate-id"],
+                               ["docker", "inspect", "original-id"],
+                               ["docker", "rename", "original-id", "flamoris-mcp-hub"],
+                               ["docker", "update", "--restart=unless-stopped", "original-id"],
+                               ["docker", "start", "original-id"]])
+
+    @unittest.skipUnless(os.environ.get("FLAMORIS2D_TEST_DOCKER"), "Explicit Docker boundary acceptance")
+    def test_real_readonly_container_recreation_preserves_settings_and_adds_environment(self):
+        image = "python:3.12-slim"
+        prefix = "fl2d-env-test-" + os.urandom(6).hex()
+        original = replacement = None
         with tempfile.TemporaryDirectory() as directory:
-            path = pathlib.Path(directory) / "runtime.env"
-            path.write_text("EXISTING_TOKEN=untouched\n")
-            environment = os.environ.copy()
-            environment["FLAMORIS_MCP_HUB_ENV_FILE"] = str(path)
-            request = {"key": SETUP.KEY, "credential": TOKEN, "uid": os.getuid(), "gid": os.getgid(), "action": "write"}
-            for _ in range(2):
-                result = subprocess.run([sys.executable, "-c", SETUP.CONTAINER_ENV], env=environment,
-                                        input=json.dumps(request), text=True, capture_output=True)
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertNotIn(TOKEN, result.stdout + result.stderr)
-            self.assertEqual(path.read_text(), "EXISTING_TOKEN=untouched\n" + SETUP.KEY + "=" + TOKEN + "\n")
-            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
-
-    def test_failed_hub_restart_restores_existing_descriptor_and_runtime(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = pathlib.Path(directory)
-            (root / "config").mkdir()
-            (root / "mcps").mkdir()
-            runtime = root / "config/runtime.env"
-            original_env = "PORT=8769\nEXISTING_TOKEN=untouched\n"
-            runtime.write_text(original_env)
-            registration = SETUP.descriptor(catalog())
-            target = root / "mcps/flamoris2d-lime.yaml"
-            original_catalog = json.dumps(registration, separators=(",", ":")).encode()
-            target.write_bytes(original_catalog)
-            connection = root / "connection.json"
-            connection.write_text(json.dumps({"source": SETUP.SOURCE, "archiveSha256": SETUP.ARCHIVE_SHA256,
-                                             "credential": TOKEN, "descriptor": registration}))
-            connection.chmod(0o600)
-
-            def fake_run(arguments, **kwargs):
-                if arguments[:2] == ["docker", "inspect"]:
-                    return types.SimpleNamespace(stdout=json.dumps([{"Config": {"Env": []}, "Mounts": []}]).encode(), returncode=0)
-                if arguments[:2] == ["docker", "restart"]:
-                    if kwargs.get("check", True):
-                        raise RuntimeError("restart failure")
-                if arguments[-2:] in [["id", "-u"], ["id", "-g"]]:
-                    return types.SimpleNamespace(stdout=b"10001", returncode=0)
-                if arguments[-1] == SETUP.CONTAINER_ENV:
-                    return types.SimpleNamespace(stdout=b'{"path":"/app/.env"}', returncode=0)
-                return types.SimpleNamespace(stdout=b"{}", returncode=0)
-
-            with patch.object(SETUP, "HUB_ROOT", root), patch.object(SETUP, "run", fake_run), \
-                 patch.object(SETUP.socket, "gethostname", return_value="decopon"), self.assertRaises(RuntimeError):
-                SETUP.hub(types.SimpleNamespace(connection=str(connection)), types.SimpleNamespace(pw_dir=str(root)))
-            self.assertEqual(runtime.read_text(), original_env)
-            self.assertEqual(target.read_bytes(), original_catalog)
-            self.assertTrue(connection.exists())
+            pathlib.Path(directory).chmod(0o755)
+            pathlib.Path(directory, "retained").write_text("mount retained")
+            try:
+                original = subprocess.check_output(["docker", "run", "-d", "--name", prefix,
+                    "--read-only", "--network", "host", "--cap-drop", "ALL", "--user", "10001:10001",
+                    "--security-opt", "no-new-privileges", "--restart", "unless-stopped",
+                    "--label", "fl2d.acceptance=retained", "--env", "EXISTING_TOKEN=retained",
+                    "--mount", "type=bind,src=" + directory + ",dst=/acceptance,readonly",
+                    image, "python", "-c", "import time;time.sleep(300)"], text=True).strip()
+                observed = json.loads(subprocess.check_output(["docker", "inspect", original]))[0]
+                replacement = SETUP.create_replacement(prefix + "-new", SETUP.replacement_config(observed, TOKEN))
+                subprocess.run(["docker", "start", replacement], check=True, capture_output=True)
+                probe = subprocess.check_output(["docker", "exec", replacement, "python", "-c",
+                    "import os,pathlib;print(os.environ['EXISTING_TOKEN']);print(os.environ['" + SETUP.KEY +
+                    "']);print(pathlib.Path('/acceptance/retained').read_text())"], text=True)
+                self.assertEqual(probe.splitlines(), ["retained", TOKEN, "mount retained"])
+                actual = json.loads(subprocess.check_output(["docker", "inspect", replacement]))[0]
+                self.assertEqual(actual["Image"], observed["Image"])
+                for key in ("ReadonlyRootfs", "RestartPolicy", "CapDrop", "SecurityOpt", "NetworkMode"):
+                    self.assertEqual(actual["HostConfig"][key], observed["HostConfig"][key])
+                self.assertEqual(actual["Config"]["Labels"], observed["Config"]["Labels"])
+                self.assertEqual(actual["Config"]["User"], observed["Config"]["User"])
+            finally:
+                for identifier in (replacement, original):
+                    if identifier: subprocess.run(["docker", "rm", "-f", identifier], capture_output=True)
 
     def test_default_cli_is_read_only_plan(self):
         result = subprocess.run([sys.executable, str(SOURCE), "lime"], capture_output=True, text=True)
