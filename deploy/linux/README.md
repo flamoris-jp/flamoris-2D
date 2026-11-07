@@ -42,6 +42,11 @@ flamoris-2d-cli 0.1.1を導入。HUB_ENDPOINT/HUB_TOKENへ専用URLと接続キ�
 
 DECO PONのHub登録はsetup-2d-lime.pyのhub phaseを使用し、
 全184ツールとmcp.contextを確認。失敗時はHub設定が戻ります。
+hub phaseは、既存の2D用Nginx snippetが読み込まれていることを確認し、
+稼働中Kachinco LIMEと同じWebSocket転送を/desktop/flamoris2d-limeへ追加します。
+nginx -t成功後にreloadし、失敗時はsnippetを復元します。
+元snippetはHub setup backup内のnginx-2d.confへ保存します。
+追加済みの一致する経路は変更しません。後段のHub確認に失敗しても、正常な転送設定は保持します。
 
 ## 接続確認後のお掃除
 
