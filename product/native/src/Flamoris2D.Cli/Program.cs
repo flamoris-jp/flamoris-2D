@@ -41,7 +41,7 @@ internal static class Program
         if (args.Length == 0 || args[0] is "--help" or "help")
         {
             Console.WriteLine("""
-                FLAMORIS 2D headless CLI 0.1.1 (.NET 10 / CPU offline)
+                FLAMORIS 2D headless CLI 0.1.2 (.NET 10 / CPU offline)
                 new --output NEW.fl2d
                 import INPUT --output NEW.fl2d
                 inspect INPUT

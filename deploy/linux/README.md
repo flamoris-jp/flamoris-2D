@@ -1,3 +1,23 @@
+# CLI 0.1.2への更新
+
+既存の0.1.1からはUpdaterで0.1.2へ更新します。stateと接続設定を保持し、
+旧実行環境をUpdaterのロールバック用に残します。先にMCPの`cli.project_save`で保存し、
+描画JOBと並行編集がないことを確認してください。
+
+0.1.2のcatalog URLは
+`https://github.com/flamoris-jp/flamoris-2D/releases/download/cli-v0.1.2/catalog.json`。
+固定0.1.1 catalogを登録している場合は0.1.2 catalogを追加してから更新します。
+
+アプリの更新後、DECO PONで同じリリースの`refresh-2d-lime-hub.py`を取得し、
+`sudo python3 refresh-2d-lime-hub.py --apply`を実行します。リリースのSHA256SUMSで
+検証した188ツールのdescriptorを、既存184ツールのスキーマを維持したまま登録し、
+Hubを再起動します。接続キーやNginx経路は変更しません。
+既存descriptorを退避し、実MCPのページング・スキーマ・mcp.contextが確認できない場合は
+以前のdescriptorへ戻します。Hub再起動中は他のHubクライアントも一時的に再接続します。
+
+成功後は188ツールと新しいruntimeIdを確認し、実素材の取り込み・描画・保存を確認します。
+以下の0.1.1手順は初回移行の履歴です。更新時に再インストールやcleanupを行いません。
+
 # LIME resident migration (CLI 0.1.1)
 
 Docker・Updater管理へ移行し、Kachinco CLIと同じ常駐・再接続方式に揃えます。
