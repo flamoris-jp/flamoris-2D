@@ -21,6 +21,7 @@ internal sealed class RenderJobs(NativeWorkspace workspace, string? root) : IAsy
     private RenderReceipt? current;
     private bool disposed;
     public Task Completion { get { lock (gate) return currentTask ?? Task.CompletedTask; } }
+    public void AssertIdle() { lock (gate) if (currentTask is { IsCompleted: false }) throw new CliException("render.busy"); }
     private static JsonElement Json(object value) => JsonSerializer.SerializeToElement(value, Program.JsonOptions);
 
     // Invoked only inside the workspace/Core commit lane.

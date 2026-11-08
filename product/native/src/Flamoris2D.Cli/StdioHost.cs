@@ -53,7 +53,7 @@ internal static class StdioHost
                             {
                                 if (!grant.IsActive) throw new McpFault(McpErrors.Unauthorized);
                                 var s = host.Snapshot;
-                                if (!s.Available || s.RuntimeId != grant.Snapshot.RuntimeId || s.DocumentToken != grant.Snapshot.DocumentToken)
+                                if (!s.Available || s.RuntimeId != grant.Snapshot.RuntimeId || !boundary.Options.ApplicationLifetime && s.DocumentToken != grant.Snapshot.DocumentToken)
                                     throw new McpFault(McpErrors.StaleSession);
                                 return JsonSerializer.SerializeToElement(new
                                 {

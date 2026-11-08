@@ -9,6 +9,8 @@ Start with the [product overview](../README.md) or the detailed
 
 ## Current design set
 
+- [`decisions/0015-resident-source-import.md`](decisions/0015-resident-source-import.md) — resident source upload/replacement candidate; LIME deployment deferred
+
 - [`headless-linux.md`](headless-linux.md) — Linux/LIME CLI, MCP, transparent PNG preview/export and service setup
 - [`decisions/0014-updater-resident-linux.md`](decisions/0014-updater-resident-linux.md) — current Docker/Updater residency, reconnect and migration boundary
 - [`reviews/lime-resident-acceptance-20261107.md`](reviews/lime-resident-acceptance-20261107.md) — real Hub attachment, proxy-route correction and cleanup acceptance

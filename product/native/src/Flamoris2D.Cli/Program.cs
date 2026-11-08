@@ -41,7 +41,7 @@ internal static class Program
         if (args.Length == 0 || args[0] is "--help" or "help")
         {
             Console.WriteLine("""
-                FLAMORIS 2D headless CLI 0.1.1 (.NET 10 / CPU offline)
+                FLAMORIS 2D headless CLI 0.1.2 (.NET 10 / CPU offline)
                 new --output NEW.fl2d
                 import INPUT --output NEW.fl2d
                 inspect INPUT
@@ -90,11 +90,12 @@ internal static class Program
         await using var workspace = new NativeWorkspace();
         using var files = new WorkspaceFiles(Optional("workspace"));
         await using var jobs = new RenderJobs(workspace, files.RenderRoot);
+        using var uploads = new SourceUploads();
         if (command == "mcp-catalog")
         {
-            using var catalogHost = new NativeMcpHost(workspace);
-            using var catalogBoundary = HeadlessMcp.Boundary(catalogHost, HeadlessMcp.ExtraTools(workspace, files, jobs));
-            var kinds = catalogHost.Tools().Concat(HeadlessMcp.ExtraTools(workspace, files, jobs)).ToDictionary(t => t.Name, t => t.Kind);
+            using var catalogHost = new NativeMcpHost(workspace, applicationLifetime: true);
+            using var catalogBoundary = HeadlessMcp.Boundary(catalogHost, HeadlessMcp.ExtraTools(workspace, files, jobs, uploads));
+            var kinds = catalogHost.Tools().Concat(HeadlessMcp.ExtraTools(workspace, files, jobs, uploads)).ToDictionary(t => t.Name, t => t.Kind);
             var descriptors = catalogBoundary.DescribeCatalog().EnumerateArray().Select(t => new
             {
                 name = t.GetProperty("name").GetString(), description = t.GetProperty("description").GetString(),
@@ -146,8 +147,8 @@ internal static class Program
                     Print(status); return status.GetProperty("state").GetString() == "succeeded" ? 0 : 1;
                 }
             case "mcp":
-                using (var host = new NativeMcpHost(workspace, permission: permission))
-                using (var boundary = HeadlessMcp.Boundary(host, HeadlessMcp.ExtraTools(workspace, files, jobs)))
+                using (var host = new NativeMcpHost(workspace, permission: permission, applicationLifetime: true))
+                using (var boundary = HeadlessMcp.Boundary(host, HeadlessMcp.ExtraTools(workspace, files, jobs, uploads)))
                     await HeadlessMcp.ServeAsync(host, boundary, permission, Optional("hub"), token);
                 return 0;
         }

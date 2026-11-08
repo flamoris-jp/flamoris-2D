@@ -59,8 +59,10 @@ jobs:
         run: |
           python -m pip install 'https://github.com/flamoris-jp/flamoris-updater/archive/93561720aed68e34ee3d4ffb9ccd81a9f035ab79.zip' python-dotenv pyyaml jsonschema
           sudo env GITHUB_ACTIONS=true "$(command -v python)" test/cli/verify-updater-catalog.py dist/release/catalog.json --install
-          cp deploy/linux/setup-2d-lime.py deploy/linux/migrate-resident.py dist/release/
-          (cd dist/release && sha256sum catalog.json candidate.json linux-amd64--image.tar setup-2d-lime.py migrate-resident.py > SHA256SUMS)
+          python3 -m unittest discover -s tests/deployment -p test_2d_refresh.py -v
+          cp deploy/linux/setup-2d-lime.py deploy/linux/migrate-resident.py deploy/linux/refresh-2d-lime-hub.py dist/release/
+          cp artifacts/linux/FLAMORIS-2D-linux-x64/flamoris2d-lime.json dist/release/
+          (cd dist/release && sha256sum catalog.json candidate.json linux-amd64--image.tar setup-2d-lime.py migrate-resident.py refresh-2d-lime-hub.py flamoris2d-lime.json > SHA256SUMS)
       - uses: actions/upload-artifact@v4
         with:
           name: flamoris2d-updater-candidate
